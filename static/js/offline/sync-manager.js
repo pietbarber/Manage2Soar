@@ -404,18 +404,25 @@ class M2SSyncManager {
     }
 
     /**
-     * Get CSRF token from cookie
+     * Get the masked CSRF token required by Django 5.x's X-CSRFToken header.
+     * The raw csrftoken cookie holds a 32-char unmasked secret; Django requires
+     * the 64-char masked form token, so reading the cookie directly causes a 403.
+     *
+     * Priority:
+     *   1. window.getCsrfToken() — page-level helper defined in logsheet_manage.html
+     *      which reads from the unconditional #csrf-anchor hidden form input.
+     *   2. Direct DOM query for [name=csrfmiddlewaretoken] — fallback for pages
+     *      that don't load the shared helper.
      * @returns {string}
      */
     getCSRFToken() {
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            if (name === 'csrftoken') {
-                return value;
-            }
+        // Prefer the shared page-level helper (defined in logsheet_manage.html)
+        if (typeof window.getCsrfToken === 'function') {
+            return window.getCsrfToken();
         }
-        return '';
+        // Direct DOM fallback for contexts where the helper isn't loaded
+        const domToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        return domToken ? domToken.value : '';
     }
 
     /**

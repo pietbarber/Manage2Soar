@@ -95,9 +95,14 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Issue #709: KioskAutoLoginMiddleware MUST run before CsrfViewMiddleware.
+    # login() calls rotate_token(), which replaces request.META["CSRF_COOKIE"].
+    # CsrfViewMiddleware.process_request (running after) overwrites that with
+    # the original cookie secret, so process_view validates against the correct
+    # token.  If Kiosk ran after CSRF, the rotated secret would cause a 403.
     "utils.middleware.KioskAutoLoginMiddleware",  # Issue #364: Kiosk auto-reauth
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -155,7 +160,8 @@ DATABASES = {
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
         "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "300")),
-        "CONN_HEALTH_CHECKS": True,  # Validate connection before reuse; prevents "connection already closed" after idle timeout
+        # Validate connection before reuse; prevents "connection already closed" after idle timeout
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
             "sslmode": os.getenv("DB_SSLMODE", "require"),
         },
@@ -540,6 +546,23 @@ LOGGING = {
         "duty_roster.generator": {
             "handlers": ["console"],
             "level": "WARNING",
+        },
+        # Log CSRF failures and security warnings to stdout in all environments
+        # (Django's default console handler is filtered to DEBUG=True only)
+        "django.security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        # Log CSRF failures (403) and other 4xx/5xx HTTP errors to stdout.
+        # Note: django.request only emits WARNING for 4xx and ERROR for 5xx;
+        # it does NOT log successful 2xx/3xx requests at any level.
+        # For access-log-level visibility, use gunicorn's --access-logfile -
+        # (already configured in Dockerfile).
+        "django.request": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
         },
     },
 }

@@ -8,6 +8,13 @@
 {% block content %}
 {% load member_extras %}
 
+<!-- Hidden form ensures getCsrfToken() can always read the CSRF token from the DOM
+     via document.querySelector('[name=csrfmiddlewaretoken]'), regardless of which
+     conditional blocks render on this page (Issue #709 - kiosk CSRF 403 fix). -->
+<form id="csrf-anchor" hidden>
+  {% csrf_token %}
+</form>
+
 <!-- Header Section -->
 <div class="management-header">
   <div class="header-content">
@@ -660,15 +667,15 @@ window.showOfflineToast = window.showOfflineToast || function(message) {
   toast.show();
 };
 
-// Helper to read CSRF token from DOM input or cookie fallback.
-// Using cookie fallback prevents 403 errors from causing spurious offline-pending state.
+// Helper to read CSRF token from the DOM hidden input rendered by {% csrf_token %}.
+// The unconditional <form id="csrf-anchor"> at the top of this page guarantees this
+// input is always present. We do NOT fall back to reading the raw csrftoken cookie
+// because the cookie holds the 32-char secret, while Django 5.x requires the masked
+// 64-char form token in the X-CSRFToken header — sending the raw secret causes 403.
 // Guard against overriding an existing definition (e.g. from kiosk_fingerprint.js).
 window.getCsrfToken = window.getCsrfToken || function() {
   const domToken = document.querySelector('[name=csrfmiddlewaretoken]');
-  if (domToken && domToken.value) return domToken.value;
-  // Cookie fallback (CSRF cookie is typically set by Django's CSRF middleware but may be absent)
-  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : '';
+  return domToken ? domToken.value : '';
 };
 
 // Shared function to attach NOW and 2K/3K button handlers to flight modal form

@@ -119,30 +119,19 @@ async function collectFingerprint() {
 }
 
 /**
- * Get CSRF token from cookie
- * @returns {string|null} CSRF token value
+ * Get the masked CSRF token required by Django 5.x's X-CSRFToken header.
+ *
+ * The raw csrftoken cookie holds a 32-char unmasked secret; Django 5.x
+ * requires the 64-char masked form token, so reading the cookie directly
+ * always produces a 403.  Reads the DOM hidden input rendered by
+ * {% csrf_token %} instead, which carries the correctly masked value.
+ *
+ * The templates that load this script (bind_device.html, verify_device.html)
+ * include a hidden #csrf-anchor form so this DOM query is always available.
+ *
+ * @returns {string} The masked CSRF token, or empty string if not found.
  */
 function getCsrfToken() {
-    const name = 'csrftoken';
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
+    const domInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    return domInput ? domInput.value : '';
 }
-
-/**
- * Retrieves the CSRF token from cookies.
- *
- * Reads the 'csrftoken' cookie value for inclusion in AJAX requests
- * requiring CSRF protection.
- *
- * @returns {string|null} The CSRF token value, or null if not found.
- */
