@@ -8,9 +8,9 @@
 {% block content %}
 {% load member_extras %}
 
-{# Hidden form ensures getCsrfToken() can always read the CSRF token from the DOM
-   via document.querySelector('[name=csrfmiddlewaretoken]'), regardless of which
-   conditional blocks render on this page (Issue #709 - kiosk CSRF 403 fix). #}
+<!-- Hidden form ensures getCsrfToken() can always read the CSRF token from the DOM
+     via document.querySelector('[name=csrfmiddlewaretoken]'), regardless of which
+     conditional blocks render on this page (Issue #709 - kiosk CSRF 403 fix). -->
 <form id="csrf-anchor" hidden>
   {% csrf_token %}
 </form>
