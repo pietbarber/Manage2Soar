@@ -132,23 +132,6 @@ async function collectFingerprint() {
  * @returns {string} The masked CSRF token, or empty string if not found.
  */
 function getCsrfToken() {
-    // Prefer the DOM masked token (rendered by {% csrf_token %})
     const domInput = document.querySelector('[name=csrfmiddlewaretoken]');
-    if (domInput) {
-        return domInput.value;
-    }
-    // Fallback: raw cookie (only safe if Django CSRF_USE_SESSIONS or pre-5.x)
-    const name = 'csrftoken';
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue || '';
+    return domInput ? domInput.value : '';
 }

@@ -16,7 +16,7 @@ every POST failed immediately.
 
 There are **two independent bugs** that combined into this failure.
 
-### Bug 1: KioskAutoLoginMiddleware rotates the CSRF token on every request
+### Bug 1: KioskAutoLoginMiddleware rotates the CSRF token on session expiry (re-authentication)
 
 Django's MIDDLEWARE list processes in order. In our configuration:
 
