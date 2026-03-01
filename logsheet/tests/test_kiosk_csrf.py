@@ -47,6 +47,8 @@ class KioskMiddlewareOrderTest(TestCase):
             kiosk_idx, "KioskAutoLoginMiddleware not found in MIDDLEWARE"
         )
         self.assertIsNotNone(csrf_idx, "CsrfViewMiddleware not found in MIDDLEWARE")
+        assert kiosk_idx is not None  # type narrowing for Pylance
+        assert csrf_idx is not None  # type narrowing for Pylance
         self.assertLess(
             kiosk_idx,
             csrf_idx,
@@ -78,6 +80,8 @@ class KioskMiddlewareOrderTest(TestCase):
         self.assertIsNotNone(
             kiosk_idx, "KioskAutoLoginMiddleware not found in MIDDLEWARE"
         )
+        assert auth_idx is not None  # type narrowing for Pylance
+        assert kiosk_idx is not None  # type narrowing for Pylance
         self.assertLess(
             auth_idx,
             kiosk_idx,
@@ -166,6 +170,7 @@ class KioskCsrfRegressionTest(TestCase):
 
         csrf_token = self._extract_csrf_token(response.content.decode())
         self.assertIsNotNone(csrf_token, "CSRF token not found in manage page HTML")
+        assert csrf_token is not None  # type narrowing for Pylance
 
         launch_url = reverse(
             "logsheet:launch_flight_now", kwargs={"flight_id": self.flight.pk}
@@ -204,6 +209,7 @@ class KioskCsrfRegressionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         csrf_token = self._extract_csrf_token(response.content.decode())
         self.assertIsNotNone(csrf_token, "CSRF token not found in manage page HTML")
+        assert csrf_token is not None  # type narrowing for Pylance
 
         # Step 2: Simulate session expiry by deleting the server-side session.
         # The client still has the (now-invalid) session cookie, so the next
@@ -246,6 +252,7 @@ class KioskCsrfRegressionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         csrf_token = self._extract_csrf_token(response.content.decode())
         self.assertIsNotNone(csrf_token)
+        assert csrf_token is not None  # type narrowing for Pylance
 
         client.session.flush()
 

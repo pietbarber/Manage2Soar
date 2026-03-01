@@ -123,10 +123,12 @@ token rotation pattern became clear in the logs immediately.
 
 ## Files Changed
 
-- `logsheet/views.py` — `@csrf_exempt` on all POST-handling views
-- `logsheet/templates/logsheet/logsheet_manage.html` — hidden csrf-anchor form; raw-cookie fallback removed
+- `manage2soar/settings.py` — MIDDLEWARE reordered: `AuthenticationMiddleware` + `KioskAutoLoginMiddleware` moved before `CsrfViewMiddleware`; `django.security` and `django.request` loggers added
+- `utils/middleware.py` — docstring updated to document required ordering constraint
+- `logsheet/views.py` — `@ensure_csrf_cookie` on `manage_logsheet` only (all `@csrf_exempt` decorators removed — full CSRF protection restored)
+- `logsheet/tests/test_kiosk_csrf.py` — regression tests: middleware order assertions + functional kiosk POST tests with `enforce_csrf_checks=True`
+- `logsheet/templates/logsheet/logsheet_manage.html` — hidden csrf-anchor form; raw-cookie fallback removed from `getCsrfToken()`
 - `static/js/offline/sync-manager.js` — raw-cookie CSRF fallback removed
 - `static/js/service-worker.js` — cache version bump v19 → v20
 - `manage2soar/urls.py` — service_worker_view reads from STATIC_ROOT first
 - `Dockerfile` — gunicorn access/error logging
-- `manage2soar/settings.py` — django.security and django.request loggers
