@@ -11,6 +11,7 @@ from icalendar import Calendar
 from duty_roster.models import DutyAssignment, DutySwapOffer, DutySwapRequest
 from duty_roster.utils.ics import (
     generate_duty_ics,
+    generate_ops_day_ics,
     generate_preop_ics,
     generate_swap_ics,
 )
@@ -424,3 +425,97 @@ class TestIcsAttachmentInEmails:
             if mock_email.attach.called:
                 attach_calls = mock_email.attach.call_args_list
                 assert any(".ics" in str(call) for call in attach_calls)
+
+
+@pytest.mark.django_db
+class TestGenerateOpsDayIcs:
+    """Unit tests for generate_ops_day_ics() (Issue #706).
+
+    Verifies: valid iCalendar output, stable UID (no timestamp), correct
+    summary, absence of crew-personalization fields, and domain-name fallback.
+    """
+
+    def test_generates_valid_ics(self, site_config):
+        """Output should be valid iCalendar bytes with the required structure."""
+        duty_date = date(2026, 7, 4)
+        ics_bytes = generate_ops_day_ics(duty_date)
+
+        assert isinstance(ics_bytes, bytes)
+        cal = Calendar.from_ical(ics_bytes)
+        assert cal is not None
+        assert b"BEGIN:VCALENDAR" in ics_bytes
+        assert b"BEGIN:VEVENT" in ics_bytes
+
+    def test_summary_contains_flying_day(self, site_config):
+        """SUMMARY should say 'Flying Day' and include the club name."""
+        duty_date = date(2026, 7, 4)
+        ics_bytes = generate_ops_day_ics(duty_date)
+
+        cal = Calendar.from_ical(ics_bytes)
+        events = [c for c in cal.walk() if c.name == "VEVENT"]
+        assert len(events) == 1
+        summary = str(events[0].get("summary"))
+        assert "Flying Day" in summary
+        assert "Test Soaring Club" in summary
+
+    def test_stable_uid_no_timestamp(self, site_config):
+        """UID must be deterministic (no timestamp) so re-sends update rather
+        than duplicate the calendar entry."""
+        duty_date = date(2026, 7, 4)
+
+        ics_bytes_1 = generate_ops_day_ics(duty_date)
+        ics_bytes_2 = generate_ops_day_ics(duty_date)
+
+        cal1 = Calendar.from_ical(ics_bytes_1)
+        cal2 = Calendar.from_ical(ics_bytes_2)
+
+        uid1 = str(next(c for c in cal1.walk() if c.name == "VEVENT").get("uid"))
+        uid2 = str(next(c for c in cal2.walk() if c.name == "VEVENT").get("uid"))
+        assert uid1 == uid2
+        assert "2026-07-04" in uid1
+        assert "flying-day" in uid1
+        assert "testsoaring.org" in uid1
+
+    def test_no_crew_personalization(self, site_config):
+        """ICS must not contain any crew-assignment personalization."""
+        duty_date = date(2026, 7, 4)
+        ics_text = generate_ops_day_ics(duty_date).decode("utf-8")
+
+        assert "Assigned to:" not in ics_text
+        # Should not contain a crew member name placeholder
+        assert "ATTENDEE" not in ics_text.upper().replace("ORGANIZER", "")
+
+    def test_domain_name_fallback_when_empty(self, db):
+        """UID should use the hardcoded fallback when domain_name is blank.
+
+        The model normally requires a non-blank domain_name, but the code
+        defensively handles an empty/falsy value. Patch objects.first() to
+        simulate a legacy or partially-migrated row with an empty string.
+        """
+        mock_config = MagicMock()
+        mock_config.club_name = "No Domain Club"
+        mock_config.domain_name = ""  # falsy — the edge case
+        mock_config.club_address = ""
+
+        with patch(
+            "duty_roster.utils.ics.SiteConfiguration.objects.first",
+            return_value=mock_config,
+        ):
+            duty_date = date(2026, 7, 4)
+            ics_text = generate_ops_day_ics(duty_date).decode("utf-8")
+
+        # UID must use the hardcoded fallback, not produce a bare '@'
+        assert "flying-day@manage2soar.com" in ics_text
+
+    def test_correct_date_span(self, site_config):
+        """Event should be an all-day event spanning exactly the duty date."""
+        duty_date = date(2026, 9, 21)
+        ics_bytes = generate_ops_day_ics(duty_date)
+
+        cal = Calendar.from_ical(ics_bytes)
+        event = next(c for c in cal.walk() if c.name == "VEVENT")
+
+        dtstart = event.get("dtstart").dt
+        dtend = event.get("dtend").dt
+        assert dtstart == duty_date
+        assert dtend == duty_date + timedelta(days=1)
