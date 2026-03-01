@@ -37,7 +37,10 @@ class KioskAutoLoginMiddleware:
     automatically log them in. This enables seamless re-authentication after session
     expiry without requiring user intervention.
 
-    This middleware should be placed AFTER AuthenticationMiddleware in MIDDLEWARE.
+    This middleware must be placed AFTER AuthenticationMiddleware and BEFORE
+    CsrfViewMiddleware in MIDDLEWARE.  See Issue #709 for the detailed explanation:
+    login() calls rotate_token() which would corrupt the CSRF secret used by
+    CsrfViewMiddleware.process_view if Kiosk ran after the CSRF middleware.
     """
 
     def __init__(self, get_response):

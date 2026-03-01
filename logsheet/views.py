@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_time
 from django.utils.timezone import now
-from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from duty_roster.models import GliderReservation
@@ -67,7 +67,6 @@ def get_validation_message(validation_error):
     return "Validation failed"
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def update_flight_split(request, flight_id):
@@ -108,7 +107,6 @@ def update_flight_split(request, flight_id):
 # --- LANDING NOW AJAX ENDPOINT ---
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def land_flight_now(request, flight_id):
@@ -162,7 +160,6 @@ def land_flight_now(request, flight_id):
         )
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def launch_flight_now(request, flight_id):
@@ -215,7 +212,6 @@ def launch_flight_now(request, flight_id):
 # Delete logsheet if empty (no flights, no closeout, no payments)
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def delete_logsheet(request, pk):
@@ -298,7 +294,6 @@ def index(request):
 #    HttpResponseRedirect: Redirects to the logsheet management page upon successful creation of a logsheet.
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @active_member_required
 def create_logsheet(request):
     if request.method == "POST":
@@ -339,7 +334,6 @@ def create_logsheet(request):
 #    HttpResponseRedirect: Redirects to the same page after performing actions like finalizing, revising, or adding flights.
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @ensure_csrf_cookie
 @active_member_required
 def manage_logsheet(request, pk):
@@ -745,7 +739,6 @@ def list_logsheets(request):
 #    HttpResponseRedirect: Redirects to the logsheet management page upon successful update of the flight.
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @active_member_required
 def edit_flight(request, logsheet_pk, flight_pk):
     logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
@@ -845,7 +838,6 @@ def edit_flight(request, logsheet_pk, flight_pk):
 #    HttpResponseRedirect: Redirects to the logsheet management page upon successful addition of the flight.
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @active_member_required
 def add_flight(request, logsheet_pk):
     logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
@@ -947,7 +939,6 @@ def add_flight(request, logsheet_pk):
 #    HttpResponseRedirect: Redirects to the logsheet management page after successful deletion.
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def delete_flight(request, logsheet_pk, flight_pk):
@@ -995,7 +986,6 @@ def delete_flight(request, logsheet_pk, flight_pk):
 #################################################
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @active_member_required
 def add_member_charge(request, logsheet_pk):
     """Add a miscellaneous charge to a logsheet."""
@@ -1056,7 +1046,6 @@ def add_member_charge(request, logsheet_pk):
 #################################################
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def delete_member_charge(request, logsheet_pk, charge_pk):
@@ -1078,7 +1067,6 @@ def delete_member_charge(request, logsheet_pk, charge_pk):
     return redirect("logsheet:manage_logsheet_finances", pk=logsheet_pk)
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @active_member_required
 def manage_logsheet_finances(request, pk):
     # For split modal: all members, grouped by active/non-active
@@ -1430,7 +1418,6 @@ def manage_logsheet_finances(request, pk):
 #################################################
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @active_member_required
 def edit_logsheet_closeout(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
@@ -1572,7 +1559,6 @@ def edit_logsheet_closeout(request, pk):
     )
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @active_member_required
 def add_towplane_closeout(request, pk):
     """Add a towplane closeout manually for rental or other non-towing usage."""
@@ -1685,7 +1671,6 @@ def view_logsheet_closeout(request, pk):
 #################################################
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def add_maintenance_issue(request, logsheet_id):
@@ -1754,7 +1739,6 @@ def add_maintenance_issue(request, logsheet_id):
 #################################################
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def add_maintenance_issue_standalone(request):
@@ -2036,7 +2020,6 @@ def resolve_maintenance_modal(request, issue_id):
 #################################################
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def resolve_maintenance_issue(request, issue_id):
@@ -2112,7 +2095,6 @@ def maintenance_resolve_modal(request, issue_id):
 #################################################
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def maintenance_mark_resolved(request, issue_id):
@@ -2236,7 +2218,6 @@ def maintenance_deadlines(request):
 #################################################
 
 
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
 @require_POST
 @active_member_required
 def update_maintenance_deadline(request, deadline_id):

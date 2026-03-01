@@ -61,49 +61,35 @@ serving `// Service worker file not found` as the service worker, breaking all S
 
 ## Solution
 
-### Primary fix: @csrf_exempt on all logsheet POST endpoints
+### Primary fix: Reorder MIDDLEWARE so KioskAutoLoginMiddleware runs before CsrfViewMiddleware
 
-Since `CsrfViewMiddleware` and `KioskAutoLoginMiddleware` run in conflicting order and cannot be
-reordered without risk, the correct fix is to exempt all logsheet POST-handling views from CSRF
-token validation.
+The root cause is a middleware ordering problem. The fix moves `AuthenticationMiddleware` and
+`KioskAutoLoginMiddleware` above `CsrfViewMiddleware` in `MIDDLEWARE`:
 
-This is **safe** because two complementary protections are already in place:
-- `@active_member_required` enforces Django session authentication on every request.
-- `CSRF_COOKIE_SAMESITE=Lax` prevents cross-origin POSTs at the browser level.
-
-CSRF token checking is redundant here and actively harmful in the kiosk context.
-
-Views that received `@csrf_exempt` in `logsheet/views.py`:
-
-| View | Type |
-|---|---|
-| `update_flight_split` | AJAX POST — split edit modal on finances page |
-| `land_flight_now` | AJAX POST — Land button |
-| `launch_flight_now` | AJAX POST — Launch button |
-| `delete_logsheet` | Form POST |
-| `delete_flight` | Form POST |
-| `add_member_charge` | Form POST |
-| `delete_member_charge` | Form POST |
-| `manage_logsheet_finances` | Form POST — finances page, posts to itself |
-| `manage_logsheet` | Form POST — finalize button, posts to itself |
-| `create_logsheet` | Form POST |
-| `edit_flight` | Form POST |
-| `add_flight` | Form POST |
-| `edit_logsheet_closeout` | Form POST — closeout page |
-| `add_towplane_closeout` | Form POST |
-| `add_maintenance_issue` | Form POST |
-| `add_maintenance_issue_standalone` | Form POST |
-| `resolve_maintenance_issue` | Form POST |
-| `maintenance_mark_resolved` | Form POST |
-| `update_maintenance_deadline` | Form POST |
-
-Decorator pattern used consistently:
 ```python
-@csrf_exempt  # Session + SameSite=Lax protects this; kiosk token rotation fights CSRF middleware
-@require_POST  # (where applicable)
-@active_member_required
-def view_name(request, ...):
+# Before fix (broken):
+"django.middleware.csrf.CsrfViewMiddleware",    # position 5 — stores old secret in META
+"django.contrib.auth.middleware.AuthenticationMiddleware",
+"utils.middleware.KioskAutoLoginMiddleware",    # position 7 — rotate_token() overwrites META
+
+# After fix (correct):
+"django.contrib.auth.middleware.AuthenticationMiddleware",
+"utils.middleware.KioskAutoLoginMiddleware",    # rotate_token() sets META = new_secret
+"django.middleware.csrf.CsrfViewMiddleware",    # process_request OVERWRITES META with cookie value -> validates OK
 ```
+
+**Why this works:** `CsrfViewMiddleware.process_request` reads the CSRF secret from
+`request.COOKIES` and stores it in `request.META["CSRF_COOKIE"]`. If KioskAutoLoginMiddleware
+has already run `rotate_token()` (writing a new random string to META), `process_request`
+overwrites it with the stable cookie value — exactly what `process_view` needs to validate
+the POST token against.
+
+No `@csrf_exempt` on any view. Full CSRF protection is preserved.
+
+Regression tests in `logsheet/tests/test_kiosk_csrf.py` verify:
+1. The middleware ordering is structurally correct.
+2. Kiosk POSTs succeed with CSRF enforcement active in both active-session and
+   post-session-expiry scenarios.
 
 ### Secondary fix: Remove raw-cookie CSRF fallback
 

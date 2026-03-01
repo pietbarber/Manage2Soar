@@ -95,9 +95,14 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Issue #709: KioskAutoLoginMiddleware MUST run before CsrfViewMiddleware.
+    # login() calls rotate_token(), which replaces request.META["CSRF_COOKIE"].
+    # CsrfViewMiddleware.process_request (running after) overwrites that with
+    # the original cookie secret, so process_view validates against the correct
+    # token.  If Kiosk ran after CSRF, the rotated secret would cause a 403.
     "utils.middleware.KioskAutoLoginMiddleware",  # Issue #364: Kiosk auto-reauth
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
