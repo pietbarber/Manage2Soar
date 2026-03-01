@@ -25,16 +25,19 @@ Position 5: CsrfViewMiddleware          ← validates CSRF token
 Position 7: KioskAutoLoginMiddleware    ← re-authenticates kiosk session
 ```
 
-`KioskAutoLoginMiddleware` calls `django.contrib.auth.login()` on every request to keep the
-kiosk session alive. `login()` internally calls `rotate_token()`, which generates a **new** CSRF
-secret and invalidates any token that was embedded in a page rendered before this request.
+`KioskAutoLoginMiddleware` calls `django.contrib.auth.login()` **only when the kiosk session has
+expired** (`not request.user.is_authenticated`). `login()` internally calls `rotate_token()`,
+which overwrites `request.META["CSRF_COOKIE"]` with a new secret mid-request.
 
 The sequence that caused every failure:
 
-1. Browser GETs `/logsheet/manage/69/` — Django renders page, bakes `{% csrf_token %}` into HTML.
-2. **KioskAutoLoginMiddleware runs**, rotates the CSRF secret. The token in the HTML is now stale.
-3. User clicks a button — browser POSTs with the stale token.
-4. `CsrfViewMiddleware` runs first (position 5), compares stale token against new secret → **403**.
+1. Browser GETs `/logsheet/manage/69/` — user is **already authenticated**; KioskAutoLoginMiddleware
+   **skips** `login()`. Django renders the page, baking `{% csrf_token %}` (derived from secret S1) into HTML.
+2. The kiosk session expires server-side (short `SESSION_COOKIE_AGE`).
+3. User clicks a button — browser POSTs with the CSRF token from step 1.
+4. `CsrfViewMiddleware.process_request` runs (position 5) — reads the stable cookie, sets `META["CSRF_COOKIE"] = S1`.
+5. `KioskAutoLoginMiddleware` runs (position 7) — user is no longer authenticated → calls `login()` → `rotate_token()` **overwrites** `META["CSRF_COOKIE"]` with a new secret S2.
+6. `CsrfViewMiddleware.process_view` compares the submitted token (masked S1) against `META["CSRF_COOKIE"]` (now S2) → **403**.
 
 Confirmed in kubectl pod logs:
 ```
