@@ -38,8 +38,12 @@ def service_worker_view(request):
     import re
     from datetime import date
 
-    # Compute service worker path once
-    sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
+    # Resolve service worker path: prefer STATIC_ROOT (populated by collectstatic in
+    # production) and fall back to the STATICFILES_DIRS source directory for local dev
+    # where collectstatic may not have been run yet.
+    sw_path = os.path.join(settings.STATIC_ROOT, "js", "service-worker.js")
+    if not os.path.exists(sw_path):
+        sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
 
     # Generate a cache version hash from:
     # 1. BUILD_HASH env var (set during Docker build)
