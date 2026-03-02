@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load static %}
+{% load member_extras %}
+{% load logsheet_tags %}
 
 {% block head_extra %}
 <link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
 {% endblock %}
 
 {% block content %}
-{% load member_extras %}
-{% load logsheet_tags %}
 
 <!-- Hidden form ensures getCsrfToken() can always read the CSRF token from the DOM
      via document.querySelector('[name=csrfmiddlewaretoken]'), regardless of which
