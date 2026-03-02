@@ -244,6 +244,32 @@
       </div>
     </div>
 
+    <!-- Search and Filter -->
+    <div class="flight-search">
+      <form method="get" class="search-form">
+        <div class="input-group">
+          <span class="input-group-text">
+            <i class="bi bi-search"></i>
+          </span>
+          <input type="text"
+                 name="q"
+                 class="form-control"
+                 placeholder="Search by pilot or instructor name..."
+                 value="{{ query }}"
+                 aria-label="Search flights">
+          <button type="submit" class="btn btn-outline-primary">
+            Filter
+          </button>
+          {% if query %}
+            <a href="?" class="btn btn-outline-secondary">
+              <i class="bi bi-x"></i>
+              Clear
+            </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+
     <!-- Modern Bootstrap5 Flights Table -->
     <div class="flights-table-container">
       <div class="table-responsive">
@@ -494,32 +520,6 @@
           </tbody>
         </table>
       </div>
-    </div>
-
-    <!-- Search and Filter -->
-    <div class="flight-search">
-      <form method="get" class="search-form">
-        <div class="input-group">
-          <span class="input-group-text">
-            <i class="bi bi-search"></i>
-          </span>
-          <input type="text"
-                 name="q"
-                 class="form-control"
-                 placeholder="Search by pilot or instructor name..."
-                 value="{{ query }}"
-                 aria-label="Search flights">
-          <button type="submit" class="btn btn-outline-primary">
-            Filter
-          </button>
-          {% if query %}
-            <a href="?" class="btn btn-outline-secondary">
-              <i class="bi bi-x"></i>
-              Clear
-            </a>
-          {% endif %}
-        </div>
-      </form>
     </div>
 
   {% else %}
