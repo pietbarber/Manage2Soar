@@ -26,15 +26,62 @@
       </div>
     </div>
 
-    <!-- Messages -->
+    <!-- Messages (inline, for desktop / keyboard users scrolled to top) -->
     {% if messages %}
-      {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-          <i class="bi bi-info-circle me-2"></i>
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      {% endfor %}
+      <div id="messages-inline">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {% if message.tags == 'danger' %}
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            {% elif message.tags == 'success' %}
+              <i class="bi bi-check-circle-fill me-2"></i>
+            {% elif message.tags == 'warning' %}
+              <i class="bi bi-exclamation-circle-fill me-2"></i>
+            {% else %}
+              <i class="bi bi-info-circle-fill me-2"></i>
+            {% endif %}
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+
+      <!-- Fixed-top toast: always visible on mobile regardless of scroll position -->
+      <div class="position-fixed top-0 start-50 translate-middle-x pt-2 px-2"
+           style="z-index: 1090; width: min(100%, 500px);" id="messages-toast-container">
+        {% for message in messages %}
+          <div class="toast align-items-center text-bg-{{ message.tags }} border-0 mb-2 show"
+               role="alert" aria-live="assertive" aria-atomic="true"
+               {% if message.tags == 'success' or message.tags == 'info' %}data-bs-delay="4000" data-bs-autohide="true"{% else %}data-bs-autohide="false"{% endif %}>
+            <div class="d-flex">
+              <div class="toast-body fw-semibold">
+                {% if message.tags == 'danger' %}
+                  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                {% elif message.tags == 'success' %}
+                  <i class="bi bi-check-circle-fill me-2"></i>
+                {% elif message.tags == 'warning' %}
+                  <i class="bi bi-exclamation-circle-fill me-2"></i>
+                {% else %}
+                  <i class="bi bi-info-circle-fill me-2"></i>
+                {% endif %}
+                {{ message }}
+              </div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                      data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <script>
+        // Initialize Bootstrap toasts (they render as .show but need JS init for autohide)
+        document.addEventListener('DOMContentLoaded', function () {
+          document.querySelectorAll('#messages-toast-container .toast').forEach(function (el) {
+            var toast = new bootstrap.Toast(el);
+            toast.show();
+          });
+        });
+      </script>
     {% endif %}
 
     <!-- Navigation Actions -->
