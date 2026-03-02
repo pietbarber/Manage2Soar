@@ -444,7 +444,7 @@
                   </div>
                 </td>
 
-                <td class="duration-col d-none d-sm-table-cell" data-sort="{% if flight.duration %}{{ flight.duration|time:'Hi' }}{% elif flight.launch_time and not flight.landing_time %}9999{% else %}0{% endif %}">
+                <td class="duration-col d-none d-sm-table-cell{% if not flight.launch_time and not flight.landing_time %} no-duration{% endif %}" data-sort="{% if flight.duration %}{{ flight.duration|time:'Hi' }}{% elif flight.launch_time and not flight.landing_time %}9999{% else %}0{% endif %}">
                   {% if not flight.landing_time and flight.launch_time %}
                     <span class="live-duration" data-launch="{{ logsheet.log_date|date:'Y-m-d' }}T{{ flight.launch_time|time:'H:i:s' }}">
                       <i class="bi bi-stopwatch text-primary me-1"></i>
@@ -556,7 +556,7 @@
               </tr>
             {% empty %}
               <tr>
-                <td colspan="8" class="text-center py-4">
+                <td colspan="{% if logsheet.finalized %}9{% else %}8{% endif %}" class="text-center py-4">
                   <div class="empty-state">
                     <i class="bi bi-airplane" style="font-size: 2rem; color: var(--bs-gray-400);"></i>
                     <div class="mt-2 text-muted">No flights recorded</div>

@@ -536,7 +536,7 @@
 @media (max-width: 430px) {
     .container,
     .container-sm {
-        --bs-gutter-x: 0.5rem;
+        --bs-gutter-x: 1rem;    /* 1rem × 0.5 = 0.5rem = 8px per side */
         padding-left: calc(var(--bs-gutter-x) * 0.5) !important;
         padding-right: calc(var(--bs-gutter-x) * 0.5) !important;
     }
@@ -612,6 +612,13 @@
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         max-width: 100%;
+    }
+    /* Undo: tables already wrapped in .table-responsive should scroll
+       via the wrapper, not via display:block on the table itself */
+    .container .table-responsive table:not(.flights-table):not(.training-grid) {
+        display: table;
+        overflow-x: unset;
+        max-width: unset;
     }
 }
 

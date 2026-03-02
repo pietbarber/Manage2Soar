@@ -1328,7 +1328,7 @@
       margin-top: 0.5rem;
   }
 
-  .table-responsive {
+  .flights-table-container .table-responsive {
       overflow: visible !important;
   }
 
@@ -1337,8 +1337,18 @@
       font-size: 0.95rem;
   }
 
+  /* Hide table headers visually but keep them in accessibility tree
+     so screen readers can still announce column names for each cell */
   .flights-table thead {
-      display: none !important;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
   }
 
   .flights-table tbody {
@@ -1480,6 +1490,24 @@
 
   /* Hide the time row entirely when no times exist yet */
   .flights-table tbody tr.flight-row td.time-col.no-time {
+      display: none !important;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     ROW 3b: Duration — shown directly under the time row
+     ════════════════════════════════════════════════════════════════ */
+  .flights-table tbody tr.flight-row td.duration-col {
+      display: block !important;
+      order: 7;
+      flex: 0 0 100%;
+      padding-top: 0.1rem !important;
+      padding-bottom: 0.4rem !important;
+      font-size: 0.85rem;
+      color: #6c757d;
+  }
+
+  /* Hide duration when no times exist (unflown flight) */
+  .flights-table tbody tr.flight-row td.duration-col.no-duration {
       display: none !important;
   }
 
