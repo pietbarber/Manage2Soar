@@ -29,7 +29,7 @@ from duty_roster.models import (
     InstructionSlot,
     OpsIntent,
 )
-from duty_roster.utils.ics import generate_preop_ics
+from duty_roster.utils.ics import generate_ops_day_ics, generate_preop_ics
 from logsheet.models import MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
@@ -123,9 +123,18 @@ class Command(BaseCommand):
         # Remove duplicates and any emails already in crew_emails
         cc_emails = list(set(cc_emails) - set(crew_emails))
 
-        # Render templates
+        # Render templates — two variants: crew (default) and participant.
+        # Participant emails use the same template but with is_participant=True
+        # so the greeting and reminder wording is appropriate for non-crew members.
         html_message = render_to_string("duty_roster/emails/preop_email.html", context)
         text_message = render_to_string("duty_roster/emails/preop_email.txt", context)
+        participant_context = {**context, "is_participant": True}
+        participant_html_message = render_to_string(
+            "duty_roster/emails/preop_email.html", participant_context
+        )
+        participant_text_message = render_to_string(
+            "duty_roster/emails/preop_email.txt", participant_context
+        )
 
         # Send email - use noreply@ with domain extracted from DEFAULT_FROM_EMAIL
         default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
@@ -155,27 +164,21 @@ class Command(BaseCommand):
                 role_slug = (role_title or "Crew").lower().replace(" ", "-")
                 ics_filename = f"duty-{target_date.isoformat()}-{role_slug}.ics"
 
-                # Create email with attachment
+                # Create email with attachment — no CC here; participants
+                # receive their own dedicated email (see below).
                 email = EmailMultiAlternatives(
                     subject=subject,
                     body=text_message,
                     from_email=from_email,
                     to=[member.email],
-                    cc=cc_emails if cc_emails else None,
                 )
                 email.attach_alternative(html_message, "text/html")
                 email.attach(ics_filename, ics_content, "text/calendar")
 
                 # Apply dev mode if enabled
                 if dev_mode and redirect_list:
-                    original_to = ", ".join(email.to)
-                    original_cc = ", ".join(email.cc) if email.cc else ""
-                    recipients_info = f"TO: {original_to}"
-                    if original_cc:
-                        recipients_info += f", CC: {original_cc}"
-                    email.subject = f"[DEV MODE] {subject} ({recipients_info})"
+                    email.subject = f"[DEV MODE] {subject} (TO: {member.email})"
                     email.to = redirect_list
-                    email.cc = []
                 elif dev_mode and not redirect_list:
                     self.stderr.write(
                         self.style.ERROR(
@@ -190,9 +193,45 @@ class Command(BaseCommand):
                         f"Email sent to {member.email} ({role_title}) with ICS attachment"
                     )
                 )
-                # Only CC on the first email to avoid spamming students/ops intent members
-                # with duplicate emails. They only need to see the duty roster once.
-                cc_emails = []
+
+            # Send a dedicated email to each CC recipient (students, ops intent
+            # members) with a generic "Flying Day" ICS rather than a crew-role
+            # ICS that would show someone else's name.
+            ics_flying_day = generate_ops_day_ics(target_date)
+            ics_flying_filename = f"flying-day-{target_date.isoformat()}.ics"
+            for participant_email in cc_emails:
+                participant_email_obj = EmailMultiAlternatives(
+                    subject=subject,
+                    body=participant_text_message,
+                    from_email=from_email,
+                    to=[participant_email],
+                )
+                participant_email_obj.attach_alternative(
+                    participant_html_message, "text/html"
+                )
+                participant_email_obj.attach(
+                    ics_flying_filename, ics_flying_day, "text/calendar"
+                )
+
+                if dev_mode and redirect_list:
+                    participant_email_obj.subject = (
+                        f"[DEV MODE] {subject} (TO: {participant_email})"
+                    )
+                    participant_email_obj.to = redirect_list
+                elif dev_mode and not redirect_list:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"DEV MODE is enabled but redirect_list is empty. Skipping participant email to {participant_email} for safety."
+                        )
+                    )
+                    continue
+
+                participant_email_obj.send(fail_silently=False)
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Email sent to participant {participant_email} with flying day ICS"
+                    )
+                )
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"Failed to send email: {e}"))
