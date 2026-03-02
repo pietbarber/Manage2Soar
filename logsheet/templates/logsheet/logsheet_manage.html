@@ -381,7 +381,7 @@
                   </div>
                 </td>
 
-                <td class="time-col" data-sort="{% if flight.launch_time %}{{ flight.launch_time|time:"Hi" }}{% else %}0000{% endif %}">
+                <td class="time-col{% if not flight.launch_time and not flight.landing_time %} no-time{% endif %}" data-sort="{% if flight.launch_time %}{{ flight.launch_time|time:"Hi" }}{% else %}0000{% endif %}">
                   <div class="time-display">
                     {% if flight.launch_time %}
                       <span class="launch-time">{{ flight.launch_time|time:"H:i" }}</span>
