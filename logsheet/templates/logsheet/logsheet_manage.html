@@ -559,6 +559,21 @@
         </a>
       {% endif %}
 
+      {% if not logsheet.finalized and visiting_pilot_config and visiting_pilot_config.visiting_pilot_enabled %}
+        <button type="button"
+                class="action-card action-card-view online-only-btn text-start"
+                data-bs-toggle="modal"
+                data-bs-target="#visitingPilotModal">
+          <div class="action-icon">
+            <i class="bi bi-person-plus"></i>
+          </div>
+          <div class="action-content">
+            <h6 class="action-title">Register Visiting Pilot</h6>
+            <p class="action-description">Add a guest pilot for today</p>
+          </div>
+        </button>
+      {% endif %}
+
       {% if not logsheet.finalized %}
         <form method="post" class="action-form" onsubmit="return confirmFinalize();">
           {% csrf_token %}
@@ -593,21 +608,6 @@
             </div>
           </button>
         </form>
-      {% endif %}
-
-      {% if not logsheet.finalized and visiting_pilot_config and visiting_pilot_config.visiting_pilot_enabled %}
-        <button type="button"
-                class="action-card action-card-view online-only-btn text-start"
-                data-bs-toggle="modal"
-                data-bs-target="#visitingPilotModal">
-          <div class="action-icon">
-            <i class="bi bi-person-plus"></i>
-          </div>
-          <div class="action-content">
-            <h6 class="action-title">Register Visiting Pilot</h6>
-            <p class="action-description">Add a guest pilot for today</p>
-          </div>
-        </button>
       {% endif %}
     </div>
   </div>
