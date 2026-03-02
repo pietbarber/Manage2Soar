@@ -16,6 +16,35 @@ from siteconfig.models import SiteConfiguration
 from utils.url_helpers import build_absolute_url
 
 
+def _build_club_location(config, fallback):
+    """Return a formatted location string from SiteConfiguration address fields.
+
+    SiteConfiguration does not have a single ``club_address`` field; the address
+    is split across ``club_address_line1``, ``club_address_line2``, ``club_city``,
+    ``club_state``, ``club_zip_code``, and ``club_country``.  Falls back to
+    *fallback* (typically ``club_name``) when no address fields are populated.
+    """
+    if not config:
+        return fallback
+    parts = []
+    line1 = getattr(config, "club_address_line1", None)
+    line2 = getattr(config, "club_address_line2", None)
+    city = getattr(config, "club_city", None)
+    state = getattr(config, "club_state", None)
+    zip_code = getattr(config, "club_zip_code", None)
+    country = getattr(config, "club_country", None)
+    if line1:
+        parts.append(line1)
+    if line2:
+        parts.append(line2)
+    city_state_zip = " ".join(p for p in [city, state, zip_code] if p)
+    if city_state_zip:
+        parts.append(city_state_zip)
+    if country:
+        parts.append(country)
+    return ", ".join(parts) if parts else fallback
+
+
 def generate_duty_ics(
     duty_date,
     role_title,
@@ -76,10 +105,8 @@ def generate_duty_ics(
     # Location
     if location:
         event.add("location", location)
-    elif config and hasattr(config, "club_address") and config.club_address:
-        event.add("location", config.club_address)
     else:
-        event.add("location", club_name)
+        event.add("location", _build_club_location(config, club_name))
 
     # Unique ID for the event
     now = timezone.now()
@@ -195,11 +222,7 @@ def generate_swap_ics(
         events_to_add.append(event)
 
     # Add location to all events
-    location = None
-    if config and hasattr(config, "club_address") and config.club_address:
-        location = config.club_address
-    else:
-        location = club_name
+    location = _build_club_location(config, club_name)
 
     # Return None if no events (e.g., requester in cover scenario has no new duty)
     if not events_to_add:
@@ -271,10 +294,7 @@ def generate_ops_day_ics(duty_date):
     event.add("dtstart", duty_date)
     event.add("dtend", duty_date + timedelta(days=1))
 
-    if config and hasattr(config, "club_address") and config.club_address:
-        event.add("location", config.club_address)
-    else:
-        event.add("location", club_name)
+    event.add("location", _build_club_location(config, club_name))
 
     now_dt = timezone.now()
     # Use a stable UID (no timestamp) so that re-sending the same flying-day

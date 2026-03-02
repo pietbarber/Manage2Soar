@@ -494,7 +494,13 @@ class TestGenerateOpsDayIcs:
         mock_config = MagicMock()
         mock_config.club_name = "No Domain Club"
         mock_config.domain_name = ""  # falsy — the edge case
-        mock_config.club_address = ""
+        # Explicitly blank address fields so _build_club_location falls back cleanly
+        mock_config.club_address_line1 = ""
+        mock_config.club_address_line2 = ""
+        mock_config.club_city = ""
+        mock_config.club_state = ""
+        mock_config.club_zip_code = ""
+        mock_config.club_country = ""
 
         with patch(
             "duty_roster.utils.ics.SiteConfiguration.objects.first",
