@@ -1202,12 +1202,23 @@
     min-width: 160px;
 }
 
+.pilot-info strong {
+    font-size: 1rem;
+}
+
+.pilot-info small {
+    font-size: 0.85rem;
+}
+
 .instructor-col {
     min-width: 160px;
 }
 
 .glider-col {
-    min-width: 120px;
+    min-width: 80px;
+    max-width: 110px;
+    white-space: normal;
+    word-break: break-word;
 }
 
 .towplane-col {

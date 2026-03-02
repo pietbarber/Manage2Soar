@@ -253,11 +253,11 @@
               <th class="status-col" data-sort-method="status">Status</th>
               <th class="actions-col no-sort">Actions</th>
               <th class="time-col" data-sort-method="time">Time</th>
+              <th class="duration-col d-none d-sm-table-cell" data-sort-method="duration">Duration</th>
               <th class="pilot-col" data-sort-method="string">Pilot / Instructor</th>
               <th class="glider-col" data-sort-method="string">Glider</th>
               <th class="towplane-col d-none d-lg-table-cell" data-sort-method="string">Towplane</th>
               <th class="altitude-col d-none d-lg-table-cell" data-sort-method="number">Release Alt</th>
-              <th class="duration-col d-none d-sm-table-cell" data-sort-method="duration">Duration</th>
             </tr>
           </thead>
           <tbody>
@@ -363,6 +363,25 @@
                   </div>
                 </td>
 
+                <td class="duration-col d-none d-sm-table-cell" data-sort="{% if flight.duration %}{{ flight.duration|time:'Hi' }}{% elif flight.launch_time and not flight.landing_time %}9999{% else %}0{% endif %}">
+                  {% if not flight.landing_time and flight.launch_time %}
+                    <span class="live-duration" data-launch="{{ logsheet.log_date|date:'Y-m-d' }}T{{ flight.launch_time|time:'H:i:s' }}">
+                      <i class="bi bi-stopwatch text-primary me-1"></i>
+                      <span class="duration-text">--:--</span>
+                    </span>
+                  {% elif flight.duration %}
+                    <span class="flight-duration">
+                      <i class="bi bi-stopwatch text-muted me-1"></i>
+                      {{ flight.duration }}
+                    </span>
+                  {% else %}
+                    <span class="flight-duration text-muted">
+                      <i class="bi bi-stopwatch me-1"></i>
+                      --:--
+                    </span>
+                  {% endif %}
+                </td>
+
                 <td class="pilot-col" data-sort="{{ flight.pilot|full_display_name }}">
                   <div class="pilot-info">
                     <strong>{{ flight.pilot|full_display_name }}</strong>
@@ -437,25 +456,6 @@
                     <span class="missing-data-badge" title="Missing: {{ flight.get_missing_fields|join:', ' }}">
                       <i class="bi bi-exclamation-triangle text-warning"></i>
                       Missing
-                    </span>
-                  {% endif %}
-                </td>
-
-                <td class="duration-col d-none d-sm-table-cell" data-sort="{% if flight.duration %}{{ flight.duration|time:'Hi' }}{% elif flight.launch_time and not flight.landing_time %}9999{% else %}0{% endif %}">
-                  {% if not flight.landing_time and flight.launch_time %}
-                    <span class="live-duration" data-launch="{{ logsheet.log_date|date:'Y-m-d' }}T{{ flight.launch_time|time:'H:i:s' }}">
-                      <i class="bi bi-stopwatch text-primary me-1"></i>
-                      <span class="duration-text">--:--</span>
-                    </span>
-                  {% elif flight.duration %}
-                    <span class="flight-duration">
-                      <i class="bi bi-stopwatch text-muted me-1"></i>
-                      {{ flight.duration }}
-                    </span>
-                  {% else %}
-                    <span class="flight-duration text-muted">
-                      <i class="bi bi-stopwatch me-1"></i>
-                      --:--
                     </span>
                   {% endif %}
                 </td>
