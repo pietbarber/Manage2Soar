@@ -40,7 +40,12 @@ def _build_club_location(config, fallback):
     city_state_zip = " ".join(p for p in [city, state, zip_code] if p)
     if city_state_zip:
         parts.append(city_state_zip)
-    if country:
+    # Only include country when other address components are present.
+    # SiteConfiguration.club_country defaults to "USA", so appending it
+    # unconditionally would produce a location of just "USA" for a config with
+    # no other address fields set — which is less useful than falling back to
+    # club_name.
+    if country and parts:
         parts.append(country)
     return ", ".join(parts) if parts else fallback
 

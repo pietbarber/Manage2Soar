@@ -10,6 +10,7 @@ from icalendar import Calendar
 
 from duty_roster.models import DutyAssignment, DutySwapOffer, DutySwapRequest
 from duty_roster.utils.ics import (
+    _build_club_location,
     generate_duty_ics,
     generate_ops_day_ics,
     generate_preop_ics,
@@ -524,3 +525,69 @@ class TestGenerateOpsDayIcs:
         dtend = event.get("dtend").dt
         assert dtstart == duty_date
         assert dtend == duty_date + timedelta(days=1)
+
+
+class TestBuildClubLocation:
+    """Unit tests for the _build_club_location() helper."""
+
+    def _mock_config(self, **kwargs):
+        """Return a MagicMock whose address attributes are explicitly set."""
+        cfg = MagicMock()
+        # Default every address field to empty string so auto-created
+        # MagicMock attributes don't masquerade as truthy values.
+        cfg.club_address_line1 = kwargs.get("club_address_line1", "")
+        cfg.club_address_line2 = kwargs.get("club_address_line2", "")
+        cfg.club_city = kwargs.get("club_city", "")
+        cfg.club_state = kwargs.get("club_state", "")
+        cfg.club_zip_code = kwargs.get("club_zip_code", "")
+        cfg.club_country = kwargs.get("club_country", "")
+        return cfg
+
+    def test_returns_fallback_when_config_is_none(self):
+        """None config should immediately return the fallback."""
+        assert _build_club_location(None, "My Club") == "My Club"
+
+    def test_returns_fallback_when_all_fields_empty(self):
+        """Config with every address field empty should return the fallback."""
+        cfg = self._mock_config()
+        assert _build_club_location(cfg, "My Club") == "My Club"
+
+    def test_returns_fallback_when_only_country_set(self):
+        """Country-only config (e.g. the default 'USA') must not become the
+        location — it should fall back to club_name instead."""
+        cfg = self._mock_config(club_country="USA")
+        assert _build_club_location(cfg, "My Club") == "My Club"
+
+    def test_country_included_when_other_fields_present(self):
+        """Country is appended when at least one other address component exists."""
+        cfg = self._mock_config(
+            club_city="Warrenton",
+            club_state="VA",
+            club_country="USA",
+        )
+        result = _build_club_location(cfg, "My Club")
+        assert "USA" in result
+        assert "Warrenton" in result
+
+    def test_full_address_formatted_correctly(self):
+        """All address fields populated produces a comma-separated string."""
+        cfg = self._mock_config(
+            club_address_line1="123 Glider Lane",
+            club_address_line2="Suite B",
+            club_city="Warrenton",
+            club_state="VA",
+            club_zip_code="20186",
+            club_country="USA",
+        )
+        result = _build_club_location(cfg, "My Club")
+        assert result == "123 Glider Lane, Suite B, Warrenton VA 20186, USA"
+
+    def test_city_state_zip_without_country(self):
+        """City/state/zip without country returns correct formatted string."""
+        cfg = self._mock_config(
+            club_city="Warrenton",
+            club_state="VA",
+            club_zip_code="20186",
+        )
+        result = _build_club_location(cfg, "My Club")
+        assert result == "Warrenton VA 20186"
