@@ -1320,257 +1320,260 @@
    ===================================================================== */
 @media (max-width: 430px) {
 
-  /* ── Container / table chrome ─────────────────────────────────── */
-  .flights-table-container {
-      background: transparent !important;
-      box-shadow: none !important;
-      border-radius: 0 !important;
-      margin-top: 0.5rem;
-  }
+    /* ── Container / table chrome ─────────────────────────────────── */
+    .flights-table-container {
+        background: transparent !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        margin-top: 0.5rem;
+    }
 
-  .flights-table-container .table-responsive {
-      overflow: visible !important;
-  }
+    .flights-table-container .table-responsive {
+        overflow: visible !important;
+    }
 
-  .flights-table {
-      display: block;
-      font-size: 0.95rem;
-  }
+    .flights-table {
+        display: block;
+        font-size: 0.95rem;
+    }
 
-  /* Hide table headers visually but keep them in accessibility tree
+    /* Hide table headers visually but keep them in accessibility tree
      so screen readers can still announce column names for each cell */
-  .flights-table thead {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0,0,0,0);
-      white-space: nowrap;
-      border: 0;
-  }
+    .flights-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
 
-  .flights-table tbody {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-  }
+    .flights-table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
 
-  /* ── Each flight row = a card ─────────────────────────────────── */
-  .flights-table tbody tr.flight-row {
-      display: flex !important;
-      flex-wrap: wrap;
-      align-items: flex-start;
-      background: white !important;
-      border-radius: 12px !important;
-      border: 1px solid #dee2e6 !important;
-      border-bottom: 1px solid #dee2e6 !important;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07) !important;
-      padding: 0.75rem !important;
-      gap: 0;
-      overflow: hidden;
-  }
+    /* ── Each flight row = a card ─────────────────────────────────── */
+    .flights-table tbody tr.flight-row {
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        background: white !important;
+        border-radius: 12px !important;
+        border: 1px solid #dee2e6 !important;
+        border-bottom: 1px solid #dee2e6 !important;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07) !important;
+        padding: 0.75rem !important;
+        gap: 0;
+        overflow: hidden;
+    }
 
-  /* Left accent stripe by status */
-  .flights-table tbody tr.flight-row:has(.flight-badge-pending) {
-      border-left: 4px solid #ffc107 !important;
-  }
-  .flights-table tbody tr.flight-row:has(.flight-badge-flying) {
-      border-left: 4px solid #0dcaf0 !important;
-  }
-  .flights-table tbody tr.flight-row:has(.flight-badge-landed) {
-      border-left: 4px solid #198754 !important;
-  }
+    /* Left accent stripe by status */
+    .flights-table tbody tr.flight-row:has(.flight-badge-pending) {
+        border-left: 4px solid #ffc107 !important;
+    }
 
-  /* Striped row colour overrides — cards all white */
-  .flights-table tbody tr.flight-row:nth-child(odd) td,
-  .flights-table tbody tr.flight-row:nth-child(even) td {
-      background: transparent !important;
-  }
+    .flights-table tbody tr.flight-row:has(.flight-badge-flying) {
+        border-left: 4px solid #0dcaf0 !important;
+    }
 
-  /* ── Hide ALL cells by default, reveal selectively ───────────── */
-  .flights-table tbody tr.flight-row td {
-      display: none !important;
-      padding: 0 !important;
-      border: none !important;
-      background: transparent !important;
-      vertical-align: top !important;
-  }
+    .flights-table tbody tr.flight-row:has(.flight-badge-landed) {
+        border-left: 4px solid #198754 !important;
+    }
 
-  /* ════════════════════════════════════════════════════════════════
+    /* Striped row colour overrides — cards all white */
+    .flights-table tbody tr.flight-row:nth-child(odd) td,
+    .flights-table tbody tr.flight-row:nth-child(even) td {
+        background: transparent !important;
+    }
+
+    /* ── Hide ALL cells by default, reveal selectively ───────────── */
+    .flights-table tbody tr.flight-row td {
+        display: none !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        vertical-align: top !important;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
      ROW 1: status badge (left, auto-width) + pilot name (right, fills)
      ════════════════════════════════════════════════════════════════ */
-  .flights-table tbody tr.flight-row td.status-col {
-      display: flex !important;
-      align-items: flex-start;
-      order: 1;
-      flex: 0 0 auto;
-      padding-right: 0.6rem !important;
-      padding-bottom: 0.5rem !important;
-  }
-  /* Keep status hidden when finalized (d-none class already on td) */
-  .flights-table tbody tr.flight-row td.status-col.d-none {
-      display: none !important;
-  }
+    .flights-table tbody tr.flight-row td.status-col {
+        display: flex !important;
+        align-items: flex-start;
+        order: 1;
+        flex: 0 0 auto;
+        padding-right: 0.6rem !important;
+        padding-bottom: 0.5rem !important;
+    }
 
-  .flights-table tbody tr.flight-row td.pilot-col {
-      display: block !important;
-      order: 2;
-      flex: 1 1 0;
-      min-width: 0;
-      padding-bottom: 0.5rem !important;
-  }
+    /* Keep status hidden when finalized (d-none class already on td) */
+    .flights-table tbody tr.flight-row td.status-col.d-none {
+        display: none !important;
+    }
 
-  /* Finalized: pilot fills full row 1 */
-  .flights-table tbody tr.flight-row.finalized td.pilot-col {
-      flex: 1 1 100%;
-  }
+    .flights-table tbody tr.flight-row td.pilot-col {
+        display: block !important;
+        order: 2;
+        flex: 1 1 0;
+        min-width: 0;
+        padding-bottom: 0.5rem !important;
+    }
 
-  /* Finalized: instructor on its own half-width row below */
-  .flights-table tbody tr.flight-row.finalized td.instructor-col {
-      display: block !important;
-      order: 3;
-      flex: 1 1 100%;
-      min-width: 0;
-      padding-bottom: 0.4rem !important;
-      font-size: 0.9rem;
-      border-top: 1px solid #f0f0f0 !important;
-      padding-top: 0.4rem !important;
-  }
+    /* Finalized: pilot fills full row 1 */
+    .flights-table tbody tr.flight-row.finalized td.pilot-col {
+        flex: 1 1 100%;
+    }
 
-  /* Pilot info sizing */
-  .pilot-info strong {
-      font-size: 1.05rem;
-      line-height: 1.3;
-  }
+    /* Finalized: instructor on its own half-width row below */
+    .flights-table tbody tr.flight-row.finalized td.instructor-col {
+        display: block !important;
+        order: 3;
+        flex: 1 1 100%;
+        min-width: 0;
+        padding-bottom: 0.4rem !important;
+        font-size: 0.9rem;
+        border-top: 1px solid #f0f0f0 !important;
+        padding-top: 0.4rem !important;
+    }
 
-  .pilot-info small {
-      font-size: 0.85rem;
-  }
+    /* Pilot info sizing */
+    .pilot-info strong {
+        font-size: 1.05rem;
+        line-height: 1.3;
+    }
 
-  /* ════════════════════════════════════════════════════════════════
+    .pilot-info small {
+        font-size: 0.85rem;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
      ROW 2: Glider — full width, prominent, with sub-details
      ════════════════════════════════════════════════════════════════ */
-  .flights-table tbody tr.flight-row td.glider-col {
-      display: block !important;
-      order: 5;
-      flex: 0 0 100%;
-      padding-bottom: 0.4rem !important;
-      border-top: 1px solid #f0f0f0 !important;
-      padding-top: 0.5rem !important;
-      max-width: none;
-  }
+    .flights-table tbody tr.flight-row td.glider-col {
+        display: block !important;
+        order: 5;
+        flex: 0 0 100%;
+        padding-bottom: 0.4rem !important;
+        border-top: 1px solid #f0f0f0 !important;
+        padding-top: 0.5rem !important;
+        max-width: none;
+    }
 
-  /* Glider name: larger, no word-break needed now that it has full width */
-  .flights-table tbody tr.flight-row td.glider-col .glider-info strong {
-      font-size: 1rem;
-      letter-spacing: 0.01em;
-  }
+    /* Glider name: larger, no word-break needed now that it has full width */
+    .flights-table tbody tr.flight-row td.glider-col .glider-info strong {
+        font-size: 1rem;
+        letter-spacing: 0.01em;
+    }
 
-  /* Always show towplane & altitude on mobile */
-  .flights-table tbody tr.flight-row td.glider-col .d-lg-none {
-      display: block !important;
-  }
+    /* Always show towplane & altitude on mobile */
+    .flights-table tbody tr.flight-row td.glider-col .d-lg-none {
+        display: block !important;
+    }
 
-  /* ════════════════════════════════════════════════════════════════
+    /* ════════════════════════════════════════════════════════════════
      ROW 3: Time — only shown when flight has been launched.
      td.no-time is added by the template when launch_time is empty.
      ════════════════════════════════════════════════════════════════ */
-  .flights-table tbody tr.flight-row td.time-col {
-      display: block !important;
-      order: 6;
-      flex: 0 0 100%;
-      padding-bottom: 0.4rem !important;
-      border-top: 1px solid #f0f0f0 !important;
-      padding-top: 0.45rem !important;
-      font-size: 0.9rem;
-      color: #495057;
-  }
+    .flights-table tbody tr.flight-row td.time-col {
+        display: block !important;
+        order: 6;
+        flex: 0 0 100%;
+        padding-bottom: 0.4rem !important;
+        border-top: 1px solid #f0f0f0 !important;
+        padding-top: 0.45rem !important;
+        font-size: 0.9rem;
+        color: #495057;
+    }
 
-  /* Hide the time row entirely when no times exist yet */
-  .flights-table tbody tr.flight-row td.time-col.no-time {
-      display: none !important;
-  }
+    /* Hide the time row entirely when no times exist yet */
+    .flights-table tbody tr.flight-row td.time-col.no-time {
+        display: none !important;
+    }
 
-  /* ════════════════════════════════════════════════════════════════
+    /* ════════════════════════════════════════════════════════════════
      ROW 3b: Duration — shown directly under the time row
      ════════════════════════════════════════════════════════════════ */
-  .flights-table tbody tr.flight-row td.duration-col {
-      display: block !important;
-      order: 7;
-      flex: 0 0 100%;
-      padding-top: 0.1rem !important;
-      padding-bottom: 0.4rem !important;
-      font-size: 0.85rem;
-      color: #6c757d;
-  }
+    .flights-table tbody tr.flight-row td.duration-col {
+        display: block !important;
+        order: 7;
+        flex: 0 0 100%;
+        padding-top: 0.1rem !important;
+        padding-bottom: 0.4rem !important;
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
 
-  /* Hide duration when no times exist (unflown flight) */
-  .flights-table tbody tr.flight-row td.duration-col.no-duration {
-      display: none !important;
-  }
+    /* Hide duration when no times exist (unflown flight) */
+    .flights-table tbody tr.flight-row td.duration-col.no-duration {
+        display: none !important;
+    }
 
-  /* ════════════════════════════════════════════════════════════════
+    /* ════════════════════════════════════════════════════════════════
      ROW 4: Action buttons — full width, big tap targets
      ════════════════════════════════════════════════════════════════ */
-  .flights-table tbody tr.flight-row td.actions-col {
-      display: block !important;
-      order: 10;
-      flex: 0 0 100%;
-      border-top: 1px solid #f0f0f0 !important;
-      padding-top: 0.6rem !important;
-  }
+    .flights-table tbody tr.flight-row td.actions-col {
+        display: block !important;
+        order: 10;
+        flex: 0 0 100%;
+        border-top: 1px solid #f0f0f0 !important;
+        padding-top: 0.6rem !important;
+    }
 
-  .flights-table tbody tr.flight-row td.actions-col .action-buttons {
-      flex-direction: row;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-  }
+    .flights-table tbody tr.flight-row td.actions-col .action-buttons {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
 
-  /* Edit / Copy / Delete / View: equal-width, big tap targets */
-  .flights-table tbody tr.flight-row td.actions-col .action-buttons > .btn {
-      flex: 1 1 auto;
-      min-width: 80px;
-      padding: 0.55rem 0.75rem;
-      font-size: 0.95rem;
-  }
+    /* Edit / Copy / Delete / View: equal-width, big tap targets */
+    .flights-table tbody tr.flight-row td.actions-col .action-buttons>.btn {
+        flex: 1 1 auto;
+        min-width: 80px;
+        padding: 0.55rem 0.75rem;
+        font-size: 0.95rem;
+    }
 
-  /* Always show button labels on mobile (overrides d-none d-md-inline) */
-  .flights-table tbody tr.flight-row td.actions-col .btn .d-none.d-md-inline {
-      display: inline !important;
-      margin-left: 0.25rem;
-  }
+    /* Always show button labels on mobile (overrides d-none d-md-inline) */
+    .flights-table tbody tr.flight-row td.actions-col .btn .d-none.d-md-inline {
+        display: inline !important;
+        margin-left: 0.25rem;
+    }
 
-  /* Launch Now / Record Landing: full width, extra tall */
-  .flights-table tbody tr.flight-row td.actions-col .mt-1 {
-      width: 100%;
-      margin-top: 0.45rem !important;
-  }
+    /* Launch Now / Record Landing: full width, extra tall */
+    .flights-table tbody tr.flight-row td.actions-col .mt-1 {
+        width: 100%;
+        margin-top: 0.45rem !important;
+    }
 
-  .flights-table tbody tr.flight-row td.actions-col .mt-1 .btn {
-      width: 100%;
-      padding: 0.7rem 1rem;
-      font-size: 1.05rem;
-      font-weight: 600;
-  }
+    .flights-table tbody tr.flight-row td.actions-col .mt-1 .btn {
+        width: 100%;
+        padding: 0.7rem 1rem;
+        font-size: 1.05rem;
+        font-weight: 600;
+    }
 
-  /* ── Empty-state row ─────────────────────────────────────────── */
-  .flights-table tbody tr:not(.flight-row) {
-      display: block !important;
-  }
+    /* ── Empty-state row ─────────────────────────────────────────── */
+    .flights-table tbody tr:not(.flight-row) {
+        display: block !important;
+    }
 
-  .flights-table tbody tr:not(.flight-row) td {
-      display: block !important;
-      text-align: center;
-      padding: 2rem 1rem !important;
-      border: none !important;
-  }
+    .flights-table tbody tr:not(.flight-row) td {
+        display: block !important;
+        text-align: center;
+        padding: 2rem 1rem !important;
+        border: none !important;
+    }
 
-  /* ── Search bar: tuck in tighter on mobile ───────────────────── */
-  .flight-search {
-      padding-bottom: 0.5rem;
-  }
+    /* ── Search bar: tuck in tighter on mobile ───────────────────── */
+    .flight-search {
+        padding-bottom: 0.5rem;
+    }
 
 }
 
@@ -2335,5 +2338,39 @@
 
     .action-description {
         font-size: 0.85rem;
+    }
+}
+
+/* =====================================================================
+   CLOSEOUT FORM — MOBILE LAYOUT (≤575px)
+   On desktop the form uses a two-column table: 200px label | field.
+   On phones that leaves only ~250px for TinyMCE which is too cramped.
+   Stack label above the field to give the editor the full width.
+   ===================================================================== */
+@media (max-width: 575px) {
+    .closeout-form-table th,
+    .closeout-form-table td {
+        display: block;
+        width: 100%;
+        padding: 0.25rem 0;
+    }
+
+    .closeout-form-table th {
+        text-align: left;
+        padding-top: 1rem;
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .closeout-form-table td {
+        padding-bottom: 0.75rem;
+    }
+
+    /* Give TinyMCE containers (and textareas) the full available width */
+    .closeout-form-table td .tox-tinymce,
+    .closeout-form-table td textarea {
+        width: 100% !important;
     }
 }
