@@ -1298,6 +1298,208 @@
     flex-wrap: wrap;
 }
 
+/* =====================================================================
+   MOBILE CARD LAYOUT  (<576px)
+   Transforms the flights table into stacked tap-friendly cards.
+   DOM order of cells: status | actions | time | duration | pilot |
+                       instructor(finalized) | glider | towplane | altitude
+   We use flex order to rearrange visually: status+pilot up top, then
+   time+glider middle row, then actions full-width at bottom.
+   ===================================================================== */
+@media (max-width: 575.98px) {
+
+  /* ── Container / table chrome ─────────────────────────────────── */
+  .flights-table-container {
+      background: transparent !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      margin-top: 0.5rem;
+  }
+
+  .table-responsive {
+      overflow: visible !important;
+  }
+
+  .flights-table {
+      display: block;
+      font-size: 0.9rem;
+  }
+
+  .flights-table thead {
+      display: none !important;
+  }
+
+  .flights-table tbody {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+  }
+
+  /* ── Each flight row = a card ─────────────────────────────────── */
+  .flights-table tbody tr.flight-row {
+      display: flex !important;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      background: white !important;
+      border-radius: 10px !important;
+      border: 1px solid #dee2e6 !important;
+      border-bottom: 1px solid #dee2e6 !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+      padding: 0.6rem 0.75rem 0.5rem !important;
+      gap: 0;
+  }
+
+  /* Striped row colour overrides — cards all white */
+  .flights-table tbody tr.flight-row:nth-child(odd) td,
+  .flights-table tbody tr.flight-row:nth-child(even) td {
+      background: transparent !important;
+  }
+
+  /* ── Hide ALL cells by default, reveal selectively ───────────── */
+  .flights-table tbody tr.flight-row td {
+      display: none !important;
+      padding: 0 !important;
+      border: none !important;
+      background: transparent !important;
+      vertical-align: top !important;
+  }
+
+  /* ── ROW 1: status badge (left) + pilot name (right) ─────────── */
+  .flights-table tbody tr.flight-row td.status-col {
+      display: flex !important;
+      align-items: center;
+      order: 1;
+      flex: 0 0 auto;
+      padding-right: 0.5rem !important;
+      padding-bottom: 0.3rem !important;
+  }
+  /* Keep status hidden when finalized */
+  .flights-table tbody tr.flight-row td.status-col.d-none {
+      display: none !important;
+  }
+
+  .flights-table tbody tr.flight-row td.pilot-col {
+      display: block !important;
+      order: 2;
+      flex: 1 1 0;
+      min-width: 0;
+      padding-bottom: 0.3rem !important;
+  }
+
+  /* When finalized, pilot takes the full first row */
+  .flights-table tbody tr.flight-row.finalized td.pilot-col {
+      flex: 1 1 100%;
+  }
+
+  /* ── ROW 1b (finalized only): instructor beside pilot ────────── */
+  .flights-table tbody tr.flight-row.finalized td.instructor-col {
+      display: block !important;
+      order: 3;
+      flex: 1 1 50%;
+      min-width: 0;
+      padding-bottom: 0.3rem !important;
+      font-size: 0.88rem;
+  }
+
+  /* ── ROW 2: time (left) + glider/towplane (right) ────────────── */
+  /* Thin separator between rows */
+  .flights-table tbody tr.flight-row td.time-col {
+      display: block !important;
+      order: 4;
+      flex: 0 0 auto;
+      padding-right: 1rem !important;
+      padding-bottom: 0.3rem !important;
+      border-top: 1px solid #f0f0f0 !important;
+      padding-top: 0.35rem !important;
+      font-size: 0.85rem;
+  }
+
+  .flights-table tbody tr.flight-row td.glider-col {
+      display: block !important;
+      order: 5;
+      flex: 1 1 0;
+      min-width: 0;
+      padding-bottom: 0.3rem !important;
+      border-top: 1px solid #f0f0f0 !important;
+      padding-top: 0.35rem !important;
+      max-width: none;
+  }
+
+  /* Show towplane & altitude sub-details on mobile (inside glider cell) */
+  .flights-table tbody tr.flight-row td.glider-col .d-lg-none {
+      display: block !important;
+  }
+
+  /* ── ROW 3: action buttons (full width, big, tappable) ────────── */
+  .flights-table tbody tr.flight-row td.actions-col {
+      display: block !important;
+      order: 10;
+      flex: 0 0 100%;
+      border-top: 1px solid #f0f0f0 !important;
+      padding-top: 0.5rem !important;
+      margin-top: 0.1rem;
+  }
+
+  .flights-table tbody tr.flight-row td.actions-col .action-buttons {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+  }
+
+  /* Edit / Copy / Delete / View: equal-width, bigger tap targets */
+  .flights-table tbody tr.flight-row td.actions-col .action-buttons > .btn {
+      flex: 1 1 auto;
+      min-width: 80px;
+      padding: 0.5rem 0.6rem;
+      font-size: 0.9rem;
+  }
+
+  /* Always show button labels on mobile */
+  .flights-table tbody tr.flight-row td.actions-col .btn .d-none.d-md-inline {
+      display: inline !important;
+      margin-left: 0.25rem;
+  }
+
+  /* Launch Now / Record Landing: full width, extra tall */
+  .flights-table tbody tr.flight-row td.actions-col .mt-1 {
+      width: 100%;
+      margin-top: 0.4rem !important;
+  }
+
+  .flights-table tbody tr.flight-row td.actions-col .mt-1 .btn {
+      width: 100%;
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+  }
+
+  /* ── Empty-state row ─────────────────────────────────────────── */
+  .flights-table tbody tr:not(.flight-row) {
+      display: block !important;
+  }
+
+  .flights-table tbody tr:not(.flight-row) td {
+      display: block !important;
+      text-align: center;
+      padding: 2rem 1rem !important;
+      border: none !important;
+  }
+
+  /* ── Search bar: tuck in tighter on mobile ───────────────────── */
+  .flight-search {
+      padding-bottom: 0.5rem;
+  }
+
+  /* ── Pilot info font sizes on mobile ─────────────────────────── */
+  .pilot-info strong {
+      font-size: 1rem;
+  }
+
+  .pilot-info small {
+      font-size: 0.82rem;
+  }
+
+}
+
 .action-buttons .btn {
     padding: 0.25rem 0.5rem;
     font-size: 0.8rem;

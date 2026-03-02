@@ -289,7 +289,7 @@
           </thead>
           <tbody>
             {% for flight in flights %}
-              <tr class="flight-row">
+              <tr class="flight-row{% if logsheet.finalized %} finalized{% endif %}">
                 <td class="status-col {% if logsheet.finalized %}d-none{% endif %}" data-sort="{% if flight.launch_time and flight.landing_time %}3{% elif flight.launch_time %}2{% else %}1{% endif %}">
                   {% if flight.launch_time and flight.landing_time %}
                     <span class="flight-badge flight-badge-landed">
