@@ -7,6 +7,7 @@
 
 {% block content %}
 {% load member_extras %}
+{% load logsheet_tags %}
 
 <!-- Hidden form ensures getCsrfToken() can always read the CSRF token from the DOM
      via document.querySelector('[name=csrfmiddlewaretoken]'), regardless of which
@@ -444,16 +445,16 @@
                   </div>
                 </td>
 
-                <td class="duration-col d-none d-sm-table-cell{% if not flight.launch_time and not flight.landing_time %} no-duration{% endif %}" data-sort="{% if flight.duration %}{{ flight.duration|time:'Hi' }}{% elif flight.launch_time and not flight.landing_time %}9999{% else %}0{% endif %}">
+                <td class="duration-col d-none d-sm-table-cell{% if not flight.launch_time and not flight.landing_time %} no-duration{% endif %}" data-sort="{% if flight.computed_duration %}{{ flight.computed_duration.total_seconds|floatformat:0 }}{% elif flight.launch_time and not flight.landing_time %}999999{% else %}0{% endif %}">
                   {% if not flight.landing_time and flight.launch_time %}
                     <span class="live-duration" data-launch="{{ logsheet.log_date|date:'Y-m-d' }}T{{ flight.launch_time|time:'H:i:s' }}">
                       <i class="bi bi-stopwatch text-primary me-1"></i>
                       <span class="duration-text">--:--</span>
                     </span>
-                  {% elif flight.duration %}
+                  {% elif flight.computed_duration %}
                     <span class="flight-duration">
                       <i class="bi bi-stopwatch text-muted me-1"></i>
-                      {{ flight.duration }}
+                      {{ flight.computed_duration|format_duration }}
                     </span>
                   {% else %}
                     <span class="flight-duration text-muted">

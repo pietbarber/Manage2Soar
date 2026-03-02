@@ -318,6 +318,32 @@ class Flight(models.Model):
     def total_cost_display(self):
         return f"${self.total_cost:.2f}" if self.total_cost > 0 else "—"
 
+    @property
+    def computed_duration(self):
+        """Return flight duration as a timedelta.
+
+        Uses the stored DurationField value when available.  Falls back to
+        computing launch→landing directly so that flights whose duration was
+        never persisted (e.g. fixtures / test data inserted without save())
+        still render a meaningful time instead of '--:--'.
+        """
+        if self.duration is not None:
+            return self.duration
+        if self.launch_time and self.landing_time:
+            from datetime import date as _date
+            from datetime import datetime as _datetime
+            from datetime import timedelta as _td
+
+            launch_dt = _datetime.combine(_date.today(), self.launch_time)
+            land_dt = _datetime.combine(_date.today(), self.landing_time)
+            if land_dt < launch_dt:
+                land_dt += _td(days=1)
+            delta = land_dt - launch_dt
+            # Sanity-check: ignore implausible values (>12 h)
+            if delta.total_seconds() <= 12 * 3600:
+                return delta
+        return None
+
     def save(self, *args, **kwargs):
         if self.launch_time and self.landing_time:
             launch_dt = datetime.combine(date.today(), self.launch_time)
