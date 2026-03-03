@@ -54,8 +54,26 @@
 
 /* ========= Responsive tweaks ========= */
 @media (max-width: 576px){
-  .chart-box{ height: 320px; }
-  .chart-box--xl{ height: 420px; }
+  :root {
+    --chart-title-pr: 4rem;
+  }
+  .chart-box        { height: 280px; }
+  .chart-box--short { height: 220px; }
+  .chart-box--tall  { height: 340px; }
+  .chart-box--xl    { height: 380px; }
+}
+
+/* Very narrow phones (≤430px) */
+@media (max-width: 430px){
+  :root {
+    --chart-title-pr: 3.5rem;
+  }
+  .chart-box        { height: 240px; }
+  .chart-box--short { height: 190px; }
+  .chart-box--tall  { height: 300px; }
+  .chart-box--xl    { height: 340px; }
+  /* Keep tool buttons compact on very small screens */
+  .chart-tools .btn { padding: .15rem .35rem; font-size: .75rem; }
 }
 
 /* ========= Print: hide controls, compress heights ========= */

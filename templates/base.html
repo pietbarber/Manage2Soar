@@ -328,7 +328,7 @@
   <!-- Spacer to prevent content from hiding behind fixed navbar -->
   <div class="navbar-spacer"></div>
 
-  <div class="container">
+  <div class="{% block page_container_class %}container{% endblock %}">
     {% if user.is_authenticated %}
       {% include "notifications/notifications_dropdown.html" %}
     {% endif %}
