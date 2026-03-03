@@ -42,6 +42,7 @@ from .models import (
     Towplane,
     TowplaneCloseout,
 )
+from .utils.finalization_email import send_finalization_summary_email
 
 logger = logging.getLogger(__name__)
 
@@ -509,6 +510,9 @@ def manage_logsheet(request, pk):
         RevisionLog.objects.create(
             logsheet=logsheet, revised_by=request.user, note="Logsheet finalized"
         )
+
+        # Send HTML summary email to all active members
+        send_finalization_summary_email(logsheet)
 
         # Retire visiting pilot token when logsheet is finalized
         config = SiteConfiguration.objects.first()

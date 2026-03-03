@@ -1,0 +1,52 @@
+{{ club_name }} – Operations Summary
+{{ logsheet.log_date|date:"l, F j, Y" }}
+============================================================
+
+Operations for {{ logsheet.log_date|date:"l, F j" }} have been finalised.
+
+View the full Ops Report online:
+{{ ops_report_url }}
+
+------------------------------------------------------------
+DUTY CREW
+------------------------------------------------------------
+{% if logsheet.duty_officer %}Duty Officer:        {{ logsheet.duty_officer.full_display_name }}
+{% endif %}{% if logsheet.assistant_duty_officer %}Asst. Duty Officer:  {{ logsheet.assistant_duty_officer.full_display_name }}
+{% endif %}{% if logsheet.duty_instructor %}Duty Instructor:     {{ logsheet.duty_instructor.full_display_name }}
+{% endif %}{% if logsheet.surge_instructor %}Surge Instructor:    {{ logsheet.surge_instructor.full_display_name }}
+{% endif %}{% if logsheet.tow_pilot %}Tow Pilot:           {{ logsheet.tow_pilot.full_display_name }}
+{% endif %}{% if logsheet.surge_tow_pilot %}Surge Tow Pilot:     {{ logsheet.surge_tow_pilot.full_display_name }}
+{% endif %}
+{% if operations_summary_html %}------------------------------------------------------------
+OPERATIONS SUMMARY
+------------------------------------------------------------
+{{ operations_summary_html|striptags|wordwrap:70 }}
+
+{% endif %}{% if safety_issues_html %}------------------------------------------------------------
+SAFETY SUMMARY
+------------------------------------------------------------
+{{ safety_issues_html|striptags|wordwrap:70 }}
+
+{% endif %}{% if equipment_issues_html %}------------------------------------------------------------
+EQUIPMENT SUMMARY
+------------------------------------------------------------
+{{ equipment_issues_html|striptags|wordwrap:70 }}
+
+{% endif %}{% if maintenance_issues %}------------------------------------------------------------
+MAINTENANCE ISSUES
+------------------------------------------------------------
+{% for issue in maintenance_issues %}* {% if issue.glider %}{{ issue.glider }}{% elif issue.towplane %}{{ issue.towplane }}{% else %}Aircraft TBD{% endif %}{% if issue.grounded %} [GROUNDED]{% endif %}
+  {{ issue.description }}{% if issue.reported_by %}
+  Reported by: {{ issue.reported_by.full_display_name }}{% endif %}
+
+{% endfor %}{% endif %}{% if flights %}------------------------------------------------------------
+FLIGHTS ({{ flights|length }})
+------------------------------------------------------------
+  #  Pilot                    Instructor               Glider   Launch  Land    Duration  Rel. Alt.
+---  -----------------------  -----------------------  -------  ------  ------  --------  ---------
+{% for row in flights %}{% if row.is_longest %}>>> {% else %}    {% endif %}{{ forloop.counter|stringformat:"2d" }}. {{ row.pilot_name|ljust:23 }}  {{ row.instructor_name|default:"—"|ljust:23 }}  {{ row.glider_label|ljust:7 }}  {{ row.launch_time|ljust:6 }}  {{ row.landing_time|ljust:6 }}  {{ row.duration_str|ljust:8 }}  {% if row.release_altitude != "—" %}{{ row.release_altitude }} ft{% else %}—{% endif %}{% if row.is_longest %} *** Longest flight{% endif %}
+
+{% endfor %}{% endif %}
+============================================================
+{{ club_name }}
+{{ ops_report_url }}
