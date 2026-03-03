@@ -49,8 +49,8 @@
       </div>
 
       <!-- Fixed-top toasts: mobile only (hidden on sm+ viewports where the inline alerts are shown) -->
-      <div class="position-fixed top-0 start-50 translate-middle-x pt-2 px-2 d-sm-none"
-           style="z-index: 1090; width: min(100%, 500px);" id="messages-toast-container">
+      <div class="position-fixed start-50 translate-middle-x pt-2 px-2 d-sm-none"
+           style="top: 3.5rem; z-index: 1090; width: min(100%, 500px);" id="messages-toast-container">
         {% for message in messages %}
           <div class="toast align-items-center text-bg-{{ message.tags|bs_tag }} border-0 mb-2 show"
                role="alert" aria-live="assertive" aria-atomic="true"
@@ -558,7 +558,7 @@
               </tr>
             {% empty %}
               <tr>
-                <td colspan="{% if logsheet.finalized %}8{% else %}9{% endif %}" class="text-center py-4">
+                <td colspan="8" class="text-center py-4">
                   <div class="empty-state">
                     <i class="bi bi-airplane" style="font-size: 2rem; color: var(--bs-gray-400);"></i>
                     <div class="mt-2 text-muted">No flights recorded</div>

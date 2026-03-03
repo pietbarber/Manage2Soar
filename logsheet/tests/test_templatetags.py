@@ -1,8 +1,6 @@
 """Tests for logsheet template filters (logsheet_tags.py)."""
 
-from datetime import time, timedelta
-
-import pytest
+from datetime import timedelta
 
 from logsheet.templatetags.logsheet_tags import bs_tag, format_duration
 
