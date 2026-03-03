@@ -53,6 +53,8 @@ class TowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     list_display = (
         "name",
+        "make",
+        "model",
         "n_number",
         "is_active",
         "oil_change_interval",
@@ -61,11 +63,23 @@ class TowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
         "next_100hr_due",
     )
     list_filter = ("is_active", "requires_100hr_inspection")
-    search_fields = ("name", "n_number")
+    search_fields = ("name", "make", "model", "n_number")
     readonly_fields = ("photo_preview",)
     exclude = ("photo_medium", "photo_small")
     fieldsets = (
-        (None, {"fields": ("name", "n_number", "is_active", "club_owned")}),
+        (
+            None,
+            {
+                "fields": (
+                    "name",
+                    "make",
+                    "model",
+                    "n_number",
+                    "is_active",
+                    "club_owned",
+                )
+            },
+        ),
         ("Photo", {"fields": ("photo", "photo_preview")}),
         ("Rental Rates", {"fields": ("hourly_rental_rate",)}),
         ("Oil Change", {"fields": ("oil_change_interval", "next_oil_change_due")}),
