@@ -1,8 +1,9 @@
+from datetime import time, timedelta
 from unittest.mock import MagicMock
 
 import pytest
 
-from logsheet.models import Airfield, Glider, MaintenanceIssue, Towplane
+from logsheet.models import Airfield, Flight, Glider, MaintenanceIssue, Towplane
 
 
 @pytest.mark.django_db
@@ -183,3 +184,69 @@ class TestTowplanePhotoUrlProperties:
 
         url = towplane.photo_url_small
         assert url is None
+
+
+# =============================================================================
+# Flight.computed_duration  (Issue #712)
+# =============================================================================
+
+
+def _bare_flight(**kwargs):
+    """Return an unsaved Flight with only the specified attributes set.
+
+    Uses __new__ so no DB access is required for pure-property tests.
+    """
+    f = Flight.__new__(Flight)
+    f.duration = None
+    f.launch_time = None
+    f.landing_time = None
+    for k, v in kwargs.items():
+        setattr(f, k, v)
+    return f
+
+
+class TestFlightComputedDuration:
+    def test_stored_duration_returned_directly(self):
+        """When a persisted duration exists, it is returned as-is."""
+        stored = timedelta(hours=1, minutes=15)
+        f = _bare_flight(
+            duration=stored, launch_time=time(10, 0), landing_time=time(11, 15)
+        )
+        assert f.computed_duration == stored
+
+    def test_computed_from_launch_and_landing(self):
+        """Falls back to computing launch→landing when duration is None."""
+        f = _bare_flight(launch_time=time(10, 30), landing_time=time(11, 15))
+        assert f.computed_duration == timedelta(minutes=45)
+
+    def test_overnight_flight_landing_before_launch(self):
+        """Handles overnight flights where landing time is earlier than launch."""
+        # Launch 23:45, landing 00:15 → 30 min
+        f = _bare_flight(launch_time=time(23, 45), landing_time=time(0, 15))
+        assert f.computed_duration == timedelta(minutes=30)
+
+    def test_implausible_duration_returns_none(self):
+        """Durations exceeding 12 hours are treated as data errors → None."""
+        # Launch 00:00, landing 13:00 → 13 h which is > 12 h cap
+        f = _bare_flight(launch_time=time(0, 0), landing_time=time(13, 0))
+        assert f.computed_duration is None
+
+    def test_no_times_returns_none(self):
+        """Returns None when neither launch_time nor landing_time is set."""
+        f = _bare_flight()
+        assert f.computed_duration is None
+
+    def test_only_launch_time_returns_none(self):
+        """Returns None when only launch_time is available (flight still aloft)."""
+        f = _bare_flight(launch_time=time(10, 0))
+        assert f.computed_duration is None
+
+    def test_only_landing_time_returns_none(self):
+        """Returns None when only landing_time is available (no launch recorded)."""
+        f = _bare_flight(landing_time=time(11, 0))
+        assert f.computed_duration is None
+
+    def test_exact_12h_boundary_accepted(self):
+        """A flight of exactly 12 hours is still within the plausibility cap."""
+        f = _bare_flight(launch_time=time(0, 0), landing_time=time(12, 0))
+        assert f.computed_duration == timedelta(hours=12)

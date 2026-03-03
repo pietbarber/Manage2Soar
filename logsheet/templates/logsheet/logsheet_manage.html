@@ -29,7 +29,8 @@
 
     <!-- Messages (inline, for desktop / keyboard users scrolled to top) -->
     {% if messages %}
-      <div id="messages-inline">
+      <!-- Inline alerts: desktop only (hidden on small screens where the toast is shown instead) -->
+      <div id="messages-inline" class="d-none d-sm-block">
         {% for message in messages %}
           <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
             {% if message.tags == 'danger' %}
@@ -47,11 +48,11 @@
         {% endfor %}
       </div>
 
-      <!-- Fixed-top toast: always visible on mobile regardless of scroll position -->
-      <div class="position-fixed top-0 start-50 translate-middle-x pt-2 px-2"
+      <!-- Fixed-top toasts: mobile only (hidden on sm+ viewports where the inline alerts are shown) -->
+      <div class="position-fixed top-0 start-50 translate-middle-x pt-2 px-2 d-sm-none"
            style="z-index: 1090; width: min(100%, 500px);" id="messages-toast-container">
         {% for message in messages %}
-          <div class="toast align-items-center text-bg-{{ message.tags }} border-0 mb-2 show"
+          <div class="toast align-items-center text-bg-{{ message.tags|bs_tag }} border-0 mb-2 show"
                role="alert" aria-live="assertive" aria-atomic="true"
                {% if message.tags == 'success' or message.tags == 'info' %}data-bs-delay="4000" data-bs-autohide="true"{% else %}data-bs-autohide="false"{% endif %}>
             <div class="d-flex">

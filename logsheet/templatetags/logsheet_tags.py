@@ -29,3 +29,14 @@ def format_duration(value):
     hours, remainder = divmod(total_seconds, 3600)
     minutes = remainder // 60
     return f"{hours}:{minutes:02d}"
+
+
+@register.filter
+def bs_tag(tag):
+    """Normalise a Django message tag to a valid Bootstrap colour variant.
+
+    Django's MESSAGE_TAGS already maps ``error → danger``, but ``debug``
+    has no Bootstrap equivalent and would produce an invalid ``text-bg-debug``
+    class.  Map it to ``secondary`` so toasts stay readable.
+    """
+    return "secondary" if tag == "debug" else tag
