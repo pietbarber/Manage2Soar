@@ -169,7 +169,7 @@ def get_finalization_email_context(logsheet):
         return f"{hours}:{minutes:02d}"
 
     flights = []
-    for f in raw_flights:
+    for idx, f in enumerate(raw_flights, start=1):
         pilot_name = (
             f.pilot.full_display_name
             if f.pilot
@@ -181,9 +181,23 @@ def get_finalization_email_context(logsheet):
             else (f.guest_instructor_name or f.legacy_instructor_name or "")
         )
         glider_label = str(f.glider) if f.glider else "—"
+        is_longest = (
+            max_duration is not None
+            and f.duration is not None
+            and f.duration == max_duration
+        )
+        # Use CSS class names so the template never needs Django template tags
+        # inside style="" attributes (which confuse VS Code's CSS language server).
+        if is_longest:
+            tr_class = "flight-row flight-row-longest"
+        elif idx % 2 == 0:
+            tr_class = "flight-row flight-row-even"
+        else:
+            tr_class = "flight-row flight-row-odd"
         flights.append(
             {
                 "flight": f,
+                "index": idx,
                 "pilot_name": pilot_name,
                 "instructor_name": instructor_name,
                 "glider_label": glider_label,
@@ -192,11 +206,9 @@ def get_finalization_email_context(logsheet):
                 "duration_str": _fmt_duration(f.duration),
                 "release_altitude": f.release_altitude if f.release_altitude else "—",
                 "flight_type": f.flight_type,
-                "is_longest": (
-                    max_duration is not None
-                    and f.duration is not None
-                    and f.duration == max_duration
-                ),
+                "is_longest": is_longest,
+                # CSS class name for the <tr> row
+                "tr_class": tr_class,
             }
         )
 
