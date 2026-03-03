@@ -468,10 +468,13 @@ class SiteFeedbackAdmin(admin.ModelAdmin):
     search_fields = ("subject", "user__first_name", "user__last_name", "message")
     readonly_fields = (
         "user",
+        "feedback_type",
+        "subject",
+        "message",
+        "referring_url",
         "created_at",
         "updated_at",
         "responded_by",
-        "referring_url",
     )
 
     # Group fields logically
