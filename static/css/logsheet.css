@@ -1372,16 +1372,18 @@
         overflow: hidden;
     }
 
-    /* Left accent stripe by status */
-    .flights-table tbody tr.flight-row:has(.flight-badge-pending) {
+    /* Left accent stripe by status — use explicit status-* classes on <tr>
+       for broad browser compatibility (avoids :has() which is unsupported
+       in Firefox ESR < 121). Classes are set server-side in the template. */
+    .flights-table tbody tr.flight-row.status-pending {
         border-left: 4px solid #ffc107 !important;
     }
 
-    .flights-table tbody tr.flight-row:has(.flight-badge-flying) {
+    .flights-table tbody tr.flight-row.status-flying {
         border-left: 4px solid #0dcaf0 !important;
     }
 
-    .flights-table tbody tr.flight-row:has(.flight-badge-landed) {
+    .flights-table tbody tr.flight-row.status-landed {
         border-left: 4px solid #198754 !important;
     }
 
