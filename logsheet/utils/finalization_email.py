@@ -14,7 +14,10 @@ to all active members with:
 
 import logging
 import re
+from urllib.parse import unquote, urlparse
 
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from django.template.loader import render_to_string
 from django.urls import reverse
 
@@ -70,11 +73,16 @@ def _youtube_replacement(match):
 def _gdocs_pdf_replacement(match):
     """Return an email-safe link for a Google Docs PDF viewer embed."""
     params = match.group(1)
-    # Extract the original document URL from the query string
+    # Extract the original document URL from the query string.
+    # The `url=` parameter is often URL-encoded so decode it before use.
     url_match = re.search(r"url=([^&\"']+)", params)
-    pdf_url = (
-        url_match.group(1) if url_match else f"https://docs.google.com/viewer?{params}"
-    )
+    if url_match:
+        raw_pdf_url = unquote(url_match.group(1))
+    else:
+        raw_pdf_url = f"https://docs.google.com/viewer?{params}"
+    # Only allow http/https to prevent javascript: or data: injection.
+    parsed = urlparse(raw_pdf_url)
+    pdf_url = raw_pdf_url if parsed.scheme in ("http", "https") else "#"
     return (
         f'<a href="{pdf_url}" style="display:inline-block;text-decoration:none;'
         f"padding:12px 16px;background:#f44336;color:#ffffff;border-radius:4px;"
@@ -93,6 +101,116 @@ def _pdf_embed_replacement(match):
         f'<a href="{pdf_url}" style="display:inline-block;text-decoration:none;'
         f"padding:12px 16px;background:#f44336;color:#ffffff;border-radius:4px;"
         f'font-size:14px;font-weight:600;">&#128196; View PDF Document</a>'
+    )
+
+
+# Bleach allowlist for closeout HTML rendered inside emails.
+# Permits common formatting and table tags produced by TinyMCE while
+# stripping any script, object, or embed elements not already handled by
+# the embed-replacement functions above.
+_EMAIL_ALLOWED_TAGS = [
+    # Text / inline formatting
+    "a",
+    "abbr",
+    "acronym",
+    "b",
+    "blockquote",
+    "br",
+    "code",
+    "em",
+    "i",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "s",
+    "small",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "u",
+    "ul",
+    # Headings
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    # Tables (TinyMCE frequently produces these)
+    "table",
+    "tbody",
+    "td",
+    "th",
+    "thead",
+    "tr",
+    # Images (inline / logo)
+    "img",
+    # Divs / horizontal rules
+    "div",
+    "hr",
+]
+_EMAIL_ALLOWED_ATTRIBUTES = {
+    "*": ["style", "class", "title"],
+    "a": ["href", "target", "rel"],
+    "img": ["src", "alt", "width", "height", "style"],
+    "td": ["colspan", "rowspan", "align", "valign", "style"],
+    "th": ["colspan", "rowspan", "align", "valign", "style"],
+    "table": ["border", "cellpadding", "cellspacing", "width", "style"],
+}
+_EMAIL_CSS_SANITIZER = CSSSanitizer(
+    allowed_css_properties=[
+        "background",
+        "background-color",
+        "border",
+        "border-collapse",
+        "border-color",
+        "border-radius",
+        "border-spacing",
+        "border-style",
+        "border-width",
+        "color",
+        "display",
+        "font-family",
+        "font-size",
+        "font-style",
+        "font-weight",
+        "height",
+        "line-height",
+        "margin",
+        "margin-bottom",
+        "margin-left",
+        "margin-right",
+        "margin-top",
+        "max-width",
+        "min-width",
+        "padding",
+        "padding-bottom",
+        "padding-left",
+        "padding-right",
+        "padding-top",
+        "text-align",
+        "text-decoration",
+        "vertical-align",
+        "white-space",
+        "width",
+    ]
+)
+
+
+class _BleachSanitizerDescriptor:
+    """Lazy wrapper so bleach is only invoked if there is content to clean."""
+
+
+def _bleach_clean_email_html(html: str) -> str:
+    """Run bleach allowlist sanitization on HTML intended for email delivery."""
+    return bleach.clean(
+        html,
+        tags=_EMAIL_ALLOWED_TAGS,
+        attributes=_EMAIL_ALLOWED_ATTRIBUTES,
+        css_sanitizer=_EMAIL_CSS_SANITIZER,
+        strip=True,
     )
 
 
@@ -117,6 +235,9 @@ def sanitize_closeout_html_for_email(html):
     html = _YOUTUBE_IFRAME_RE.sub(_youtube_replacement, html)
     html = _GDOCS_IFRAME_RE.sub(_gdocs_pdf_replacement, html)
     html = _PDF_EMBED_RE.sub(_pdf_embed_replacement, html)
+    # Allowlist-sanitize the remaining HTML so that unexpected tags, remote
+    # tracking pixels, or residual iframes cannot reach member inboxes.
+    html = _bleach_clean_email_html(html)
     return html
 
 
@@ -311,17 +432,32 @@ def send_finalization_summary_email(logsheet):
     )
 
     try:
-        send_mail(
-            subject=subject,
-            message=text_message,
-            from_email=from_email,
-            recipient_list=recipients,
-            html_message=html_message,
-        )
+        sent_count = 0
+        failure_count = 0
+        for recipient in recipients:
+            # Send one email per recipient so that member addresses are not
+            # disclosed to each other via the To: header.
+            try:
+                send_mail(
+                    subject=subject,
+                    message=text_message,
+                    from_email=from_email,
+                    recipient_list=[recipient],
+                    html_message=html_message,
+                )
+                sent_count += 1
+            except Exception:
+                failure_count += 1
+                logger.exception(
+                    "Failed to send finalization summary email for logsheet %s to %s.",
+                    logsheet.pk,
+                    recipient,
+                )
         logger.info(
-            "Sent finalization summary email for logsheet %s to %d recipient(s).",
+            "Finalization summary email for logsheet %s: sent to %d recipient(s), %d failure(s).",
             logsheet.pk,
-            len(recipients),
+            sent_count,
+            failure_count,
         )
     except Exception:
         logger.exception(

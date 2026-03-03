@@ -296,14 +296,21 @@ class TestSendFinalizationSummaryEmail:
             email="member2@example.com",
         )
         send_finalization_summary_email(self.logsheet)
-        assert mock_send.called
-        call_kwargs = mock_send.call_args
-        # All active-member emails should appear in recipient_list
-        recipients = call_kwargs.kwargs.get(
-            "recipient_list", call_kwargs.args[3] if len(call_kwargs.args) > 3 else []
-        )
-        assert "do@example.com" in recipients
-        assert "member2@example.com" in recipients
+        # send_mail is called once per recipient (individual sends to avoid
+        # disclosing member addresses to each other via the To: header).
+        assert mock_send.call_count == 2
+        all_recipients = [
+            call.kwargs.get(
+                "recipient_list",
+                call.args[3] if len(call.args) > 3 else [],
+            )
+            for call in mock_send.call_args_list
+        ]
+        # Each call should target exactly one address
+        assert all(len(r) == 1 for r in all_recipients)
+        called_addresses = {r[0] for r in all_recipients}
+        assert "do@example.com" in called_addresses
+        assert "member2@example.com" in called_addresses
 
     @patch("logsheet.utils.finalization_email.send_mail")
     def test_email_not_sent_when_no_active_members_with_email(self, mock_send):
