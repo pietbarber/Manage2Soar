@@ -1324,6 +1324,13 @@ def manage_logsheet_finances(request, pk):
             # so the sender sees committed state and mail failures cannot roll
             # back financial finalization.
             with transaction.atomic():
+                locked_logsheet = Logsheet.objects.select_for_update().get(
+                    pk=logsheet.pk
+                )
+                if locked_logsheet.finalized:
+                    messages.info(request, "This logsheet has already been finalized.")
+                    return redirect("logsheet:manage", pk=locked_logsheet.pk)
+
                 # Lock in costs
                 for flight in flights:
                     if flight.tow_cost_actual is None:
@@ -1332,16 +1339,18 @@ def manage_logsheet_finances(request, pk):
                         flight.rental_cost_actual = flight.rental_cost_calculated
                     flight.save()
 
-                logsheet.finalized = True
-                logsheet.save()
+                locked_logsheet.finalized = True
+                locked_logsheet.save()
 
                 RevisionLog.objects.create(
-                    logsheet=logsheet,
+                    logsheet=locked_logsheet,
                     revised_by=request.user,
                     note="Logsheet finalized",
                 )
 
-                transaction.on_commit(lambda: send_finalization_summary_email(logsheet))
+                transaction.on_commit(
+                    lambda: send_finalization_summary_email(locked_logsheet)
+                )
 
             messages.success(
                 request, "Logsheet has been finalized and all costs locked in."

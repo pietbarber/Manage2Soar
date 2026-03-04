@@ -493,6 +493,16 @@ def _get_from_email(config):
     return "noreply@manage2soar.com"
 
 
+def _sanitize_email_subject(raw_subject, max_length=255):
+    """Remove header-unsafe content from an email subject line."""
+    subject_no_crlf = re.sub(r"[\r\n]+", " ", raw_subject)
+    subject_printable = "".join(ch for ch in subject_no_crlf if ch.isprintable())
+    subject = subject_printable.strip()
+    if len(subject) > max_length:
+        return subject[:max_length]
+    return subject
+
+
 def send_finalization_summary_email(logsheet):
     """
     Send the post-finalization HTML summary email to all active members
@@ -538,10 +548,11 @@ def send_finalization_summary_email(logsheet):
 
         # Use Django's date_format so the format is locale-aware and avoids the
         # %-d day specifier which is not supported on all platforms (e.g. Windows).
-        subject = (
+        raw_subject = (
             f"{context['club_name']} Operations Summary – "
             f"{django_date_format(logsheet.log_date, 'l, N j, Y')}"
         )
+        subject = _sanitize_email_subject(raw_subject)
 
         html_message = render_to_string(
             "logsheet/emails/logsheet_summary_email.html", context
