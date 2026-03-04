@@ -1,6 +1,7 @@
 # AJAX endpoint to update split fields for a flight
 import logging
 from datetime import date, datetime, timedelta
+from threading import Thread
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -46,6 +47,27 @@ from .models import (
 from .utils.finalization_email import send_finalization_summary_email
 
 logger = logging.getLogger(__name__)
+
+
+def enqueue_finalization_summary_email(logsheet_id):
+    """Dispatch finalization summary email in a background thread."""
+
+    def _send_in_background():
+        try:
+            logsheet = Logsheet.objects.get(pk=logsheet_id)
+        except Logsheet.DoesNotExist:
+            logger.warning(
+                "Skipping finalization summary email: logsheet %s no longer exists.",
+                logsheet_id,
+            )
+            return
+        send_finalization_summary_email(logsheet)
+
+    Thread(
+        target=_send_in_background,
+        name=f"finalization-email-{logsheet_id}",
+        daemon=True,
+    ).start()
 
 
 def get_validation_message(validation_error):
@@ -501,6 +523,11 @@ def manage_logsheet(request, pk):
         # and any post-finalization behavior outside this block, run after
         # the DB commit rather than inline.
         with transaction.atomic():
+            locked_logsheet = Logsheet.objects.select_for_update().get(pk=logsheet.pk)
+            if locked_logsheet.finalized:
+                messages.info(request, "This logsheet has already been finalized.")
+                return redirect("logsheet:manage", pk=locked_logsheet.pk)
+
             # Lock in cost values
             # That means take the temporary values we calculated for the costs
             # and place them in these other variables that get perma-written to the database.
@@ -512,17 +539,20 @@ def manage_logsheet(request, pk):
                     flight.rental_cost_actual = flight.rental_cost_calculated
                 flight.save()
 
-            logsheet.finalized = True
-            logsheet.save()
+            locked_logsheet.finalized = True
+            locked_logsheet.save()
 
             RevisionLog.objects.create(
-                logsheet=logsheet, revised_by=request.user, note="Logsheet finalized"
+                logsheet=locked_logsheet,
+                revised_by=request.user,
+                note="Logsheet finalized",
             )
 
-            # Send HTML summary email after the atomic block commits so the
-            # finalized logsheet is visible to DB queries inside the sender
-            # and a mail failure cannot roll back the finalization.
-            transaction.on_commit(lambda: send_finalization_summary_email(logsheet))
+            # Queue summary email dispatch after commit so request latency
+            # does not scale with recipient count.
+            transaction.on_commit(
+                lambda: enqueue_finalization_summary_email(locked_logsheet.pk)
+            )
 
         # Retire visiting pilot token when logsheet is finalized
         config = SiteConfiguration.objects.first()
@@ -1349,7 +1379,7 @@ def manage_logsheet_finances(request, pk):
                 )
 
                 transaction.on_commit(
-                    lambda: send_finalization_summary_email(locked_logsheet)
+                    lambda: enqueue_finalization_summary_email(locked_logsheet.pk)
                 )
 
             messages.success(

@@ -192,8 +192,10 @@ def _email_allowed_attribute(tag, name, value):
     Callable bleach attribute filter for email-bound HTML.
 
     Restricts ``img[src]`` to trusted image CDN hosts so that remote tracking
-    pixels embedded in TinyMCE content cannot reach member inboxes.  All other
-    standard formatting attributes are passed through unchanged.
+    pixels embedded in TinyMCE content cannot reach member inboxes.
+
+    Attributes are allowlisted per tag (plus a small global set); any attribute
+    not explicitly permitted is rejected.
     """
     # Global attributes permitted on every element
     if name in ("style", "class", "title"):

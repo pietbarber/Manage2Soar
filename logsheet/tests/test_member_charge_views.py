@@ -741,8 +741,8 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         )
         self.assertNotContains(response, delete_url)
 
-    @patch("logsheet.views.send_finalization_summary_email")
-    def test_finances_finalize_triggers_summary_email(self, mock_send_summary):
+    @patch("logsheet.views.enqueue_finalization_summary_email")
+    def test_finances_finalize_triggers_summary_email(self, mock_enqueue_summary):
         """Finalizing from finances should schedule the finalization summary email."""
         self.client.login(username="do@test.com", password="testpass123")
         url = reverse(
@@ -756,10 +756,10 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.logsheet.refresh_from_db()
         self.assertTrue(self.logsheet.finalized)
         self.assertEqual(response.status_code, 200)
-        mock_send_summary.assert_called_once_with(self.logsheet)
+        mock_enqueue_summary.assert_called_once_with(self.logsheet.pk)
 
-    @patch("logsheet.views.send_finalization_summary_email")
-    def test_finances_finalize_creates_revision_log_entry(self, mock_send_summary):
+    @patch("logsheet.views.enqueue_finalization_summary_email")
+    def test_finances_finalize_creates_revision_log_entry(self, mock_enqueue_summary):
         """Finalizing from finances should record a revision log entry."""
         self.client.login(username="do@test.com", password="testpass123")
         url = reverse(
@@ -777,11 +777,11 @@ class FinancesViewChargeDisplayTestCase(TestCase):
                 note="Logsheet finalized",
             ).exists()
         )
-        mock_send_summary.assert_called_once_with(self.logsheet)
+        mock_enqueue_summary.assert_called_once_with(self.logsheet.pk)
 
-    @patch("logsheet.views.send_finalization_summary_email")
+    @patch("logsheet.views.enqueue_finalization_summary_email")
     def test_finances_finalize_already_finalized_does_not_resend_email(
-        self, mock_send_summary
+        self, mock_enqueue_summary
     ):
         """Repeat finalize POST should not re-send summary email for finalized logsheets."""
         self.logsheet.finalized = True
@@ -799,4 +799,4 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         messages = list(response.context["messages"])
         self.assertTrue(any("already been finalized" in str(m) for m in messages))
-        mock_send_summary.assert_not_called()
+        mock_enqueue_summary.assert_not_called()
