@@ -93,6 +93,22 @@ class TestSanitizeCloseoutHtml(SimpleTestCase):
         assert "testVideoId" in result
         assert "/media/report.pdf" in result
 
+    def test_untrusted_img_source_is_removed(self):
+        html = '<p>Test<img src="https://evil.example.com/tracker.png" alt="x"></p>'
+        result = sanitize_closeout_html_for_email(html)
+        assert "evil.example.com" not in result
+        assert "tracker.png" not in result
+
+    def test_background_url_is_stripped_from_inline_style(self):
+        html = (
+            '<p style="background:url(https://evil.example.com/bg.png);'
+            'color:#111;">Safe text</p>'
+        )
+        result = sanitize_closeout_html_for_email(html)
+        assert "background:url" not in result
+        assert "evil.example.com/bg.png" not in result
+        assert "Safe text" in result
+
 
 class TestHtmlToTextPreserveLinks(SimpleTestCase):
     def test_converts_links_to_label_and_url(self):

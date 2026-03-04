@@ -7,6 +7,7 @@ in the logsheet workflow.
 
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
@@ -120,7 +121,7 @@ class MemberChargeFormTestCase(TestCase):
             membership_status="Inactive",
         )
         form = MemberChargeForm()
-        choices = form.fields["member"].choices
+        choices = list(form.fields["member"].choices)
         # Should have blank option + at least one group
         self.assertEqual(choices[0], ("", "— Select member —"))
         # Active members group should exist
@@ -392,6 +393,7 @@ class AddMemberChargeViewTestCase(TestCase):
         self.client.post(url, data)
 
         charge = MemberCharge.objects.first()
+        assert charge is not None
         self.assertEqual(charge.logsheet, self.logsheet)
 
     def test_charge_date_matches_logsheet_date(self):
@@ -408,6 +410,7 @@ class AddMemberChargeViewTestCase(TestCase):
         self.client.post(url, data)
 
         charge = MemberCharge.objects.first()
+        assert charge is not None
         self.assertEqual(charge.date, self.logsheet.log_date)
 
     def test_success_message_displayed(self):
@@ -737,3 +740,20 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             },
         )
         self.assertNotContains(response, delete_url)
+
+    @patch("logsheet.views.send_finalization_summary_email")
+    def test_finances_finalize_triggers_summary_email(self, mock_send_summary):
+        """Finalizing from finances should schedule the finalization summary email."""
+        self.client.login(username="do@test.com", password="testpass123")
+        url = reverse(
+            "logsheet:manage_logsheet_finances",
+            kwargs={"pk": self.logsheet.pk},
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(url, {"finalize": "true"}, follow=True)
+
+        self.logsheet.refresh_from_db()
+        self.assertTrue(self.logsheet.finalized)
+        self.assertEqual(response.status_code, 200)
+        mock_send_summary.assert_called_once_with(self.logsheet)

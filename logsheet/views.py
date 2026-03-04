@@ -1316,16 +1316,23 @@ def manage_logsheet_finances(request, pk):
                 )
                 return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
-            # Lock in costs
-            for flight in flights:
-                if flight.tow_cost_actual is None:
-                    flight.tow_cost_actual = flight.tow_cost_calculated
-                if flight.rental_cost_actual is None:
-                    flight.rental_cost_actual = flight.rental_cost_calculated
-                flight.save()
+            # Keep finalization DB writes atomic and register post-commit email
+            # so the sender sees committed state and mail failures cannot roll
+            # back financial finalization.
+            with transaction.atomic():
+                # Lock in costs
+                for flight in flights:
+                    if flight.tow_cost_actual is None:
+                        flight.tow_cost_actual = flight.tow_cost_calculated
+                    if flight.rental_cost_actual is None:
+                        flight.rental_cost_actual = flight.rental_cost_calculated
+                    flight.save()
 
-            logsheet.finalized = True
-            logsheet.save()
+                logsheet.finalized = True
+                logsheet.save()
+
+                transaction.on_commit(lambda: send_finalization_summary_email(logsheet))
+
             messages.success(
                 request, "Logsheet has been finalized and all costs locked in."
             )
