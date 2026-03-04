@@ -24,7 +24,7 @@ from django.urls import reverse
 from django.utils.formats import date_format as django_date_format
 
 from members.models import Member
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import MembershipStatus, SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -72,17 +72,6 @@ def _youtube_replacement(match):
     )
 
 
-def _gdocs_pdf_replacement(match):
-    """Return an email-safe link for a Google Docs PDF viewer embed.
-
-    Relative ``url=`` values are converted to absolute in
-    ``sanitize_closeout_html_for_email()`` via the closure form; this
-    module-level version is kept only for compatibility and does not
-    convert relative paths.
-    """
-    return _make_pdf_link_from_gdocs_params(match.group(1), site_url=None)
-
-
 def _make_pdf_link_from_gdocs_params(params, site_url):
     """Extract a PDF URL from Google Docs viewer query params and return a link."""
     url_match = re.search(r"url=([^&\"']+)", params)
@@ -108,17 +97,6 @@ def _make_pdf_link_from_gdocs_params(params, site_url):
         f"padding:12px 16px;background:#f44336;color:#ffffff;border-radius:4px;"
         f'font-size:14px;font-weight:600;">&#128196; View PDF Document</a>'
     )
-
-
-def _pdf_embed_replacement(match):
-    """Return an email-safe link for a bare PDF embed/object.
-
-    Relative ``src``/``data`` values are converted to absolute in
-    ``sanitize_closeout_html_for_email()`` via the closure form; this
-    module-level version is kept only for compatibility and does not
-    convert relative paths.
-    """
-    return _make_pdf_link_from_embed(match, site_url=None)
 
 
 def _make_pdf_link_from_embed(match, site_url):
@@ -475,8 +453,12 @@ def send_finalization_summary_email(logsheet):
     from_email = _get_from_email(config)
 
     # Fetch all active members with a valid email address
+    active_statuses = list(MembershipStatus.get_active_statuses())
     recipients = list(
-        Member.objects.filter(is_active=True)
+        Member.objects.filter(
+            membership_status__in=active_statuses,
+            is_active=True,
+        )
         .exclude(email="")
         .exclude(email__isnull=True)
         .values_list("email", flat=True)

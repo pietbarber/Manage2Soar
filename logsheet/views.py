@@ -494,10 +494,12 @@ def manage_logsheet(request, pk):
                     messages.error(request, f"Cannot finalize. {msg}")
                 return redirect("logsheet:manage", pk=logsheet.pk)
 
-        # Perform all finalization writes inside a single atomic transaction so
-        # that flight saves, logsheet finalization, and the revision log either
-        # all succeed or all roll back together.  on_commit() is registered
-        # inside the block so it fires *after* the DB commit, not inline.
+        # Perform the core finalization writes inside a single atomic
+        # transaction so that flight saves, logsheet.finalized, and the
+        # revision log entry either all succeed or all roll back together.
+        # on_commit() is registered inside the block so the summary email,
+        # and any post-finalization behavior outside this block, run after
+        # the DB commit rather than inline.
         with transaction.atomic():
             # Lock in cost values
             # That means take the temporary values we calculated for the costs

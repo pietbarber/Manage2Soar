@@ -2,7 +2,7 @@
 {{ logsheet.log_date|date:"l, F j, Y" }}
 ============================================================
 
-Operations for {{ logsheet.log_date|date:"l, F j" }} have been finalised.
+Operations for {{ logsheet.log_date|date:"l, F j" }} have been finalized.
 
 View the full Ops Report online:
 {{ ops_report_url }}

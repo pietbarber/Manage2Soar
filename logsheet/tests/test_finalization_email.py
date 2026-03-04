@@ -6,7 +6,7 @@ from datetime import date, time, timedelta
 from unittest.mock import patch
 
 import pytest
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase
 
 from logsheet.models import (
     Airfield,
@@ -21,6 +21,7 @@ from logsheet.utils.finalization_email import (
     send_finalization_summary_email,
 )
 from members.models import Member
+from siteconfig.models import MembershipStatus
 
 # ---------------------------------------------------------------------------
 # sanitize_closeout_html_for_email
@@ -264,6 +265,14 @@ class TestGetFinalizationEmailContext:
 class TestSendFinalizationSummaryEmail:
     @pytest.fixture(autouse=True)
     def setup(self, db):
+        MembershipStatus.objects.update_or_create(
+            name="Full Member",
+            defaults={"is_active": True},
+        )
+        MembershipStatus.objects.update_or_create(
+            name="Inactive Member",
+            defaults={"is_active": False},
+        )
         self.airfield = Airfield.objects.create(identifier="KBAR", name="Bar Field")
         self.member = Member.objects.create_user(
             username="do2",
@@ -311,6 +320,36 @@ class TestSendFinalizationSummaryEmail:
         called_addresses = {r[0] for r in all_recipients}
         assert "do@example.com" in called_addresses
         assert "member2@example.com" in called_addresses
+
+    @patch("logsheet.utils.finalization_email.send_mail")
+    def test_email_excludes_inactive_membership_status(self, mock_send):
+        Member.objects.create_user(
+            username="inactive_status_user",
+            password="test",
+            membership_status="Inactive Member",
+            is_active=True,
+            email="inactive-status@example.com",
+        )
+        Member.objects.create_user(
+            username="active3",
+            password="test",
+            membership_status="Full Member",
+            is_active=True,
+            email="member3@example.com",
+        )
+
+        send_finalization_summary_email(self.logsheet)
+
+        called_addresses = {
+            call.kwargs.get(
+                "recipient_list",
+                call.args[3] if len(call.args) > 3 else [],
+            )[0]
+            for call in mock_send.call_args_list
+        }
+        assert "do@example.com" in called_addresses
+        assert "member3@example.com" in called_addresses
+        assert "inactive-status@example.com" not in called_addresses
 
     @patch("logsheet.utils.finalization_email.send_mail")
     def test_email_not_sent_when_no_active_members_with_email(self, mock_send):
