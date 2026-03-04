@@ -17,6 +17,7 @@ from logsheet.models import (
 )
 from logsheet.utils.finalization_email import (
     get_finalization_email_context,
+    html_to_text_preserve_links,
     sanitize_closeout_html_for_email,
     send_finalization_summary_email,
 )
@@ -93,6 +94,13 @@ class TestSanitizeCloseoutHtml(SimpleTestCase):
         assert "/media/report.pdf" in result
 
 
+class TestHtmlToTextPreserveLinks(SimpleTestCase):
+    def test_converts_links_to_label_and_url(self):
+        html = '<p>See <a href="https://example.com/doc.pdf">View PDF Document</a></p>'
+        result = html_to_text_preserve_links(html)
+        assert "View PDF Document (https://example.com/doc.pdf)" in result
+
+
 # ---------------------------------------------------------------------------
 # get_finalization_email_context
 # ---------------------------------------------------------------------------
@@ -138,6 +146,9 @@ class TestGetFinalizationEmailContext:
             "safety_issues_html",
             "equipment_issues_html",
             "operations_summary_html",
+            "safety_issues_text",
+            "equipment_issues_text",
+            "operations_summary_text",
             "club_name",
             "club_nickname",
             "club_logo_url",
@@ -385,3 +396,23 @@ class TestSendFinalizationSummaryEmail:
         assert "Operations Summary" in kwargs.get("html_message", "")
         assert kwargs.get("message") is not None
         assert "Great flying day" in kwargs.get("message", "")
+
+    @patch("logsheet.utils.finalization_email.send_mail")
+    def test_text_template_preserves_link_urls(self, mock_send):
+        self.logsheet.closeout.operations_summary = (
+            '<p>Read <a href="https://example.com/manual.pdf">Manual</a></p>'
+        )
+        self.logsheet.closeout.save()
+
+        send_finalization_summary_email(self.logsheet)
+
+        kwargs = mock_send.call_args.kwargs
+        assert "Manual (https://example.com/manual.pdf)" in kwargs.get("message", "")
+
+    @patch(
+        "logsheet.utils.finalization_email.render_to_string",
+        side_effect=Exception("Template rendering error"),
+    )
+    def test_template_render_exception_does_not_propagate(self, mock_render):
+        send_finalization_summary_email(self.logsheet)
+        assert mock_render.called

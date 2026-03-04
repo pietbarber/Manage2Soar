@@ -17,20 +17,20 @@ DUTY CREW
 {% endif %}{% if logsheet.tow_pilot %}Tow Pilot:           {{ logsheet.tow_pilot.full_display_name }}
 {% endif %}{% if logsheet.surge_tow_pilot %}Surge Tow Pilot:     {{ logsheet.surge_tow_pilot.full_display_name }}
 {% endif %}
-{% if operations_summary_html %}------------------------------------------------------------
+{% if operations_summary_text %}------------------------------------------------------------
 OPERATIONS SUMMARY
 ------------------------------------------------------------
-{{ operations_summary_html|striptags|wordwrap:70 }}
+{{ operations_summary_text|wordwrap:70 }}
 
-{% endif %}{% if safety_issues_html %}------------------------------------------------------------
+{% endif %}{% if safety_issues_text %}------------------------------------------------------------
 SAFETY SUMMARY
 ------------------------------------------------------------
-{{ safety_issues_html|striptags|wordwrap:70 }}
+{{ safety_issues_text|wordwrap:70 }}
 
-{% endif %}{% if equipment_issues_html %}------------------------------------------------------------
+{% endif %}{% if equipment_issues_text %}------------------------------------------------------------
 EQUIPMENT SUMMARY
 ------------------------------------------------------------
-{{ equipment_issues_html|striptags|wordwrap:70 }}
+{{ equipment_issues_text|wordwrap:70 }}
 
 {% endif %}{% if maintenance_issues %}------------------------------------------------------------
 MAINTENANCE ISSUES

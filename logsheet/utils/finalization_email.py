@@ -14,6 +14,7 @@ to all active members with:
 
 import logging
 import re
+from html import unescape
 from urllib.parse import unquote, urlparse
 
 import bleach
@@ -24,7 +25,8 @@ from django.urls import reverse
 from django.utils.formats import date_format as django_date_format
 
 from members.models import Member
-from siteconfig.models import MembershipStatus, SiteConfiguration
+from members.utils.membership import get_active_membership_statuses
+from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -55,6 +57,13 @@ _PDF_EMBED_RE = re.compile(
     r'<(?:embed|object)\b[^>]*(?:src|data)=["\'][^"\']*\.pdf["\'][^>]*(?:>.*?</object>|/?>)',
     re.IGNORECASE | re.DOTALL,
 )
+
+_ANCHOR_TAG_RE = re.compile(
+    r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
 def _youtube_replacement(match):
@@ -295,6 +304,35 @@ def sanitize_closeout_html_for_email(html, site_url=None):
     return html
 
 
+def html_to_text_preserve_links(html):
+    """Convert sanitized HTML to plain text while preserving link targets."""
+    if not html:
+        return ""
+
+    def _anchor_to_text(match):
+        href = unescape(match.group(1)).strip()
+        label = unescape(_HTML_TAG_RE.sub("", match.group(2))).strip()
+        label = re.sub(r"\s+", " ", label)
+
+        if not href:
+            return label
+        if not label:
+            return href
+        if label == href:
+            return href
+        return f"{label} ({href})"
+
+    text = _ANCHOR_TAG_RE.sub(_anchor_to_text, html)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</p\s*>", "\n\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</li\s*>", "\n", text, flags=re.IGNORECASE)
+    text = _HTML_TAG_RE.sub("", text)
+    text = unescape(text)
+    text = text.replace("\xa0", " ")
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 # ---------------------------------------------------------------------------
 # Context builder
 # ---------------------------------------------------------------------------
@@ -393,6 +431,9 @@ def get_finalization_email_context(logsheet):
     safety_issues_html = ""
     equipment_issues_html = ""
     operations_summary_html = ""
+    safety_issues_text = ""
+    equipment_issues_text = ""
+    operations_summary_text = ""
     if closeout:
         safety_issues_html = sanitize_closeout_html_for_email(
             closeout.safety_issues or "", site_url=site_url
@@ -403,6 +444,9 @@ def get_finalization_email_context(logsheet):
         operations_summary_html = sanitize_closeout_html_for_email(
             closeout.operations_summary or "", site_url=site_url
         )
+        safety_issues_text = html_to_text_preserve_links(safety_issues_html)
+        equipment_issues_text = html_to_text_preserve_links(equipment_issues_html)
+        operations_summary_text = html_to_text_preserve_links(operations_summary_html)
 
     return {
         "logsheet": logsheet,
@@ -412,6 +456,9 @@ def get_finalization_email_context(logsheet):
         "safety_issues_html": safety_issues_html,
         "equipment_issues_html": equipment_issues_html,
         "operations_summary_html": operations_summary_html,
+        "safety_issues_text": safety_issues_text,
+        "equipment_issues_text": equipment_issues_text,
+        "operations_summary_text": operations_summary_text,
         "club_name": config.club_name if config else "Soaring Club",
         "club_nickname": config.club_nickname if config else "",
         "club_logo_url": get_absolute_club_logo_url(config),
@@ -449,46 +496,46 @@ def send_finalization_summary_email(logsheet):
     Args:
         logsheet: The ``Logsheet`` instance that has just been finalized.
     """
-    config = SiteConfiguration.objects.first()
-    from_email = _get_from_email(config)
-
-    # Fetch all active members with a valid email address
-    active_statuses = list(MembershipStatus.get_active_statuses())
-    recipients = list(
-        Member.objects.filter(
-            membership_status__in=active_statuses,
-            is_active=True,
-        )
-        .exclude(email="")
-        .exclude(email__isnull=True)
-        .values_list("email", flat=True)
-        .distinct()
-    )
-
-    if not recipients:
-        logger.warning(
-            "Finalization email for logsheet %s: no active members with email found, skipping.",
-            logsheet.pk,
-        )
-        return
-
-    context = get_finalization_email_context(logsheet)
-
-    # Use Django's date_format so the format is locale-aware and avoids the
-    # %-d day specifier which is not supported on all platforms (e.g. Windows).
-    subject = (
-        f"{context['club_name']} Operations Summary – "
-        f"{django_date_format(logsheet.log_date, 'l, N j, Y')}"
-    )
-
-    html_message = render_to_string(
-        "logsheet/emails/logsheet_summary_email.html", context
-    )
-    text_message = render_to_string(
-        "logsheet/emails/logsheet_summary_email.txt", context
-    )
-
     try:
+        config = SiteConfiguration.objects.first()
+        from_email = _get_from_email(config)
+
+        # Fetch all active members with a valid email address
+        active_statuses = get_active_membership_statuses()
+        recipients = list(
+            Member.objects.filter(
+                membership_status__in=active_statuses,
+                is_active=True,
+            )
+            .exclude(email="")
+            .exclude(email__isnull=True)
+            .values_list("email", flat=True)
+            .distinct()
+        )
+
+        if not recipients:
+            logger.warning(
+                "Finalization email for logsheet %s: no active members with email found, skipping.",
+                logsheet.pk,
+            )
+            return
+
+        context = get_finalization_email_context(logsheet)
+
+        # Use Django's date_format so the format is locale-aware and avoids the
+        # %-d day specifier which is not supported on all platforms (e.g. Windows).
+        subject = (
+            f"{context['club_name']} Operations Summary – "
+            f"{django_date_format(logsheet.log_date, 'l, N j, Y')}"
+        )
+
+        html_message = render_to_string(
+            "logsheet/emails/logsheet_summary_email.html", context
+        )
+        text_message = render_to_string(
+            "logsheet/emails/logsheet_summary_email.txt", context
+        )
+
         sent_count = 0
         failure_count = 0
         # Open a single SMTP connection for all sends to avoid per-message
