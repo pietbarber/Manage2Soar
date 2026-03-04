@@ -68,11 +68,16 @@ def _sanitize_csv_cell(value):
 
 def _member_flight_charge_breakdown(flight, member):
     """Return (tow, rental, total) owed by `member` for a single flight."""
-    if flight.logsheet.finalized:
-        tow_base = flight.tow_cost_actual or Decimal("0.00")
-        rental_base = flight.rental_cost_actual or Decimal("0.00")
+    # Prefer locked-in actual values for finalized logsheets, but fall back to
+    # calculated values when legacy rows have NULL actuals.
+    if flight.logsheet.finalized and flight.tow_cost_actual is not None:
+        tow_base = flight.tow_cost_actual
     else:
         tow_base = flight.tow_cost_calculated or Decimal("0.00")
+
+    if flight.logsheet.finalized and flight.rental_cost_actual is not None:
+        rental_base = flight.rental_cost_actual
+    else:
         rental_base = flight.rental_cost or Decimal("0.00")
 
     allocations = split_flight_costs(
@@ -1375,8 +1380,10 @@ def manage_logsheet_finances(request, pk):
         for charged_member, split_values in allocations.items():
             if not charged_member:
                 continue
-            member_charges[charged_member]["tow"] += split_values["tow"]
-            member_charges[charged_member]["rental"] += split_values["rental"]
+            tow_split = quantize_currency(split_values["tow"])
+            rental_split = quantize_currency(split_values["rental"])
+            member_charges[charged_member]["tow"] += tow_split
+            member_charges[charged_member]["rental"] += rental_split
 
     # Add towplane rental costs to member charges
     for closeout, rental_cost in towplane_data:
