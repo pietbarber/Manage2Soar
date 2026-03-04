@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import time, timedelta
 from decimal import Decimal
 
 import pytest
@@ -174,3 +174,96 @@ class TestPersonalChargesView:
         assert "Misc" in content
         assert "T-Shirt" in content
         assert str(self.old_date) not in content
+
+    def test_personal_charges_view_covers_even_rental_and_full_splits(self, client):
+        flight_even = Flight.objects.create(
+            logsheet=self.recent_logsheet,
+            pilot=self.other_member,
+            split_with=self.member,
+            split_type="even",
+            glider=self.glider,
+            flight_type="dual",
+            tow_cost_actual=Decimal("10.00"),
+            rental_cost_actual=Decimal("5.00"),
+        )
+        flight_rental = Flight.objects.create(
+            logsheet=self.recent_logsheet,
+            pilot=self.other_member,
+            split_with=self.member,
+            split_type="rental",
+            glider=self.glider,
+            flight_type="dual",
+            tow_cost_actual=Decimal("9.00"),
+            rental_cost_actual=Decimal("4.00"),
+        )
+        flight_full = Flight.objects.create(
+            logsheet=self.recent_logsheet,
+            pilot=self.other_member,
+            split_with=self.member,
+            split_type="full",
+            glider=self.glider,
+            flight_type="dual",
+            tow_cost_actual=Decimal("3.00"),
+            rental_cost_actual=Decimal("2.00"),
+        )
+
+        client.force_login(self.member)
+        response = client.get(reverse("logsheet:personal_charges"))
+        assert response.status_code == 200
+
+        rows_by_flight_id = {
+            row["flight"].pk: row for row in response.context["flight_rows"]
+        }
+
+        even_row = rows_by_flight_id[flight_even.pk]
+        assert even_row["tow_cost"] == Decimal("5.00")
+        assert even_row["rental_cost"] == Decimal("2.50")
+        assert even_row["total_cost"] == Decimal("7.50")
+
+        rental_row = rows_by_flight_id[flight_rental.pk]
+        assert rental_row["tow_cost"] == Decimal("0.00")
+        assert rental_row["rental_cost"] == Decimal("4.00")
+        assert rental_row["total_cost"] == Decimal("4.00")
+
+        full_row = rows_by_flight_id[flight_full.pk]
+        assert full_row["tow_cost"] == Decimal("3.00")
+        assert full_row["rental_cost"] == Decimal("2.00")
+        assert full_row["total_cost"] == Decimal("5.00")
+
+    def test_non_finalized_flight_path_uses_calculated_and_half_up_rounding(
+        self, client
+    ):
+        self.glider.rental_rate = Decimal("11.11")
+        self.glider.save(update_fields=["rental_rate"])
+
+        non_finalized_logsheet = Logsheet.objects.create(
+            log_date=self.recent_date - timedelta(days=1),
+            airfield=self.airfield,
+            created_by=self.member,
+            finalized=False,
+        )
+        flight_non_finalized = Flight.objects.create(
+            logsheet=non_finalized_logsheet,
+            pilot=self.other_member,
+            split_with=self.member,
+            split_type="even",
+            glider=self.glider,
+            flight_type="dual",
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            tow_cost_actual=Decimal("0.00"),
+            rental_cost_actual=Decimal("0.00"),
+        )
+
+        client.force_login(self.member)
+        response = client.get(reverse("logsheet:personal_charges"))
+        assert response.status_code == 200
+
+        non_finalized_row = next(
+            row
+            for row in response.context["flight_rows"]
+            if row["flight"].pk == flight_non_finalized.pk
+        )
+        assert non_finalized_row["tow_cost"] == Decimal("0.00")
+        assert non_finalized_row["rental_cost"] == Decimal("5.56")
+        assert non_finalized_row["total_cost"] == Decimal("5.56")

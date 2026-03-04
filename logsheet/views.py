@@ -49,6 +49,7 @@ from .models import (
     Towplane,
     TowplaneCloseout,
 )
+from .utils.flight_charges import quantize_currency, split_flight_costs
 
 logger = logging.getLogger(__name__)
 
@@ -62,44 +63,21 @@ def _member_flight_charge_breakdown(flight, member):
         tow_base = flight.tow_cost_calculated or Decimal("0.00")
         rental_base = flight.rental_cost or Decimal("0.00")
 
-    tow_base = Decimal(str(tow_base))
-    rental_base = Decimal(str(rental_base))
+    allocations = split_flight_costs(
+        flight.pilot,
+        flight.split_with,
+        flight.split_type,
+        tow_base,
+        rental_base,
+    )
+    member_alloc = allocations.get(
+        member,
+        {"tow": Decimal("0.00"), "rental": Decimal("0.00")},
+    )
 
-    pilot = flight.pilot
-    partner = flight.split_with
-    split_type = flight.split_type
-
-    owed_tow = Decimal("0.00")
-    owed_rental = Decimal("0.00")
-
-    if partner and split_type:
-        if split_type == "even":
-            half_tow = tow_base / 2
-            half_rental = rental_base / 2
-            if member == pilot or member == partner:
-                owed_tow = half_tow
-                owed_rental = half_rental
-        elif split_type == "tow":
-            if member == pilot:
-                owed_rental = rental_base
-            elif member == partner:
-                owed_tow = tow_base
-        elif split_type == "rental":
-            if member == pilot:
-                owed_tow = tow_base
-            elif member == partner:
-                owed_rental = rental_base
-        elif split_type == "full":
-            if member == partner:
-                owed_tow = tow_base
-                owed_rental = rental_base
-    elif member == pilot:
-        owed_tow = tow_base
-        owed_rental = rental_base
-
-    owed_tow = owed_tow.quantize(Decimal("0.01"))
-    owed_rental = owed_rental.quantize(Decimal("0.01"))
-    total = (owed_tow + owed_rental).quantize(Decimal("0.01"))
+    owed_tow = quantize_currency(member_alloc["tow"])
+    owed_rental = quantize_currency(member_alloc["rental"])
+    total = quantize_currency(owed_tow + owed_rental)
     return owed_tow, owed_rental, total
 
 
@@ -112,8 +90,13 @@ def _get_personal_charge_data(member, start_date):
         .order_by("-logsheet__log_date", "-launch_time", "-pk")
     )
 
+    # Avoid per-flight SiteConfiguration lookups when non-finalized flights
+    # use tow_cost_calculated / rental_cost and retrieve-waiver rules.
+    site_config = SiteConfiguration.objects.first()
+
     flight_rows = []
     for flight in flights:
+        flight._site_config_cache = site_config
         tow_cost, rental_cost, total_cost = _member_flight_charge_breakdown(
             flight, member
         )
@@ -1340,37 +1323,24 @@ def manage_logsheet_finances(request, pk):
         }
     )
     for flight, costs in flight_data:
-        pilot = flight.pilot
-        partner = flight.split_with
-        split_type = flight.split_type
         tow = costs["tow"] or Decimal("0.00")
         rental = costs["rental"] or Decimal("0.00")
-        total = costs["total"] or Decimal("0.00")
 
-        if partner and split_type:
-            if split_type == "even":
-                # For 50/50 splits, divide both tow and rental costs equally
-                # IMPORTANT: This logic is duplicated in manage_logsheet_finances.html (JavaScript)
-                # If this calculation changes, update BOTH locations!
-                half_tow = tow / 2
-                half_rental = rental / 2
-                member_charges[pilot]["tow"] += half_tow
-                member_charges[pilot]["rental"] += half_rental
-                member_charges[partner]["tow"] += half_tow
-                member_charges[partner]["rental"] += half_rental
-            elif split_type == "tow":
-                member_charges[pilot]["rental"] += rental
-                member_charges[partner]["tow"] += tow
-            elif split_type == "rental":
-                member_charges[pilot]["tow"] += tow
-                member_charges[partner]["rental"] += rental
-            elif split_type == "full":
-                member_charges[partner]["tow"] += tow
-                member_charges[partner]["rental"] += rental
-        else:
-            if pilot:
-                member_charges[pilot]["tow"] += tow
-                member_charges[pilot]["rental"] += rental
+        # IMPORTANT: Equivalent split logic is still implemented in
+        # manage_logsheet_finances.html (JavaScript) for client-side preview
+        # recalculation. Keep these rules in sync when changing behavior.
+        allocations = split_flight_costs(
+            flight.pilot,
+            flight.split_with,
+            flight.split_type,
+            tow,
+            rental,
+        )
+        for charged_member, split_values in allocations.items():
+            if not charged_member:
+                continue
+            member_charges[charged_member]["tow"] += split_values["tow"]
+            member_charges[charged_member]["rental"] += split_values["rental"]
 
     # Add towplane rental costs to member charges
     for closeout, rental_cost in towplane_data:
