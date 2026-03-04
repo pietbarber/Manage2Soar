@@ -494,28 +494,33 @@ def manage_logsheet(request, pk):
                     messages.error(request, f"Cannot finalize. {msg}")
                 return redirect("logsheet:manage", pk=logsheet.pk)
 
-        # Lock in cost values
-        # That means take the temporary values we calculated for the costs
-        # and place them in these other variables that get perma-written to the database.
-        # Use unfiltered queryset to lock in costs for all flights
-        for flight in all_flights:
-            if flight.tow_cost_actual is None:
-                flight.tow_cost_actual = flight.tow_cost_calculated
-            if flight.rental_cost_actual is None:
-                flight.rental_cost_actual = flight.rental_cost_calculated
-            flight.save()
+        # Perform all finalization writes inside a single atomic transaction so
+        # that flight saves, logsheet finalization, and the revision log either
+        # all succeed or all roll back together.  on_commit() is registered
+        # inside the block so it fires *after* the DB commit, not inline.
+        with transaction.atomic():
+            # Lock in cost values
+            # That means take the temporary values we calculated for the costs
+            # and place them in these other variables that get perma-written to the database.
+            # Use unfiltered queryset to lock in costs for all flights
+            for flight in all_flights:
+                if flight.tow_cost_actual is None:
+                    flight.tow_cost_actual = flight.tow_cost_calculated
+                if flight.rental_cost_actual is None:
+                    flight.rental_cost_actual = flight.rental_cost_calculated
+                flight.save()
 
-        logsheet.finalized = True
-        logsheet.save()
+            logsheet.finalized = True
+            logsheet.save()
 
-        RevisionLog.objects.create(
-            logsheet=logsheet, revised_by=request.user, note="Logsheet finalized"
-        )
+            RevisionLog.objects.create(
+                logsheet=logsheet, revised_by=request.user, note="Logsheet finalized"
+            )
 
-        # Send HTML summary email to all active members after the transaction
-        # commits, so the finalized logsheet is visible to DB queries inside
-        # the email sender and a mail failure cannot roll back the save.
-        transaction.on_commit(lambda: send_finalization_summary_email(logsheet))
+            # Send HTML summary email after the atomic block commits so the
+            # finalized logsheet is visible to DB queries inside the sender
+            # and a mail failure cannot roll back the finalization.
+            transaction.on_commit(lambda: send_finalization_summary_email(logsheet))
 
         # Retire visiting pilot token when logsheet is finalized
         config = SiteConfiguration.objects.first()

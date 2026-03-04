@@ -73,18 +73,36 @@ def _youtube_replacement(match):
 
 
 def _gdocs_pdf_replacement(match):
-    """Return an email-safe link for a Google Docs PDF viewer embed."""
-    params = match.group(1)
-    # Extract the original document URL from the query string.
-    # The `url=` parameter is often URL-encoded so decode it before use.
+    """Return an email-safe link for a Google Docs PDF viewer embed.
+
+    Relative ``url=`` values are converted to absolute in
+    ``sanitize_closeout_html_for_email()`` via the closure form; this
+    module-level version is kept only for compatibility and does not
+    convert relative paths.
+    """
+    return _make_pdf_link_from_gdocs_params(match.group(1), site_url=None)
+
+
+def _make_pdf_link_from_gdocs_params(params, site_url):
+    """Extract a PDF URL from Google Docs viewer query params and return a link."""
     url_match = re.search(r"url=([^&\"']+)", params)
     if url_match:
         raw_pdf_url = unquote(url_match.group(1))
     else:
         raw_pdf_url = f"https://docs.google.com/viewer?{params}"
-    # Only allow http/https to prevent javascript: or data: injection.
     parsed = urlparse(raw_pdf_url)
-    pdf_url = raw_pdf_url if parsed.scheme in ("http", "https") else "#"
+    if parsed.scheme in ("http", "https"):
+        pdf_url = raw_pdf_url
+    elif not parsed.scheme:
+        # Relative URL — make absolute so it resolves in email clients.
+        pdf_url = (
+            build_absolute_url(raw_pdf_url, canonical=site_url)
+            if site_url
+            else raw_pdf_url
+        )
+    else:
+        # Reject javascript:, data:, etc.
+        pdf_url = "#"
     return (
         f'<a href="{pdf_url}" style="display:inline-block;text-decoration:none;'
         f"padding:12px 16px;background:#f44336;color:#ffffff;border-radius:4px;"
@@ -93,12 +111,36 @@ def _gdocs_pdf_replacement(match):
 
 
 def _pdf_embed_replacement(match):
-    """Return an email-safe link for a bare PDF embed/object."""
-    # Try to extract src / data URL from the matched text
+    """Return an email-safe link for a bare PDF embed/object.
+
+    Relative ``src``/``data`` values are converted to absolute in
+    ``sanitize_closeout_html_for_email()`` via the closure form; this
+    module-level version is kept only for compatibility and does not
+    convert relative paths.
+    """
+    return _make_pdf_link_from_embed(match, site_url=None)
+
+
+def _make_pdf_link_from_embed(match, site_url):
+    """Extract the PDF URL from an embed/object match and return a link."""
     src_match = re.search(
         r'(?:src|data)=["\']([^"\']+)["\']', match.group(0), re.IGNORECASE
     )
-    pdf_url = src_match.group(1) if src_match else "#"
+    raw_url = src_match.group(1) if src_match else ""
+    if raw_url:
+        parsed = urlparse(raw_url)
+        if parsed.scheme in ("http", "https"):
+            pdf_url = raw_url
+        elif not parsed.scheme:
+            # Relative URL — make absolute so it resolves in email clients.
+            pdf_url = (
+                build_absolute_url(raw_url, canonical=site_url) if site_url else raw_url
+            )
+        else:
+            # Reject javascript:, data:, etc.
+            pdf_url = "#"
+    else:
+        pdf_url = "#"
     return (
         f'<a href="{pdf_url}" style="display:inline-block;text-decoration:none;'
         f"padding:12px 16px;background:#f44336;color:#ffffff;border-radius:4px;"
@@ -237,7 +279,7 @@ def _bleach_clean_email_html(html: str) -> str:
     )
 
 
-def sanitize_closeout_html_for_email(html):
+def sanitize_closeout_html_for_email(html, site_url=None):
     """
     Strip unrenderable embeds from TinyMCE HTML and replace them with
     email-safe equivalents.
@@ -247,8 +289,15 @@ def sanitize_closeout_html_for_email(html):
     - Google Docs PDF viewer ``<iframe>`` → styled "View PDF" link
     - Bare ``<embed>``/``<object>`` for .pdf files → styled "View PDF" link
 
+    Relative PDF URLs (e.g. ``/media/uploads/doc.pdf``) are converted to
+    absolute using ``site_url`` so they resolve correctly in email clients.
+    Pass ``site_url=get_canonical_url()`` for production calls (already done
+    by ``get_finalization_email_context``).
+
     Args:
         html (str): Raw HTML from a TinyMCE HTMLField.
+        site_url (str | None): Canonical site origin used to absolutise
+            relative PDF URLs.  When ``None``, relative URLs are left as-is.
 
     Returns:
         str: HTML safe for rendering inside an email.
@@ -256,8 +305,10 @@ def sanitize_closeout_html_for_email(html):
     if not html:
         return html
     html = _YOUTUBE_IFRAME_RE.sub(_youtube_replacement, html)
-    html = _GDOCS_IFRAME_RE.sub(_gdocs_pdf_replacement, html)
-    html = _PDF_EMBED_RE.sub(_pdf_embed_replacement, html)
+    html = _GDOCS_IFRAME_RE.sub(
+        lambda m: _make_pdf_link_from_gdocs_params(m.group(1), site_url), html
+    )
+    html = _PDF_EMBED_RE.sub(lambda m: _make_pdf_link_from_embed(m, site_url), html)
     # Allowlist-sanitize the remaining HTML.  Unknown tags are stripped
     # (strip=True), img[src] is restricted to trusted CDN hosts only (see
     # _email_allowed_attribute), and the CSS shorthand "background" is
@@ -366,13 +417,13 @@ def get_finalization_email_context(logsheet):
     operations_summary_html = ""
     if closeout:
         safety_issues_html = sanitize_closeout_html_for_email(
-            closeout.safety_issues or ""
+            closeout.safety_issues or "", site_url=site_url
         )
         equipment_issues_html = sanitize_closeout_html_for_email(
-            closeout.equipment_issues or ""
+            closeout.equipment_issues or "", site_url=site_url
         )
         operations_summary_html = sanitize_closeout_html_for_email(
-            closeout.operations_summary or ""
+            closeout.operations_summary or "", site_url=site_url
         )
 
     return {

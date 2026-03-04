@@ -6,7 +6,7 @@ from datetime import date, time, timedelta
 from unittest.mock import patch
 
 import pytest
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from logsheet.models import (
     Airfield,
@@ -27,7 +27,7 @@ from members.models import Member
 # ---------------------------------------------------------------------------
 
 
-class TestSanitizeCloseoutHtml(TestCase):
+class TestSanitizeCloseoutHtml(SimpleTestCase):
     def test_empty_string_returns_empty(self):
         assert sanitize_closeout_html_for_email("") == ""
 
