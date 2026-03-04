@@ -15,7 +15,6 @@ to all active members with:
 import logging
 import re
 from html import unescape
-from threading import Thread
 from urllib.parse import unquote, urlparse
 
 import bleach
@@ -23,7 +22,7 @@ from bleach.css_sanitizer import CSSSanitizer
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import get_connection
-from django.db import close_old_connections, transaction
+from django.db import transaction
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -38,6 +37,10 @@ from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
 logger = logging.getLogger(__name__)
+
+
+class FinalizationEmailDeliveryError(Exception):
+    """Raised when delivery fails while processing durable outbox jobs."""
 
 
 # ---------------------------------------------------------------------------
@@ -509,17 +512,22 @@ def _sanitize_email_subject(raw_subject, max_length=255):
     return subject
 
 
-def send_finalization_summary_email(logsheet):
+def send_finalization_summary_email(logsheet, raise_on_failure=False):
     """
     Send the post-finalization HTML summary email to all active members
     who have an email address on file.
 
-    Called immediately after a logsheet is set to ``finalized=True`` and
-    saved.  Failures are logged but never bubble up to the calling view so
-    that a mail problem cannot prevent a logsheet from being finalized.
+    Called after a logsheet is finalized. By default failures are logged and
+    not raised so a mail problem cannot block finalization UX. For durable
+    outbox processing, ``raise_on_failure=True`` makes failures explicit so the
+    outbox row can remain failed instead of being marked sent.
 
     Args:
         logsheet: The ``Logsheet`` instance that has just been finalized.
+        raise_on_failure: If True, raise when any delivery fails.
+
+    Returns:
+        tuple[int, int]: ``(sent_count, failure_count)``
     """
     try:
         config = SiteConfiguration.objects.first()
@@ -544,7 +552,7 @@ def send_finalization_summary_email(logsheet):
                 "Finalization email for logsheet %s: no active members with email found, skipping.",
                 logsheet.pk,
             )
-            return
+            return (0, 0)
 
         context = get_finalization_email_context(
             logsheet,
@@ -598,16 +606,23 @@ def send_finalization_summary_email(logsheet):
             sent_count,
             failure_count,
         )
+        if raise_on_failure and failure_count > 0:
+            raise FinalizationEmailDeliveryError(
+                f"Failed to deliver {failure_count} recipient email(s) for logsheet {logsheet.pk}."
+            )
+        return (sent_count, failure_count)
     except Exception:
         logger.exception(
             "Failed to send finalization summary email for logsheet %s.",
             logsheet.pk,
         )
+        if raise_on_failure:
+            raise
+        return (0, 1)
 
 
 def _process_finalization_email_outbox_job(outbox_id):
     """Process one durable outbox entry and send its summary email."""
-    close_old_connections()
     try:
         with transaction.atomic():
             outbox = (
@@ -621,7 +636,7 @@ def _process_finalization_email_outbox_job(outbox_id):
             outbox.attempt_count += 1
             outbox.save(update_fields=["attempt_count"])
 
-        send_finalization_summary_email(outbox.logsheet)
+        send_finalization_summary_email(outbox.logsheet, raise_on_failure=True)
 
         FinalizationEmailOutbox.objects.filter(pk=outbox_id).update(
             status=FinalizationEmailOutbox.STATUS_SENT,
@@ -637,12 +652,10 @@ def _process_finalization_email_outbox_job(outbox_id):
             status=FinalizationEmailOutbox.STATUS_FAILED,
             last_error=str(exc)[:2000],
         )
-    finally:
-        close_old_connections()
 
 
 def enqueue_finalization_summary_email_job(logsheet_id):
-    """Persist and schedule finalization summary delivery for a logsheet."""
+    """Persist finalization summary delivery for durable outbox processing."""
     outbox, created = FinalizationEmailOutbox.objects.get_or_create(
         logsheet_id=logsheet_id,
         defaults={"status": FinalizationEmailOutbox.STATUS_PENDING},
@@ -654,12 +667,7 @@ def enqueue_finalization_summary_email_job(logsheet_id):
     if not created and outbox.status == FinalizationEmailOutbox.STATUS_FAILED:
         outbox.status = FinalizationEmailOutbox.STATUS_PENDING
         outbox.last_error = ""
-        outbox.save(update_fields=["status", "last_error"])
+        outbox.processed_at = None
+        outbox.save(update_fields=["status", "last_error", "processed_at"])
 
-    Thread(
-        target=_process_finalization_email_outbox_job,
-        args=(outbox.pk,),
-        name=f"finalization-email-outbox-{logsheet_id}",
-        daemon=True,
-    ).start()
     return outbox

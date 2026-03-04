@@ -54,6 +54,59 @@ spec:
                 secretName: gcp-sa-key
 
 ---
+# Every 10 minutes: Durable finalization email outbox processing
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: process-finalization-email-outbox
+  namespace: default
+spec:
+  schedule: "*/10 * * * *"
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: process-finalization-email-outbox
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - process_finalization_email_outbox
+                - --limit=200
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/gcp-credentials.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
 # Daily: Pre-operation Duty Emails (6:00 AM UTC for next day)
 apiVersion: batch/v1
 kind: CronJob

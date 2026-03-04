@@ -1339,8 +1339,14 @@ def manage_logsheet_finances(request, pk):
                     messages.info(request, "This logsheet has already been finalized.")
                     return redirect("logsheet:manage", pk=locked_logsheet.pk)
 
+                # Re-query and lock flight rows inside the transaction so
+                # cost lock-in writes operate on transaction-consistent data.
+                locked_flights = Flight.objects.select_for_update().filter(
+                    logsheet=locked_logsheet
+                )
+
                 # Lock in costs
-                for flight in flights:
+                for flight in locked_flights:
                     if flight.tow_cost_actual is None:
                         flight.tow_cost_actual = flight.tow_cost_calculated
                     if flight.rental_cost_actual is None:
