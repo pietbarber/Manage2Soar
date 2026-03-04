@@ -1273,6 +1273,10 @@ def manage_logsheet_finances(request, pk):
         )
     if request.method == "POST":
         if "finalize" in request.POST:
+            if logsheet.finalized:
+                messages.info(request, "This logsheet has already been finalized.")
+                return redirect("logsheet:manage", pk=logsheet.pk)
+
             # Check that all responsible members have a payment method
             responsible_members = set()
 
@@ -1330,6 +1334,12 @@ def manage_logsheet_finances(request, pk):
 
                 logsheet.finalized = True
                 logsheet.save()
+
+                RevisionLog.objects.create(
+                    logsheet=logsheet,
+                    revised_by=request.user,
+                    note="Logsheet finalized",
+                )
 
                 transaction.on_commit(lambda: send_finalization_summary_email(logsheet))
 
