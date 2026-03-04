@@ -1,5 +1,7 @@
+import csv
 from datetime import time, timedelta
 from decimal import Decimal
+from io import StringIO
 
 import pytest
 from django.urls import reverse
@@ -174,6 +176,54 @@ class TestPersonalChargesView:
         assert "Misc" in content
         assert "T-Shirt" in content
         assert str(self.old_date) not in content
+
+    def test_personal_charges_csv_sanitizes_formula_like_cells(self, client):
+        bad_glider = Glider.objects.create(
+            n_number="=2+2",
+            make="Test",
+            model="Glider",
+            club_owned=True,
+            is_active=True,
+        )
+        bad_item = ChargeableItem.objects.create(
+            name="@malicious-item",
+            price=Decimal("5.00"),
+            unit=ChargeableItem.UnitType.EACH,
+            is_active=True,
+        )
+
+        Flight.objects.create(
+            logsheet=self.recent_logsheet,
+            pilot=self.member,
+            glider=bad_glider,
+            flight_type="solo",
+            tow_cost_actual=Decimal("1.00"),
+            rental_cost_actual=Decimal("2.00"),
+        )
+        MemberCharge.objects.create(
+            member=self.member,
+            chargeable_item=bad_item,
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("5.00"),
+            date=self.recent_date,
+            notes=" +SUM(1,2)",
+            entered_by=self.member,
+        )
+
+        client.force_login(self.member)
+        response = client.get(reverse("logsheet:personal_charges_csv"))
+        assert response.status_code == 200
+
+        rows = list(csv.reader(StringIO(response.content.decode("utf-8"))))
+        data_rows = rows[1:]
+
+        sanitized_glider_values = [r[2] for r in data_rows if r[1] == "Flight"]
+        sanitized_item_values = [r[3] for r in data_rows if r[1] == "Misc"]
+        sanitized_notes_values = [r[8] for r in data_rows if r[1] == "Misc"]
+
+        assert any(value.startswith("'=2+2") for value in sanitized_glider_values)
+        assert "'@malicious-item" in sanitized_item_values
+        assert "' +SUM(1,2)" in sanitized_notes_values
 
     def test_personal_charges_view_covers_even_rental_and_full_splits(self, client):
         flight_even = Flight.objects.create(

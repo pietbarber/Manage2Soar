@@ -54,6 +54,17 @@ from .utils.flight_charges import quantize_currency, split_flight_costs
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_csv_cell(value):
+    """Neutralize spreadsheet-formula strings in CSV cells."""
+    if not isinstance(value, str):
+        return value
+
+    stripped = value.lstrip()
+    if stripped.startswith(("=", "+", "-", "@")):
+        return f"'{value}"
+    return value
+
+
 def _member_flight_charge_breakdown(flight, member):
     """Return (tow, rental, total) owed by `member` for a single flight."""
     if flight.logsheet.finalized:
@@ -177,7 +188,7 @@ def personal_charges_summary_csv(request):
             [
                 row["flight_date"].isoformat(),
                 "Flight",
-                str(row["glider"]) if row["glider"] else "—",
+                _sanitize_csv_cell(str(row["glider"]) if row["glider"] else "—"),
                 "",
                 f"{row['tow_cost']:.2f}",
                 f"{row['rental_cost']:.2f}",
@@ -193,12 +204,12 @@ def personal_charges_summary_csv(request):
                 charge.date.isoformat(),
                 "Misc",
                 "",
-                charge.chargeable_item.name,
+                _sanitize_csv_cell(charge.chargeable_item.name),
                 "",
                 "",
                 f"{charge.total_price:.2f}",
                 f"{charge.total_price:.2f}",
-                charge.notes,
+                _sanitize_csv_cell(charge.notes),
             ]
         )
 
