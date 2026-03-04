@@ -7,7 +7,17 @@ import pytest
 from django.urls import reverse
 from django.utils import timezone
 
-from logsheet.models import Airfield, Flight, Glider, Logsheet, MemberCharge
+from logsheet.models import (
+    Airfield,
+    Flight,
+    Glider,
+    Logsheet,
+    MemberCharge,
+    Towplane,
+    TowplaneChargeScheme,
+    TowplaneChargeTier,
+)
+from logsheet.views import _get_personal_charge_data
 from members.models import Member
 from siteconfig.models import ChargeableItem, MembershipStatus
 
@@ -317,3 +327,55 @@ class TestPersonalChargesView:
         assert non_finalized_row["tow_cost"] == Decimal("0.00")
         assert non_finalized_row["rental_cost"] == Decimal("5.56")
         assert non_finalized_row["total_cost"] == Decimal("5.56")
+
+    def test_personal_charge_data_avoids_n_plus_one_for_charge_tiers(
+        self, django_assert_num_queries
+    ):
+        towplane = Towplane.objects.create(
+            name="Tow 1",
+            n_number="N200TP",
+            is_active=True,
+        )
+        scheme = TowplaneChargeScheme.objects.create(
+            towplane=towplane,
+            name="Standard",
+            is_active=True,
+            hookup_fee=Decimal("0.00"),
+        )
+        TowplaneChargeTier.objects.create(
+            charge_scheme=scheme,
+            altitude_start=0,
+            altitude_end=None,
+            rate_type="per_1000ft",
+            rate_amount=Decimal("20.00"),
+            is_active=True,
+        )
+
+        non_finalized_logsheet = Logsheet.objects.create(
+            log_date=self.recent_date - timedelta(days=1),
+            airfield=self.airfield,
+            created_by=self.member,
+            finalized=False,
+        )
+
+        for altitude in [1000, 1200, 1400, 1600, 1800]:
+            Flight.objects.create(
+                logsheet=non_finalized_logsheet,
+                pilot=self.other_member,
+                split_with=self.member,
+                split_type="tow",
+                glider=self.glider,
+                towplane=towplane,
+                flight_type="dual",
+                release_altitude=altitude,
+                tow_cost_actual=Decimal("0.00"),
+                rental_cost_actual=Decimal("0.00"),
+            )
+
+        start_date = timezone.localdate() - timedelta(days=365)
+        with django_assert_num_queries(4):
+            flight_rows, misc_charges = _get_personal_charge_data(
+                self.member, start_date
+            )
+            assert len(flight_rows) >= 5
+            assert len(misc_charges) >= 1

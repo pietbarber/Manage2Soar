@@ -47,6 +47,7 @@ from .models import (
     MemberCharge,
     RevisionLog,
     Towplane,
+    TowplaneChargeScheme,
     TowplaneCloseout,
 )
 from .utils.flight_charges import quantize_currency, split_flight_costs
@@ -105,6 +106,7 @@ def _get_personal_charge_data(member, start_date):
             "towplane",
             "towplane__charge_scheme",
         )
+        .prefetch_related("towplane__charge_scheme__charge_tiers")
         .order_by("-logsheet__log_date", "-launch_time", "-pk")
     )
 
@@ -115,6 +117,22 @@ def _get_personal_charge_data(member, start_date):
     flight_rows = []
     for flight in flights:
         flight._site_config_cache = site_config
+        if flight.towplane_id:
+            try:
+                charge_scheme = flight.towplane.charge_scheme
+            except TowplaneChargeScheme.DoesNotExist:
+                charge_scheme = None
+
+            if charge_scheme and not hasattr(charge_scheme, "_active_charge_tiers"):
+                charge_scheme._active_charge_tiers = sorted(
+                    [
+                        tier
+                        for tier in charge_scheme.charge_tiers.all()
+                        if tier.is_active
+                    ],
+                    key=lambda tier: tier.altitude_start,
+                )
+
         tow_cost, rental_cost, total_cost = _member_flight_charge_breakdown(
             flight, member
         )
