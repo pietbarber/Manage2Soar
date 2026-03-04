@@ -97,7 +97,14 @@ def _get_personal_charge_data(member, start_date):
     flights = (
         Flight.objects.filter(logsheet__log_date__gte=start_date)
         .filter(Q(pilot=member) | Q(split_with=member))
-        .select_related("logsheet", "glider", "pilot", "split_with")
+        .select_related(
+            "logsheet",
+            "glider",
+            "pilot",
+            "split_with",
+            "towplane",
+            "towplane__charge_scheme",
+        )
         .order_by("-logsheet__log_date", "-launch_time", "-pk")
     )
 
