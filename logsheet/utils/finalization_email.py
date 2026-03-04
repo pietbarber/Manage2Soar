@@ -19,6 +19,7 @@ from urllib.parse import unquote, urlparse
 
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import get_connection
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -103,7 +104,7 @@ def _make_pdf_link_from_gdocs_params(params, site_url):
         pdf_url = "#"
     return (
         f'<a href="{pdf_url}" style="display:inline-block;text-decoration:none;'
-        f"padding:12px 16px;background:#f44336;color:#ffffff;border-radius:4px;"
+        f"padding:12px 16px;background-color:#f44336;color:#ffffff;border-radius:4px;"
         f'font-size:14px;font-weight:600;">&#128196; View PDF Document</a>'
     )
 
@@ -130,7 +131,7 @@ def _make_pdf_link_from_embed(match, site_url):
         pdf_url = "#"
     return (
         f'<a href="{pdf_url}" style="display:inline-block;text-decoration:none;'
-        f"padding:12px 16px;background:#f44336;color:#ffffff;border-radius:4px;"
+        f"padding:12px 16px;background-color:#f44336;color:#ffffff;border-radius:4px;"
         f'font-size:14px;font-weight:600;">&#128196; View PDF Document</a>'
     )
 
@@ -422,12 +423,17 @@ def get_finalization_email_context(logsheet):
         )
 
     # Maintenance issues created for this logsheet
-    maintenance_issues = logsheet.maintenance_issues.select_related(
-        "glider", "towplane", "reported_by"
-    ).order_by("grounded", "description")
+    maintenance_issues = list(
+        logsheet.maintenance_issues.select_related(
+            "glider", "towplane", "reported_by"
+        ).order_by("grounded", "description")
+    )
 
     # Closeout content – sanitised for email rendering
-    closeout = getattr(logsheet, "closeout", None)
+    try:
+        closeout = logsheet.closeout
+    except ObjectDoesNotExist:
+        closeout = None
     safety_issues_html = ""
     equipment_issues_html = ""
     operations_summary_html = ""

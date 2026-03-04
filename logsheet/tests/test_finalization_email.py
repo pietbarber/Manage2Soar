@@ -264,7 +264,7 @@ class TestGetFinalizationEmailContext:
             resolved=False,
         )
         ctx = get_finalization_email_context(self.logsheet)
-        assert ctx["maintenance_issues"].count() == 1
+        assert len(ctx["maintenance_issues"]) == 1
 
 
 # ---------------------------------------------------------------------------
