@@ -741,7 +741,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         )
         self.assertNotContains(response, delete_url)
 
-    @patch("logsheet.views.enqueue_finalization_summary_email")
+    @patch("logsheet.views.enqueue_finalization_summary_email_job")
     def test_finances_finalize_triggers_summary_email(self, mock_enqueue_summary):
         """Finalizing from finances should schedule the finalization summary email."""
         self.client.login(username="do@test.com", password="testpass123")
@@ -758,7 +758,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         mock_enqueue_summary.assert_called_once_with(self.logsheet.pk)
 
-    @patch("logsheet.views.enqueue_finalization_summary_email")
+    @patch("logsheet.views.enqueue_finalization_summary_email_job")
     def test_finances_finalize_creates_revision_log_entry(self, mock_enqueue_summary):
         """Finalizing from finances should record a revision log entry."""
         self.client.login(username="do@test.com", password="testpass123")
@@ -779,7 +779,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         )
         mock_enqueue_summary.assert_called_once_with(self.logsheet.pk)
 
-    @patch("logsheet.views.enqueue_finalization_summary_email")
+    @patch("logsheet.views.enqueue_finalization_summary_email_job")
     def test_finances_finalize_already_finalized_does_not_resend_email(
         self, mock_enqueue_summary
     ):

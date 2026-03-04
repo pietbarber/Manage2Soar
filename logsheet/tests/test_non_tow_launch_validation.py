@@ -10,6 +10,7 @@ Issue #623: Logsheet: Self-Launch or Winch, no towpilots
 """
 
 from datetime import date, time
+from unittest.mock import patch
 
 import pytest
 from django.contrib.messages import get_messages
@@ -359,6 +360,75 @@ class TestFinalizationWithNonTowFlights:
 
         logsheet.refresh_from_db()
         assert logsheet.finalized is True
+
+    def test_manage_finalize_enqueues_summary_email(
+        self,
+        client,
+        logsheet,
+        pilot,
+        glider,
+        virtual_towplane_winch,
+        duty_officer,
+        duty_instructor,
+        django_capture_on_commit_callbacks,
+    ):
+        """Finalizing via manage view should enqueue the summary email job."""
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            glider=glider,
+            launch_method=Flight.LaunchMethod.WINCH,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            release_altitude=1000,
+            towplane=virtual_towplane_winch,
+        )
+        LogsheetCloseout.objects.create(logsheet=logsheet)
+        LogsheetPayment.objects.create(
+            logsheet=logsheet, member=pilot, payment_method="cash"
+        )
+
+        client.force_login(duty_officer)
+        with patch(
+            "logsheet.views.enqueue_finalization_summary_email_job"
+        ) as mock_enqueue:
+            with django_capture_on_commit_callbacks(execute=True):
+                client.post(
+                    reverse("logsheet:manage", args=[logsheet.pk]),
+                    {"finalize": "true"},
+                    follow=True,
+                )
+
+        logsheet.refresh_from_db()
+        assert logsheet.finalized is True
+        mock_enqueue.assert_called_once_with(logsheet.pk)
+
+    def test_manage_finalize_already_finalized_does_not_reenqueue(
+        self,
+        client,
+        logsheet,
+        duty_officer,
+        duty_instructor,
+        django_capture_on_commit_callbacks,
+    ):
+        """Repeat finalize POST should not enqueue summary email job again."""
+        logsheet.finalized = True
+        logsheet.save(update_fields=["finalized"])
+
+        client.force_login(duty_officer)
+        with patch(
+            "logsheet.views.enqueue_finalization_summary_email_job"
+        ) as mock_enqueue:
+            with django_capture_on_commit_callbacks(execute=True):
+                response = client.post(
+                    reverse("logsheet:manage", args=[logsheet.pk]),
+                    {"finalize": "true"},
+                    follow=True,
+                )
+
+        messages = list(get_messages(response.wsgi_request))
+        assert any("already been finalized" in str(m) for m in messages)
+        mock_enqueue.assert_not_called()
 
     def test_finalization_requires_tow_pilot_when_tow_flights_exist(
         self,

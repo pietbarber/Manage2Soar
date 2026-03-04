@@ -15,6 +15,7 @@ to all active members with:
 import logging
 import re
 from html import unescape
+from threading import Thread
 from urllib.parse import unquote, urlparse
 
 import bleach
@@ -22,10 +23,13 @@ from bleach.css_sanitizer import CSSSanitizer
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import get_connection
+from django.db import close_old_connections, transaction
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.formats import date_format as django_date_format
 
+from logsheet.models import FinalizationEmailOutbox
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
@@ -599,3 +603,63 @@ def send_finalization_summary_email(logsheet):
             "Failed to send finalization summary email for logsheet %s.",
             logsheet.pk,
         )
+
+
+def _process_finalization_email_outbox_job(outbox_id):
+    """Process one durable outbox entry and send its summary email."""
+    close_old_connections()
+    try:
+        with transaction.atomic():
+            outbox = (
+                FinalizationEmailOutbox.objects.select_for_update()
+                .select_related("logsheet")
+                .get(pk=outbox_id)
+            )
+            if outbox.status == FinalizationEmailOutbox.STATUS_SENT:
+                return
+
+            outbox.attempt_count += 1
+            outbox.save(update_fields=["attempt_count"])
+
+        send_finalization_summary_email(outbox.logsheet)
+
+        FinalizationEmailOutbox.objects.filter(pk=outbox_id).update(
+            status=FinalizationEmailOutbox.STATUS_SENT,
+            processed_at=timezone.now(),
+            last_error="",
+        )
+    except Exception as exc:
+        logger.exception(
+            "Failed processing finalization email outbox job %s.",
+            outbox_id,
+        )
+        FinalizationEmailOutbox.objects.filter(pk=outbox_id).update(
+            status=FinalizationEmailOutbox.STATUS_FAILED,
+            last_error=str(exc)[:2000],
+        )
+    finally:
+        close_old_connections()
+
+
+def enqueue_finalization_summary_email_job(logsheet_id):
+    """Persist and schedule finalization summary delivery for a logsheet."""
+    outbox, created = FinalizationEmailOutbox.objects.get_or_create(
+        logsheet_id=logsheet_id,
+        defaults={"status": FinalizationEmailOutbox.STATUS_PENDING},
+    )
+
+    if not created and outbox.status == FinalizationEmailOutbox.STATUS_SENT:
+        return outbox
+
+    if not created and outbox.status == FinalizationEmailOutbox.STATUS_FAILED:
+        outbox.status = FinalizationEmailOutbox.STATUS_PENDING
+        outbox.last_error = ""
+        outbox.save(update_fields=["status", "last_error"])
+
+    Thread(
+        target=_process_finalization_email_outbox_job,
+        args=(outbox.pk,),
+        name=f"finalization-email-outbox-{logsheet_id}",
+        daemon=True,
+    ).start()
+    return outbox

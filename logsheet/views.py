@@ -1,7 +1,6 @@
 # AJAX endpoint to update split fields for a flight
 import logging
 from datetime import date, datetime, timedelta
-from threading import Thread
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -44,30 +43,9 @@ from .models import (
     Towplane,
     TowplaneCloseout,
 )
-from .utils.finalization_email import send_finalization_summary_email
+from .utils.finalization_email import enqueue_finalization_summary_email_job
 
 logger = logging.getLogger(__name__)
-
-
-def enqueue_finalization_summary_email(logsheet_id):
-    """Dispatch finalization summary email in a background thread."""
-
-    def _send_in_background():
-        try:
-            logsheet = Logsheet.objects.get(pk=logsheet_id)
-        except Logsheet.DoesNotExist:
-            logger.warning(
-                "Skipping finalization summary email: logsheet %s no longer exists.",
-                logsheet_id,
-            )
-            return
-        send_finalization_summary_email(logsheet)
-
-    Thread(
-        target=_send_in_background,
-        name=f"finalization-email-{logsheet_id}",
-        daemon=True,
-    ).start()
 
 
 def get_validation_message(validation_error):
@@ -551,7 +529,7 @@ def manage_logsheet(request, pk):
             # Queue summary email dispatch after commit so request latency
             # does not scale with recipient count.
             transaction.on_commit(
-                lambda: enqueue_finalization_summary_email(locked_logsheet.pk)
+                lambda: enqueue_finalization_summary_email_job(locked_logsheet.pk)
             )
 
         # Retire visiting pilot token when logsheet is finalized
@@ -1379,7 +1357,7 @@ def manage_logsheet_finances(request, pk):
                 )
 
                 transaction.on_commit(
-                    lambda: enqueue_finalization_summary_email(locked_logsheet.pk)
+                    lambda: enqueue_finalization_summary_email_job(locked_logsheet.pk)
                 )
 
             messages.success(
