@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDate
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
@@ -511,8 +512,10 @@ def manage_logsheet(request, pk):
             logsheet=logsheet, revised_by=request.user, note="Logsheet finalized"
         )
 
-        # Send HTML summary email to all active members
-        send_finalization_summary_email(logsheet)
+        # Send HTML summary email to all active members after the transaction
+        # commits, so the finalized logsheet is visible to DB queries inside
+        # the email sender and a mail failure cannot roll back the save.
+        transaction.on_commit(lambda: send_finalization_summary_email(logsheet))
 
         # Retire visiting pilot token when logsheet is finalized
         config = SiteConfiguration.objects.first()

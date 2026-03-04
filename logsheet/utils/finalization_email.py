@@ -18,8 +18,10 @@ from urllib.parse import unquote, urlparse
 
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
+from django.core.mail import get_connection
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.formats import date_format as django_date_format
 
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -151,17 +153,42 @@ _EMAIL_ALLOWED_TAGS = [
     "div",
     "hr",
 ]
-_EMAIL_ALLOWED_ATTRIBUTES = {
-    "*": ["style", "class", "title"],
-    "a": ["href", "target", "rel"],
-    "img": ["src", "alt", "width", "height", "style"],
-    "td": ["colspan", "rowspan", "align", "valign", "style"],
-    "th": ["colspan", "rowspan", "align", "valign", "style"],
-    "table": ["border", "cellpadding", "cellspacing", "width", "style"],
-}
+
+
+def _email_allowed_attribute(tag, name, value):
+    """
+    Callable bleach attribute filter for email-bound HTML.
+
+    Restricts ``img[src]`` to trusted image CDN hosts so that remote tracking
+    pixels embedded in TinyMCE content cannot reach member inboxes.  All other
+    standard formatting attributes are passed through unchanged.
+    """
+    # Global attributes permitted on every element
+    if name in ("style", "class", "title"):
+        return True
+    if tag == "a":
+        return name in ("href", "target", "rel")
+    if tag == "img":
+        if name == "src":
+            # Only allow images served from trusted CDN hosts (e.g. YouTube
+            # thumbnails added by the embed-replacement functions above).
+            parsed = urlparse(value)
+            return parsed.scheme in ("http", "https") and (parsed.hostname or "") in (
+                "img.youtube.com",
+                "i.ytimg.com",
+            )
+        return name in ("alt", "width", "height", "style")
+    if tag in ("td", "th"):
+        return name in ("colspan", "rowspan", "align", "valign", "style")
+    if tag == "table":
+        return name in ("border", "cellpadding", "cellspacing", "width", "style")
+    return False
+
+
 _EMAIL_CSS_SANITIZER = CSSSanitizer(
     allowed_css_properties=[
-        "background",
+        # Note: "background" shorthand is intentionally omitted; it can carry
+        # external url() references.  Use "background-color" instead.
         "background-color",
         "border",
         "border-collapse",
@@ -199,16 +226,12 @@ _EMAIL_CSS_SANITIZER = CSSSanitizer(
 )
 
 
-class _BleachSanitizerDescriptor:
-    """Lazy wrapper so bleach is only invoked if there is content to clean."""
-
-
 def _bleach_clean_email_html(html: str) -> str:
     """Run bleach allowlist sanitization on HTML intended for email delivery."""
     return bleach.clean(
         html,
         tags=_EMAIL_ALLOWED_TAGS,
-        attributes=_EMAIL_ALLOWED_ATTRIBUTES,
+        attributes=_email_allowed_attribute,
         css_sanitizer=_EMAIL_CSS_SANITIZER,
         strip=True,
     )
@@ -235,8 +258,10 @@ def sanitize_closeout_html_for_email(html):
     html = _YOUTUBE_IFRAME_RE.sub(_youtube_replacement, html)
     html = _GDOCS_IFRAME_RE.sub(_gdocs_pdf_replacement, html)
     html = _PDF_EMBED_RE.sub(_pdf_embed_replacement, html)
-    # Allowlist-sanitize the remaining HTML so that unexpected tags, remote
-    # tracking pixels, or residual iframes cannot reach member inboxes.
+    # Allowlist-sanitize the remaining HTML.  Unknown tags are stripped
+    # (strip=True), img[src] is restricted to trusted CDN hosts only (see
+    # _email_allowed_attribute), and the CSS shorthand "background" is
+    # excluded to prevent url()-based beacons.
     html = _bleach_clean_email_html(html)
     return html
 
@@ -307,14 +332,10 @@ def get_finalization_email_context(logsheet):
             and f.duration is not None
             and f.duration == max_duration
         )
-        # Use CSS class names so the template never needs Django template tags
-        # inside style="" attributes (which confuse VS Code's CSS language server).
-        if is_longest:
-            tr_class = "flight-row flight-row-longest"
-        elif idx % 2 == 0:
-            tr_class = "flight-row flight-row-even"
-        else:
-            tr_class = "flight-row flight-row-odd"
+        # Row colours are rendered in the template via {% if row.is_longest %}
+        # conditional blocks with hardcoded inline style values, so that no
+        # Django template expression appears inside a style="" attribute and
+        # the VS Code CSS linter does not report false positives.
         flights.append(
             {
                 "flight": f,
@@ -325,11 +346,11 @@ def get_finalization_email_context(logsheet):
                 "launch_time": _fmt_time(f.launch_time),
                 "landing_time": _fmt_time(f.landing_time),
                 "duration_str": _fmt_duration(f.duration),
-                "release_altitude": f.release_altitude if f.release_altitude else "—",
+                "release_altitude": (
+                    f.release_altitude if f.release_altitude is not None else "—"
+                ),
                 "flight_type": f.flight_type,
                 "is_longest": is_longest,
-                # CSS class name for the <tr> row
-                "tr_class": tr_class,
             }
         )
 
@@ -408,6 +429,7 @@ def send_finalization_summary_email(logsheet):
         .exclude(email="")
         .exclude(email__isnull=True)
         .values_list("email", flat=True)
+        .distinct()
     )
 
     if not recipients:
@@ -419,9 +441,11 @@ def send_finalization_summary_email(logsheet):
 
     context = get_finalization_email_context(logsheet)
 
+    # Use Django's date_format so the format is locale-aware and avoids the
+    # %-d day specifier which is not supported on all platforms (e.g. Windows).
     subject = (
         f"{context['club_name']} Operations Summary – "
-        f"{logsheet.log_date.strftime('%A, %B %-d, %Y')}"
+        f"{django_date_format(logsheet.log_date, 'l, N j, Y')}"
     )
 
     html_message = render_to_string(
@@ -434,25 +458,29 @@ def send_finalization_summary_email(logsheet):
     try:
         sent_count = 0
         failure_count = 0
-        for recipient in recipients:
-            # Send one email per recipient so that member addresses are not
-            # disclosed to each other via the To: header.
-            try:
-                send_mail(
-                    subject=subject,
-                    message=text_message,
-                    from_email=from_email,
-                    recipient_list=[recipient],
-                    html_message=html_message,
-                )
-                sent_count += 1
-            except Exception:
-                failure_count += 1
-                logger.exception(
-                    "Failed to send finalization summary email for logsheet %s to %s.",
-                    logsheet.pk,
-                    recipient,
-                )
+        # Open a single SMTP connection for all sends to avoid per-message
+        # connection overhead when the club has many members.
+        with get_connection() as connection:
+            for recipient in recipients:
+                # Send one email per recipient so that member addresses are
+                # not disclosed to each other via the To: header.
+                try:
+                    send_mail(
+                        subject=subject,
+                        message=text_message,
+                        from_email=from_email,
+                        recipient_list=[recipient],
+                        html_message=html_message,
+                        connection=connection,
+                    )
+                    sent_count += 1
+                except Exception:
+                    failure_count += 1
+                    logger.exception(
+                        "Failed to send finalization summary email for logsheet %s to %s.",
+                        logsheet.pk,
+                        recipient,
+                    )
         logger.info(
             "Finalization summary email for logsheet %s: sent to %d recipient(s), %d failure(s).",
             logsheet.pk,

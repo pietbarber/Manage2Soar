@@ -4,16 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Operations Summary – {{ logsheet.log_date|date:"N j, Y" }}</title>
-    <style type="text/css">
-        /* Flight row colours – used in the flights table */
-        .flight-row-longest { background-color: #fefce8; }
-        .flight-row-even    { background-color: #f7fafc; }
-        .flight-row-odd     { background-color: #ffffff; }
-        .td-pilot-longest   { color: #2d3748; font-weight: 600; }
-        .td-pilot-normal    { color: #2d3748; font-weight: 400; }
-        .td-duration-longest { color: #92600a; font-weight: 700; background-color: #fefce8; }
-        .td-duration-normal  { color: #2d3748; }
-    </style>
     <!--[if mso]>
     <style type="text/css">
         table { border-collapse: collapse; }
@@ -240,10 +230,19 @@
                                 <td style="padding:8px 6px;text-align:right;font-weight:600;border-radius:0 4px 0 0;">Rel. Alt.</td>
                             </tr>
                             {% for row in flights %}
-                            <tr class="{{ row.tr_class }}">
+                            {% if row.is_longest %}
+                            <tr style="background-color:#fefce8;">
+                            {% elif forloop.counter|divisibleby:2 %}
+                            <tr style="background-color:#f7fafc;">
+                            {% else %}
+                            <tr style="background-color:#ffffff;">
+                            {% endif %}
                                 <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#718096;">{{ row.index }}</td>
-                                <td class="{% if row.is_longest %}td-pilot-longest{% else %}td-pilot-normal{% endif %}"
-                                    style="padding:7px 6px;border-bottom:1px solid #e2e8f0;">
+                                {% if row.is_longest %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#2d3748;font-weight:600;">
+                                {% else %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#2d3748;font-weight:400;">
+                                {% endif %}
                                     {{ row.pilot_name }}
                                 </td>
                                 <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;">
@@ -252,8 +251,11 @@
                                 <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;">{{ row.glider_label }}</td>
                                 <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;text-align:center;">{{ row.launch_time }}</td>
                                 <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;text-align:center;">{{ row.landing_time }}</td>
-                                <td class="{% if row.is_longest %}td-duration-longest{% else %}td-duration-normal{% endif %}"
-                                    style="padding:7px 6px;border-bottom:1px solid #e2e8f0;text-align:center;">
+                                {% if row.is_longest %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;text-align:center;color:#92600a;font-weight:700;background-color:#fefce8;">
+                                {% else %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;text-align:center;color:#2d3748;">
+                                {% endif %}
                                     {{ row.duration_str }}{% if row.is_longest %}&nbsp;&#9733;{% endif %}
                                 </td>
                                 <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;text-align:right;">
