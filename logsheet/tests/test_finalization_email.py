@@ -80,6 +80,22 @@ class TestSanitizeCloseoutHtml(SimpleTestCase):
         assert "/media/uploads/manual.pdf" in result
         assert "View PDF" in result
 
+    def test_pdf_embed_with_query_string_is_replaced(self):
+        html = (
+            '<embed src="/media/uploads/manual.pdf?version=1" type="application/pdf">'
+        )
+        result = sanitize_closeout_html_for_email(html)
+        assert "<embed" not in result
+        assert "/media/uploads/manual.pdf?version=1" in result
+        assert "View PDF" in result
+
+    def test_pdf_embed_with_fragment_is_replaced(self):
+        html = '<object data="/media/uploads/manual.pdf#page=2"></object>'
+        result = sanitize_closeout_html_for_email(html)
+        assert "<object" not in result
+        assert "/media/uploads/manual.pdf#page=2" in result
+        assert "View PDF" in result
+
     def test_mixed_youtube_and_pdf_in_same_content(self):
         html = (
             "<p>Video below</p>"

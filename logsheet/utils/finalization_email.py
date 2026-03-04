@@ -31,7 +31,7 @@ from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
-from utils.url_helpers import build_absolute_url
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,10 @@ _GDOCS_IFRAME_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-# Matches <embed> or <object> tags whose src/data attribute ends with .pdf
+# Matches <embed> or <object> tags whose src/data attribute points to a PDF,
+# allowing optional query strings or fragments after .pdf.
 _PDF_EMBED_RE = re.compile(
-    r'<(?:embed|object)\b[^>]*(?:src|data)=["\'][^"\']*\.pdf["\'][^>]*(?:>.*?</object>|/?>)',
+    r'<(?:embed|object)\b[^>]*(?:src|data)=["\'][^"\']*\.pdf(?:[?#][^"\']*)?["\'][^>]*(?:>.*?</object>|/?>)',
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -280,8 +281,9 @@ def sanitize_closeout_html_for_email(html, site_url=None):
 
     Relative PDF URLs (e.g. ``/media/uploads/doc.pdf``) are converted to
     absolute using ``site_url`` so they resolve correctly in email clients.
-    Pass ``site_url=get_canonical_url()`` for production calls (already done
-    by ``get_finalization_email_context``).
+    In production, pass the canonical site origin (an absolute site URL);
+    ``get_finalization_email_context`` already provides this via its
+    resolved ``site_url`` argument.
 
     Args:
         html (str): Raw HTML from a TinyMCE HTMLField.
@@ -340,18 +342,6 @@ def html_to_text_preserve_links(html):
 # ---------------------------------------------------------------------------
 
 
-def _resolve_site_url(config):
-    """Resolve canonical site URL from cached config with safe fallbacks."""
-    if config and config.canonical_url:
-        return config.canonical_url.rstrip("/")
-
-    site_url = getattr(settings, "SITE_URL", "").strip()
-    if site_url:
-        return site_url.rstrip("/")
-
-    return "http://localhost:8001"
-
-
 def get_finalization_email_context(logsheet, config=None, site_url=None):
     """
     Build the full template context for the finalization summary email.
@@ -365,7 +355,7 @@ def get_finalization_email_context(logsheet, config=None, site_url=None):
     if config is None:
         config = SiteConfiguration.objects.first()
     if site_url is None:
-        site_url = _resolve_site_url(config)
+        site_url = get_canonical_url()
 
     # Absolute URL for the ops report page
     ops_report_path = reverse("logsheet:manage", kwargs={"pk": logsheet.pk})
@@ -517,7 +507,7 @@ def send_finalization_summary_email(logsheet):
     """
     try:
         config = SiteConfiguration.objects.first()
-        site_url = _resolve_site_url(config)
+        site_url = get_canonical_url()
         from_email = _get_from_email(config)
 
         # Fetch all active members with a valid email address
