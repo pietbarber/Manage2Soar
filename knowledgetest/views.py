@@ -126,6 +126,12 @@ class CreateWrittenTestView(FormView):
         ctx["presets"] = [preset.name for preset in active_presets]
         # For template access to descriptions, etc.
         ctx["preset_objects"] = active_presets
+        form = ctx.get("form")
+        ctx["weight_fields"] = (
+            [field for field in form if field.name.startswith("weight_")]
+            if form
+            else []
+        )
         return ctx
 
     def form_invalid(self, form):
