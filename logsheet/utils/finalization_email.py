@@ -19,6 +19,7 @@ from urllib.parse import unquote, urlparse
 
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import get_connection
 from django.template.loader import render_to_string
@@ -30,7 +31,7 @@ from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
-from utils.url_helpers import build_absolute_url, get_canonical_url
+from utils.url_helpers import build_absolute_url
 
 logger = logging.getLogger(__name__)
 
@@ -339,7 +340,19 @@ def html_to_text_preserve_links(html):
 # ---------------------------------------------------------------------------
 
 
-def get_finalization_email_context(logsheet):
+def _resolve_site_url(config):
+    """Resolve canonical site URL from cached config with safe fallbacks."""
+    if config and config.canonical_url:
+        return config.canonical_url.rstrip("/")
+
+    site_url = getattr(settings, "SITE_URL", "").strip()
+    if site_url:
+        return site_url.rstrip("/")
+
+    return "http://localhost:8001"
+
+
+def get_finalization_email_context(logsheet, config=None, site_url=None):
     """
     Build the full template context for the finalization summary email.
 
@@ -349,8 +362,10 @@ def get_finalization_email_context(logsheet):
     Returns:
         dict: Template context.
     """
-    config = SiteConfiguration.objects.first()
-    site_url = get_canonical_url()
+    if config is None:
+        config = SiteConfiguration.objects.first()
+    if site_url is None:
+        site_url = _resolve_site_url(config)
 
     # Absolute URL for the ops report page
     ops_report_path = reverse("logsheet:manage", kwargs={"pk": logsheet.pk})
@@ -479,8 +494,6 @@ def get_finalization_email_context(logsheet):
 
 def _get_from_email(config):
     """Return a suitable noreply@ address for the finalization email."""
-    from django.conf import settings
-
     default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
     if "@" in default_from:
         domain = default_from.split("@")[-1]
@@ -504,6 +517,7 @@ def send_finalization_summary_email(logsheet):
     """
     try:
         config = SiteConfiguration.objects.first()
+        site_url = _resolve_site_url(config)
         from_email = _get_from_email(config)
 
         # Fetch all active members with a valid email address
@@ -526,7 +540,11 @@ def send_finalization_summary_email(logsheet):
             )
             return
 
-        context = get_finalization_email_context(logsheet)
+        context = get_finalization_email_context(
+            logsheet,
+            config=config,
+            site_url=site_url,
+        )
 
         # Use Django's date_format so the format is locale-aware and avoids the
         # %-d day specifier which is not supported on all platforms (e.g. Windows).
