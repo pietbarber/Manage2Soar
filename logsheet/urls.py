@@ -6,6 +6,12 @@ app_name = "logsheet"
 
 urlpatterns = [
     path("", views.list_logsheets, name="index"),
+    path("charges/personal/", views.personal_charges_summary, name="personal_charges"),
+    path(
+        "charges/personal/export/csv/",
+        views.personal_charges_summary_csv,
+        name="personal_charges_csv",
+    ),
     path("create/", views.create_logsheet, name="create"),
     path("flight/<int:pk>/view/", views.view_flight, name="flight_view"),
     path("manage/<int:pk>/", views.manage_logsheet, name="manage"),

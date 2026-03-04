@@ -1,12 +1,19 @@
 # AJAX endpoint to update split fields for a flight
+import csv
 import logging
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDate
-from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
+from django.http import (
+    HttpResponse,
+    HttpResponseForbidden,
+    HttpResponseNotAllowed,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_time
@@ -44,6 +51,175 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _member_flight_charge_breakdown(flight, member):
+    """Return (tow, rental, total) owed by `member` for a single flight."""
+    if flight.logsheet.finalized:
+        tow_base = flight.tow_cost_actual or Decimal("0.00")
+        rental_base = flight.rental_cost_actual or Decimal("0.00")
+    else:
+        tow_base = flight.tow_cost_calculated or Decimal("0.00")
+        rental_base = flight.rental_cost or Decimal("0.00")
+
+    tow_base = Decimal(str(tow_base))
+    rental_base = Decimal(str(rental_base))
+
+    pilot = flight.pilot
+    partner = flight.split_with
+    split_type = flight.split_type
+
+    owed_tow = Decimal("0.00")
+    owed_rental = Decimal("0.00")
+
+    if partner and split_type:
+        if split_type == "even":
+            half_tow = tow_base / 2
+            half_rental = rental_base / 2
+            if member == pilot or member == partner:
+                owed_tow = half_tow
+                owed_rental = half_rental
+        elif split_type == "tow":
+            if member == pilot:
+                owed_rental = rental_base
+            elif member == partner:
+                owed_tow = tow_base
+        elif split_type == "rental":
+            if member == pilot:
+                owed_tow = tow_base
+            elif member == partner:
+                owed_rental = rental_base
+        elif split_type == "full":
+            if member == partner:
+                owed_tow = tow_base
+                owed_rental = rental_base
+    elif member == pilot:
+        owed_tow = tow_base
+        owed_rental = rental_base
+
+    owed_tow = owed_tow.quantize(Decimal("0.01"))
+    owed_rental = owed_rental.quantize(Decimal("0.01"))
+    total = (owed_tow + owed_rental).quantize(Decimal("0.01"))
+    return owed_tow, owed_rental, total
+
+
+def _get_personal_charge_data(member, start_date):
+    """Build per-flight and misc-charge rows for a member from start_date onward."""
+    flights = (
+        Flight.objects.filter(logsheet__log_date__gte=start_date)
+        .filter(Q(pilot=member) | Q(split_with=member))
+        .select_related("logsheet", "glider", "pilot", "split_with")
+        .order_by("-logsheet__log_date", "-launch_time", "-pk")
+    )
+
+    flight_rows = []
+    for flight in flights:
+        tow_cost, rental_cost, total_cost = _member_flight_charge_breakdown(
+            flight, member
+        )
+        if total_cost <= Decimal("0.00"):
+            continue
+        flight_rows.append(
+            {
+                "flight": flight,
+                "flight_date": flight.logsheet.log_date,
+                "glider": flight.glider,
+                "tow_cost": tow_cost,
+                "rental_cost": rental_cost,
+                "total_cost": total_cost,
+            }
+        )
+
+    misc_charges = list(
+        MemberCharge.objects.filter(member=member, date__gte=start_date)
+        .select_related("chargeable_item")
+        .order_by("-date", "-created_at")
+    )
+
+    return flight_rows, misc_charges
+
+
+@active_member_required
+def personal_charges_summary(request):
+    """Show a member's personal flight and miscellaneous charges for the last year."""
+    start_date = timezone.localdate() - timedelta(days=365)
+    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+
+    total_flight_cost = sum((row["total_cost"] for row in flight_rows), Decimal("0.00"))
+    total_misc_cost = sum(
+        (charge.total_price for charge in misc_charges), Decimal("0.00")
+    )
+
+    return render(
+        request,
+        "logsheet/personal_charges_summary.html",
+        {
+            "flight_rows": flight_rows,
+            "misc_charges": misc_charges,
+            "total_flight_cost": total_flight_cost,
+            "total_misc_cost": total_misc_cost,
+            "start_date": start_date,
+        },
+    )
+
+
+@active_member_required
+def personal_charges_summary_csv(request):
+    """Export a member's personal charges (flight + misc) as CSV."""
+    start_date = timezone.localdate() - timedelta(days=365)
+    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="personal_charges_{timezone.localdate().isoformat()}.csv"'
+    )
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "Date",
+            "Charge Type",
+            "Glider",
+            "Item",
+            "Tow Cost",
+            "Rental Cost",
+            "Misc Cost",
+            "Total",
+            "Notes",
+        ]
+    )
+
+    for row in flight_rows:
+        writer.writerow(
+            [
+                row["flight_date"].isoformat(),
+                "Flight",
+                str(row["glider"]) if row["glider"] else "—",
+                "",
+                f"{row['tow_cost']:.2f}",
+                f"{row['rental_cost']:.2f}",
+                "",
+                f"{row['total_cost']:.2f}",
+                "",
+            ]
+        )
+
+    for charge in misc_charges:
+        writer.writerow(
+            [
+                charge.date.isoformat(),
+                "Misc",
+                "",
+                charge.chargeable_item.name,
+                "",
+                "",
+                f"{charge.total_price:.2f}",
+                f"{charge.total_price:.2f}",
+                charge.notes,
+            ]
+        )
+
+    return response
 
 
 def get_validation_message(validation_error):
