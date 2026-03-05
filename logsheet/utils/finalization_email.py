@@ -498,7 +498,9 @@ def _get_from_email(config):
         domain = default_from.split("@")[-1]
         return f"noreply@{domain}"
     if config and config.domain_name:
-        return f"noreply@{config.domain_name}"
+        normalized_domain = _normalize_members_alias_domain(config.domain_name)
+        if normalized_domain:
+            return f"noreply@{normalized_domain}"
     return "noreply@manage2soar.com"
 
 

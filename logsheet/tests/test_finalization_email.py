@@ -16,6 +16,7 @@ from logsheet.models import (
     MaintenanceIssue,
 )
 from logsheet.utils.finalization_email import (
+    _get_from_email,
     _normalize_members_alias_domain,
     get_finalization_email_context,
     html_to_text_preserve_links,
@@ -169,6 +170,22 @@ class TestMembersAliasDomainNormalization(SimpleTestCase):
 
     def test_rejects_invalid_host(self):
         assert _normalize_members_alias_domain("https://[::1]:8001") == ""
+
+
+class TestFromEmailNormalization(SimpleTestCase):
+    @override_settings(DEFAULT_FROM_EMAIL="")
+    def test_normalizes_domain_name_for_from_email(self):
+        class DummyConfig:
+            domain_name = "https://demo.manage2soar.com:8443/path"
+
+        assert _get_from_email(DummyConfig()) == "noreply@demo.manage2soar.com"
+
+    @override_settings(DEFAULT_FROM_EMAIL="")
+    def test_falls_back_when_domain_name_invalid(self):
+        class DummyConfig:
+            domain_name = "http://[::1]:8001"
+
+        assert _get_from_email(DummyConfig()) == "noreply@manage2soar.com"
 
 
 # ---------------------------------------------------------------------------
