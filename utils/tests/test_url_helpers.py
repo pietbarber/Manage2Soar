@@ -99,6 +99,40 @@ class TestGetCanonicalURL:
             result = get_canonical_url()
             assert result == "http://localhost:8001"
 
+    def test_uses_domain_name_when_site_url_is_localhost(self):
+        """Should use configured domain_name when SITE_URL is localhost fallback."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="tenant-demo.skylinesoaring.org",
+            )
+        config.canonical_url = ""
+        config.domain_name = "tenant-demo.skylinesoaring.org"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "http://127.0.0.1:8001"):
+            result = get_canonical_url()
+            assert result == "https://tenant-demo.skylinesoaring.org"
+
+    def test_prefers_non_local_site_url_over_domain_name(self):
+        """Should keep SITE_URL priority over domain_name for non-local origins."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="tenant-demo.skylinesoaring.org",
+            )
+        config.canonical_url = ""
+        config.domain_name = "tenant-demo.skylinesoaring.org"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "https://fallback.example.com"):
+            result = get_canonical_url()
+            assert result == "https://fallback.example.com"
+
     def test_handles_db_not_ready_operational_error(self):
         """Should gracefully handle OperationalError during migrations/startup."""
         with patch(

@@ -62,20 +62,32 @@ def get_canonical_url(config=None):
                 normalized = _normalize_origin(canonical_url)
                 if normalized:
                     return normalized.rstrip("/")
-
-            domain_name = (getattr(config, "domain_name", "") or "").strip()
-            if domain_name:
-                normalized = _normalize_origin(domain_name)
-                if normalized:
-                    return normalized.rstrip("/")
     except (OperationalError, ProgrammingError):
         # Database not ready (migrations, tests, initial setup)
         pass
 
     # Fallback to environment variable
     site_url = getattr(settings, "SITE_URL", "").strip()
+    normalized_site_url = ""
     if site_url:
-        return site_url.rstrip("/")
+        normalized_site_url = _normalize_origin(site_url) or site_url.rstrip("/")
+        parsed_site_url = urlparse(normalized_site_url)
+        hostname = (parsed_site_url.hostname or "").lower()
+
+        # Respect SITE_URL unless it is a local development address.
+        if hostname not in {"localhost", "127.0.0.1"}:
+            return normalized_site_url.rstrip("/")
+
+        # SITE_URL points to localhost. If config has a real domain, prefer it
+        # for outbound links; otherwise keep the explicit SITE_URL value.
+        if config:
+            domain_name = (getattr(config, "domain_name", "") or "").strip()
+            if domain_name:
+                normalized = _normalize_origin(domain_name)
+                if normalized:
+                    return normalized.rstrip("/")
+
+        return normalized_site_url.rstrip("/")
 
     # Development fallback
     return "http://localhost:8001"
