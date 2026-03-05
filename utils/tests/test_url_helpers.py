@@ -76,6 +76,16 @@ class TestGetCanonicalURL:
         result = get_canonical_url(config=DummyConfig())
         assert result == "https://prod.example.org:8443"
 
+    def test_handles_invalid_port_in_db_canonical_url(self):
+        """Should not raise if canonical_url contains an invalid port."""
+
+        class DummyConfig:
+            canonical_url = "https://prod.example.org:abc/path"
+            domain_name = ""
+
+        result = get_canonical_url(config=DummyConfig())
+        assert result == "https://prod.example.org"
+
     def test_falls_back_to_site_url_when_db_empty(self):
         """Should fall back to settings.SITE_URL when DB canonical_url is blank."""
         config = SiteConfiguration.objects.first()
@@ -141,6 +151,30 @@ class TestGetCanonicalURL:
         ):
             result = get_canonical_url()
             assert result == "https://fallback.example.com"
+
+    def test_handles_invalid_port_in_site_url(self):
+        """Should not raise if SITE_URL contains an invalid port."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = ""
+        config.save()
+
+        with patch.object(
+            settings, "SITE_URL", "https://fallback.example.com:abc/path"
+        ):
+            result = get_canonical_url()
+            assert result == "https://fallback.example.com"
+
+    def test_normalize_origin_accepts_none(self):
+        """Internal normalizer should safely handle None input."""
+        from utils.url_helpers import _normalize_origin
+
+        assert _normalize_origin(None) == ""
 
     def test_falls_back_to_localhost_when_all_empty(self):
         """Should fall back to localhost:8001 when DB and SITE_URL are both blank."""

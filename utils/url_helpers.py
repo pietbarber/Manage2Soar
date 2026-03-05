@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 
 
-def _normalize_origin(url_or_domain: str) -> str:
+def _normalize_origin(url_or_domain: str | None) -> str:
     """Normalize a URL/domain to scheme://host[:port] origin form."""
     raw = (url_or_domain or "").strip()
     if not raw:
@@ -31,8 +31,13 @@ def _normalize_origin(url_or_domain: str) -> str:
         if ":" in host and not host.startswith("["):
             # Preserve valid IPv6 origin formatting when rebuilding netloc.
             host = f"[{host}]"
-        if parsed.port:
-            host = f"{host}:{parsed.port}"
+        try:
+            port = parsed.port
+        except ValueError:
+            # Invalid ports (e.g., :abc) should not crash URL resolution.
+            port = None
+        if port:
+            host = f"{host}:{port}"
         return f"{parsed.scheme}://{host}"
 
     return ""
