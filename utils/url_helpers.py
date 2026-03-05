@@ -25,8 +25,15 @@ def _normalize_origin(url_or_domain: str) -> str:
         # Treat bare hostnames/domains (and optional ports) as HTTPS.
         parsed = urlparse(f"https://{raw}")
 
-    if parsed.scheme and parsed.netloc:
-        return f"{parsed.scheme}://{parsed.netloc}"
+    if parsed.scheme and (parsed.hostname or parsed.netloc):
+        # Reconstruct host[:port] to avoid leaking username/password from netloc.
+        host = parsed.hostname or parsed.netloc
+        if ":" in host and not host.startswith("["):
+            # Preserve valid IPv6 origin formatting when rebuilding netloc.
+            host = f"[{host}]"
+        if parsed.port:
+            host = f"{host}:{parsed.port}"
+        return f"{parsed.scheme}://{host}"
 
     return ""
 
@@ -35,12 +42,12 @@ def get_canonical_url(config=None):
     """
     Get the canonical URL for email links.
 
-     Priority:
-     1. SiteConfiguration.canonical_url (database - webmaster configurable)
-     2. settings.SITE_URL (environment variable - backward compatibility)
-     3. If SITE_URL resolves to localhost/127.0.0.1 and SiteConfiguration
-         has domain_name set, use that domain for outbound links
-     4. 'http://localhost:8001' (development fallback)
+    Priority:
+    1. SiteConfiguration.canonical_url (database - webmaster configurable)
+    2. settings.SITE_URL (environment variable - backward compatibility)
+    3. If SITE_URL resolves to localhost/127.0.0.1 and SiteConfiguration
+       has domain_name set, use that domain for outbound links
+    4. 'http://localhost:8001' (development fallback)
 
     Returns:
         str: Canonical URL without trailing slash

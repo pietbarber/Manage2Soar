@@ -66,6 +66,16 @@ class TestGetCanonicalURL:
         result = get_canonical_url()
         assert result == "https://prod.example.org"
 
+    def test_strips_userinfo_from_db_canonical_url(self):
+        """Should drop credentials if canonical_url accidentally contains userinfo."""
+
+        class DummyConfig:
+            canonical_url = "https://user:pass@prod.example.org:8443/path"
+            domain_name = ""
+
+        result = get_canonical_url(config=DummyConfig())
+        assert result == "https://prod.example.org:8443"
+
     def test_falls_back_to_site_url_when_db_empty(self):
         """Should fall back to settings.SITE_URL when DB canonical_url is blank."""
         config = SiteConfiguration.objects.first()
@@ -111,6 +121,24 @@ class TestGetCanonicalURL:
         config.save()
 
         with patch.object(settings, "SITE_URL", "HTTPS://fallback.example.com/path"):
+            result = get_canonical_url()
+            assert result == "https://fallback.example.com"
+
+    def test_strips_userinfo_from_site_url(self):
+        """Should drop credentials if SITE_URL accidentally contains userinfo."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = ""
+        config.save()
+
+        with patch.object(
+            settings, "SITE_URL", "https://user:pass@fallback.example.com"
+        ):
             result = get_canonical_url()
             assert result == "https://fallback.example.com"
 
