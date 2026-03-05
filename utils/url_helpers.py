@@ -61,12 +61,12 @@ def get_canonical_url(config=None):
     """
     Get the canonical URL for email links.
 
-     Priority:
-     1. SiteConfiguration.canonical_url when it resolves to a non-loopback host
-     2. settings.SITE_URL
-     3. If SITE_URL resolves to a loopback host and SiteConfiguration has
-         domain_name set, use that domain for outbound links
-     4. 'http://localhost:8001' (development fallback)
+    Priority:
+    1. SiteConfiguration.canonical_url when it resolves to a non-loopback host
+    2. settings.SITE_URL
+    3. If SITE_URL resolves to a loopback host and SiteConfiguration has
+       domain_name set, use that domain for outbound links
+    4. 'http://localhost:8001' (development fallback)
 
     Returns:
         str: Canonical URL without trailing slash
