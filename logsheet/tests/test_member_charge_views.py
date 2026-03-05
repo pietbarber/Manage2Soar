@@ -7,12 +7,13 @@ in the logsheet workflow.
 
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
 
 from logsheet.forms import MemberChargeForm
-from logsheet.models import Airfield, Logsheet, MemberCharge
+from logsheet.models import Airfield, Logsheet, MemberCharge, RevisionLog
 from members.models import Member
 from siteconfig.models import ChargeableItem, MembershipStatus, SiteConfiguration
 
@@ -120,7 +121,7 @@ class MemberChargeFormTestCase(TestCase):
             membership_status="Inactive",
         )
         form = MemberChargeForm()
-        choices = form.fields["member"].choices
+        choices = list(form.fields["member"].choices)
         # Should have blank option + at least one group
         self.assertEqual(choices[0], ("", "— Select member —"))
         # Active members group should exist
@@ -392,6 +393,7 @@ class AddMemberChargeViewTestCase(TestCase):
         self.client.post(url, data)
 
         charge = MemberCharge.objects.first()
+        self.assertIsNotNone(charge)
         self.assertEqual(charge.logsheet, self.logsheet)
 
     def test_charge_date_matches_logsheet_date(self):
@@ -408,6 +410,7 @@ class AddMemberChargeViewTestCase(TestCase):
         self.client.post(url, data)
 
         charge = MemberCharge.objects.first()
+        self.assertIsNotNone(charge)
         self.assertEqual(charge.date, self.logsheet.log_date)
 
     def test_success_message_displayed(self):
@@ -737,3 +740,63 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             },
         )
         self.assertNotContains(response, delete_url)
+
+    @patch("logsheet.views.enqueue_finalization_summary_email_job")
+    def test_finances_finalize_triggers_summary_email(self, mock_enqueue_summary):
+        """Finalizing from finances should schedule the finalization summary email."""
+        self.client.login(username="do@test.com", password="testpass123")
+        url = reverse(
+            "logsheet:manage_logsheet_finances",
+            kwargs={"pk": self.logsheet.pk},
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(url, {"finalize": "true"}, follow=True)
+
+        self.logsheet.refresh_from_db()
+        self.assertTrue(self.logsheet.finalized)
+        self.assertEqual(response.status_code, 200)
+        mock_enqueue_summary.assert_called_once_with(self.logsheet.pk)
+
+    @patch("logsheet.views.enqueue_finalization_summary_email_job")
+    def test_finances_finalize_creates_revision_log_entry(self, mock_enqueue_summary):
+        """Finalizing from finances should record a revision log entry."""
+        self.client.login(username="do@test.com", password="testpass123")
+        url = reverse(
+            "logsheet:manage_logsheet_finances",
+            kwargs={"pk": self.logsheet.pk},
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(url, {"finalize": "true"}, follow=True)
+
+        self.assertTrue(
+            RevisionLog.objects.filter(
+                logsheet=self.logsheet,
+                revised_by=self.duty_officer,
+                note="Logsheet finalized",
+            ).exists()
+        )
+        mock_enqueue_summary.assert_called_once_with(self.logsheet.pk)
+
+    @patch("logsheet.views.enqueue_finalization_summary_email_job")
+    def test_finances_finalize_already_finalized_does_not_resend_email(
+        self, mock_enqueue_summary
+    ):
+        """Repeat finalize POST should not re-send summary email for finalized logsheets."""
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        url = reverse(
+            "logsheet:manage_logsheet_finances",
+            kwargs={"pk": self.logsheet.pk},
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(url, {"finalize": "true"}, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        messages = list(response.context["messages"])
+        self.assertTrue(any("already been finalized" in str(m) for m in messages))
+        mock_enqueue_summary.assert_not_called()

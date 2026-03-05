@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDate
 from django.http import (
@@ -50,6 +51,7 @@ from .models import (
     TowplaneChargeScheme,
     TowplaneCloseout,
 )
+from .utils.finalization_email import enqueue_finalization_summary_email_job
 from .utils.flight_charges import quantize_currency, split_flight_costs
 
 logger = logging.getLogger(__name__)
@@ -692,23 +694,43 @@ def manage_logsheet(request, pk):
                     messages.error(request, f"Cannot finalize. {msg}")
                 return redirect("logsheet:manage", pk=logsheet.pk)
 
-        # Lock in cost values
-        # That means take the temporary values we calculated for the costs
-        # and place them in these other variables that get perma-written to the database.
-        # Use unfiltered queryset to lock in costs for all flights
-        for flight in all_flights:
-            if flight.tow_cost_actual is None:
-                flight.tow_cost_actual = flight.tow_cost_calculated
-            if flight.rental_cost_actual is None:
-                flight.rental_cost_actual = flight.rental_cost_calculated
-            flight.save()
+        # Perform the core finalization writes inside a single atomic
+        # transaction so that flight saves, logsheet.finalized, and the
+        # revision log entry either all succeed or all roll back together.
+        # on_commit() is registered inside the block so the summary email,
+        # and any post-finalization behavior outside this block, run after
+        # the DB commit rather than inline.
+        with transaction.atomic():
+            locked_logsheet = Logsheet.objects.select_for_update().get(pk=logsheet.pk)
+            if locked_logsheet.finalized:
+                messages.info(request, "This logsheet has already been finalized.")
+                return redirect("logsheet:manage", pk=locked_logsheet.pk)
 
-        logsheet.finalized = True
-        logsheet.save()
+            # Lock in cost values
+            # That means take the temporary values we calculated for the costs
+            # and place them in these other variables that get perma-written to the database.
+            # Use unfiltered queryset to lock in costs for all flights
+            for flight in all_flights:
+                if flight.tow_cost_actual is None:
+                    flight.tow_cost_actual = flight.tow_cost_calculated
+                if flight.rental_cost_actual is None:
+                    flight.rental_cost_actual = flight.rental_cost_calculated
+                flight.save()
 
-        RevisionLog.objects.create(
-            logsheet=logsheet, revised_by=request.user, note="Logsheet finalized"
-        )
+            locked_logsheet.finalized = True
+            locked_logsheet.save()
+
+            RevisionLog.objects.create(
+                logsheet=locked_logsheet,
+                revised_by=request.user,
+                note="Logsheet finalized",
+            )
+
+            # Queue summary email dispatch after commit so request latency
+            # does not scale with recipient count.
+            transaction.on_commit(
+                lambda: enqueue_finalization_summary_email_job(locked_logsheet.pk)
+            )
 
         # Retire visiting pilot token when logsheet is finalized
         config = SiteConfiguration.objects.first()
@@ -1448,6 +1470,10 @@ def manage_logsheet_finances(request, pk):
         )
     if request.method == "POST":
         if "finalize" in request.POST:
+            if logsheet.finalized:
+                messages.info(request, "This logsheet has already been finalized.")
+                return redirect("logsheet:manage", pk=logsheet.pk)
+
             # Check that all responsible members have a payment method
             responsible_members = set()
 
@@ -1491,16 +1517,44 @@ def manage_logsheet_finances(request, pk):
                 )
                 return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
-            # Lock in costs
-            for flight in flights:
-                if flight.tow_cost_actual is None:
-                    flight.tow_cost_actual = flight.tow_cost_calculated
-                if flight.rental_cost_actual is None:
-                    flight.rental_cost_actual = flight.rental_cost_calculated
-                flight.save()
+            # Keep finalization DB writes atomic and register post-commit email
+            # so the sender sees committed state and mail failures cannot roll
+            # back financial finalization.
+            with transaction.atomic():
+                locked_logsheet = Logsheet.objects.select_for_update().get(
+                    pk=logsheet.pk
+                )
+                if locked_logsheet.finalized:
+                    messages.info(request, "This logsheet has already been finalized.")
+                    return redirect("logsheet:manage", pk=locked_logsheet.pk)
 
-            logsheet.finalized = True
-            logsheet.save()
+                # Re-query and lock flight rows inside the transaction so
+                # cost lock-in writes operate on transaction-consistent data.
+                locked_flights = Flight.objects.select_for_update().filter(
+                    logsheet=locked_logsheet
+                )
+
+                # Lock in costs
+                for flight in locked_flights:
+                    if flight.tow_cost_actual is None:
+                        flight.tow_cost_actual = flight.tow_cost_calculated
+                    if flight.rental_cost_actual is None:
+                        flight.rental_cost_actual = flight.rental_cost_calculated
+                    flight.save()
+
+                locked_logsheet.finalized = True
+                locked_logsheet.save()
+
+                RevisionLog.objects.create(
+                    logsheet=locked_logsheet,
+                    revised_by=request.user,
+                    note="Logsheet finalized",
+                )
+
+                transaction.on_commit(
+                    lambda: enqueue_finalization_summary_email_job(locked_logsheet.pk)
+                )
+
             messages.success(
                 request, "Logsheet has been finalized and all costs locked in."
             )

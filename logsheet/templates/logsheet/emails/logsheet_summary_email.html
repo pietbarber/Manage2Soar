@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operations Summary – {{ logsheet.log_date|date:"N j, Y" }}</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f5f5f5;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;">
+    <tr>
+        <td align="center" style="padding:20px 10px;">
+            <!-- Main 600 px container -->
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+                   style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+
+                <!-- ───────────── HEADER ───────────── -->
+                <tr>
+                    <td style="background-color:#2c5282;padding:24px;text-align:center;">
+                        {% if club_logo_url %}
+                        <img src="{{ club_logo_url }}" alt="{{ club_name }}"
+                             style="max-height:60px;max-width:200px;height:auto;display:block;margin:0 auto 12px auto;">
+                        {% endif %}
+                        <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:600;">
+                            Operations Summary
+                        </h1>
+                        <p style="margin:8px 0 0 0;color:#bee3f8;font-size:16px;">
+                            {{ logsheet.log_date|date:"l, F j, Y" }}
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- ───────────── INTRO ───────────── -->
+                <tr>
+                    <td style="padding:24px 24px 16px 24px;">
+                        <p style="margin:0;color:#2d3748;font-size:16px;line-height:1.5;">
+                            Hello {{ club_nickname|default:club_name }} Members,
+                        </p>
+                        <p style="margin:12px 0 0 0;color:#4a5568;font-size:15px;line-height:1.5;">
+                            Operations for {{ logsheet.log_date|date:"l, F j" }} have been finalized.
+                            You can view the full Ops Report online:
+                        </p>
+                        <p style="margin:16px 0 0 0;text-align:center;">
+                            <a href="{{ ops_report_url }}"
+                               style="display:inline-block;padding:10px 20px;background-color:#2c5282;color:#ffffff;
+                                      text-decoration:none;border-radius:4px;font-size:14px;font-weight:600;">
+                                View Ops Report
+                            </a>
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- ───────────── DUTY CREW ───────────── -->
+                <tr>
+                    <td style="padding:0 24px 16px 24px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               style="background-color:#edf2f7;border-radius:6px;">
+                            <tr>
+                                <td style="padding:16px;">
+                                    <h2 style="margin:0 0 12px 0;color:#2d3748;font-size:18px;font-weight:600;">
+                                        Duty Crew
+                                    </h2>
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                        {% if logsheet.duty_officer %}
+                                        <tr>
+                                            <td style="padding:4px 0;color:#718096;font-size:14px;width:180px;">Duty Officer:</td>
+                                            <td style="padding:4px 0;color:#2d3748;font-size:14px;font-weight:500;">{{ logsheet.duty_officer.full_display_name }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if logsheet.assistant_duty_officer %}
+                                        <tr>
+                                            <td style="padding:4px 0;color:#718096;font-size:14px;">Asst. Duty Officer:</td>
+                                            <td style="padding:4px 0;color:#2d3748;font-size:14px;font-weight:500;">{{ logsheet.assistant_duty_officer.full_display_name }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if logsheet.duty_instructor %}
+                                        <tr>
+                                            <td style="padding:4px 0;color:#718096;font-size:14px;">Duty Instructor:</td>
+                                            <td style="padding:4px 0;color:#2d3748;font-size:14px;font-weight:500;">{{ logsheet.duty_instructor.full_display_name }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if logsheet.surge_instructor %}
+                                        <tr>
+                                            <td style="padding:4px 0;color:#718096;font-size:14px;">Surge Instructor:</td>
+                                            <td style="padding:4px 0;color:#2d3748;font-size:14px;font-weight:500;">{{ logsheet.surge_instructor.full_display_name }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if logsheet.tow_pilot %}
+                                        <tr>
+                                            <td style="padding:4px 0;color:#718096;font-size:14px;">Tow Pilot:</td>
+                                            <td style="padding:4px 0;color:#2d3748;font-size:14px;font-weight:500;">{{ logsheet.tow_pilot.full_display_name }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if logsheet.surge_tow_pilot %}
+                                        <tr>
+                                            <td style="padding:4px 0;color:#718096;font-size:14px;">Surge Tow Pilot:</td>
+                                            <td style="padding:4px 0;color:#2d3748;font-size:14px;font-weight:500;">{{ logsheet.surge_tow_pilot.full_display_name }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- ───────────── OPERATIONS SUMMARY ───────────── -->
+                {% if operations_summary_html %}
+                <tr>
+                    <td style="padding:0 24px 16px 24px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               style="background-color:#f0fff4;border-radius:6px;border-left:4px solid #38a169;">
+                            <tr>
+                                <td style="padding:16px;">
+                                    <h2 style="margin:0 0 10px 0;color:#276749;font-size:18px;font-weight:600;">
+                                        Operations Summary
+                                    </h2>
+                                    <div style="color:#2d3748;font-size:14px;line-height:1.6;">
+                                        <div class="cms-content" style="max-width:100%;overflow-x:auto;word-wrap:break-word;overflow-wrap:anywhere;">
+                                            {{ operations_summary_html|safe }}
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+
+                <!-- ───────────── SAFETY SUMMARY ───────────── -->
+                {% if safety_issues_html %}
+                <tr>
+                    <td style="padding:0 24px 16px 24px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               style="background-color:#fffbeb;border-radius:6px;border-left:4px solid #d69e2e;">
+                            <tr>
+                                <td style="padding:16px;">
+                                    <h2 style="margin:0 0 10px 0;color:#744210;font-size:18px;font-weight:600;">
+                                        Safety Summary
+                                    </h2>
+                                    <div style="color:#2d3748;font-size:14px;line-height:1.6;">
+                                        <div class="cms-content" style="max-width:100%;overflow-x:auto;word-wrap:break-word;overflow-wrap:anywhere;">
+                                            {{ safety_issues_html|safe }}
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+
+                <!-- ───────────── EQUIPMENT SUMMARY ───────────── -->
+                {% if equipment_issues_html %}
+                <tr>
+                    <td style="padding:0 24px 16px 24px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               style="background-color:#ebf8ff;border-radius:6px;border-left:4px solid #3182ce;">
+                            <tr>
+                                <td style="padding:16px;">
+                                    <h2 style="margin:0 0 10px 0;color:#2c5282;font-size:18px;font-weight:600;">
+                                        Equipment Summary
+                                    </h2>
+                                    <div style="color:#2d3748;font-size:14px;line-height:1.6;">
+                                        <div class="cms-content" style="max-width:100%;overflow-x:auto;word-wrap:break-word;overflow-wrap:anywhere;">
+                                            {{ equipment_issues_html|safe }}
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+
+                <!-- ───────────── MAINTENANCE ISSUES ───────────── -->
+                {% if maintenance_issues %}
+                <tr>
+                    <td style="padding:0 24px 16px 24px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               style="background-color:#fff5f5;border-radius:6px;border-left:4px solid #c53030;">
+                            <tr>
+                                <td style="padding:16px;">
+                                    <h2 style="margin:0 0 10px 0;color:#9b2c2c;font-size:18px;font-weight:600;">
+                                        Maintenance Issues
+                                    </h2>
+                                    {% for issue in maintenance_issues %}
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                                           style="margin-bottom:10px;background-color:#ffffff;border-radius:4px;border:1px solid #feb2b2;">
+                                        <tr>
+                                            <td style="padding:10px 12px;">
+                                                <p style="margin:0;color:#2d3748;font-size:14px;font-weight:600;">
+                                                    {% if issue.glider %}{{ issue.glider }}{% elif issue.towplane %}{{ issue.towplane }}{% else %}Aircraft TBD{% endif %}
+                                                    {% if issue.grounded %}
+                                                    <span style="display:inline-block;padding:2px 6px;background:#c53030;color:#fff;border-radius:3px;font-size:11px;font-weight:700;margin-left:6px;">GROUNDED</span>
+                                                    {% endif %}
+                                                </p>
+                                                <p style="margin:4px 0 0 0;color:#4a5568;font-size:13px;">{{ issue.description }}</p>
+                                                {% if issue.reported_by %}
+                                                <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">Reported by: {{ issue.reported_by.full_display_name }}</p>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+
+                <!-- ───────────── FLIGHTS TABLE ───────────── -->
+                {% if flights %}
+                <tr>
+                    <td style="padding:0 24px 24px 24px;">
+                        <h2 style="margin:0 0 12px 0;color:#2d3748;font-size:18px;font-weight:600;">
+                            Flights ({{ flights|length }})
+                        </h2>
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               style="border-collapse:collapse;font-size:13px;">
+                            <!-- Table header -->
+                            <tr style="background-color:#2c5282;color:#ffffff;">
+                                <td style="padding:8px 6px;text-align:left;font-weight:600;border-radius:4px 0 0 0;">#</td>
+                                <td style="padding:8px 6px;text-align:left;font-weight:600;">Pilot</td>
+                                <td style="padding:8px 6px;text-align:left;font-weight:600;">Instructor</td>
+                                <td style="padding:8px 6px;text-align:left;font-weight:600;">Glider</td>
+                                <td style="padding:8px 6px;text-align:center;font-weight:600;">Launch</td>
+                                <td style="padding:8px 6px;text-align:center;font-weight:600;">Land</td>
+                                <td style="padding:8px 6px;text-align:center;font-weight:600;">Duration</td>
+                                <td style="padding:8px 6px;text-align:right;font-weight:600;border-radius:0 4px 0 0;">Rel. Alt.</td>
+                            </tr>
+                            {% for row in flights %}
+                            {% if row.is_longest %}
+                            <tr style="background-color:#fefce8;">
+                            {% elif forloop.counter|divisibleby:2 %}
+                            <tr style="background-color:#f7fafc;">
+                            {% else %}
+                            <tr style="background-color:#ffffff;">
+                            {% endif %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#718096;">{{ row.index }}</td>
+                                {% if row.is_longest %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#2d3748;font-weight:600;">
+                                {% else %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#2d3748;font-weight:400;">
+                                {% endif %}
+                                    {{ row.pilot_name }}
+                                </td>
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;">
+                                    {{ row.instructor_name|default:"—" }}
+                                </td>
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;">{{ row.glider_label }}</td>
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;text-align:center;">{{ row.launch_time }}</td>
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;text-align:center;">{{ row.landing_time }}</td>
+                                {% if row.is_longest %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;text-align:center;color:#92600a;font-weight:700;background-color:#fefce8;">
+                                {% else %}
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;text-align:center;color:#2d3748;">
+                                {% endif %}
+                                    {{ row.duration_str }}{% if row.is_longest %}&nbsp;&#9733;{% endif %}
+                                </td>
+                                <td style="padding:7px 6px;border-bottom:1px solid #e2e8f0;color:#4a5568;text-align:right;">
+                                    {% if row.release_altitude != "—" %}{{ row.release_altitude }} ft{% else %}—{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+
+                <!-- ───────────── FOOTER ───────────── -->
+                <tr>
+                    <td style="background-color:#f7fafc;padding:20px 24px;text-align:center;border-top:1px solid #e2e8f0;">
+                        <p style="margin:0;color:#718096;font-size:13px;line-height:1.5;">
+                            {{ club_name }}<br>
+                            <a href="{{ ops_report_url }}" style="color:#3182ce;text-decoration:none;">
+                                View full Ops Report online
+                            </a>
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

@@ -448,6 +448,41 @@ class RevisionLog(models.Model):
         return f"Revised by {self.revised_by} on {self.revised_at}"
 
 
+class FinalizationEmailOutbox(models.Model):
+    """Durable queue record for post-finalization summary email delivery."""
+
+    STATUS_PENDING = "pending"
+    STATUS_SENT = "sent"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_SENT, "Sent"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    logsheet = models.OneToOneField(
+        "Logsheet",
+        on_delete=models.CASCADE,
+        related_name="finalization_email_outbox",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    attempt_count = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    queued_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["queued_at"]
+
+    def __str__(self):
+        return f"FinalizationEmailOutbox(logsheet={self.logsheet_id}, status={self.status})"
+
+
 ####################################################
 # Towplane model
 #
