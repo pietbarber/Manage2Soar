@@ -661,10 +661,12 @@ def enqueue_finalization_summary_email_job(logsheet_id):
         defaults={"status": FinalizationEmailOutbox.STATUS_PENDING},
     )
 
-    if not created and outbox.status == FinalizationEmailOutbox.STATUS_SENT:
-        return outbox
-
-    if not created and outbox.status == FinalizationEmailOutbox.STATUS_FAILED:
+    # If an outbox entry already exists (whether previously sent or failed),
+    # reset it to pending so that a re-finalization will enqueue a fresh job.
+    if not created and outbox.status in (
+        FinalizationEmailOutbox.STATUS_SENT,
+        FinalizationEmailOutbox.STATUS_FAILED,
+    ):
         outbox.status = FinalizationEmailOutbox.STATUS_PENDING
         outbox.last_error = ""
         outbox.processed_at = None
