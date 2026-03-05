@@ -12,6 +12,7 @@ to all active members with:
   - YouTube iframes and PDF embeds replaced with linked logos / placeholders
 """
 
+import ipaddress
 import logging
 import re
 from html import unescape
@@ -524,6 +525,15 @@ def _normalize_members_alias_domain(domain_name: str | None) -> str:
     host = (parsed.hostname or "").strip().lower()
     if not host:
         return ""
+
+    # Do not construct mailing aliases from localhost or literal IPs.
+    if host == "localhost":
+        return ""
+    try:
+        ipaddress.ip_address(host)
+        return ""
+    except ValueError:
+        pass
 
     # Email domains must not include URL-style punctuation or whitespace.
     if any(ch in host for ch in "[]/@"):

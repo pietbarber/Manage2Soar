@@ -171,6 +171,12 @@ class TestMembersAliasDomainNormalization(SimpleTestCase):
     def test_rejects_invalid_host(self):
         assert _normalize_members_alias_domain("https://[::1]:8001") == ""
 
+    def test_rejects_localhost_host(self):
+        assert _normalize_members_alias_domain("localhost") == ""
+
+    def test_rejects_literal_ip_host(self):
+        assert _normalize_members_alias_domain("127.0.0.1") == ""
+
 
 class TestFromEmailNormalization(SimpleTestCase):
     @override_settings(DEFAULT_FROM_EMAIL="")
@@ -184,6 +190,20 @@ class TestFromEmailNormalization(SimpleTestCase):
     def test_falls_back_when_domain_name_invalid(self):
         class DummyConfig:
             domain_name = "http://[::1]:8001"
+
+        assert _get_from_email(DummyConfig()) == "noreply@manage2soar.com"
+
+    @override_settings(DEFAULT_FROM_EMAIL="")
+    def test_falls_back_when_domain_name_localhost(self):
+        class DummyConfig:
+            domain_name = "localhost"
+
+        assert _get_from_email(DummyConfig()) == "noreply@manage2soar.com"
+
+    @override_settings(DEFAULT_FROM_EMAIL="")
+    def test_falls_back_when_domain_name_is_ip(self):
+        class DummyConfig:
+            domain_name = "127.0.0.1"
 
         assert _get_from_email(DummyConfig()) == "noreply@manage2soar.com"
 
