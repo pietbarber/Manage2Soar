@@ -512,9 +512,35 @@ def _sanitize_email_subject(raw_subject, max_length=255):
     return subject
 
 
+def _normalize_members_alias_domain(domain_name: str | None) -> str:
+    """Return a safe bare hostname for members@ aliasing, or empty string."""
+    raw = (domain_name or "").strip().lower()
+    if not raw:
+        return ""
+
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    host = (parsed.hostname or "").strip().lower()
+    if not host:
+        return ""
+
+    # Email domains must not include URL-style punctuation or whitespace.
+    if any(ch in host for ch in "[]/@"):
+        return ""
+
+    # Allow common DNS hostnames and local dev hostnames; reject everything
+    # else so we can safely fall back to individual member delivery.
+    if re.fullmatch(
+        r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*",
+        host,
+    ):
+        return host
+
+    return ""
+
+
 def _get_finalization_recipients(config):
     """Resolve recipients for finalization summary delivery."""
-    domain_name = (getattr(config, "domain_name", "") or "").strip().lower()
+    domain_name = _normalize_members_alias_domain(getattr(config, "domain_name", ""))
     members_list_exists = MailingList.objects.filter(
         is_active=True,
         name__iexact="members",

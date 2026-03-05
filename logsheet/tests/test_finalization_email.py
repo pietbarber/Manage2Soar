@@ -16,6 +16,7 @@ from logsheet.models import (
     MaintenanceIssue,
 )
 from logsheet.utils.finalization_email import (
+    _normalize_members_alias_domain,
     get_finalization_email_context,
     html_to_text_preserve_links,
     sanitize_closeout_html_for_email,
@@ -157,6 +158,17 @@ class TestEmailSiteUrlResolution(SimpleTestCase):
 
         resolved = get_canonical_url(config=DummyConfig())
         assert resolved == "https://prod.example.org"
+
+
+class TestMembersAliasDomainNormalization(SimpleTestCase):
+    def test_normalizes_url_to_bare_hostname(self):
+        assert (
+            _normalize_members_alias_domain("https://demo.manage2soar.com:8443/path")
+            == "demo.manage2soar.com"
+        )
+
+    def test_rejects_invalid_host(self):
+        assert _normalize_members_alias_domain("https://[::1]:8001") == ""
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +437,83 @@ class TestSendFinalizationSummaryEmail:
         assert mock_send.call_count == 1
         recipient_list = mock_send.call_args.kwargs.get("recipient_list", [])
         assert recipient_list == ["members@demo.manage2soar.com"]
+
+    @patch("logsheet.utils.finalization_email.send_mail")
+    def test_email_uses_normalized_members_mailing_list_domain(self, mock_send):
+        Member.objects.create_user(
+            username="active5",
+            password="test",
+            membership_status="Full Member",
+            is_active=True,
+            email="member5@example.com",
+        )
+        config = SiteConfiguration.objects.first()
+        if not config:
+            SiteConfiguration.objects.create(
+                club_name="Demo Club",
+                domain_name="https://demo.manage2soar.com:8443/path",
+                club_abbreviation="DC",
+            )
+        else:
+            config.club_name = "Demo Club"
+            config.domain_name = "https://demo.manage2soar.com:8443/path"
+            config.club_abbreviation = "DC"
+            config.save()
+        MailingList.objects.update_or_create(
+            name="members",
+            defaults={
+                "description": "All active members",
+                "is_active": True,
+                "criteria": [MailingListCriterion.ACTIVE_MEMBER],
+            },
+        )
+
+        send_finalization_summary_email(self.logsheet)
+
+        assert mock_send.call_count == 1
+        recipient_list = mock_send.call_args.kwargs.get("recipient_list", [])
+        assert recipient_list == ["members@demo.manage2soar.com"]
+
+    @patch("logsheet.utils.finalization_email.send_mail")
+    def test_falls_back_to_individual_delivery_when_domain_invalid(self, mock_send):
+        Member.objects.create_user(
+            username="active6",
+            password="test",
+            membership_status="Full Member",
+            is_active=True,
+            email="member6@example.com",
+        )
+        config = SiteConfiguration.objects.first()
+        if not config:
+            SiteConfiguration.objects.create(
+                club_name="Demo Club",
+                domain_name="http://[::1]:8001",
+                club_abbreviation="DC",
+            )
+        else:
+            config.club_name = "Demo Club"
+            config.domain_name = "http://[::1]:8001"
+            config.club_abbreviation = "DC"
+            config.save()
+        MailingList.objects.update_or_create(
+            name="members",
+            defaults={
+                "description": "All active members",
+                "is_active": True,
+                "criteria": [MailingListCriterion.ACTIVE_MEMBER],
+            },
+        )
+
+        send_finalization_summary_email(self.logsheet)
+
+        assert mock_send.call_count == 2
+        recipients = {
+            call.kwargs.get("recipient_list", [""])[0]
+            for call in mock_send.call_args_list
+        }
+        assert "members@demo.manage2soar.com" not in recipients
+        assert "do@example.com" in recipients
+        assert "member6@example.com" in recipients
 
     @patch("logsheet.utils.finalization_email.send_mail")
     def test_email_excludes_inactive_membership_status(self, mock_send):
