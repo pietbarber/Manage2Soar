@@ -118,6 +118,38 @@ class TestGetCanonicalURL:
             result = get_canonical_url()
             assert result == "https://demo.manage2soar.com"
 
+    def test_ignores_loopback_db_canonical_127_0_1_1(self):
+        """Should ignore any 127.0.0.0/8 canonical host, not only 127.0.0.1."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="demo.manage2soar.com",
+            )
+        config.canonical_url = "http://127.0.1.1:8001"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "https://demo.manage2soar.com"):
+            result = get_canonical_url()
+            assert result == "https://demo.manage2soar.com"
+
+    def test_ignores_loopback_db_canonical_ipv6(self):
+        """Should ignore IPv6 loopback canonical_url values."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="demo.manage2soar.com",
+            )
+        config.canonical_url = "http://[::1]:8001"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "https://demo.manage2soar.com"):
+            result = get_canonical_url()
+            assert result == "https://demo.manage2soar.com"
+
     def test_ignores_localhost_db_canonical_and_uses_domain_when_site_url_local(self):
         """Should use domain_name when both canonical_url and SITE_URL are local."""
         config = SiteConfiguration.objects.first()
@@ -239,6 +271,40 @@ class TestGetCanonicalURL:
         config.save()
 
         with patch.object(settings, "SITE_URL", "http://127.0.0.1:8001"):
+            result = get_canonical_url()
+            assert result == "https://tenant-demo.skylinesoaring.org"
+
+    def test_uses_domain_name_when_site_url_is_loopback_variant(self):
+        """Should treat all loopback SITE_URL hosts as local for fallback."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="tenant-demo.skylinesoaring.org",
+            )
+        config.canonical_url = ""
+        config.domain_name = "tenant-demo.skylinesoaring.org"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "http://127.0.1.1:8001"):
+            result = get_canonical_url()
+            assert result == "https://tenant-demo.skylinesoaring.org"
+
+    def test_uses_domain_name_when_site_url_is_ipv6_loopback(self):
+        """Should treat IPv6 loopback SITE_URL as local for fallback."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="tenant-demo.skylinesoaring.org",
+            )
+        config.canonical_url = ""
+        config.domain_name = "tenant-demo.skylinesoaring.org"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "http://[::1]:8001"):
             result = get_canonical_url()
             assert result == "https://tenant-demo.skylinesoaring.org"
 
