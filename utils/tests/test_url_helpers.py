@@ -102,6 +102,39 @@ class TestGetCanonicalURL:
             result = get_canonical_url()
             assert result == "https://fallback.example.com"
 
+    def test_ignores_localhost_db_canonical_and_uses_non_local_site_url(self):
+        """Should not use localhost canonical_url for outbound links in deployed env."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="demo.manage2soar.com",
+            )
+        config.canonical_url = "http://127.0.0.1:8001"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "https://demo.manage2soar.com"):
+            result = get_canonical_url()
+            assert result == "https://demo.manage2soar.com"
+
+    def test_ignores_localhost_db_canonical_and_uses_domain_when_site_url_local(self):
+        """Should use domain_name when both canonical_url and SITE_URL are local."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="demo.manage2soar.com",
+            )
+        config.canonical_url = "http://127.0.0.1:8001"
+        config.domain_name = "demo.manage2soar.com"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "http://127.0.0.1:8001"):
+            result = get_canonical_url()
+            assert result == "https://demo.manage2soar.com"
+
     def test_strips_trailing_slash_from_site_url(self):
         """Should normalize settings.SITE_URL by removing trailing slash."""
         config = SiteConfiguration.objects.first()

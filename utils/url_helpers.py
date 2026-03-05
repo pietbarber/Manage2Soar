@@ -74,7 +74,9 @@ def get_canonical_url(config=None):
             if canonical_url:
                 normalized = _normalize_origin(canonical_url)
                 if normalized:
-                    return normalized.rstrip("/")
+                    canonical_host = (urlparse(normalized).hostname or "").lower()
+                    if canonical_host not in {"localhost", "127.0.0.1"}:
+                        return normalized.rstrip("/")
     except (OperationalError, ProgrammingError):
         # Database not ready (migrations, tests, initial setup)
         pass

@@ -31,7 +31,7 @@ from django.utils.formats import date_format as django_date_format
 from logsheet.models import FinalizationEmailOutbox
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import MailingList, SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -512,10 +512,41 @@ def _sanitize_email_subject(raw_subject, max_length=255):
     return subject
 
 
+def _get_finalization_recipients(config):
+    """Resolve recipients for finalization summary delivery."""
+    domain_name = (getattr(config, "domain_name", "") or "").strip().lower()
+    members_list_exists = MailingList.objects.filter(
+        is_active=True,
+        name__iexact="members",
+    ).exists()
+
+    if members_list_exists and domain_name:
+        return [f"members@{domain_name}"], "mailing-list"
+
+    # Fallback: deliver directly to active members when no members@ list
+    # is configured (or when domain_name is unavailable).
+    active_statuses = get_active_membership_statuses()
+    recipients = list(
+        Member.objects.filter(
+            membership_status__in=active_statuses,
+            is_active=True,
+        )
+        .exclude(email="")
+        .exclude(email__isnull=True)
+        .values_list("email", flat=True)
+        .distinct()
+    )
+    return recipients, "individual"
+
+
 def send_finalization_summary_email(logsheet, raise_on_failure=False):
     """
-    Send the post-finalization HTML summary email to all active members
-    who have an email address on file.
+    Send the post-finalization HTML summary email.
+
+    Delivery target selection:
+    1. If an active ``MailingList`` named ``members`` is configured and the
+       site has a domain name, send one email to ``members@<domain>``.
+    2. Otherwise, fall back to one-email-per-active-member delivery.
 
     Called after a logsheet is finalized. By default failures are logged and
     not raised so a mail problem cannot block finalization UX. For durable
@@ -534,18 +565,7 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
         site_url = get_canonical_url(config=config)
         from_email = _get_from_email(config)
 
-        # Fetch all active members with a valid email address
-        active_statuses = get_active_membership_statuses()
-        recipients = list(
-            Member.objects.filter(
-                membership_status__in=active_statuses,
-                is_active=True,
-            )
-            .exclude(email="")
-            .exclude(email__isnull=True)
-            .values_list("email", flat=True)
-            .distinct()
-        )
+        recipients, delivery_mode = _get_finalization_recipients(config)
 
         if not recipients:
             logger.warning(
@@ -577,12 +597,14 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
 
         sent_count = 0
         failure_count = 0
-        # Open a single SMTP connection for all sends to avoid per-message
-        # connection overhead when the club has many members.
+        # Open a single SMTP connection for all sends.
+        # For mailing-list mode there is one send; for fallback mode this
+        # retains efficient reuse across many individual sends.
         with get_connection() as connection:
             for recipient in recipients:
-                # Send one email per recipient so that member addresses are
-                # not disclosed to each other via the To: header.
+                # Individual mode sends one-per-member so addresses are not
+                # disclosed to each other via To:. Mailing-list mode has a
+                # single recipient alias.
                 try:
                     send_mail(
                         subject=subject,
@@ -601,8 +623,9 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
                         recipient,
                     )
         logger.info(
-            "Finalization summary email for logsheet %s: sent to %d recipient(s), %d failure(s).",
+            "Finalization summary email for logsheet %s: mode=%s sent to %d recipient(s), %d failure(s).",
             logsheet.pk,
+            delivery_mode,
             sent_count,
             failure_count,
         )
