@@ -520,3 +520,192 @@
         outline: none;
     }
 }
+
+/* ==========================================================================
+   SITEWIDE MOBILE UX IMPROVEMENTS
+   Now that base.html has a proper viewport meta tag, all @media queries
+   below actually fire correctly on real phone hardware.
+
+   Targets: iPhone 12 (390px), Pixel 9 (412px), and similar phones.
+   Desktop (≥576px) is completely unaffected.
+   ========================================================================== */
+
+/* ── 1. Container gutter tightening ──────────────────────────────────────
+   Bootstrap's .container uses 12px gutters (--bs-gutter-x: 0.75rem).
+   On a 390px phone every pixel counts; tighten to 8px each side.        */
+@media (max-width: 430px) {
+    .container,
+    .container-sm {
+        --bs-gutter-x: 1rem;    /* 1rem × 0.5 = 0.5rem = 8px per side */
+        padding-left: calc(var(--bs-gutter-x) * 0.5) !important;
+        padding-right: calc(var(--bs-gutter-x) * 0.5) !important;
+    }
+}
+
+/* ── 2. Page header rows (title left / action button right) ──────────────
+   The pattern `d-flex justify-content-between align-items-center mb-4`
+   is used on virtually every list page (member list, logsheet list,
+   equipment list, etc.).  On a narrow phone the h1 and button fight for
+   space and both lose.  Let the button wrap underneath the title.        */
+@media (max-width: 575px) {
+    .d-flex.justify-content-between.align-items-center {
+        flex-wrap: wrap !important;
+        gap: 0.6rem;
+    }
+
+    /* The action button in those headers should span its own line */
+    .d-flex.justify-content-between.align-items-center > .btn,
+    .d-flex.justify-content-between.align-items-center > a.btn {
+        width: 100%;
+    }
+}
+
+/* ── 3. Display headings: scale down for phones ──────────────────────────
+   .display-5 / .display-6 calculates ~2.3–2.1rem at phone widths.
+   Combined with fw-bold that's visually large; knock it back.            */
+@media (max-width: 430px) {
+    .display-5 { font-size: 1.6rem !important; }
+    .display-6 { font-size: 1.4rem !important; }
+}
+
+/* ── 4. Modal dialogs: prevent overflow on small phones ─────────────────
+   Bootstrap's modal-lg is 800px wide; on a phone that means horizontal
+   scroll or clipped content.  Force modals to use the viewport width
+   with sensible margins.                                                  */
+@media (max-width: 575px) {
+    .modal-dialog {
+        margin: 0.5rem !important;
+        max-width: calc(100vw - 1rem) !important;
+    }
+
+    .modal-dialog.modal-lg,
+    .modal-dialog.modal-xl {
+        margin: 0.5rem !important;
+        max-width: calc(100vw - 1rem) !important;
+    }
+
+    .modal-content {
+        border-radius: 10px;
+    }
+
+    /* Tighten modal body padding so form fields get more width */
+    .modal-body {
+        padding: 1rem 0.875rem !important;
+    }
+
+    /* Stack col-md-* form rows inside modals vertically */
+    .modal-body .row > [class*="col-md-"],
+    .modal-body .row > [class*="col-sm-"] {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* ── 5. Tables without .table-responsive: add overflow scroll ────────────
+   Any plain <table> that escapes a .table-responsive wrapper will now
+   overflow the page because the viewport is correctly sized.  Catch them
+   all with a safe default.                                                */
+@media (max-width: 575px) {
+    /* Standalone tables (not already inside .table-responsive) */
+    .container table:not(.flights-table):not(.training-grid) {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+    }
+    /* Undo: tables already wrapped in .table-responsive should scroll
+       via the wrapper, not via display:block on the table itself */
+    .container .table-responsive table:not(.flights-table):not(.training-grid) {
+        display: table;
+        overflow-x: unset;
+        max-width: unset;
+    }
+}
+
+/* ── 6. Logsheet management hero header ─────────────────────────────────
+   The gradient management-header inside .container: tighten padding and
+   let the border-radius soften on small screens.                         */
+@media (max-width: 430px) {
+    .management-header {
+        padding: 1rem !important;
+        border-radius: 12px !important;
+        margin-bottom: 1rem !important;
+    }
+
+    /* Date badge + status badge: stack if they don't fit side-by-side */
+    .management-header .d-flex.justify-content-between {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+}
+
+/* ── 7. Summary/stats cards row: ensure proper sizing on 390px ───────────
+   Four summary cards in a row.  They use d-flex with auto sizing;
+   just make sure the numbers are readable and the row doesn't overflow. */
+@media (max-width: 430px) {
+    .summary-cards {
+        gap: 0.4rem !important;
+    }
+
+    .summary-card {
+        min-width: 72px !important;
+        padding: 0.4rem 0.5rem !important;
+    }
+
+    .summary-number {
+        font-size: 1.3rem !important;
+    }
+
+    .summary-label {
+        font-size: 0.65rem !important;
+    }
+
+    .summary-icon {
+        font-size: 1.1rem !important;
+        width: 32px !important;
+        height: 32px !important;
+    }
+}
+
+/* ── 8. Footer: tighten on very small screens ────────────────────────────
+   Supplement the existing 768px footer rules with phone-specific tweaks. */
+@media (max-width: 430px) {
+    .footer {
+        padding: 1.25rem 0 !important;
+        font-size: 0.9rem !important;
+    }
+
+    /* Safety Suggestion Box link in footer */
+    .footer .safety-link,
+    .footer a {
+        font-size: 0.9rem !important;
+    }
+}
+
+/* ── 9. Card grids: ensure single-column on phones ──────────────────────
+   Any col-md-6 / col-lg-4 / col-xl-4 card grid should be a single
+   column on phones (Bootstrap already handles this via responsive classes
+   once the viewport meta tag is in place, but this is an explicit guard). */
+@media (max-width: 575px) {
+    .row > [class*="col-xl-"],
+    .row > [class*="col-lg-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    /* Management action cards at bottom of logsheet page */
+    .management-actions .row > [class*="col-md-"] {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* ── 10. Duty roster calendar: basic overflow guard ─────────────────────
+   The calendar is complex; at minimum prevent it from breaking the page. */
+@media (max-width: 575px) {
+    .calendar-container,
+    .fc {                          /* FullCalendar root element */
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}

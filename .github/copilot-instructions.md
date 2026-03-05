@@ -88,6 +88,24 @@
 - **DO NOT**: Parse workspace storage files, use `jq` on cached tool output, or manually traverse VS Code temporary directories
 - **Pattern**: Call MCP tool → Parse JSON response → Address comments → Commit with descriptive message
 
+### Copilot PR Review Loop Automation (CRITICAL)
+- **When the user is in the flow**: "comments from GitHub Copilot" → "fix comments".
+- **Default behavior**: Run the full loop automatically without asking for extra confirmation between steps.
+- **Required sequence**:
+  1. Fetch unresolved, non-outdated PR review comments.
+  2. Implement fixes for those comments.
+  3. Run validation, including Pylance/editor diagnostics on touched files (`get_errors`) and targeted tests.
+  4. Commit the changes with a descriptive message.
+  5. Push the branch to update the open PR automatically (`git push`).
+  6. Post replies on each addressed review comment summarizing what was fixed.
+  7. Return a ready-to-paste prompt for the next review round.
+- **Branch safety**:
+  - Never commit directly to `main`.
+  - If currently on `main`, create/switch to the PR feature branch before committing.
+- **Reply quality**:
+  - Include concrete file references and behavior changes in each comment reply.
+  - If a comment is not fully addressed, state what remains and why.
+
 ## Security Scanning & CodeQL Alerts
 - **CRITICAL**: When user mentions security vulnerabilities, CodeQL alerts, code scanning issues, or dependabot alerts, ALWAYS use the GitHub API to fetch alert details:
   ```bash

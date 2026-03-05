@@ -626,3 +626,16 @@ class TestPresetViewIntegrationTests(TestCase):
         self.assertIsNotNone(weight_st_field)
         self.assertEqual(weight_gf_field.initial, 5)
         self.assertEqual(weight_st_field.initial, 3)
+
+    def test_create_test_renders_question_weight_slots(self):
+        """Create page should provide and render dynamic weight_* fields."""
+        self.client.login(username="testuser", password="pass")
+
+        url = reverse("knowledgetest:create")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        weight_fields = response.context.get("weight_fields", [])
+        self.assertGreaterEqual(len(weight_fields), 2)
+        self.assertContains(response, 'name="weight_GF"')
+        self.assertContains(response, 'name="weight_ST"')

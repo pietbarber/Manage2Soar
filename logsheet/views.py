@@ -1,13 +1,20 @@
 # AJAX endpoint to update split fields for a flight
+import csv
 import logging
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDate
-from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
+from django.http import (
+    HttpResponse,
+    HttpResponseForbidden,
+    HttpResponseNotAllowed,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_time
@@ -41,11 +48,204 @@ from .models import (
     MemberCharge,
     RevisionLog,
     Towplane,
+    TowplaneChargeScheme,
     TowplaneCloseout,
 )
 from .utils.finalization_email import enqueue_finalization_summary_email_job
+from .utils.flight_charges import quantize_currency, split_flight_costs
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_csv_cell(value):
+    """Neutralize spreadsheet-formula strings in CSV cells."""
+    if not isinstance(value, str):
+        return value
+
+    stripped = value.lstrip()
+    if stripped.startswith(("=", "+", "-", "@")):
+        return f"'{value}"
+    return value
+
+
+def _member_flight_charge_breakdown(flight, member):
+    """Return (tow, rental, total) owed by `member` for a single flight."""
+    # Prefer locked-in actual values for finalized logsheets, but fall back to
+    # calculated values when legacy rows have NULL actuals.
+    if flight.logsheet.finalized and flight.tow_cost_actual is not None:
+        tow_base = flight.tow_cost_actual
+    else:
+        tow_base = flight.tow_cost_calculated or Decimal("0.00")
+
+    if flight.logsheet.finalized and flight.rental_cost_actual is not None:
+        rental_base = flight.rental_cost_actual
+    else:
+        rental_base = flight.rental_cost or Decimal("0.00")
+
+    allocations = split_flight_costs(
+        flight.pilot,
+        flight.split_with,
+        flight.split_type,
+        tow_base,
+        rental_base,
+    )
+    member_alloc = allocations.get(
+        member,
+        {"tow": Decimal("0.00"), "rental": Decimal("0.00")},
+    )
+
+    owed_tow = quantize_currency(member_alloc["tow"])
+    owed_rental = quantize_currency(member_alloc["rental"])
+    total = quantize_currency(owed_tow + owed_rental)
+    return owed_tow, owed_rental, total
+
+
+def _get_personal_charge_data(member, start_date):
+    """Build per-flight and misc-charge rows for a member from start_date onward."""
+    flights = (
+        Flight.objects.filter(logsheet__log_date__gte=start_date)
+        .filter(Q(pilot=member) | Q(split_with=member))
+        .select_related(
+            "logsheet",
+            "glider",
+            "pilot",
+            "split_with",
+            "towplane",
+            "towplane__charge_scheme",
+        )
+        .prefetch_related("towplane__charge_scheme__charge_tiers")
+        .order_by("-logsheet__log_date", "-launch_time", "-pk")
+    )
+
+    # Avoid per-flight SiteConfiguration lookups when non-finalized flights
+    # use tow_cost_calculated / rental_cost and retrieve-waiver rules.
+    site_config = SiteConfiguration.objects.first()
+
+    flight_rows = []
+    for flight in flights:
+        flight._site_config_cache = site_config
+        if flight.towplane_id:
+            try:
+                charge_scheme = flight.towplane.charge_scheme
+            except TowplaneChargeScheme.DoesNotExist:
+                charge_scheme = None
+
+            if charge_scheme and not hasattr(charge_scheme, "_active_charge_tiers"):
+                charge_scheme._active_charge_tiers = sorted(
+                    [
+                        tier
+                        for tier in charge_scheme.charge_tiers.all()
+                        if tier.is_active
+                    ],
+                    key=lambda tier: tier.altitude_start,
+                )
+
+        tow_cost, rental_cost, total_cost = _member_flight_charge_breakdown(
+            flight, member
+        )
+        if total_cost <= Decimal("0.00"):
+            continue
+        flight_rows.append(
+            {
+                "flight": flight,
+                "flight_date": flight.logsheet.log_date,
+                "glider": flight.glider,
+                "tow_cost": tow_cost,
+                "rental_cost": rental_cost,
+                "total_cost": total_cost,
+            }
+        )
+
+    misc_charges = list(
+        MemberCharge.objects.filter(member=member, date__gte=start_date)
+        .select_related("chargeable_item")
+        .order_by("-date", "-created_at")
+    )
+
+    return flight_rows, misc_charges
+
+
+@active_member_required
+def personal_charges_summary(request):
+    """Show a member's personal flight and miscellaneous charges for the last year."""
+    start_date = timezone.localdate() - timedelta(days=365)
+    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+
+    total_flight_cost = sum((row["total_cost"] for row in flight_rows), Decimal("0.00"))
+    total_misc_cost = sum(
+        (charge.total_price for charge in misc_charges), Decimal("0.00")
+    )
+
+    return render(
+        request,
+        "logsheet/personal_charges_summary.html",
+        {
+            "flight_rows": flight_rows,
+            "misc_charges": misc_charges,
+            "total_flight_cost": total_flight_cost,
+            "total_misc_cost": total_misc_cost,
+            "start_date": start_date,
+        },
+    )
+
+
+@active_member_required
+def personal_charges_summary_csv(request):
+    """Export a member's personal charges (flight + misc) as CSV."""
+    start_date = timezone.localdate() - timedelta(days=365)
+    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="personal_charges_{timezone.localdate().isoformat()}.csv"'
+    )
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "Date",
+            "Charge Type",
+            "Glider",
+            "Item",
+            "Tow Cost",
+            "Rental Cost",
+            "Misc Cost",
+            "Total",
+            "Notes",
+        ]
+    )
+
+    for row in flight_rows:
+        writer.writerow(
+            [
+                row["flight_date"].isoformat(),
+                "Flight",
+                _sanitize_csv_cell(str(row["glider"]) if row["glider"] else "—"),
+                "",
+                f"{row['tow_cost']:.2f}",
+                f"{row['rental_cost']:.2f}",
+                "",
+                f"{row['total_cost']:.2f}",
+                "",
+            ]
+        )
+
+    for charge in misc_charges:
+        writer.writerow(
+            [
+                charge.date.isoformat(),
+                "Misc",
+                "",
+                _sanitize_csv_cell(charge.chargeable_item.name),
+                "",
+                "",
+                f"{charge.total_price:.2f}",
+                f"{charge.total_price:.2f}",
+                _sanitize_csv_cell(charge.notes),
+            ]
+        )
+
+    return response
 
 
 def get_validation_message(validation_error):
@@ -1186,37 +1386,26 @@ def manage_logsheet_finances(request, pk):
         }
     )
     for flight, costs in flight_data:
-        pilot = flight.pilot
-        partner = flight.split_with
-        split_type = flight.split_type
         tow = costs["tow"] or Decimal("0.00")
         rental = costs["rental"] or Decimal("0.00")
-        total = costs["total"] or Decimal("0.00")
 
-        if partner and split_type:
-            if split_type == "even":
-                # For 50/50 splits, divide both tow and rental costs equally
-                # IMPORTANT: This logic is duplicated in manage_logsheet_finances.html (JavaScript)
-                # If this calculation changes, update BOTH locations!
-                half_tow = tow / 2
-                half_rental = rental / 2
-                member_charges[pilot]["tow"] += half_tow
-                member_charges[pilot]["rental"] += half_rental
-                member_charges[partner]["tow"] += half_tow
-                member_charges[partner]["rental"] += half_rental
-            elif split_type == "tow":
-                member_charges[pilot]["rental"] += rental
-                member_charges[partner]["tow"] += tow
-            elif split_type == "rental":
-                member_charges[pilot]["tow"] += tow
-                member_charges[partner]["rental"] += rental
-            elif split_type == "full":
-                member_charges[partner]["tow"] += tow
-                member_charges[partner]["rental"] += rental
-        else:
-            if pilot:
-                member_charges[pilot]["tow"] += tow
-                member_charges[pilot]["rental"] += rental
+        # IMPORTANT: Equivalent split logic is still implemented in
+        # manage_logsheet_finances.html (JavaScript) for client-side preview
+        # recalculation. Keep these rules in sync when changing behavior.
+        allocations = split_flight_costs(
+            flight.pilot,
+            flight.split_with,
+            flight.split_type,
+            tow,
+            rental,
+        )
+        for charged_member, split_values in allocations.items():
+            if not charged_member:
+                continue
+            tow_split = quantize_currency(split_values["tow"])
+            rental_split = quantize_currency(split_values["rental"])
+            member_charges[charged_member]["tow"] += tow_split
+            member_charges[charged_member]["rental"] += rental_split
 
     # Add towplane rental costs to member charges
     for closeout, rental_cost in towplane_data:

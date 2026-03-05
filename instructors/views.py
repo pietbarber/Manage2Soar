@@ -2227,6 +2227,12 @@ class CreateWrittenTestView(FormView):
     def get_context_data(self, **ctx):
         ctx = super().get_context_data(**ctx)
         ctx["presets"] = get_presets().keys()
+        form = ctx.get("form")
+        ctx["weight_fields"] = (
+            [field for field in form if field.name.startswith("weight_")]
+            if form
+            else []
+        )
         return ctx
 
     def form_valid(self, form):

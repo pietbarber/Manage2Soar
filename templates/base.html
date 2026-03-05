@@ -7,6 +7,7 @@
 <html lang="en">
 
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   {% comment %}Favicon: use generated one from media if club logo exists, otherwise use static default{% endcomment %}
   {% get_siteconfig as siteconfig %}
   {% if siteconfig.club_logo %}
@@ -136,6 +137,9 @@
                 <a class="dropdown-item" href="{% url 'duty_roster:my_swap_requests' %}"><i class="fas fa-exchange-alt me-1"></i> My Swap Requests</a>
               </li>
               <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:my_instruction_requests' %}"><i class="fas fa-chalkboard-teacher me-1"></i> My Instruction Requests</a>
+              </li>
+              <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:open_swap_requests' %}"><i class="fas fa-hands-helping me-1"></i> Help Others</a>
               </li>
               {% if siteconfig.allow_glider_reservations %}
@@ -249,6 +253,9 @@
                 <a class="dropdown-item" href="{% url 'logsheet:maintenance_issues' %}">🔧 Maintenance Issues</a>
               </li>
               <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'logsheet:maintenance_log' %}">📋 Maintenance Log</a>
+              </li>
+              <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'logsheet:maintenance_deadlines' %}">⏰ Maintenance Deadlines</a>
               </li>
               {% webcam_enabled as webcam_feature_on %}
@@ -291,6 +298,10 @@
                 <i class="fas fa-book me-1"></i> View Training Syllabus
               </a></li>
               <li><a class="dropdown-item" href="{% url 'instructors:member_logbook' %}">🗒️ My Logbook</a></li>
+              <li><a class="dropdown-item" href="{% url 'knowledgetest:quiz-pending' %}">📝 My Pending Tests</a></li>
+              <li><a class="dropdown-item" href="{% url 'knowledgetest:member-test-history' %}">📊 My Test History</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'members:safety_report_submit' %}">💡 Suggestion Box</a></li>
               {% if user.glider_rating != "private" and user.glider_rating != "commercial" %}
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="{% url 'instructors:needed_for_solo' member_id=user.pk %}">

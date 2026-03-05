@@ -75,14 +75,19 @@
       </thead>
       <tbody>
 
-        {% for field in form %}
-        {% if field.name|slice:":7" == "weight_" %}
+        {% for field in weight_fields %}
         <tr>
           <td>{{ field.label }}</td>
           <td>{{ field.field.max_value }}</td>
           <td>{{ field }}</td>
         </tr>
-        {% endif %}
+        {% empty %}
+        <tr>
+          <td colspan="3" class="text-muted">
+            No question categories are configured yet. Add categories/questions in the knowledge test bank,
+            then reload this page.
+          </td>
+        </tr>
         {% endfor %}
 
         <tr>
