@@ -51,6 +51,41 @@ class TestGetCanonicalURL:
         assert result == "https://www.skylinesoaring.org"
         assert not result.endswith("/")
 
+    def test_normalizes_mixed_case_scheme_in_db_canonical_url(self):
+        """Should handle canonical_url values with mixed-case schemes."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = "HTTPS://prod.example.org"
+        config.save()
+
+        result = get_canonical_url()
+        assert result == "https://prod.example.org"
+
+    def test_strips_userinfo_from_db_canonical_url(self):
+        """Should drop credentials if canonical_url accidentally contains userinfo."""
+
+        class DummyConfig:
+            canonical_url = "https://user:pass@prod.example.org:8443/path"
+            domain_name = ""
+
+        result = get_canonical_url(config=DummyConfig())
+        assert result == "https://prod.example.org:8443"
+
+    def test_handles_invalid_port_in_db_canonical_url(self):
+        """Should not raise if canonical_url contains an invalid port."""
+
+        class DummyConfig:
+            canonical_url = "https://prod.example.org:abc/path"
+            domain_name = ""
+
+        result = get_canonical_url(config=DummyConfig())
+        assert result == "https://prod.example.org"
+
     def test_falls_back_to_site_url_when_db_empty(self):
         """Should fall back to settings.SITE_URL when DB canonical_url is blank."""
         config = SiteConfiguration.objects.first()
@@ -83,6 +118,64 @@ class TestGetCanonicalURL:
             result = get_canonical_url()
             assert result == "https://fallback.example.com"
 
+    def test_normalizes_mixed_case_scheme_in_site_url(self):
+        """Should handle SITE_URL values with mixed-case schemes."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = ""
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "HTTPS://fallback.example.com/path"):
+            result = get_canonical_url()
+            assert result == "https://fallback.example.com"
+
+    def test_strips_userinfo_from_site_url(self):
+        """Should drop credentials if SITE_URL accidentally contains userinfo."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = ""
+        config.save()
+
+        with patch.object(
+            settings, "SITE_URL", "https://user:pass@fallback.example.com"
+        ):
+            result = get_canonical_url()
+            assert result == "https://fallback.example.com"
+
+    def test_handles_invalid_port_in_site_url(self):
+        """Should not raise if SITE_URL contains an invalid port."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = ""
+        config.save()
+
+        with patch.object(
+            settings, "SITE_URL", "https://fallback.example.com:abc/path"
+        ):
+            result = get_canonical_url()
+            assert result == "https://fallback.example.com"
+
+    def test_normalize_origin_accepts_none(self):
+        """Internal normalizer should safely handle None input."""
+        from utils.url_helpers import _normalize_origin
+
+        assert _normalize_origin(None) == ""
+
     def test_falls_back_to_localhost_when_all_empty(self):
         """Should fall back to localhost:8001 when DB and SITE_URL are both blank."""
         config = SiteConfiguration.objects.first()
@@ -98,6 +191,40 @@ class TestGetCanonicalURL:
         with patch.object(settings, "SITE_URL", ""):
             result = get_canonical_url()
             assert result == "http://localhost:8001"
+
+    def test_uses_domain_name_when_site_url_is_localhost(self):
+        """Should use configured domain_name when SITE_URL is localhost fallback."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="tenant-demo.skylinesoaring.org",
+            )
+        config.canonical_url = ""
+        config.domain_name = "tenant-demo.skylinesoaring.org"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "http://127.0.0.1:8001"):
+            result = get_canonical_url()
+            assert result == "https://tenant-demo.skylinesoaring.org"
+
+    def test_prefers_non_local_site_url_over_domain_name(self):
+        """Should keep SITE_URL priority over domain_name for non-local origins."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="tenant-demo.skylinesoaring.org",
+            )
+        config.canonical_url = ""
+        config.domain_name = "tenant-demo.skylinesoaring.org"
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "https://fallback.example.com"):
+            result = get_canonical_url()
+            assert result == "https://fallback.example.com"
 
     def test_handles_db_not_ready_operational_error(self):
         """Should gracefully handle OperationalError during migrations/startup."""

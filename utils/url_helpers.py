@@ -9,17 +9,50 @@ of which domain users access.
 See GitHub Issue #612 for background.
 """
 
+from urllib.parse import urlparse
+
 from django.conf import settings
 
 
-def get_canonical_url():
+def _normalize_origin(url_or_domain: str | None) -> str:
+    """Normalize a URL/domain to scheme://host[:port] origin form."""
+    raw = (url_or_domain or "").strip()
+    if not raw:
+        return ""
+
+    parsed = urlparse(raw)
+    if not (parsed.scheme and parsed.netloc):
+        # Treat bare hostnames/domains (and optional ports) as HTTPS.
+        parsed = urlparse(f"https://{raw}")
+
+    if parsed.scheme and (parsed.hostname or parsed.netloc):
+        # Reconstruct host[:port] to avoid leaking username/password from netloc.
+        host = parsed.hostname or parsed.netloc
+        if ":" in host and not host.startswith("["):
+            # Preserve valid IPv6 origin formatting when rebuilding netloc.
+            host = f"[{host}]"
+        try:
+            port = parsed.port
+        except ValueError:
+            # Invalid ports (e.g., :abc) should not crash URL resolution.
+            port = None
+        if port:
+            host = f"{host}:{port}"
+        return f"{parsed.scheme}://{host}"
+
+    return ""
+
+
+def get_canonical_url(config=None):
     """
     Get the canonical URL for email links.
 
     Priority:
     1. SiteConfiguration.canonical_url (database - webmaster configurable)
     2. settings.SITE_URL (environment variable - backward compatibility)
-    3. 'http://localhost:8001' (development fallback)
+    3. If SITE_URL resolves to localhost/127.0.0.1 and SiteConfiguration
+       has domain_name set, use that domain for outbound links
+    4. 'http://localhost:8001' (development fallback)
 
     Returns:
         str: Canonical URL without trailing slash
@@ -33,17 +66,41 @@ def get_canonical_url():
 
         from siteconfig.models import SiteConfiguration
 
-        config = SiteConfiguration.objects.first()
-        if config and config.canonical_url:
-            return config.canonical_url.rstrip("/")
+        if config is None:
+            config = SiteConfiguration.objects.first()
+
+        if config:
+            canonical_url = (getattr(config, "canonical_url", "") or "").strip()
+            if canonical_url:
+                normalized = _normalize_origin(canonical_url)
+                if normalized:
+                    return normalized.rstrip("/")
     except (OperationalError, ProgrammingError):
         # Database not ready (migrations, tests, initial setup)
         pass
 
     # Fallback to environment variable
     site_url = getattr(settings, "SITE_URL", "").strip()
+    normalized_site_url = ""
     if site_url:
-        return site_url.rstrip("/")
+        normalized_site_url = _normalize_origin(site_url) or site_url.rstrip("/")
+        parsed_site_url = urlparse(normalized_site_url)
+        hostname = (parsed_site_url.hostname or "").lower()
+
+        # Respect SITE_URL unless it is a local development address.
+        if hostname not in {"localhost", "127.0.0.1"}:
+            return normalized_site_url.rstrip("/")
+
+        # SITE_URL points to localhost. If config has a real domain, prefer it
+        # for outbound links; otherwise keep the explicit SITE_URL value.
+        if config:
+            domain_name = (getattr(config, "domain_name", "") or "").strip()
+            if domain_name:
+                normalized = _normalize_origin(domain_name)
+                if normalized:
+                    return normalized.rstrip("/")
+
+        return normalized_site_url.rstrip("/")
 
     # Development fallback
     return "http://localhost:8001"

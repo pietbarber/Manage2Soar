@@ -364,7 +364,7 @@ def get_finalization_email_context(logsheet, config=None, site_url=None):
     if config is None:
         config = SiteConfiguration.objects.first()
     if site_url is None:
-        site_url = get_canonical_url()
+        site_url = get_canonical_url(config=config)
 
     # Absolute URL for the ops report page
     ops_report_path = reverse("logsheet:manage", kwargs={"pk": logsheet.pk})
@@ -531,7 +531,7 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
     """
     try:
         config = SiteConfiguration.objects.first()
-        site_url = get_canonical_url()
+        site_url = get_canonical_url(config=config)
         from_email = _get_from_email(config)
 
         # Fetch all active members with a valid email address

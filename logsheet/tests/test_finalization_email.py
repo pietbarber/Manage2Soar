@@ -6,7 +6,7 @@ from datetime import date, time, timedelta
 from unittest.mock import patch
 
 import pytest
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from logsheet.models import (
     Airfield,
@@ -23,6 +23,7 @@ from logsheet.utils.finalization_email import (
 )
 from members.models import Member
 from siteconfig.models import MembershipStatus
+from utils.url_helpers import get_canonical_url
 
 # ---------------------------------------------------------------------------
 # sanitize_closeout_html_for_email
@@ -131,6 +132,26 @@ class TestHtmlToTextPreserveLinks(SimpleTestCase):
         html = '<p>See <a href="https://example.com/doc.pdf">View PDF Document</a></p>'
         result = html_to_text_preserve_links(html)
         assert "View PDF Document (https://example.com/doc.pdf)" in result
+
+
+class TestEmailSiteUrlResolution(SimpleTestCase):
+    @override_settings(SITE_URL="http://127.0.0.1:8001")
+    def test_resolves_domain_name_to_https_origin(self):
+        class DummyConfig:
+            domain_name = "tenant-demo.skylinesoaring.org"
+            canonical_url = ""
+
+        resolved = get_canonical_url(config=DummyConfig())
+        assert resolved == "https://tenant-demo.skylinesoaring.org"
+
+    @override_settings(SITE_URL="https://prod.example.org")
+    def test_prefers_non_local_site_url_over_domain_name(self):
+        class DummyConfig:
+            domain_name = "tenant-demo.skylinesoaring.org"
+            canonical_url = ""
+
+        resolved = get_canonical_url(config=DummyConfig())
+        assert resolved == "https://prod.example.org"
 
 
 # ---------------------------------------------------------------------------
