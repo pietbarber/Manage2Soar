@@ -402,7 +402,7 @@
                               data-glider-name="{{ flight.glider|escapejs }}"
                               {% if flight.release_altitude %}data-release-altitude="{{ flight.release_altitude }}"{% endif %}
                               title="Copy flight details">
-                        <i class="bi bi-copy"></i>
+                        <i class="bi bi-files me-1"></i>
                         <span class="d-none d-md-inline ms-1">Copy</span>
                       </button>
 
@@ -1133,7 +1133,7 @@ document.addEventListener("click", async function(e) {
         const instructorName = flightData.instructor_name ? ` & ${escapeHtml(flightData.instructor_name)}` : '';
         const gliderName = escapeHtml(flightData.glider_name || 'glider');
         cloneNotice.innerHTML = `
-          <i class="bi bi-copy me-2"></i>
+          <i class="bi bi-files me-2"></i>
           <strong>Cloned Flight:</strong> Pre-filled from ${pilotName}${instructorName} in ${gliderName}
         `;
         existingHeader.insertAdjacentElement('afterend', cloneNotice);
