@@ -20,9 +20,8 @@ def _normalize_origin(url_or_domain: str) -> str:
     if not raw:
         return ""
 
-    if raw.startswith(("http://", "https://")):
-        parsed = urlparse(raw)
-    else:
+    parsed = urlparse(raw)
+    if not (parsed.scheme and parsed.netloc):
         # Treat bare hostnames/domains (and optional ports) as HTTPS.
         parsed = urlparse(f"https://{raw}")
 

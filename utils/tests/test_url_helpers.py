@@ -51,6 +51,21 @@ class TestGetCanonicalURL:
         assert result == "https://www.skylinesoaring.org"
         assert not result.endswith("/")
 
+    def test_normalizes_mixed_case_scheme_in_db_canonical_url(self):
+        """Should handle canonical_url values with mixed-case schemes."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = "HTTPS://prod.example.org"
+        config.save()
+
+        result = get_canonical_url()
+        assert result == "https://prod.example.org"
+
     def test_falls_back_to_site_url_when_db_empty(self):
         """Should fall back to settings.SITE_URL when DB canonical_url is blank."""
         config = SiteConfiguration.objects.first()
@@ -80,6 +95,22 @@ class TestGetCanonicalURL:
         config.save()
 
         with patch.object(settings, "SITE_URL", "https://fallback.example.com/"):
+            result = get_canonical_url()
+            assert result == "https://fallback.example.com"
+
+    def test_normalizes_mixed_case_scheme_in_site_url(self):
+        """Should handle SITE_URL values with mixed-case schemes."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = ""
+        config.save()
+
+        with patch.object(settings, "SITE_URL", "HTTPS://fallback.example.com/path"):
             result = get_canonical_url()
             assert result == "https://fallback.example.com"
 
