@@ -43,6 +43,23 @@ class FinalizationEmailDeliveryError(Exception):
     """Raised when delivery fails while processing durable outbox jobs."""
 
 
+def _resolve_email_site_url(config=None):
+    """Return canonical base URL for email links, avoiding localhost fallbacks."""
+    site_url = get_canonical_url()
+    parsed = urlparse(site_url)
+    hostname = (parsed.hostname or "").lower()
+
+    # In deployed environments, localhost fallback is not valid for email links.
+    # If SiteConfiguration has a configured domain, prefer that instead.
+    if hostname in {"localhost", "127.0.0.1"} and config and config.domain_name:
+        configured_domain = config.domain_name.strip().rstrip("/")
+        if configured_domain.startswith(("http://", "https://")):
+            return configured_domain
+        return f"https://{configured_domain}"
+
+    return site_url
+
+
 # ---------------------------------------------------------------------------
 # HTML sanitisation helpers
 # ---------------------------------------------------------------------------
@@ -364,7 +381,7 @@ def get_finalization_email_context(logsheet, config=None, site_url=None):
     if config is None:
         config = SiteConfiguration.objects.first()
     if site_url is None:
-        site_url = get_canonical_url()
+        site_url = _resolve_email_site_url(config)
 
     # Absolute URL for the ops report page
     ops_report_path = reverse("logsheet:manage", kwargs={"pk": logsheet.pk})
@@ -531,7 +548,7 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
     """
     try:
         config = SiteConfiguration.objects.first()
-        site_url = get_canonical_url()
+        site_url = _resolve_email_site_url(config)
         from_email = _get_from_email(config)
 
         # Fetch all active members with a valid email address

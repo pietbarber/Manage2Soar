@@ -16,6 +16,7 @@ from logsheet.models import (
     MaintenanceIssue,
 )
 from logsheet.utils.finalization_email import (
+    _resolve_email_site_url,
     get_finalization_email_context,
     html_to_text_preserve_links,
     sanitize_closeout_html_for_email,
@@ -131,6 +132,17 @@ class TestHtmlToTextPreserveLinks(SimpleTestCase):
         html = '<p>See <a href="https://example.com/doc.pdf">View PDF Document</a></p>'
         result = html_to_text_preserve_links(html)
         assert "View PDF Document (https://example.com/doc.pdf)" in result
+
+
+class TestEmailSiteUrlResolution(SimpleTestCase):
+    @patch("logsheet.utils.finalization_email.get_canonical_url")
+    def test_resolves_localhost_to_configured_domain(self, mock_canonical):
+        class DummyConfig:
+            domain_name = "tenant-demo.skylinesoaring.org"
+
+        mock_canonical.return_value = "http://127.0.0.1:8001"
+        resolved = _resolve_email_site_url(DummyConfig())
+        assert resolved == "https://tenant-demo.skylinesoaring.org"
 
 
 # ---------------------------------------------------------------------------
