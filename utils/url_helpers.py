@@ -9,6 +9,7 @@ of which domain users access.
 See GitHub Issue #612 for background.
 """
 
+import ipaddress
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -43,15 +44,28 @@ def _normalize_origin(url_or_domain: str | None) -> str:
     return ""
 
 
+def _is_loopback_host(hostname: str) -> bool:
+    """Return True for localhost and IP loopback addresses."""
+    host = (hostname or "").strip().lower()
+    if not host:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def get_canonical_url(config=None):
     """
     Get the canonical URL for email links.
 
     Priority:
-    1. SiteConfiguration.canonical_url (database - webmaster configurable)
-    2. settings.SITE_URL (environment variable - backward compatibility)
-    3. If SITE_URL resolves to localhost/127.0.0.1 and SiteConfiguration
-       has domain_name set, use that domain for outbound links
+    1. SiteConfiguration.canonical_url when it resolves to a non-loopback host
+    2. settings.SITE_URL
+    3. If SITE_URL resolves to a loopback host and SiteConfiguration has
+       domain_name set, use that domain for outbound links
     4. 'http://localhost:8001' (development fallback)
 
     Returns:
@@ -74,7 +88,9 @@ def get_canonical_url(config=None):
             if canonical_url:
                 normalized = _normalize_origin(canonical_url)
                 if normalized:
-                    return normalized.rstrip("/")
+                    canonical_host = (urlparse(normalized).hostname or "").lower()
+                    if not _is_loopback_host(canonical_host):
+                        return normalized.rstrip("/")
     except (OperationalError, ProgrammingError):
         # Database not ready (migrations, tests, initial setup)
         pass
@@ -88,7 +104,7 @@ def get_canonical_url(config=None):
         hostname = (parsed_site_url.hostname or "").lower()
 
         # Respect SITE_URL unless it is a local development address.
-        if hostname not in {"localhost", "127.0.0.1"}:
+        if not _is_loopback_host(hostname):
             return normalized_site_url.rstrip("/")
 
         # SITE_URL points to localhost. If config has a real domain, prefer it
