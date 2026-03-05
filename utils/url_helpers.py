@@ -9,10 +9,30 @@ of which domain users access.
 See GitHub Issue #612 for background.
 """
 
+from urllib.parse import urlparse
+
 from django.conf import settings
 
 
-def get_canonical_url():
+def _normalize_origin(url_or_domain: str) -> str:
+    """Normalize a URL/domain to scheme://host[:port] origin form."""
+    raw = (url_or_domain or "").strip()
+    if not raw:
+        return ""
+
+    if raw.startswith(("http://", "https://")):
+        parsed = urlparse(raw)
+    else:
+        # Treat bare hostnames/domains (and optional ports) as HTTPS.
+        parsed = urlparse(f"https://{raw}")
+
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    return ""
+
+
+def get_canonical_url(config=None):
     """
     Get the canonical URL for email links.
 
@@ -33,9 +53,21 @@ def get_canonical_url():
 
         from siteconfig.models import SiteConfiguration
 
-        config = SiteConfiguration.objects.first()
-        if config and config.canonical_url:
-            return config.canonical_url.rstrip("/")
+        if config is None:
+            config = SiteConfiguration.objects.first()
+
+        if config:
+            canonical_url = (getattr(config, "canonical_url", "") or "").strip()
+            if canonical_url:
+                normalized = _normalize_origin(canonical_url)
+                if normalized:
+                    return normalized.rstrip("/")
+
+            domain_name = (getattr(config, "domain_name", "") or "").strip()
+            if domain_name:
+                normalized = _normalize_origin(domain_name)
+                if normalized:
+                    return normalized.rstrip("/")
     except (OperationalError, ProgrammingError):
         # Database not ready (migrations, tests, initial setup)
         pass

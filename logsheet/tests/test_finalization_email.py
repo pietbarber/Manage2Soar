@@ -16,7 +16,6 @@ from logsheet.models import (
     MaintenanceIssue,
 )
 from logsheet.utils.finalization_email import (
-    _resolve_email_site_url,
     get_finalization_email_context,
     html_to_text_preserve_links,
     sanitize_closeout_html_for_email,
@@ -24,6 +23,7 @@ from logsheet.utils.finalization_email import (
 )
 from members.models import Member
 from siteconfig.models import MembershipStatus
+from utils.url_helpers import get_canonical_url
 
 # ---------------------------------------------------------------------------
 # sanitize_closeout_html_for_email
@@ -135,13 +135,12 @@ class TestHtmlToTextPreserveLinks(SimpleTestCase):
 
 
 class TestEmailSiteUrlResolution(SimpleTestCase):
-    @patch("logsheet.utils.finalization_email.get_canonical_url")
-    def test_resolves_localhost_to_configured_domain(self, mock_canonical):
+    def test_resolves_domain_name_to_https_origin(self):
         class DummyConfig:
             domain_name = "tenant-demo.skylinesoaring.org"
+            canonical_url = ""
 
-        mock_canonical.return_value = "http://127.0.0.1:8001"
-        resolved = _resolve_email_site_url(DummyConfig())
+        resolved = get_canonical_url(config=DummyConfig())
         assert resolved == "https://tenant-demo.skylinesoaring.org"
 
 
