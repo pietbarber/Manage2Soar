@@ -1220,6 +1220,7 @@ def member_instruction_record(request, member_id):
 
     # Precompute solo-required vs rating-required lesson IDs
     lessons = list(TrainingLesson.objects.all())
+    lesson_sort_keys = {lesson.code: lesson.sort_key for lesson in lessons}
     solo_ids = {L.id for L in lessons if L.is_required_for_solo()}
     rating_ids = {L.id for L in lessons if L.is_required_for_private()}
     total_solo = len(solo_ids) or 1
@@ -1456,7 +1457,11 @@ def member_instruction_record(request, member_id):
         daily_score_groups = []
         for score in ["1", "2", "3", "4", "!"]:
             lessons_for_score = sorted(
-                score_to_lessons.get(score, []), key=lambda lesson: lesson["code"]
+                score_to_lessons.get(score, []),
+                key=lambda lesson: (
+                    lesson_sort_keys.get(lesson["code"], lesson["code"]),
+                    lesson["code"],
+                ),
             )
             if lessons_for_score:
                 daily_score_groups.append(
