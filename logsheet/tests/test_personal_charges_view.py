@@ -1,4 +1,5 @@
 import csv
+import re
 from datetime import time, timedelta
 from decimal import Decimal
 from io import StringIO
@@ -171,6 +172,14 @@ class TestPersonalChargesView:
         misc_charges = response.context["misc_charges"]
         assert len(misc_charges) == 1
         assert misc_charges[0].notes == "Two shirts"
+
+        content = response.content.decode("utf-8")
+        sortable_tables = re.findall(
+            r"<table[^>]*class=\"[^\"]*\bsort\b[^\"]*\"",
+            content,
+            flags=re.IGNORECASE,
+        )
+        assert len(sortable_tables) == 2
 
     def test_personal_charges_csv_exports_flights_and_misc(self, client):
         client.force_login(self.member)
