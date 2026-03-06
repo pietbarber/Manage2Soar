@@ -5,7 +5,7 @@ Issue #615: User-facing form for adding miscellaneous member charges
 in the logsheet workflow.
 """
 
-from datetime import date
+from datetime import date, time
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -13,7 +13,15 @@ from django.test import TestCase
 from django.urls import reverse
 
 from logsheet.forms import MemberChargeForm
-from logsheet.models import Airfield, Logsheet, MemberCharge, RevisionLog
+from logsheet.models import (
+    Airfield,
+    Flight,
+    Glider,
+    Logsheet,
+    MemberCharge,
+    RevisionLog,
+    Towplane,
+)
 from members.models import Member
 from siteconfig.models import ChargeableItem, MembershipStatus, SiteConfiguration
 
@@ -667,6 +675,41 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         )
         self.assertNotContains(response, add_url)
 
+    def test_treasurer_csv_button_hidden_on_non_finalized(self):
+        """Treasurer export should only show once the logsheet is finalized."""
+        self.client.login(username="do@test.com", password="testpass123")
+        url = reverse(
+            "logsheet:manage_logsheet_finances",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(url)
+
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        self.assertNotContains(response, export_url)
+        self.assertNotContains(response, "Download Treasurer CSV")
+
+    def test_treasurer_csv_button_shown_on_finalized(self):
+        """Finalized logsheets should expose the treasurer CSV export link."""
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        url = reverse(
+            "logsheet:manage_logsheet_finances",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(url)
+
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        self.assertContains(response, export_url)
+        self.assertContains(response, "Download Treasurer CSV")
+
     def test_charges_displayed_in_finances_view(self):
         """Test that existing charges appear in the finances view."""
         MemberCharge.objects.create(
@@ -800,3 +843,75 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         messages = list(response.context["messages"])
         self.assertTrue(any("already been finalized" in str(m) for m in messages))
         mock_enqueue_summary.assert_not_called()
+
+    def test_treasurer_csv_export_requires_finalized_logsheet(self):
+        """Non-finalized logsheets should redirect back with an explanatory message."""
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            any(
+                "only after the logsheet is finalized" in str(msg)
+                for msg in response.context["messages"]
+            )
+        )
+
+    def test_treasurer_csv_export_contains_expected_charge_rows(self):
+        """Finalized export should include rental and tow line items with expected filename."""
+        glider = Glider.objects.create(
+            n_number="N100AA",
+            make="PW",
+            model="PW-5",
+            rental_rate=Decimal("24.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            n_number="N200BB",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+        Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(9, 0),
+            landing_time=time(9, 47),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("45.00"),
+            rental_cost_actual=Decimal("18.80"),
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("text/csv"))
+        self.assertIn(
+            f"Flights_{self.logsheet.log_date.isoformat()}.csv",
+            response["Content-Disposition"],
+        )
+
+        content = response.content.decode("utf-8")
+        self.assertIn("Inv Num,Customer,Invoice Date,Service Date", content)
+        self.assertIn("Pilot, Test", content)
+        self.assertIn("Rental", content)
+        self.assertIn(",47,,0.4,18.8", content)
+        self.assertIn(",3000", content)
+        self.assertIn("Tow", content)
+        self.assertIn(",1,,45,45", content)
