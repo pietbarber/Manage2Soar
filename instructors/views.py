@@ -1189,10 +1189,10 @@ def member_instruction_record(request, member_id):
     Original version had 8+ queries per session (880+ queries for 110 sessions).
     Optimized version uses ~10 queries total regardless of session count.
     """
-    # Build a mapping of lesson code to lesson title for tooltips
-    lesson_titles = {
-        lesson.code: lesson.title for lesson in TrainingLesson.objects.all()
-    }
+    # Fetch lesson metadata once and derive all mappings from it.
+    lessons = list(TrainingLesson.objects.all())
+    lesson_titles = {lesson.code: lesson.title for lesson in lessons}
+    lesson_sort_keys = {lesson.code: lesson.sort_key for lesson in lessons}
     member = get_object_or_404(
         Member.objects.prefetch_related(
             "badges__badge", "memberqualification_set__qualification"
@@ -1219,8 +1219,6 @@ def member_instruction_record(request, member_id):
     )
 
     # Precompute solo-required vs rating-required lesson IDs
-    lessons = list(TrainingLesson.objects.all())
-    lesson_sort_keys = {lesson.code: lesson.sort_key for lesson in lessons}
     solo_ids = {L.id for L in lessons if L.is_required_for_solo()}
     rating_ids = {L.id for L in lessons if L.is_required_for_private()}
     total_solo = len(solo_ids) or 1
