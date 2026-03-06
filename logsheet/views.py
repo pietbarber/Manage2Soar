@@ -318,6 +318,8 @@ def export_logsheet_finances_csv(request, pk):
     )
 
     invoice_numbers = {}
+    invoice_counter = 0
+    invoice_date_token = logsheet.log_date.strftime("%Y%m%d")
 
     for flight in flights:
         tow_base = (
@@ -344,7 +346,10 @@ def export_logsheet_finances_csv(request, pk):
                 continue
 
             if member.id not in invoice_numbers:
-                invoice_numbers[member.id] = len(invoice_numbers) + 1
+                invoice_counter += 1
+                invoice_numbers[member.id] = (
+                    f"{invoice_date_token}-{invoice_counter:03d}-F{flight.pk}"
+                )
             invoice_num = invoice_numbers[member.id]
 
             customer_name = _sanitize_csv_cell(_csv_customer_name(member))

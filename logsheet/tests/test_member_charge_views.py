@@ -5,8 +5,10 @@ Issue #615: User-facing form for adding miscellaneous member charges
 in the logsheet workflow.
 """
 
+import csv
 from datetime import date, time
 from decimal import Decimal
+from io import StringIO
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -915,3 +917,18 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.assertIn(",3000", content)
         self.assertIn("Tow", content)
         self.assertIn(",1,,45,45", content)
+
+        rows = list(csv.reader(StringIO(content)))
+        data_rows = rows[1:]
+        invoice_numbers = [r[0] for r in data_rows]
+
+        # Same member/flight line items share one invoice number, but it must
+        # be a unique identifier (not plain "1") and date-based for uploads.
+        self.assertGreater(len(invoice_numbers), 0)
+        self.assertEqual(len(set(invoice_numbers)), 1)
+        invoice_number = invoice_numbers[0]
+        self.assertNotEqual(invoice_number, "1")
+        self.assertTrue(
+            invoice_number.startswith(self.logsheet.log_date.strftime("%Y%m%d"))
+        )
+        self.assertIn("-F", invoice_number)
