@@ -172,6 +172,12 @@ class TestPersonalChargesView:
         assert len(misc_charges) == 1
         assert misc_charges[0].notes == "Two shirts"
 
+        content = response.content.decode("utf-8")
+        assert (
+            content.count('class="table table-striped table-hover align-middle sort"')
+            == 2
+        )
+
     def test_personal_charges_csv_exports_flights_and_misc(self, client):
         client.force_login(self.member)
         response = client.get(reverse("logsheet:personal_charges_csv"))

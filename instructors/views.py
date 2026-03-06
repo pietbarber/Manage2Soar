@@ -1418,6 +1418,7 @@ def member_instruction_record(request, member_id):
     )
 
     # Group blocks by date for template
+    score_rank = {"!": 0, "1": 1, "2": 2, "3": 3, "4": 4}
     daily_blocks = OrderedDict()
     for block in blocks:
         date_key = (
@@ -1428,9 +1429,52 @@ def member_instruction_record(request, member_id):
         if date_key not in daily_blocks:
             daily_blocks[date_key] = []
         daily_blocks[date_key].append(block)
-    daily_blocks = [
-        {"date": date, "blocks": blist} for date, blist in daily_blocks.items()
-    ]
+
+    grouped_daily_blocks = []
+    for day_date, blist in daily_blocks.items():
+        # Aggregate and dedupe lesson coverage once per day.
+        # If the same lesson is scored multiple times in a day, keep the best score.
+        best_score_by_lesson = {}
+        for block in blist:
+            for score, lesson_codes in block["scores_by_code"].items():
+                current_rank = score_rank.get(str(score), -1)
+                for lesson_code in lesson_codes:
+                    existing_score = best_score_by_lesson.get(lesson_code)
+                    existing_rank = score_rank.get(str(existing_score), -1)
+                    if existing_score is None or current_rank > existing_rank:
+                        best_score_by_lesson[lesson_code] = str(score)
+
+        score_to_lessons = defaultdict(list)
+        for lesson_code, lesson_score in best_score_by_lesson.items():
+            score_to_lessons[lesson_score].append(
+                {
+                    "code": lesson_code,
+                    "title": lesson_titles.get(lesson_code, ""),
+                }
+            )
+
+        daily_score_groups = []
+        for score in ["1", "2", "3", "4", "!"]:
+            lessons_for_score = sorted(
+                score_to_lessons.get(score, []), key=lambda lesson: lesson["code"]
+            )
+            if lessons_for_score:
+                daily_score_groups.append(
+                    {
+                        "score": score,
+                        "lessons": lessons_for_score,
+                    }
+                )
+
+        grouped_daily_blocks.append(
+            {
+                "date": day_date,
+                "blocks": blist,
+                "syllabus_score_groups": daily_score_groups,
+            }
+        )
+
+    daily_blocks = grouped_daily_blocks
 
     return render(
         request,
