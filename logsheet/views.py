@@ -2,7 +2,7 @@
 import csv
 import logging
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -70,7 +70,9 @@ def _sanitize_csv_cell(value):
 
 def _format_charge_csv_number(value):
     """Format Decimal-like values for CSV with trimmed trailing zeros."""
-    decimal_value = Decimal(str(value or Decimal("0.00"))).quantize(Decimal("0.01"))
+    decimal_value = Decimal(str(value or Decimal("0.00"))).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
     normalized = format(decimal_value.normalize(), "f")
     if "." not in normalized:
         return normalized
@@ -294,6 +296,12 @@ def export_logsheet_finances_csv(request, pk):
         ).order_by("launch_time", "pk")
     )
 
+    # Avoid per-flight SiteConfiguration lookups when legacy finalized flights
+    # rely on calculated properties (retrieve waiver checks).
+    site_config = SiteConfiguration.objects.first()
+    for flight in flights:
+        flight._site_config_cache = site_config
+
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = (
         f'attachment; filename="Flights_{logsheet.log_date.isoformat()}.csv"'
@@ -361,16 +369,17 @@ def export_logsheet_finances_csv(request, pk):
 
             rental_amount = quantize_currency(split_values.get("rental"))
             if rental_amount > Decimal("0.00"):
-                if flight.duration and flight.duration.total_seconds() > 0:
-                    qty_minutes = Decimal(
-                        str(flight.duration.total_seconds())
-                    ) / Decimal("60")
+                duration = flight.computed_duration
+                if duration and duration.total_seconds() > 0:
+                    qty_minutes = Decimal(str(duration.total_seconds())) / Decimal("60")
                     quantity = qty_minutes.quantize(Decimal("0.01"))
                 else:
                     quantity = Decimal("1")
 
                 rate = (
-                    (rental_amount / quantity).quantize(Decimal("0.01"))
+                    (rental_amount / quantity).quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    )
                     if quantity > 0
                     else rental_amount
                 )
@@ -404,7 +413,11 @@ def export_logsheet_finances_csv(request, pk):
                     if flight.towplane
                     else "Tow"
                 )
-                tow_label = str(flight.release_altitude or "Tow")
+                tow_label = (
+                    str(flight.release_altitude)
+                    if flight.release_altitude is not None
+                    else "Tow"
+                )
 
                 writer.writerow(
                     [

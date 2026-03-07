@@ -24,6 +24,7 @@ from logsheet.models import (
     RevisionLog,
     Towplane,
 )
+from logsheet.views import _format_charge_csv_number
 from members.models import Member
 from siteconfig.models import ChargeableItem, MembershipStatus, SiteConfiguration
 
@@ -976,3 +977,92 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             row[0] for row in data_rows if row[0].startswith(f"{flight.pk}.")
         }
         self.assertEqual(split_invoice_numbers, {f"{flight.pk}.1", f"{flight.pk}.2"})
+
+    def test_treasurer_csv_export_handles_zero_release_altitude(self):
+        """A 0-ft tow altitude should export as '0', not fallback 'Tow'."""
+        glider = Glider.objects.create(
+            n_number="N102AA",
+            make="PW",
+            model="PW-5",
+            rental_rate=Decimal("20.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            n_number="N202BB",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+        Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(8, 0),
+            landing_time=time(8, 10),
+            release_altitude=0,
+            tow_cost_actual=Decimal("12.00"),
+            rental_cost_actual=Decimal("5.00"),
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        content = response.content.decode("utf-8")
+        self.assertIn(",0,", content)
+
+    def test_treasurer_csv_export_uses_computed_duration_when_duration_missing(self):
+        """Export should use computed_duration fallback, not default quantity=1."""
+        glider = Glider.objects.create(
+            n_number="N103AA",
+            make="PW",
+            model="PW-5",
+            rental_rate=Decimal("20.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            n_number="N203BB",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(11, 0),
+            landing_time=time(11, 30),
+            release_altitude=2000,
+            tow_cost_actual=Decimal("30.00"),
+            rental_cost_actual=Decimal("15.00"),
+        )
+        Flight.objects.filter(pk=flight.pk).update(duration=None)
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        content = response.content.decode("utf-8")
+        self.assertIn(",30,,0.5,15", content)
+
+    def test_format_charge_csv_number_uses_half_up_rounding(self):
+        """CSV number formatting should align with billing half-up semantics."""
+        self.assertEqual(_format_charge_csv_number(Decimal("1.005")), "1.01")
