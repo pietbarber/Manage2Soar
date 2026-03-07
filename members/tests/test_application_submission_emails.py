@@ -8,7 +8,10 @@ from django.test import TestCase, override_settings
 
 from members.models import Member
 from members.models_applications import MembershipApplication
-from members.signals import notify_membership_managers_of_new_application
+from members.signals import (
+    notify_membership_managers_of_application,
+    notify_membership_managers_of_new_application,
+)
 from siteconfig.models import SiteConfiguration
 
 
@@ -170,3 +173,37 @@ class ApplicationSubmissionEmailTests(TestCase):
 
         # Check that no email was sent
         self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(
+        DEFAULT_FROM_EMAIL="noreply@testclub.com",
+        SITE_URL="https://testclub.com",
+        EMAIL_DEV_MODE=False,
+    )
+    def test_html_email_rendering_for_legacy_application_notifier(self):
+        """Legacy membership notifier should also send multipart HTML + text."""
+        application = MembershipApplication.objects.create(
+            first_name="Legacy",
+            last_name="Applicant",
+            email="legacy@example.com",
+            phone="555-7777",
+            address_line1="1 Legacy Lane",
+            city="Legacytown",
+            state="VA",
+            zip_code="22000",
+            emergency_contact_name="Legacy Contact",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-8888",
+            soaring_goals="Legacy flow validation",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        notify_membership_managers_of_application(application)
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(len(email.alternatives), 1)
+        self.assertIn("text/html", email.alternatives[0][1])
+        self.assertIn("New Membership Application", email.alternatives[0][0])
+        self.assertIn("Legacy Applicant", email.body)

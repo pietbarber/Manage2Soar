@@ -2994,20 +2994,35 @@ def _notify_instructor_cancellation(slot):
         return
 
     try:
+        email_config = get_email_config()
+        config = email_config["config"]
+        ops_date = slot.assignment.date.strftime("%A, %B %d, %Y")
+
         subject = (
             f"Instruction Cancellation for {slot.assignment.date.strftime('%B %d, %Y')}"
         )
-        message = (
-            f"{slot.student.full_display_name} has cancelled their instruction request for "
-            f"{slot.assignment.date.strftime('%A, %B %d, %Y')}.\n\n"
-            f"You now have one fewer student for this day."
+        context = {
+            "student_name": slot.student.full_display_name,
+            "instructor_name": instructor.full_display_name,
+            "ops_date": ops_date,
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+            "roster_url": email_config["roster_url"],
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/instructor_cancellation.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/instructor_cancellation.txt", context
         )
 
         send_mail(
             subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
+            text_message,
+            email_config["from_email"],
             [instructor.email],
+            html_message=html_message,
             fail_silently=True,
         )
     except Exception:
