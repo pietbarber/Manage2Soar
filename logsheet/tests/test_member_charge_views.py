@@ -405,6 +405,8 @@ class AddMemberChargeViewTestCase(TestCase):
 
         charge = MemberCharge.objects.first()
         self.assertIsNotNone(charge)
+        if charge is None:
+            self.fail("Expected a MemberCharge to be created")
         self.assertEqual(charge.logsheet, self.logsheet)
 
     def test_charge_date_matches_logsheet_date(self):
@@ -422,6 +424,8 @@ class AddMemberChargeViewTestCase(TestCase):
 
         charge = MemberCharge.objects.first()
         self.assertIsNotNone(charge)
+        if charge is None:
+            self.fail("Expected a MemberCharge to be created")
         self.assertEqual(charge.date, self.logsheet.log_date)
 
     def test_success_message_displayed(self):
