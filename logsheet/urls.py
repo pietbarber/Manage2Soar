@@ -32,6 +32,11 @@ urlpatterns = [
         name="manage_logsheet_finances",
     ),
     path(
+        "manage/<int:pk>/finances/export/csv/",
+        views.export_logsheet_finances_csv,
+        name="export_logsheet_finances_csv",
+    ),
+    path(
         "manage/<int:logsheet_pk>/add-charge/",
         views.add_member_charge,
         name="add_member_charge",

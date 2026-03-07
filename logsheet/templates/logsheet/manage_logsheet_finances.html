@@ -478,6 +478,10 @@
     <button type="submit" form="finance-form" class="btn btn-success me-3">
       <i class="bi bi-check-circle me-2"></i>Save Changes
     </button>
+  {% else %}
+    <a href="{% url 'logsheet:export_logsheet_finances_csv' pk=logsheet.pk %}" class="btn btn-outline-primary me-3">
+      <i class="bi bi-download me-2"></i>Download Treasurer CSV
+    </a>
   {% endif %}
   <a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary">
     <i class="bi bi-x-circle me-2"></i>Cancel

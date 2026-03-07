@@ -2,7 +2,7 @@
 import csv
 import logging
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -66,6 +66,53 @@ def _sanitize_csv_cell(value):
     if stripped.startswith(("=", "+", "-", "@")):
         return f"'{value}"
     return value
+
+
+def _format_charge_csv_number(value):
+    """Format Decimal-like values for CSV with trimmed trailing zeros."""
+    decimal_value = Decimal(str(value or Decimal("0.00"))).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    normalized = format(decimal_value.normalize(), "f")
+    if "." not in normalized:
+        return normalized
+    return normalized.rstrip("0").rstrip(".")
+
+
+def _csv_customer_name(member):
+    """Return customer name as 'Last, First' with sensible fallbacks."""
+    if not member:
+        return "Unknown"
+
+    first = (member.first_name or "").strip()
+    last = (member.last_name or "").strip()
+    if first and last:
+        return f"{last}, {first}"
+    if last:
+        return last
+    if first:
+        return first
+    return (member.username or "Unknown").strip()
+
+
+def _csv_glider_product_name(glider):
+    """Return stable glider Product/Service label for treasurer CSV exports."""
+    if not glider:
+        return "Glider"
+
+    competition_number = (glider.competition_number or "").strip().upper()
+    model = (glider.model or "").strip()
+    return _sanitize_csv_cell(competition_number or model or "Glider")
+
+
+def _csv_towplane_product_name(towplane):
+    """Return stable towplane Product/Service label for treasurer CSV exports."""
+    if not towplane:
+        return "Tow"
+
+    model = (towplane.model or "").strip()
+    name = (towplane.name or "").strip()
+    return _sanitize_csv_cell(model or name or "Tow")
 
 
 def _member_flight_charge_breakdown(flight, member):
@@ -244,6 +291,164 @@ def personal_charges_summary_csv(request):
                 _sanitize_csv_cell(charge.notes),
             ]
         )
+
+    return response
+
+
+@active_member_required
+def export_logsheet_finances_csv(request, pk):
+    """Export finalized per-flight financial charges for treasurer workflows."""
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+
+    if not logsheet.finalized:
+        messages.error(
+            request,
+            "This CSV is available only after the logsheet is finalized.",
+        )
+        return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
+
+    flights = list(
+        logsheet.flights.select_related(
+            "pilot",
+            "split_with",
+            "glider",
+            "towplane",
+        ).order_by("launch_time", "pk")
+    )
+
+    # Avoid per-flight SiteConfiguration lookups when legacy finalized flights
+    # rely on calculated properties (retrieve waiver checks).
+    site_config = SiteConfiguration.objects.first()
+    for flight in flights:
+        flight._site_config_cache = site_config
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="Flights_{logsheet.log_date.isoformat()}.csv"'
+    )
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "Inv Num",
+            "Customer",
+            "Invoice Date",
+            "Service Date",
+            "Product/Service",
+            "Product/Service",
+            "Description",
+            "Product/Service",
+            "Quantity",
+            "Product/Service",
+            "Rate",
+            "Amount",
+        ]
+    )
+
+    for flight in flights:
+        tow_base = (
+            flight.tow_cost_actual
+            if flight.tow_cost_actual is not None
+            else (flight.tow_cost_calculated or Decimal("0.00"))
+        )
+        rental_base = (
+            flight.rental_cost_actual
+            if flight.rental_cost_actual is not None
+            else (flight.rental_cost or Decimal("0.00"))
+        )
+
+        allocations = split_flight_costs(
+            flight.pilot,
+            flight.split_with,
+            flight.split_type,
+            tow_base,
+            rental_base,
+        )
+
+        member_allocations = [
+            (member, split_values)
+            for member, split_values in allocations.items()
+            if member
+        ]
+        has_split_allocations = len(member_allocations) > 1
+
+        for allocation_index, (member, split_values) in enumerate(
+            member_allocations, start=1
+        ):
+            # Treasurer requirement: use flight PK as base invoice identifier.
+            # For split charges, suffix with .1/.2 by allocation order.
+            invoice_num = (
+                f"{flight.pk}.{allocation_index}"
+                if has_split_allocations
+                else str(flight.pk)
+            )
+
+            customer_name = _sanitize_csv_cell(_csv_customer_name(member))
+            invoice_date = logsheet.log_date.isoformat()
+            service_date = logsheet.log_date.isoformat()
+
+            rental_amount = quantize_currency(split_values.get("rental"))
+            if rental_amount > Decimal("0.00"):
+                duration = flight.computed_duration
+                if duration and duration.total_seconds() > 0:
+                    qty_minutes = Decimal(str(duration.total_seconds())) / Decimal("60")
+                    quantity = qty_minutes.quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    )
+                else:
+                    quantity = Decimal("1")
+
+                rate = (
+                    (rental_amount / quantity).quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    )
+                    if quantity > 0
+                    else rental_amount
+                )
+                glider_name = _csv_glider_product_name(flight.glider)
+
+                writer.writerow(
+                    [
+                        invoice_num,
+                        customer_name,
+                        invoice_date,
+                        service_date,
+                        f"{glider_name} Rental",
+                        "",
+                        "",
+                        "",
+                        _format_charge_csv_number(quantity),
+                        "",
+                        _format_charge_csv_number(rate),
+                        _format_charge_csv_number(rental_amount),
+                    ]
+                )
+
+            tow_amount = quantize_currency(split_values.get("tow"))
+            if tow_amount > Decimal("0.00"):
+                towplane_name = _csv_towplane_product_name(flight.towplane)
+                tow_label = (
+                    str(flight.release_altitude)
+                    if flight.release_altitude is not None
+                    else "Tow"
+                )
+
+                writer.writerow(
+                    [
+                        invoice_num,
+                        customer_name,
+                        invoice_date,
+                        service_date,
+                        tow_label,
+                        f"{towplane_name} Tow",
+                        "",
+                        "",
+                        "1",
+                        "",
+                        _format_charge_csv_number(tow_amount),
+                        _format_charge_csv_number(tow_amount),
+                    ]
+                )
 
     return response
 
