@@ -372,7 +372,9 @@ def export_logsheet_finances_csv(request, pk):
                 duration = flight.computed_duration
                 if duration and duration.total_seconds() > 0:
                     qty_minutes = Decimal(str(duration.total_seconds())) / Decimal("60")
-                    quantity = qty_minutes.quantize(Decimal("0.01"))
+                    quantity = qty_minutes.quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    )
                 else:
                     quantity = Decimal("1")
 
