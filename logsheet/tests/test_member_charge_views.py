@@ -880,7 +880,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             club_owned=True,
             is_active=True,
         )
-        Flight.objects.create(
+        flight = Flight.objects.create(
             logsheet=self.logsheet,
             pilot=self.member,
             glider=glider,
@@ -922,13 +922,57 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         data_rows = rows[1:]
         invoice_numbers = [r[0] for r in data_rows]
 
-        # Same member/flight line items share one invoice number, but it must
-        # be a unique identifier (not plain "1") and date-based for uploads.
+        # Treasurer requirement: invoice number comes directly from Flight.pk.
         self.assertGreater(len(invoice_numbers), 0)
         self.assertEqual(len(set(invoice_numbers)), 1)
-        invoice_number = invoice_numbers[0]
-        self.assertNotEqual(invoice_number, "1")
-        self.assertTrue(
-            invoice_number.startswith(self.logsheet.log_date.strftime("%Y%m%d"))
+        self.assertEqual(invoice_numbers[0], str(flight.pk))
+
+    def test_treasurer_csv_export_uses_split_suffix_invoice_numbers(self):
+        """Split allocations should use Flight.pk.1 / Flight.pk.2 invoice IDs."""
+        glider = Glider.objects.create(
+            n_number="N101AA",
+            make="PW",
+            model="PW-5",
+            rental_rate=Decimal("24.00"),
+            club_owned=True,
+            is_active=True,
         )
-        self.assertIn("-F", invoice_number)
+        towplane = Towplane.objects.create(
+            n_number="N201BB",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            split_with=self.duty_officer,
+            split_type="even",
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(10, 0),
+            landing_time=time(10, 30),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("40.00"),
+            rental_cost_actual=Decimal("12.00"),
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        self.assertEqual(response.status_code, 200)
+        rows = list(csv.reader(StringIO(response.content.decode("utf-8"))))
+        data_rows = rows[1:]
+
+        split_invoice_numbers = {
+            row[0] for row in data_rows if row[0].startswith(f"{flight.pk}.")
+        }
+        self.assertEqual(split_invoice_numbers, {f"{flight.pk}.1", f"{flight.pk}.2"})

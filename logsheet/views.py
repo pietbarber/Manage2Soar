@@ -317,10 +317,6 @@ def export_logsheet_finances_csv(request, pk):
         ]
     )
 
-    invoice_numbers = {}
-    invoice_counter = 0
-    invoice_date_token = logsheet.log_date.strftime("%Y%m%d")
-
     for flight in flights:
         tow_base = (
             flight.tow_cost_actual
@@ -341,16 +337,23 @@ def export_logsheet_finances_csv(request, pk):
             rental_base,
         )
 
-        for member, split_values in allocations.items():
-            if not member:
-                continue
+        member_allocations = [
+            (member, split_values)
+            for member, split_values in allocations.items()
+            if member
+        ]
+        has_split_allocations = len(member_allocations) > 1
 
-            if member.id not in invoice_numbers:
-                invoice_counter += 1
-                invoice_numbers[member.id] = (
-                    f"{invoice_date_token}-{invoice_counter:03d}-F{flight.pk}"
-                )
-            invoice_num = invoice_numbers[member.id]
+        for allocation_index, (member, split_values) in enumerate(
+            member_allocations, start=1
+        ):
+            # Treasurer requirement: use flight PK as base invoice identifier.
+            # For split charges, suffix with .1/.2 by allocation order.
+            invoice_num = (
+                f"{flight.pk}.{allocation_index}"
+                if has_split_allocations
+                else str(flight.pk)
+            )
 
             customer_name = _sanitize_csv_cell(_csv_customer_name(member))
             invoice_date = logsheet.log_date.isoformat()
