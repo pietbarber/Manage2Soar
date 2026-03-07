@@ -95,6 +95,26 @@ def _csv_customer_name(member):
     return (member.username or "Unknown").strip()
 
 
+def _csv_glider_product_name(glider):
+    """Return stable glider Product/Service label for treasurer CSV exports."""
+    if not glider:
+        return "Glider"
+
+    competition_number = (glider.competition_number or "").strip().upper()
+    model = (glider.model or "").strip()
+    return _sanitize_csv_cell(competition_number or model or "Glider")
+
+
+def _csv_towplane_product_name(towplane):
+    """Return stable towplane Product/Service label for treasurer CSV exports."""
+    if not towplane:
+        return "Tow"
+
+    model = (towplane.model or "").strip()
+    name = (towplane.name or "").strip()
+    return _sanitize_csv_cell(model or name or "Tow")
+
+
 def _member_flight_charge_breakdown(flight, member):
     """Return (tow, rental, total) owed by `member` for a single flight."""
     # Prefer locked-in actual values for finalized logsheets, but fall back to
@@ -385,11 +405,7 @@ def export_logsheet_finances_csv(request, pk):
                     if quantity > 0
                     else rental_amount
                 )
-                glider_name = (
-                    _sanitize_csv_cell(str(flight.glider))
-                    if flight.glider
-                    else "Glider"
-                )
+                glider_name = _csv_glider_product_name(flight.glider)
 
                 writer.writerow(
                     [
@@ -410,11 +426,7 @@ def export_logsheet_finances_csv(request, pk):
 
             tow_amount = quantize_currency(split_values.get("tow"))
             if tow_amount > Decimal("0.00"):
-                towplane_name = (
-                    _sanitize_csv_cell(str(flight.towplane))
-                    if flight.towplane
-                    else "Tow"
-                )
+                towplane_name = _csv_towplane_product_name(flight.towplane)
                 tow_label = (
                     str(flight.release_altitude)
                     if flight.release_altitude is not None

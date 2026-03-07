@@ -913,20 +913,79 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         content = response.content.decode("utf-8")
         self.assertIn("Inv Num,Customer,Invoice Date,Service Date", content)
         self.assertIn("Pilot, Test", content)
-        self.assertIn("Rental", content)
         self.assertIn(",47,,0.4,18.8", content)
         self.assertIn(",3000", content)
-        self.assertIn("Tow", content)
         self.assertIn(",1,,45,45", content)
 
         rows = list(csv.reader(StringIO(content)))
         data_rows = rows[1:]
         invoice_numbers = [r[0] for r in data_rows]
 
+        rental_rows = [row for row in data_rows if row[4].endswith(" Rental")]
+        tow_rows = [row for row in data_rows if row[5].endswith(" Tow")]
+
+        self.assertEqual(len(rental_rows), 1)
+        self.assertEqual(rental_rows[0][4], "PW-5 Rental")
+        self.assertNotIn("/", rental_rows[0][4])
+        self.assertNotIn("N100AA", rental_rows[0][4])
+
+        self.assertEqual(len(tow_rows), 1)
+        self.assertEqual(tow_rows[0][5], "Pawnee Tow")
+        self.assertNotIn("(", tow_rows[0][5])
+        self.assertNotIn("N200BB", tow_rows[0][5])
+
         # Treasurer requirement: invoice number comes directly from Flight.pk.
         self.assertGreater(len(invoice_numbers), 0)
         self.assertEqual(len(set(invoice_numbers)), 1)
         self.assertEqual(invoice_numbers[0], str(flight.pk))
+
+    def test_treasurer_csv_export_prefers_glider_competition_number_for_product(self):
+        """Glider Product/Service should use competition number when present."""
+        glider = Glider.objects.create(
+            n_number="N104AA",
+            make="Schleicher",
+            model="ASK-21",
+            competition_number="321K",
+            rental_rate=Decimal("24.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            n_number="N204BB",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+        Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(12, 0),
+            landing_time=time(12, 20),
+            release_altitude=2500,
+            tow_cost_actual=Decimal("30.00"),
+            rental_cost_actual=Decimal("12.00"),
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        self.assertEqual(response.status_code, 200)
+        rows = list(csv.reader(StringIO(response.content.decode("utf-8"))))
+        data_rows = rows[1:]
+        rental_rows = [row for row in data_rows if row[4].endswith(" Rental")]
+
+        self.assertEqual(len(rental_rows), 1)
+        self.assertEqual(rental_rows[0][4], "321K Rental")
 
     def test_treasurer_csv_export_uses_split_suffix_invoice_numbers(self):
         """Split allocations should use Flight.pk.1 / Flight.pk.2 invoice IDs."""
