@@ -58,7 +58,7 @@ These tests prevent regressions in both the field-level backfill behavior and da
 4. For production remediations, use dry-run validation queries before applying updates.
 5. Keep `*_actual` fields nullable to preserve unknown vs zero semantics:
    - `None` means unknown/not locked
-    - Historically, some legacy rows use `0.00` as a placeholder for "missing"; `update_flight_costs` treats `*_cost_actual == 0` the same as `NULL` for backfill eligibility.
+   - Historically, some legacy rows use `0.00` as a placeholder for "missing"; `update_flight_costs` treats `*_cost_actual == 0` the same as `NULL` for backfill eligibility.
 
 ## Files Changed
 - `logsheet/management/commands/update_flight_costs.py`
