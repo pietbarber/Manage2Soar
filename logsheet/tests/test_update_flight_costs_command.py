@@ -156,3 +156,57 @@ def test_does_not_count_unchanged_zero_costs_as_updates(airfield, active_member)
     output = out.getvalue()
     assert "Updated flight ID" not in output
     assert "Total updated flights after 2026-03-01: 0" in output
+
+
+@pytest.mark.django_db
+def test_skips_non_finalized_logsheets_when_backfilling(airfield, active_member):
+    """Only finalized logsheets should be backfilled by the command."""
+    glider = Glider.objects.create(
+        make="Schempp-Hirth",
+        model="Duo Discus",
+        n_number="NTEST005",
+        rental_rate=Decimal("45.00"),
+        club_owned=True,
+        is_active=True,
+    )
+    draft_logsheet = Logsheet.objects.create(
+        log_date=date(2026, 3, 8),
+        airfield=airfield,
+        created_by=active_member,
+        finalized=False,
+    )
+    final_logsheet = Logsheet.objects.create(
+        log_date=date(2026, 3, 9),
+        airfield=airfield,
+        created_by=active_member,
+        finalized=True,
+    )
+
+    draft_flight = Flight.objects.create(
+        logsheet=draft_logsheet,
+        pilot=active_member,
+        glider=glider,
+        flight_type="solo",
+        launch_time=time(9, 0),
+        landing_time=time(10, 0),
+        tow_cost_actual=Decimal("0.00"),
+        rental_cost_actual=Decimal("0.00"),
+    )
+    final_flight = Flight.objects.create(
+        logsheet=final_logsheet,
+        pilot=active_member,
+        glider=glider,
+        flight_type="solo",
+        launch_time=time(10, 0),
+        landing_time=time(11, 0),
+        tow_cost_actual=Decimal("0.00"),
+        rental_cost_actual=Decimal("0.00"),
+    )
+
+    call_command("update_flight_costs", after="2026-03-01")
+
+    draft_flight.refresh_from_db()
+    final_flight.refresh_from_db()
+    assert draft_flight.tow_cost_actual == Decimal("0.00")
+    assert draft_flight.rental_cost_actual == Decimal("0.00")
+    assert final_flight.rental_cost_actual == Decimal("45.00")

@@ -25,9 +25,11 @@ class Command(BaseCommand):
         if not after_date:
             raise CommandError(f"Invalid date format: {after_str}. Use YYYY-MM-DD.")
 
-        logsheets = Logsheet.objects.filter(log_date__gt=after_date).order_by(
-            "log_date"
-        )
+        # Only process finalized logsheets so we do not lock in draft costs.
+        logsheets = Logsheet.objects.filter(
+            log_date__gt=after_date,
+            finalized=True,
+        ).order_by("log_date")
         if not logsheets.exists():
             raise CommandError(f"No logsheets found after {after_str}.")
 
