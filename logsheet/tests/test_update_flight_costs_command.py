@@ -77,3 +77,40 @@ def test_after_filter_is_strictly_greater_than(airfield, active_member):
     flight.refresh_from_db()
     assert flight.tow_cost_actual == Decimal("0.00")
     assert flight.rental_cost_actual == Decimal("0.00")
+
+
+@pytest.mark.django_db
+def test_does_not_coerce_non_computable_costs_to_zero(airfield, active_member):
+    """Keep actual fields as None when computed costs are not computable."""
+    glider = Glider.objects.create(
+        make="Schempp-Hirth",
+        model="Discus",
+        n_number="NTEST003",
+        rental_rate=Decimal("30.00"),
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2026, 3, 8),
+        airfield=airfield,
+        created_by=active_member,
+        finalized=True,
+    )
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        flight_type="solo",
+        launch_time=time(9, 0),
+        # Missing landing/release data means rental_cost/tow_cost are not computable.
+        landing_time=None,
+        release_altitude=None,
+        tow_cost_actual=None,
+        rental_cost_actual=None,
+    )
+
+    call_command("update_flight_costs", after="2026-03-01")
+
+    flight.refresh_from_db()
+    assert flight.tow_cost_actual is None
+    assert flight.rental_cost_actual is None

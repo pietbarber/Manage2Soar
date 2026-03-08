@@ -42,19 +42,25 @@ class Command(BaseCommand):
                 # Backfill each cost independently so existing values do not
                 # block filling the other missing/zero field.
                 if should_update_tow or should_update_rental:
-                    tow = flight.tow_cost or 0
-                    rental = flight.rental_cost or 0
+                    updates = []
 
                     if should_update_tow:
-                        flight.tow_cost_actual = tow
+                        tow = flight.tow_cost
+                        if tow is not None:
+                            flight.tow_cost_actual = tow
+                            updates.append("tow_cost_actual")
                     if should_update_rental:
-                        flight.rental_cost_actual = rental
+                        rental = flight.rental_cost
+                        if rental is not None:
+                            flight.rental_cost_actual = rental
+                            updates.append("rental_cost_actual")
 
-                    flight.save()
-                    updated += 1
-                    self.stdout.write(
-                        f"Updated flight ID {flight.pk} (tow: {flight.tow_cost_actual}, rental: {flight.rental_cost_actual})"
-                    )
+                    if updates:
+                        flight.save(update_fields=updates)
+                        updated += 1
+                        self.stdout.write(
+                            f"Updated flight ID {flight.pk} (tow: {flight.tow_cost_actual}, rental: {flight.rental_cost_actual})"
+                        )
             if updated:
                 self.stdout.write(
                     self.style.SUCCESS(
