@@ -8,14 +8,14 @@ from siteconfig.models import SiteConfiguration
 
 
 class Command(BaseCommand):
-    help = "Update flight costs for all logsheets after a given date, only if costs are missing or zero."
+    help = "Update flight costs for finalized logsheets after a given date, only if costs are missing or zero."
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--after",
             type=str,
             required=True,
-            help="Update all logsheets with log_date > this date (YYYY-MM-DD)",
+            help="Update finalized logsheets with log_date > this date (YYYY-MM-DD)",
         )
 
     @transaction.atomic
@@ -31,7 +31,7 @@ class Command(BaseCommand):
             finalized=True,
         ).order_by("log_date")
         if not logsheets.exists():
-            raise CommandError(f"No logsheets found after {after_str}.")
+            raise CommandError(f"No finalized logsheets found after {after_str}.")
 
         # Cache site configuration once for this run; cost properties read
         # retrieve-waiver flags from this model.

@@ -72,7 +72,9 @@ def test_after_filter_is_strictly_greater_than(airfield, active_member):
         rental_cost_actual=Decimal("0.00"),
     )
 
-    with pytest.raises(CommandError, match="No logsheets found after 2026-03-07"):
+    with pytest.raises(
+        CommandError, match="No finalized logsheets found after 2026-03-07"
+    ):
         call_command("update_flight_costs", after="2026-03-07")
 
     flight.refresh_from_db()
