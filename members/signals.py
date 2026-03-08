@@ -276,10 +276,10 @@ def notify_membership_managers_of_new_application(application):
 
                 # Render HTML and plain text templates
                 html_message = render_to_string(
-                    "members/emails/membership_application_notification.html", context
+                    "members/emails/application_submitted.html", context
                 )
                 text_message = render_to_string(
-                    "members/emails/membership_application_notification.txt", context
+                    "members/emails/application_submitted.txt", context
                 )
 
                 # Send email to each member manager
@@ -388,10 +388,10 @@ def notify_membership_managers_of_application(application):
                 }
 
                 html_message = render_to_string(
-                    "members/emails/membership_application_notification.html", context
+                    "members/emails/application_submitted.html", context
                 )
                 text_message = render_to_string(
-                    "members/emails/membership_application_notification.txt", context
+                    "members/emails/application_submitted.txt", context
                 )
 
                 # Send email to each member manager

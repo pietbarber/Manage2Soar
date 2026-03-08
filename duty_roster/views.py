@@ -3011,10 +3011,10 @@ def _notify_instructor_cancellation(slot):
         }
 
         html_message = render_to_string(
-            "duty_roster/emails/instructor_cancellation.html", context
+            "duty_roster/emails/instruction_cancellation.html", context
         )
         text_message = render_to_string(
-            "duty_roster/emails/instructor_cancellation.txt", context
+            "duty_roster/emails/instruction_cancellation.txt", context
         )
 
         send_mail(
