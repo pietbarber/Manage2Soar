@@ -1,8 +1,10 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 from django.utils.dateparse import parse_date
 
 from logsheet.models import Flight, Logsheet
+from siteconfig.models import SiteConfiguration
 
 
 class Command(BaseCommand):
@@ -29,11 +31,26 @@ class Command(BaseCommand):
         if not logsheets.exists():
             raise CommandError(f"No logsheets found after {after_str}.")
 
+        # Cache site configuration once for this run; cost properties read
+        # retrieve-waiver flags from this model.
+        site_config = SiteConfiguration.objects.first()
+
         total_updated = 0
         for logsheet in logsheets:
-            flights = Flight.objects.filter(logsheet=logsheet)
+            flights = (
+                Flight.objects.filter(logsheet=logsheet)
+                .filter(
+                    Q(tow_cost_actual__isnull=True)
+                    | Q(tow_cost_actual=0)
+                    | Q(rental_cost_actual__isnull=True)
+                    | Q(rental_cost_actual=0)
+                )
+                .select_related("glider", "towplane__charge_scheme")
+                .prefetch_related("towplane__charge_scheme__charge_tiers")
+            )
             updated = 0
             for flight in flights:
+                flight._site_config_cache = site_config
                 tow_actual = getattr(flight, "tow_cost_actual", None)
                 rental_actual = getattr(flight, "rental_cost_actual", None)
                 should_update_tow = tow_actual is None or tow_actual == 0
