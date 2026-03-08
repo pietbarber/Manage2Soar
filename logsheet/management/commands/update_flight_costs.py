@@ -36,19 +36,24 @@ class Command(BaseCommand):
             for flight in flights:
                 tow_actual = getattr(flight, "tow_cost_actual", None)
                 rental_actual = getattr(flight, "rental_cost_actual", None)
-                # Only update if both are missing or zero
-                if (tow_actual is None or tow_actual == 0) and (
-                    rental_actual is None or rental_actual == 0
-                ):
-                    # Use model properties to calculate
+                should_update_tow = tow_actual is None or tow_actual == 0
+                should_update_rental = rental_actual is None or rental_actual == 0
+
+                # Backfill each cost independently so existing values do not
+                # block filling the other missing/zero field.
+                if should_update_tow or should_update_rental:
                     tow = flight.tow_cost or 0
                     rental = flight.rental_cost or 0
-                    flight.tow_cost_actual = tow
-                    flight.rental_cost_actual = rental
+
+                    if should_update_tow:
+                        flight.tow_cost_actual = tow
+                    if should_update_rental:
+                        flight.rental_cost_actual = rental
+
                     flight.save()
                     updated += 1
                     self.stdout.write(
-                        f"Updated flight ID {flight.pk} (tow: {tow}, rental: {rental})"
+                        f"Updated flight ID {flight.pk} (tow: {flight.tow_cost_actual}, rental: {flight.rental_cost_actual})"
                     )
             if updated:
                 self.stdout.write(
