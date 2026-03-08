@@ -42,6 +42,7 @@ File: `logsheet/tests/test_update_flight_costs_command.py`
 - `test_updates_rental_when_tow_actual_already_set`
 - `test_after_filter_is_strictly_greater_than`
 - `test_does_not_coerce_non_computable_costs_to_zero`
+- `test_does_not_count_unchanged_zero_costs_as_updates`
 
 These tests prevent regressions in both the field-level backfill behavior and date filter boundary behavior.
 
