@@ -46,12 +46,12 @@ class Command(BaseCommand):
 
                     if should_update_tow:
                         tow = flight.tow_cost
-                        if tow is not None:
+                        if tow is not None and tow != flight.tow_cost_actual:
                             flight.tow_cost_actual = tow
                             updates.append("tow_cost_actual")
                     if should_update_rental:
                         rental = flight.rental_cost
-                        if rental is not None:
+                        if rental is not None and rental != flight.rental_cost_actual:
                             flight.rental_cost_actual = rental
                             updates.append("rental_cost_actual")
 

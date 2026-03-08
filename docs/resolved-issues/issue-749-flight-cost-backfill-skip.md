@@ -41,6 +41,7 @@ File: `logsheet/tests/test_update_flight_costs_command.py`
 
 - `test_updates_rental_when_tow_actual_already_set`
 - `test_after_filter_is_strictly_greater_than`
+- `test_does_not_coerce_non_computable_costs_to_zero`
 
 These tests prevent regressions in both the field-level backfill behavior and date filter boundary behavior.
 
@@ -56,7 +57,7 @@ These tests prevent regressions in both the field-level backfill behavior and da
 4. For production remediations, use dry-run validation queries before applying updates.
 5. Keep `*_actual` fields nullable to preserve unknown vs zero semantics:
    - `None` means unknown/not locked
-   - `0.00` means known and intentionally zero
+    - Historically, some legacy rows use `0.00` as a placeholder for "missing"; `update_flight_costs` treats `*_cost_actual == 0` the same as `NULL` for backfill eligibility.
 
 ## Files Changed
 - `logsheet/management/commands/update_flight_costs.py`

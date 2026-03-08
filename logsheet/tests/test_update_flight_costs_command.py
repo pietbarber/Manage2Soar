@@ -1,5 +1,6 @@
 from datetime import date, time
 from decimal import Decimal
+from io import StringIO
 
 import pytest
 from django.core.management import call_command
@@ -114,3 +115,44 @@ def test_does_not_coerce_non_computable_costs_to_zero(airfield, active_member):
     flight.refresh_from_db()
     assert flight.tow_cost_actual is None
     assert flight.rental_cost_actual is None
+
+
+@pytest.mark.django_db
+def test_does_not_count_unchanged_zero_costs_as_updates(airfield, active_member):
+    """Do not write/count updates when computed values equal stored values."""
+    glider = Glider.objects.create(
+        make="Schleicher",
+        model="ASK-21",
+        n_number="NTEST004",
+        rental_rate=Decimal("20.00"),
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2026, 3, 8),
+        airfield=airfield,
+        created_by=active_member,
+        finalized=True,
+    )
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        flight_type="solo",
+        launch_time=time(10, 0),
+        landing_time=time(10, 30),
+        free_tow=True,
+        free_rental=True,
+        tow_cost_actual=Decimal("0.00"),
+        rental_cost_actual=Decimal("0.00"),
+    )
+
+    out = StringIO()
+    call_command("update_flight_costs", after="2026-03-01", stdout=out)
+
+    flight.refresh_from_db()
+    assert flight.tow_cost_actual == Decimal("0.00")
+    assert flight.rental_cost_actual == Decimal("0.00")
+    output = out.getvalue()
+    assert "Updated flight ID" not in output
+    assert "Total updated flights after 2026-03-01: 0" in output
