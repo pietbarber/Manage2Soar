@@ -367,73 +367,32 @@ def notify_membership_managers_of_application(application):
                 safe_name = f"{application.first_name} {application.last_name}".replace(
                     "\r", ""
                 ).replace("\n", " ")
-                safe_email = application.email.replace("\r", "").replace("\n", " ")
-
                 subject = f"New Membership Application: {safe_name[:50]}"
 
-                message_lines = [
-                    f"A new membership application has been submitted through the club website.",
-                    "",
-                    "Applicant Details:",
-                    f"- Name: {safe_name}",
-                    f"- Email: {safe_email}",
-                    f"- Phone: {application.phone or 'Not provided'}",
-                    f"- City, State: {application.city}, {application.state}",
-                    f"- Application ID: {application.application_id}",
-                    f"- Submission Time: {application.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}",
-                    "",
-                    "Pilot Experience:",
-                    f"- Current Pilot: {'Yes' if application.pilot_ratings else 'No'}",
-                ]
+                site_url = get_canonical_url()
+                context = {
+                    "application": application,
+                    "submitted_at": application.submitted_at.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    "review_application_url": build_absolute_url(
+                        f"/members/applications/{application.application_id}/",
+                        canonical=site_url,
+                    ),
+                    "all_applications_url": build_absolute_url(
+                        "/members/applications/", canonical=site_url
+                    ),
+                    "club_name": config.club_name if config else "Club",
+                    "club_logo_url": get_absolute_club_logo_url(config),
+                    "site_url": site_url,
+                }
 
-                if application.pilot_ratings:
-                    message_lines.append(f"- Ratings: {application.pilot_ratings}")
-                if application.certificates_licenses:
-                    message_lines.append(
-                        f"- Certificates: {application.certificates_licenses}"
-                    )
-                if application.total_flight_hours:
-                    message_lines.append(
-                        f"- Flight Hours: {application.total_flight_hours}"
-                    )
-
-                message_lines.extend(
-                    [
-                        "",
-                        "Soaring Experience:",
-                        f"- Previous Soaring: {'Yes' if application.previous_soaring_experience else 'No'}",
-                    ]
+                html_message = render_to_string(
+                    "members/emails/application_submitted.html", context
                 )
-
-                if application.soaring_hours:
-                    message_lines.append(
-                        f"- Soaring Hours: {application.soaring_hours}"
-                    )
-                if application.glider_ownership:
-                    message_lines.append(
-                        f"- Glider Ownership: {application.glider_ownership}"
-                    )
-
-                message_lines.extend(
-                    [
-                        "",
-                        f"- Interested in Learning: {'Yes' if application.interested_in_learning_to_fly else 'No'}",
-                        f"- How They Heard: {application.how_did_you_hear or 'Not specified'}",
-                        "",
-                        "Review and Action Required:",
-                        "1. Review the complete application in the member management system",
-                        "2. Contact the applicant to schedule any required interviews or visits",
-                        "3. Approve, waitlist, or request additional information",
-                        "",
-                        "Management Links:",
-                        f"- View Application: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/{application.application_id}/",
-                        f"- All Applications: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/",
-                        "",
-                        "This message was sent automatically by the club website membership system.",
-                    ]
+                text_message = render_to_string(
+                    "members/emails/application_submitted.txt", context
                 )
-
-                message = "\n".join(message_lines)
 
                 # Send email to each member manager
                 recipient_emails = [
@@ -443,9 +402,10 @@ def notify_membership_managers_of_application(application):
                 if recipient_emails:
                     send_mail(
                         subject=subject,
-                        message=message,
+                        message=text_message,
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=recipient_emails,
+                        html_message=html_message,
                         fail_silently=False,  # We want to know if email fails
                     )
 
