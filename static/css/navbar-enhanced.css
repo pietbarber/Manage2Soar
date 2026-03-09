@@ -237,6 +237,15 @@
    ACTIVE PAGE HIGHLIGHTING
    ========================================================================== */
 
+/* Keep login/logout auth buttons vertically centered across browsers (Safari).
+    Using inline-flex avoids baseline alignment differences on anchor vs button. */
+.navbar-auth-btn {
+     display: inline-flex;
+     align-items: center;
+     justify-content: center;
+     line-height: 1.2;
+}
+
 /* Active/current page indicator */
 .nav-link.active,
 .dropdown-item.active {
