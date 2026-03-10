@@ -17,6 +17,7 @@ from duty_roster.roster_generator import (
 )
 from logsheet.models import Airfield
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -450,3 +451,31 @@ class TestProposeRosterSessionTracking:
         # Ensure fallback produced a valid range and did not retain reversed values.
         assert response.context["start_date"] <= response.context["end_date"]
         assert response.context["start_date"] != date(2026, 5, 2)
+
+    def test_cross_year_range_omits_single_year_season_summary(
+        self, client, rostermeister, instructor_member
+    ):
+        """Cross-year ranges should not expose misleading single-year season bounds."""
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.example.com",
+            club_abbreviation="TC",
+            schedule_instructors=True,
+        )
+
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-12-20",
+                "end_date": "2027-01-10",
+            },
+        )
+
+        assert response.status_code == 200
+        operational_info = response.context["operational_info"]
+        assert operational_info.get("range_spans_years") is True
+        assert "season_start" not in operational_info
+        assert "season_end" not in operational_info

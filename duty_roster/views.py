@@ -1842,20 +1842,25 @@ def propose_roster(request):
     filtered_dates = []
     if siteconfig:
         try:
-            season_start, season_end = get_operational_season_bounds(range_start.year)
+            all_weekend_dates = get_weekend_dates_in_range(range_start, range_end)
+            filtered_dates = [
+                d for d in all_weekend_dates if not is_within_operational_season(d)
+            ]
 
-            # Only show operational info if we have filtering enabled
-            if season_start or season_end:
-                if season_start:
-                    operational_info["season_start"] = season_start
-                if season_end:
-                    operational_info["season_end"] = season_end
+            if range_start.year == range_end.year:
+                season_start, season_end = get_operational_season_bounds(
+                    range_start.year
+                )
 
-                # Find which dates would be filtered out
-                all_weekend_dates = get_weekend_dates_in_range(range_start, range_end)
-                filtered_dates = [
-                    d for d in all_weekend_dates if not is_within_operational_season(d)
-                ]
+                # Only show operational info if we have filtering enabled
+                if season_start or season_end:
+                    if season_start:
+                        operational_info["season_start"] = season_start
+                    if season_end:
+                        operational_info["season_end"] = season_end
+            else:
+                # Avoid presenting misleading single-year season bounds for multi-year ranges.
+                operational_info["range_spans_years"] = True
         except Exception as e:
             logger.warning(f"Error calculating operational season info: {e}")
 
@@ -1914,9 +1919,7 @@ def propose_roster(request):
                 weekend = [
                     d
                     for d in get_weekend_dates_in_range(range_start, range_end)
-                    if d.weekday() in (5, 6)
-                    and is_within_operational_season(d)
-                    and d not in exclude_set
+                    if is_within_operational_season(d) and d not in exclude_set
                 ]
                 raw = [
                     {"date": d, "slots": {r: None for r in enabled_roles}}
@@ -2056,9 +2059,7 @@ def propose_roster(request):
             weekend = [
                 d
                 for d in get_weekend_dates_in_range(range_start, range_end)
-                if d.weekday() in (5, 6)
-                and is_within_operational_season(d)
-                and d not in exclude_set
+                if is_within_operational_season(d) and d not in exclude_set
             ]
             raw = [
                 {"date": d, "slots": {r: None for r in enabled_roles}} for d in weekend

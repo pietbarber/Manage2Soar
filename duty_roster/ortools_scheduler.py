@@ -13,7 +13,6 @@ Phase 2 Implementation: Full production constraints matching legacy scheduler be
 import logging
 from dataclasses import dataclass
 from datetime import date
-from decimal import ROUND_CEILING, Decimal
 from typing import Any
 
 from ortools.sat.python import cp_model
@@ -24,6 +23,7 @@ from duty_roster.models import (
     DutyPreference,
     MemberBlackout,
 )
+from duty_roster.roster_generator import calculate_assignment_cap
 from members.models import Member
 
 logger = logging.getLogger("duty_roster.ortools_scheduler")
@@ -346,14 +346,8 @@ class DutyRosterScheduler:
             monthly_limit = (
                 pref.max_assignments_per_month if pref else DEFAULT_MAX_ASSIGNMENTS
             )
-
-            max_assignments_decimal = Decimal(str(monthly_limit)) * Decimal(
-                self.data.month_span
-            )
-            max_assignments = (
-                int(max_assignments_decimal.to_integral_value(rounding=ROUND_CEILING))
-                if max_assignments_decimal > 0
-                else 0
+            max_assignments = calculate_assignment_cap(
+                monthly_limit, self.data.month_span
             )
 
             # Honor max_assignments including 0 (which means "no assignments allowed")

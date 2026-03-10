@@ -23,6 +23,9 @@
   {% if operational_info.season_start and operational_info.season_end %}
     <p><strong>{{ year }} Season:</strong> {{ operational_info.season_start }} through {{ operational_info.season_end }}</p>
   {% endif %}
+  {% if operational_info.range_spans_years %}
+    <p><strong>Selected range spans multiple years.</strong> Per-year season summary is hidden to avoid showing misleading single-year bounds.</p>
+  {% endif %}
   {% if filtered_dates %}
     <div class="mt-2">
       <strong>⚠️ Dates excluded from roster (outside operational season):</strong>
