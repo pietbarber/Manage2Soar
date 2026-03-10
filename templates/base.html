@@ -327,11 +327,11 @@
         {% if not kiosk_mode %}
         <form action="{% url 'logout' %}" method="post" class="d-flex ms-2">
           {% csrf_token %}
-          <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
+          <button class="btn btn-outline-light btn-sm navbar-auth-btn" type="submit">Logout</button>
         </form>
         {% endif %}
         {% else %}
-        <a class="btn btn-outline-light btn-sm" href="{% url 'login' %}">Login</a>
+        <a class="btn btn-outline-light btn-sm navbar-auth-btn" href="{% url 'login' %}">Login</a>
         {% endif %}
 
         </div><!-- /.offcanvas-body -->
