@@ -495,6 +495,7 @@ class TestGenerateOpsDayIcs:
         mock_config = MagicMock()
         mock_config.club_name = "No Domain Club"
         mock_config.domain_name = ""  # falsy — the edge case
+        mock_config.canonical_url = ""
         # Explicitly blank address fields so _build_club_location falls back cleanly
         mock_config.club_address_line1 = ""
         mock_config.club_address_line2 = ""

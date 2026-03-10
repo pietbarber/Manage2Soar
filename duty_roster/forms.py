@@ -55,12 +55,15 @@ class MemberBlackoutForm(forms.ModelForm):
 
 
 class DutyPreferenceForm(forms.ModelForm):
-    max_assignments_per_month = forms.ChoiceField(
-        choices=[(i, str(i)) for i in range(0, 13)],  # 0–12
+    max_assignments_per_month = forms.DecimalField(
+        min_value=0,
+        max_value=12,
+        decimal_places=2,
         label="Max assignments per month",
-        initial=lambda: DutyPreference._meta.get_field(
-            "max_assignments_per_month"
-        ).default,
+        initial=DutyPreference._meta.get_field("max_assignments_per_month").default,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control", "step": "0.25", "min": "0", "max": "12"}
+        ),
     )
 
     class Meta:

@@ -13,6 +13,7 @@ Phase 2 Implementation: Full production constraints matching legacy scheduler be
 import logging
 from dataclasses import dataclass
 from datetime import date
+from decimal import ROUND_CEILING, Decimal
 from typing import Any
 
 from ortools.sat.python import cp_model
@@ -53,6 +54,7 @@ class SchedulingData:
     pairings: set[tuple[int, int]]
     role_scarcity: dict[str, dict[str, Any]]
     earliest_duty_day: date
+    month_span: int = 1
 
 
 class DutyRosterScheduler:
@@ -341,8 +343,17 @@ class DutyRosterScheduler:
         """
         for member in self.data.members:
             pref = self.data.preferences.get(member.id)
-            max_assignments = (
+            monthly_limit = (
                 pref.max_assignments_per_month if pref else DEFAULT_MAX_ASSIGNMENTS
+            )
+
+            max_assignments_decimal = Decimal(str(monthly_limit)) * Decimal(
+                self.data.month_span
+            )
+            max_assignments = (
+                int(max_assignments_decimal.to_integral_value(rounding=ROUND_CEILING))
+                if max_assignments_decimal > 0
+                else 0
             )
 
             # Honor max_assignments including 0 (which means "no assignments allowed")
@@ -667,6 +678,8 @@ def extract_scheduling_data(
     month: int | None = None,
     roles: list[str] | None = None,
     exclude_dates: list[date] | set[date] | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> SchedulingData:
     """
     Extract all necessary data from Django ORM for OR-Tools scheduler.
@@ -676,29 +689,34 @@ def extract_scheduling_data(
         month: Month to schedule (default: current month)
         roles: List of roles to schedule (default: DEFAULT_ROLES)
         exclude_dates: Dates to exclude from scheduling (e.g., user-removed dates)
+        start_date: Optional explicit scheduling range start (inclusive)
+        end_date: Optional explicit scheduling range end (inclusive)
 
     Returns:
         SchedulingData object with all preprocessed scheduling information
     """
-    import calendar
-
     from django.utils.timezone import now
 
+    from duty_roster.roster_generator import (
+        count_calendar_months_inclusive,
+        get_weekend_dates_in_range,
+        resolve_roster_date_range,
+    )
     from members.constants.membership import DEFAULT_ROLES
 
-    # Default to current year/month
     today = now().date()
-    year = year or today.year
-    month = month or today.month
-    roles = roles if roles is not None else DEFAULT_ROLES
 
-    # Get all weekend dates in month
-    cal = calendar.Calendar()
-    all_weekend_dates = [
-        d
-        for d in cal.itermonthdates(year, month)
-        if d.month == month and d.weekday() in (5, 6)
-    ]
+    range_start, range_end = resolve_roster_date_range(
+        year=year,
+        month=month,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    roles = roles if roles is not None else DEFAULT_ROLES
+    month_span = count_calendar_months_inclusive(range_start, range_end)
+
+    # Get all weekend dates in range
+    all_weekend_dates = get_weekend_dates_in_range(range_start, range_end)
 
     # Filter by operational season
     from duty_roster.roster_generator import is_within_operational_season
@@ -717,7 +735,9 @@ def extract_scheduling_data(
     }
     blackouts = {
         (b.member_id, b.date)
-        for b in MemberBlackout.objects.filter(date__year=year, date__month=month)
+        for b in MemberBlackout.objects.filter(
+            date__gte=range_start, date__lte=range_end
+        )
     }
     avoidances = {(a.member_id, a.avoid_with_id) for a in DutyAvoidance.objects.all()}
     pairings_qs = DutyPairing.objects.all()
@@ -757,6 +777,7 @@ def extract_scheduling_data(
         pairings=pairings,
         role_scarcity=role_scarcity,
         earliest_duty_day=earliest_duty_day,
+        month_span=month_span,
     )
 
 
@@ -765,6 +786,8 @@ def generate_roster_ortools(
     month: int | None = None,
     roles: list[str] | None = None,
     exclude_dates: list[date] | set[date] | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     timeout_seconds: float = 10.0,
 ) -> list[dict[str, Any]]:
     """
@@ -778,6 +801,8 @@ def generate_roster_ortools(
         month: Month to schedule (default: current month)
         roles: List of roles to schedule (default: DEFAULT_ROLES)
         exclude_dates: Dates to exclude from scheduling
+        start_date: Optional explicit scheduling range start (inclusive)
+        end_date: Optional explicit scheduling range end (inclusive)
         timeout_seconds: Solver timeout (default: 10 seconds)
 
     Returns:
@@ -790,7 +815,14 @@ def generate_roster_ortools(
         RuntimeError: If solver fails to find solution
     """
     # Extract data from Django ORM
-    data = extract_scheduling_data(year, month, roles, exclude_dates)
+    data = extract_scheduling_data(
+        year,
+        month,
+        roles,
+        exclude_dates,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
     # Create scheduler and solve
     scheduler = DutyRosterScheduler(data)

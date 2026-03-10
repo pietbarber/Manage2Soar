@@ -68,7 +68,14 @@ class DualPathRoutingTests(TestCase):
             generate_roster(year=2026, month=3, roles=DEFAULT_ROLES)
 
             # Legacy should be called (exclude_dates normalized to set())
-            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, set())
+            mock_legacy.assert_called_once_with(
+                2026,
+                3,
+                DEFAULT_ROLES,
+                set(),
+                start_date=date(2026, 3, 1),
+                end_date=date(2026, 3, 31),
+            )
 
     def test_routes_to_ortools_when_flag_enabled(self):
         """Test that OR-Tools scheduler is used when feature flag is True."""
@@ -83,7 +90,14 @@ class DualPathRoutingTests(TestCase):
             generate_roster(year=2026, month=3, roles=DEFAULT_ROLES)
 
             # OR-Tools should be called (exclude_dates normalized to set())
-            mock_ortools.assert_called_once_with(2026, 3, DEFAULT_ROLES, set())
+            mock_ortools.assert_called_once_with(
+                2026,
+                3,
+                DEFAULT_ROLES,
+                set(),
+                start_date=date(2026, 3, 1),
+                end_date=date(2026, 3, 31),
+            )
 
     def test_fallback_to_legacy_when_ortools_fails(self):
         """Test that legacy scheduler is used if OR-Tools raises exception."""
@@ -106,7 +120,14 @@ class DualPathRoutingTests(TestCase):
             mock_ortools.assert_called_once()
 
             # Legacy should be called as fallback (exclude_dates normalized to set())
-            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, set())
+            mock_legacy.assert_called_once_with(
+                2026,
+                3,
+                DEFAULT_ROLES,
+                set(),
+                start_date=date(2026, 3, 1),
+                end_date=date(2026, 3, 31),
+            )
 
     def test_uses_legacy_when_no_config_exists(self):
         """Test that legacy scheduler is used if SiteConfiguration doesn't exist."""
@@ -121,7 +142,14 @@ class DualPathRoutingTests(TestCase):
             generate_roster(year=2026, month=3, roles=DEFAULT_ROLES)
 
             # Legacy should be called (exclude_dates normalized to set())
-            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, set())
+            mock_legacy.assert_called_once_with(
+                2026,
+                3,
+                DEFAULT_ROLES,
+                set(),
+                start_date=date(2026, 3, 1),
+                end_date=date(2026, 3, 31),
+            )
 
     def test_passes_all_parameters_to_legacy(self):
         """Test that all parameters are correctly passed to legacy scheduler."""
@@ -139,7 +167,14 @@ class DualPathRoutingTests(TestCase):
             generate_roster(year=2026, month=3, roles=roles, exclude_dates=exclude)
 
             # Verify all parameters passed correctly
-            mock_legacy.assert_called_once_with(2026, 3, roles, exclude)
+            mock_legacy.assert_called_once_with(
+                2026,
+                3,
+                roles,
+                exclude,
+                start_date=date(2026, 3, 1),
+                end_date=date(2026, 3, 31),
+            )
 
     def test_passes_all_parameters_to_ortools(self):
         """Test that all parameters are correctly passed to OR-Tools scheduler."""
@@ -157,7 +192,64 @@ class DualPathRoutingTests(TestCase):
             generate_roster(year=2026, month=3, roles=roles, exclude_dates=exclude)
 
             # Verify all parameters passed correctly
-            mock_ortools.assert_called_once_with(2026, 3, roles, exclude)
+            mock_ortools.assert_called_once_with(
+                2026,
+                3,
+                roles,
+                exclude,
+                start_date=date(2026, 3, 1),
+                end_date=date(2026, 3, 31),
+            )
+
+    def test_forwards_explicit_date_range_to_legacy(self):
+        """Explicit range args should be forwarded unchanged to legacy scheduler."""
+        self.config.use_ortools_scheduler = False
+        self.config.save()
+
+        with patch(
+            "duty_roster.roster_generator._generate_roster_legacy"
+        ) as mock_legacy:
+            mock_legacy.return_value = []
+
+            generate_roster(
+                roles=DEFAULT_ROLES,
+                start_date=date(2026, 3, 15),
+                end_date=date(2026, 5, 2),
+            )
+
+            mock_legacy.assert_called_once_with(
+                2026,
+                3,
+                DEFAULT_ROLES,
+                set(),
+                start_date=date(2026, 3, 15),
+                end_date=date(2026, 5, 2),
+            )
+
+    def test_forwards_explicit_date_range_to_ortools(self):
+        """Explicit range args should be forwarded unchanged to OR-Tools scheduler."""
+        self.config.use_ortools_scheduler = True
+        self.config.save()
+
+        with patch(
+            "duty_roster.ortools_scheduler.generate_roster_ortools"
+        ) as mock_ortools:
+            mock_ortools.return_value = []
+
+            generate_roster(
+                roles=DEFAULT_ROLES,
+                start_date=date(2026, 3, 15),
+                end_date=date(2026, 5, 2),
+            )
+
+            mock_ortools.assert_called_once_with(
+                2026,
+                3,
+                DEFAULT_ROLES,
+                set(),
+                start_date=date(2026, 3, 15),
+                end_date=date(2026, 5, 2),
+            )
 
     def test_returns_schedule_from_legacy(self):
         """Test that schedule returned by legacy scheduler is passed through."""

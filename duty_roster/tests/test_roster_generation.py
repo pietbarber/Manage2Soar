@@ -11,10 +11,12 @@ from datetime import date, timedelta
 import pytest
 
 from duty_roster.models import DutyPreference, MemberBlackout
+from duty_roster.ortools_scheduler import generate_roster_ortools
 from duty_roster.roster_generator import (
     calculate_role_scarcity,
     diagnose_empty_slot,
     generate_roster,
+    generate_roster_legacy,
 )
 from members.models import Member
 
@@ -249,3 +251,74 @@ class TestRosterGeneration:
             assert "slots" in entry
             assert "diagnostics" in entry
             assert isinstance(entry["diagnostics"], dict)
+
+
+@pytest.mark.django_db
+class TestFractionalRangeCapParity:
+    """Parity tests for fractional monthly caps across scheduler implementations."""
+
+    def _create_members(self):
+        target = Member.objects.create(
+            username="fractional_target",
+            email="fractional_target@test.com",
+            first_name="Fractional",
+            last_name="Target",
+            instructor=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today(),
+        )
+        DutyPreference.objects.create(member=target, max_assignments_per_month=0.5)
+
+        for i in range(6):
+            member = Member.objects.create(
+                username=f"fractional_other_{i}",
+                email=f"fractional_other_{i}@test.com",
+                first_name="Other",
+                last_name=f"Member{i}",
+                instructor=True,
+                is_active=True,
+                membership_status="Full Member",
+                joined_club=date.today(),
+            )
+            DutyPreference.objects.create(member=member, max_assignments_per_month=9)
+
+        return target
+
+    @pytest.mark.parametrize(
+        "start_date,end_date,expected_cap",
+        [
+            (date(2026, 3, 1), date(2026, 3, 31), 1),
+            (date(2026, 3, 1), date(2026, 4, 30), 1),
+            (date(2026, 3, 1), date(2026, 5, 31), 2),
+        ],
+    )
+    def test_fractional_cap_applies_to_both_schedulers(
+        self, start_date, end_date, expected_cap
+    ):
+        target = self._create_members()
+
+        legacy = generate_roster_legacy(
+            roles=["instructor"],
+            start_date=start_date,
+            end_date=end_date,
+        )
+        ortools = generate_roster_ortools(
+            roles=["instructor"],
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        legacy_count = sum(
+            1
+            for entry in legacy
+            if entry.get("slots", {}).get("instructor") == target.id
+        )
+        ortools_count = sum(
+            1
+            for entry in ortools
+            if entry.get("slots", {}).get("instructor") == target.id
+        )
+
+        assert legacy_count <= expected_cap
+        assert ortools_count <= expected_cap

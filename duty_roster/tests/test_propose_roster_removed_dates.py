@@ -10,7 +10,11 @@ from datetime import date
 import pytest
 from django.urls import reverse
 
-from duty_roster.roster_generator import clear_operational_season_cache, generate_roster
+from duty_roster.roster_generator import (
+    calculate_assignment_cap,
+    clear_operational_season_cache,
+    generate_roster,
+)
 from logsheet.models import Airfield
 from members.models import Member
 
@@ -124,6 +128,37 @@ class TestGenerateRosterExcludeDates:
         )
 
         assert len(roster_default) == len(roster_empty)
+
+    def test_generate_roster_accepts_arbitrary_date_range(self):
+        """Date-range generation should include weekend days across month boundaries."""
+        Member.objects.create(
+            username="test_range",
+            email="range@test.com",
+            first_name="Range",
+            last_name="Tester",
+            instructor=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today(),
+        )
+
+        roster = generate_roster(
+            roles=["instructor"],
+            start_date=date(2026, 3, 28),
+            end_date=date(2026, 4, 6),
+        )
+        roster_dates = {entry["date"] for entry in roster}
+
+        assert date(2026, 3, 28) in roster_dates
+        assert date(2026, 3, 29) in roster_dates
+        assert date(2026, 4, 4) in roster_dates
+        assert date(2026, 4, 5) in roster_dates
+
+    def test_fractional_assignment_cap_rounds_up(self):
+        """Fractional monthly limits should convert to integer caps by rounding up."""
+        assert calculate_assignment_cap(0.5, 1) == 1
+        assert calculate_assignment_cap(0.5, 2) == 1
+        assert calculate_assignment_cap(1.25, 2) == 3
 
 
 @pytest.mark.django_db
@@ -336,3 +371,82 @@ class TestProposeRosterSessionTracking:
         session = client.session
         assert "proposed_roster" not in session
         assert removed_key not in session
+
+    def test_explicit_range_is_reflected_in_context(
+        self, client, rostermeister, instructor_member
+    ):
+        """Providing start/end dates should be reflected in template context."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-03-15",
+                "end_date": "2026-05-02",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.context["start_date"] == date(2026, 3, 15)
+        assert response.context["end_date"] == date(2026, 5, 2)
+        assert response.context["month_span"] == 3
+
+    def test_remove_dates_stores_in_range_session_key(
+        self, client, rostermeister, instructor_member
+    ):
+        """Removing dates in a custom range should use range-scoped session key."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-03-15",
+                "end_date": "2026-05-02",
+            },
+        )
+        assert response.status_code == 200
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-15", "slots": {}}]
+        session.save()
+
+        client.post(
+            url,
+            {
+                "start_date": "2026-03-15",
+                "end_date": "2026-05-02",
+                "action": "remove_dates",
+                "remove_date": ["2026-03-15"],
+            },
+        )
+
+        session = client.session
+        removed_key = "removed_roster_dates_2026-03-15_2026-05-02"
+        removed = session.get(removed_key, [])
+        assert "2026-03-15" in removed
+
+    def test_invalid_reversed_range_shows_error_and_falls_back(
+        self, client, rostermeister, instructor_member
+    ):
+        """Reversed range should show an error and fall back to default month range."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-05-02",
+                "end_date": "2026-03-15",
+            },
+        )
+
+        assert response.status_code == 200
+
+        messages = list(response.context["messages"])
+        assert any("Invalid roster date range." in str(m) for m in messages)
+
+        # Ensure fallback produced a valid range and did not retain reversed values.
+        assert response.context["start_date"] <= response.context["end_date"]
+        assert response.context["start_date"] != date(2026, 5, 2)

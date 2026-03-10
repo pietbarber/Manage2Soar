@@ -119,7 +119,7 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("h2", timeout=10000)
 
         # Check if there's a roster to work with, or generate one
-        roll_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_button = self.page.get_by_role("button", name="Generate For Range")
         if roll_button.count() > 0:
             # Click roll button to generate roster
             roll_button.click()

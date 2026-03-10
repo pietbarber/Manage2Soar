@@ -275,17 +275,17 @@
                       <i class="fas fa-hashtag me-2 text-info"></i>
                       Monthly Limit
                     </h6>
-                    <select name="max_assignments_per_month" id="maxAssignments" class="form-select">
-                      <option value="" disabled {% if not preference.max_assignments_per_month %}selected{% endif %}>
-                        -- Select maximum --
-                      </option>
-                      {% for val,label in max_assignments_choices %}
-                      <option value="{{ val }}" {% if val == preference.max_assignments_per_month %}selected{% endif %}>
-                        {{ label }}
-                      </option>
-                      {% endfor %}
-                    </select>
-                    <div class="form-text">Maximum times you'd like to be assigned per month</div>
+                    <input
+                      type="number"
+                      name="max_assignments_per_month"
+                      id="maxAssignments"
+                      class="form-control"
+                      min="0"
+                      max="12"
+                      step="0.25"
+                      value="{{ preference.max_assignments_per_month|default_if_none:'2.00' }}"
+                    >
+                    <div class="form-text">Monthly assignment rate (example: 0.5 means about once every two months over a range)</div>
                   </div>
                 </div>
               </div>
