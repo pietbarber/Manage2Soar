@@ -5,10 +5,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from instructors.models import (
+    ClubQualificationType,
     GroundInstruction,
     GroundLessonScore,
     InstructionReport,
     LessonScore,
+    MemberQualification,
     TrainingLesson,
     TrainingPhase,
 )
@@ -94,3 +96,56 @@ class TestMemberInstructionRecordDailyDedup:
         assert "2" not in groups_by_score
         solo_codes = [lesson["code"] for lesson in groups_by_score["3"]]
         assert sorted(solo_codes) == ["1.1", "1.2"]
+
+
+@pytest.mark.django_db
+class TestMemberInstructionRecordQualificationVisibility:
+    def setup_method(self):
+        MembershipStatus.objects.update_or_create(
+            name="Full Member", defaults={"is_active": True}
+        )
+
+        self.student = Member.objects.create_user(
+            username="qual_visibility_student",
+            password="testpass123",
+            first_name="Student",
+            last_name="Pilot",
+            membership_status="Full Member",
+            is_active=True,
+        )
+
+    def test_hides_obsolete_qualifications(self, client):
+        current = ClubQualificationType.objects.create(
+            code="SAFE2026",
+            name="Safety Meeting 2026",
+            is_obsolete=False,
+        )
+        obsolete = ClubQualificationType.objects.create(
+            code="SAFE2025",
+            name="Safety Meeting 2025",
+            is_obsolete=True,
+        )
+
+        MemberQualification.objects.create(
+            member=self.student,
+            qualification=current,
+            is_qualified=True,
+            date_awarded=timezone.localdate(),
+        )
+        MemberQualification.objects.create(
+            member=self.student,
+            qualification=obsolete,
+            is_qualified=True,
+            date_awarded=timezone.localdate(),
+        )
+
+        client.force_login(self.student)
+        response = client.get(
+            reverse("instructors:member_instruction_record", args=[self.student.pk])
+        )
+
+        assert response.status_code == 200
+        visible = response.context["visible_qualifications"]
+        codes = {mq.qualification.code for mq in visible}
+        assert "SAFE2026" in codes
+        assert "SAFE2025" not in codes

@@ -426,7 +426,10 @@ def fill_instruction_report(request, student_id, report_date):
 
     # Get existing qualifications and create qualification form
     existing_qualifications = (
-        MemberQualification.objects.filter(member=student)
+        MemberQualification.objects.filter(
+            member=student,
+            qualification__is_obsolete=False,
+        )
         .select_related("qualification")
         .order_by("-date_awarded")
     )
@@ -871,7 +874,10 @@ def log_ground_instruction(request):
     qualification_form = None
     if student:
         existing_qualifications = (
-            MemberQualification.objects.filter(member=student)
+            MemberQualification.objects.filter(
+                member=student,
+                qualification__is_obsolete=False,
+            )
             .select_related("qualification")
             .order_by("-date_awarded")
         )
@@ -959,19 +965,12 @@ def assign_qualification_modal(request, member_id):
         )
         if form.is_valid():
             qualification = form.save()
-            # Return success content with updated qualifications list
-            updated_qualifications = (
-                MemberQualification.objects.filter(member=student)
-                .select_related("qualification")
-                .order_by("-date_awarded")
-            )
             return render(
                 request,
                 "instructors/_qualification_success.html",
                 {
                     "member": student,
                     "qualification": qualification,
-                    "updated_qualifications": updated_qualifications,
                 },
             )
         # If form has errors, fall through to return form with errors
@@ -1198,6 +1197,12 @@ def member_instruction_record(request, member_id):
             "badges__badge", "memberqualification_set__qualification"
         ),
         pk=member_id,
+    )
+    visible_qualifications = list(
+        member.memberqualification_set.filter(
+            is_qualified=True,
+            qualification__is_obsolete=False,
+        ).select_related("qualification")
     )
 
     # Flying summary by glider (uses aggregation, already efficient)
@@ -1497,6 +1502,7 @@ def member_instruction_record(request, member_id):
             "chart_rating_json": json.dumps(chart_rating),
             "chart_anchors_json": json.dumps(chart_anchors),
             "lesson_titles": lesson_titles,
+            "visible_qualifications": visible_qualifications,
         },
     )
 

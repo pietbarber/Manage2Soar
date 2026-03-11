@@ -164,7 +164,11 @@ def member_view(request, member_id):
     mobile_link = bool(mobile_display)
 
     qualifications = (
-        MemberQualification.objects.filter(member=member, is_qualified=True)
+        MemberQualification.objects.filter(
+            member=member,
+            is_qualified=True,
+            qualification__is_obsolete=False,
+        )
         .select_related("qualification", "instructor")
         .order_by("qualification__code")
     )
