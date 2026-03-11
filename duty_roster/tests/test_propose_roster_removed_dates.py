@@ -592,6 +592,53 @@ class TestProposeRosterSessionTracking:
             "Duty roster published for 2026-03-01 to 2026-03-31" in m for m in messages
         )
 
+    def test_publish_redirects_to_effective_draft_month(
+        self, client, rostermeister, airfield
+    ):
+        """Publish should redirect to the month of the effective draft range."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "action": "publish",
+            },
+        )
+
+        assert response.status_code == 302
+        expected = reverse(
+            "duty_roster:duty_calendar_month", kwargs={"year": 2026, "month": 3}
+        )
+        assert response["Location"].endswith(expected)
+
+    def test_rejects_proposal_ranges_longer_than_max(self, client, rostermeister):
+        """Very large explicit date ranges should be rejected with a clear message."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-01-01",
+                "end_date": "2027-06-01",
+            },
+        )
+
+        assert response.status_code == 200
+        messages = [str(m) for m in response.context["messages"]]
+        assert any("cannot exceed 12 months" in m for m in messages)
+
     def test_publish_skips_invalid_draft_entries(self, client, rostermeister, airfield):
         """Malformed draft dates should be skipped instead of aborting publish."""
         client.login(username="rostermeister", password="testpass123")

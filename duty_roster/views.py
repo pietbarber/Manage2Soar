@@ -67,6 +67,7 @@ logger = logging.getLogger("duty_roster.views")
 
 # Allowed roles for roster slot editing/assignment endpoints
 ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
+MAX_PROPOSAL_RANGE_MONTHS = 12
 
 
 def calendar_refresh_response(year, month):
@@ -1823,12 +1824,20 @@ def _resolve_proposal_range(request):
     year_val = int(year) if year else None
     month_val = int(month) if month else None
 
-    return resolve_roster_date_range(
+    range_start, range_end = resolve_roster_date_range(
         year=year_val,
         month=month_val,
         start_date=start_date,
         end_date=end_date,
     )
+
+    range_months = count_calendar_months_inclusive(range_start, range_end)
+    if range_months > MAX_PROPOSAL_RANGE_MONTHS:
+        raise ValueError(
+            f"Roster date range cannot exceed {MAX_PROPOSAL_RANGE_MONTHS} months."
+        )
+
+    return range_start, range_end
 
 
 def _get_removed_dates_from_session(request, start_date, end_date, clean_invalid=False):
@@ -1871,8 +1880,8 @@ def _get_removed_dates_from_session(request, start_date, end_date, clean_invalid
 def propose_roster(request):
     try:
         range_start, range_end = _resolve_proposal_range(request)
-    except ValueError:
-        messages.error(request, "Invalid roster date range.")
+    except ValueError as exc:
+        messages.error(request, str(exc) or "Invalid roster date range.")
         today = timezone.now().date()
         range_start, range_end = resolve_roster_date_range(
             year=today.year,
@@ -2151,7 +2160,11 @@ def propose_roster(request):
                     "No duty assignments to notify, so no calendar invites were sent.",
                 )
 
-            return redirect("duty_roster:duty_calendar_month", year=year, month=month)
+            return redirect(
+                "duty_roster:duty_calendar_month",
+                year=active_start.year,
+                month=active_start.month,
+            )
 
         elif action == "restore_dates":
             # Clear removed dates so Roll Again includes all dates again (scoped to range)

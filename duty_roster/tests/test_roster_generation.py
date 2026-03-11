@@ -5,6 +5,7 @@ Tests for Issue #616: Roster generation improvements including default eligibili
 role scarcity prioritization, and diagnostic output.
 """
 
+import random
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -346,11 +347,13 @@ class TestFractionalRangeCapParity:
             joined_club=date.today(),
         )
 
+        random.seed(42)
         legacy = generate_roster_legacy(
             roles=["instructor"],
             start_date=date(2026, 3, 1),
             end_date=date(2026, 5, 31),
         )
+        random.seed(42)
         ortools = generate_roster_ortools(
             roles=["instructor"],
             start_date=date(2026, 3, 1),
