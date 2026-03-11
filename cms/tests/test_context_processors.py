@@ -98,6 +98,21 @@ def test_resources_nav_excludes_private_promoted_page_for_anonymous():
 
 
 @pytest.mark.django_db
+def test_resources_nav_excludes_member_utility_links_for_anonymous():
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    assert "Gliders and Towplanes" not in titles
+    assert "Report Website Issue" not in titles
+    assert "Safety Suggestion Box" not in titles
+    assert "Safety Dashboard" not in titles
+    assert "Suggestion Box Reports" not in titles
+    assert "Webcam" not in titles
+
+
+@pytest.mark.django_db
 def test_resources_nav_includes_member_only_links_for_active_member():
     member = User.objects.create_user(
         username="member_nav",

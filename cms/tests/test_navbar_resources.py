@@ -17,6 +17,23 @@ def test_anonymous_navbar_shows_resources_drawer(client):
 
 
 @pytest.mark.django_db
+def test_anonymous_navbar_is_simplified(client):
+    HomePageContent.objects.create(title="Home", slug="home", content="<p>Public</p>")
+
+    response = client.get(reverse("home"))
+
+    assert response.status_code == 200
+    assert b"Duty Roster" in response.content
+    assert b"Training Syllabus" in response.content
+    assert b"Contact Us" in response.content
+    assert b"Membership Application" in response.content
+    assert b'id="membersDropdown"' not in response.content
+    assert b'id="logsheetDropdown"' not in response.content
+    assert b'id="equipmentDropdown"' not in response.content
+    assert b'id="instructorDropdown"' not in response.content
+
+
+@pytest.mark.django_db
 def test_member_navbar_shows_report_issue_and_no_welcome_prefix(
     client, django_user_model
 ):

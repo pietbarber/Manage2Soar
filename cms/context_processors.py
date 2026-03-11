@@ -88,16 +88,15 @@ def _build_resources_nav_items(request, footer=None):
                 }
             )
 
-    # Relocated utility links (issue #746 IA update).
-    items.append(
-        {
-            "title": "Gliders and Towplanes",
-            "url": reverse("logsheet:equipment_list"),
-            "rank": 900,
-        }
-    )
-
     if request.user.is_authenticated and is_active_member(request.user):
+        # Relocated utility links (issue #746 IA update).
+        items.append(
+            {
+                "title": "Gliders and Towplanes",
+                "url": reverse("logsheet:equipment_list"),
+                "rank": 900,
+            }
+        )
         items.append(
             {
                 "title": "Report Website Issue",

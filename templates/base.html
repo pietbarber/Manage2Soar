@@ -101,6 +101,7 @@
         </div>
         <div class="offcanvas-body">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          {% if user.is_authenticated %}
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="membersDropdown" role="button" data-bs-toggle="dropdown"
               aria-expanded="false">
@@ -118,6 +119,33 @@
             </ul>
           </li>
 
+          {% else %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="guestDutyrosterDropdown" role="button" data-bs-toggle="dropdown"
+              aria-expanded="false">
+              Duty Roster
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="guestDutyrosterDropdown">
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}"><i class="fas fa-calendar-alt me-1"></i> Calendar</a>
+              </li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=agenda"><i class="fas fa-list me-1"></i> Roster Agenda</a>
+              </li>
+            </ul>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'public_syllabus_overview' %}">Training Syllabus</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'contact' %}">Contact Us</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'members:membership_application' %}">Membership Application</a>
+          </li>
+          {% endif %}
+
+          {% if user.is_authenticated %}
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="dutyrosterDropdown" role="button" data-bs-toggle="dropdown"
               aria-expanded="false">
@@ -232,6 +260,7 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="resourcesDropdown" role="button" data-bs-toggle="dropdown"
