@@ -1448,6 +1448,7 @@ def get_eligible_members_for_slot(request):
 
         # Find eligible members
         DEFAULT_MAX_ASSIGNMENTS = 8
+        default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, range_months)
         eligible_members = []
         for m in members:
             # Check if member has the role flag
@@ -1471,9 +1472,6 @@ def get_eligible_members_for_slot(request):
                         break
 
                 already_assigned = m in assigned_today
-                default_cap = calculate_assignment_cap(
-                    DEFAULT_MAX_ASSIGNMENTS, range_months
-                )
                 at_max = assignments[m.id] >= default_cap
 
                 eligible_members.append(
@@ -1752,6 +1750,67 @@ def _removed_dates_session_key(start_date, end_date):
     return f"removed_roster_dates_{start_date.isoformat()}_{end_date.isoformat()}"
 
 
+def _set_proposed_roster_range(request, start_date, end_date):
+    """Persist the selected proposal range used to build session draft roster."""
+    request.session["proposed_roster_range"] = {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+    }
+
+
+def _get_proposed_roster_range(request):
+    """Read the persisted proposal range from session, if valid."""
+    stored = request.session.get("proposed_roster_range")
+    if not isinstance(stored, dict):
+        return None
+
+    start_raw = stored.get("start_date")
+    end_raw = stored.get("end_date")
+    if not start_raw or not end_raw:
+        return None
+
+    try:
+        return resolve_roster_date_range(
+            start_date=dt_date.fromisoformat(start_raw),
+            end_date=dt_date.fromisoformat(end_raw),
+        )
+    except ValueError:
+        return None
+
+
+def _get_draft_date_range(draft):
+    """Derive inclusive date range from draft entries, if any parseable dates exist."""
+    draft_dates = []
+    for entry in draft:
+        date_raw = entry.get("date")
+        if not date_raw:
+            continue
+        try:
+            draft_dates.append(dt_date.fromisoformat(date_raw))
+        except (TypeError, ValueError):
+            continue
+
+    if not draft_dates:
+        return None
+    return min(draft_dates), max(draft_dates)
+
+
+def _effective_draft_range(request, draft, fallback_start, fallback_end):
+    """Resolve effective range for draft-mutating actions.
+
+    Priority: persisted selection range -> draft-derived range -> request fallback.
+    """
+    session_range = _get_proposed_roster_range(request)
+    if session_range:
+        return session_range
+
+    draft_range = _get_draft_date_range(draft)
+    if draft_range:
+        return draft_range
+
+    return fallback_start, fallback_end
+
+
 def _resolve_proposal_range(request):
     """Resolve scheduling date range from request parameters."""
     start_raw = request.POST.get("start_date") or request.GET.get("start_date")
@@ -1887,6 +1946,9 @@ def propose_roster(request):
     if request.method == "POST":
         action = request.POST.get("action")
         draft = request.session.get("proposed_roster", [])
+        active_start, active_end = _effective_draft_range(
+            request, draft, range_start, range_end
+        )
 
         if action == "remove_dates":
             # Handle removing specific dates from the roster
@@ -1909,7 +1971,7 @@ def propose_roster(request):
                 request.session["proposed_roster"] = draft
 
                 # Track removed dates so Roll Again remembers them (scoped to date range)
-                session_key = _removed_dates_session_key(range_start, range_end)
+                session_key = _removed_dates_session_key(active_start, active_end)
                 previously_removed = set(request.session.get(session_key, []))
                 previously_removed.update(d.isoformat() for d in dates_to_remove_set)
                 request.session[session_key] = sorted(previously_removed)
@@ -1955,35 +2017,52 @@ def propose_roster(request):
                 for e in raw
             ]
             request.session["proposed_roster"] = draft
+            _set_proposed_roster_range(request, range_start, range_end)
 
         elif action == "publish":
             from .models import DutyAssignment
             from .utils.email import send_roster_published_notifications
 
             default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
-            DutyAssignment.objects.filter(
-                date__gte=range_start,
-                date__lte=range_end,
-            ).delete()
-
             created_assignments = []
-            for e in request.session.get("proposed_roster", []):
-                edt = dt_date.fromisoformat(e["date"])
-                assignment_data = {
-                    "date": edt,
-                    "location": default_field,
-                }
-                for role, mem in e["slots"].items():
-                    field_name = ROLE_FIELD_MAP.get(role)
-                    if field_name and mem:
-                        assignment_data[field_name] = Member.objects.get(pk=mem)
+            draft_entries = request.session.get("proposed_roster", [])
+            publish_dates = []
+            for entry in draft_entries:
+                try:
+                    publish_dates.append(dt_date.fromisoformat(entry["date"]))
+                except (KeyError, TypeError, ValueError):
+                    continue
 
-                assignment = DutyAssignment.objects.create(**assignment_data)
-                created_assignments.append(assignment)
+            try:
+                with transaction.atomic():
+                    if publish_dates:
+                        DutyAssignment.objects.filter(date__in=publish_dates).delete()
+
+                    for e in draft_entries:
+                        edt = dt_date.fromisoformat(e["date"])
+                        assignment_data = {
+                            "date": edt,
+                            "location": default_field,
+                        }
+                        for role, mem in e["slots"].items():
+                            field_name = ROLE_FIELD_MAP.get(role)
+                            if field_name and mem:
+                                assignment_data[field_name] = Member.objects.get(pk=mem)
+
+                        assignment = DutyAssignment.objects.create(**assignment_data)
+                        created_assignments.append(assignment)
+            except Exception as e:
+                logger.exception("Failed publishing proposed roster")
+                messages.error(
+                    request,
+                    f"Could not publish roster due to an internal error: {str(e)}",
+                )
+                return redirect("duty_roster:propose_roster")
 
             request.session.pop("proposed_roster", None)
+            request.session.pop("proposed_roster_range", None)
             # Clear removed dates for the current range
-            session_key = _removed_dates_session_key(range_start, range_end)
+            session_key = _removed_dates_session_key(active_start, active_end)
             request.session.pop(session_key, None)
 
             # Send ICS calendar invites to all assigned members
@@ -2011,14 +2090,14 @@ def propose_roster(request):
                         messages.success(
                             request,
                             "Duty roster published for "
-                            f"{range_start.isoformat()} to {range_end.isoformat()}. "
+                            f"{active_start.isoformat()} to {active_end.isoformat()}. "
                             f"Calendar invites sent to {sent_count} member(s).",
                         )
                     else:
                         messages.success(
                             request,
                             "Duty roster published for "
-                            f"{range_start.isoformat()} to {range_end.isoformat()}.",
+                            f"{active_start.isoformat()} to {active_end.isoformat()}.",
                         )
                     if all_errors:
                         for error in all_errors:
@@ -2027,7 +2106,7 @@ def propose_roster(request):
                     messages.success(
                         request,
                         "Duty roster published for "
-                        f"{range_start.isoformat()} to {range_end.isoformat()}.",
+                        f"{active_start.isoformat()} to {active_end.isoformat()}.",
                     )
                     messages.warning(
                         request,
@@ -2037,7 +2116,7 @@ def propose_roster(request):
                 messages.success(
                     request,
                     "Duty roster published for "
-                    f"{range_start.isoformat()} to {range_end.isoformat()}.",
+                    f"{active_start.isoformat()} to {active_end.isoformat()}.",
                 )
                 messages.info(
                     request,
@@ -2048,7 +2127,7 @@ def propose_roster(request):
 
         elif action == "restore_dates":
             # Clear removed dates so Roll Again includes all dates again (scoped to range)
-            session_key = _removed_dates_session_key(range_start, range_end)
+            session_key = _removed_dates_session_key(active_start, active_end)
             request.session.pop(session_key, None)
             messages.info(
                 request,
@@ -2058,8 +2137,9 @@ def propose_roster(request):
 
         elif action == "cancel":
             request.session.pop("proposed_roster", None)
+            request.session.pop("proposed_roster_range", None)
             # Clear removed dates for the current range
-            session_key = _removed_dates_session_key(range_start, range_end)
+            session_key = _removed_dates_session_key(active_start, active_end)
             request.session.pop(session_key, None)
             return redirect("duty_roster:duty_calendar")
     else:
@@ -2094,6 +2174,7 @@ def propose_roster(request):
             for e in raw
         ]
         request.session["proposed_roster"] = draft
+        _set_proposed_roster_range(request, range_start, range_end)
     display = [
         {
             "date": dt_date.fromisoformat(e["date"]),
@@ -2102,8 +2183,11 @@ def propose_roster(request):
         }
         for e in request.session.get("proposed_roster", [])
     ]
+    display_start, display_end = _effective_draft_range(
+        request, request.session.get("proposed_roster", []), range_start, range_end
+    )
     # Build list of removed dates for display in the template (scoped to range)
-    removed_dates = _get_removed_dates_from_session(request, range_start, range_end)
+    removed_dates = _get_removed_dates_from_session(request, display_start, display_end)
 
     return render(
         request,

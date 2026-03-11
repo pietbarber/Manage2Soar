@@ -62,7 +62,7 @@ class DutyPreferenceForm(forms.ModelForm):
         label="Monthly assignment rate (assignments per month)",
         initial=DutyPreference._meta.get_field("max_assignments_per_month").default,
         widget=forms.NumberInput(
-            attrs={"class": "form-control", "step": "0.25", "min": "0", "max": "12"}
+            attrs={"class": "form-control", "step": "0.01", "min": "0", "max": "12"}
         ),
     )
 

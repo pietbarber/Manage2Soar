@@ -10,11 +10,12 @@ from datetime import date
 import pytest
 from django.urls import reverse
 
-from duty_roster.models import DutyPreference
+from duty_roster.models import DutyAssignment, DutyPreference
 from duty_roster.roster_generator import (
     calculate_assignment_cap,
     clear_operational_season_cache,
     generate_roster,
+    resolve_roster_date_range,
 )
 from logsheet.models import Airfield
 from members.models import Member
@@ -161,6 +162,14 @@ class TestGenerateRosterExcludeDates:
         assert calculate_assignment_cap(0.5, 1) == 1
         assert calculate_assignment_cap(0.5, 2) == 1
         assert calculate_assignment_cap(1.25, 2) == 3
+
+    def test_resolve_range_requires_both_explicit_bounds(self):
+        """Providing only one explicit bound should fail fast."""
+        with pytest.raises(ValueError):
+            resolve_roster_date_range(start_date=date(2026, 3, 1))
+
+        with pytest.raises(ValueError):
+            resolve_roster_date_range(end_date=date(2026, 3, 31))
 
 
 @pytest.mark.django_db
@@ -524,3 +533,36 @@ class TestProposeRosterSessionTracking:
         # Range spans Mar/Apr/May -> 3 months, so cap should be 3 for monthly rate 1.
         assert member_row["max_assignments"] == 3
         assert member_row["warnings"]["at_max"] is False
+
+    def test_publish_uses_draft_range_when_posted_range_differs(
+        self, client, rostermeister, airfield
+    ):
+        """Publish should use the draft/session range, not edited POST range fields."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        DutyAssignment.objects.create(date=date(2026, 3, 7), location=airfield)
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "action": "publish",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        messages = [str(m) for m in response.context["messages"]]
+        assert any(
+            "Duty roster published for 2026-03-01 to 2026-03-31" in m for m in messages
+        )

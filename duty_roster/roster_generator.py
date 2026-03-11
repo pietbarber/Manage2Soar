@@ -120,6 +120,11 @@ def resolve_roster_date_range(
         if start_date > end_date:
             raise ValueError("start_date cannot be after end_date")
         return start_date, end_date
+    if start_date or end_date:
+        raise ValueError(
+            "Both start_date and end_date must be provided together, "
+            "or neither to use the year/month fallback."
+        )
 
     today = now().date()
     year = year or today.year
