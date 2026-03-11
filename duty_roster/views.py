@@ -1440,10 +1440,10 @@ def get_eligible_members_for_slot(request):
                 )
 
         if range_months == 1:
-            draft_dates = [dt_date.fromisoformat(entry["date"]) for entry in draft]
-            if draft_dates:
+            draft_range = _get_draft_date_range(draft)
+            if draft_range:
                 range_months = count_calendar_months_inclusive(
-                    min(draft_dates), max(draft_dates)
+                    draft_range[0], draft_range[1]
                 )
 
         # Find eligible members

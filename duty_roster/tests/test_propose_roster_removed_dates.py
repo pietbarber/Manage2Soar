@@ -534,6 +534,31 @@ class TestProposeRosterSessionTracking:
         assert member_row["max_assignments"] == 3
         assert member_row["warnings"]["at_max"] is False
 
+    def test_slot_eligibility_handles_malformed_draft_dates(
+        self, client, rostermeister, instructor_member
+    ):
+        """Malformed draft dates should not cause eligible-member endpoint failures."""
+        client.login(username="rostermeister", password="testpass123")
+        session = client.session
+        session["proposed_roster"] = [
+            {"date": "not-a-date", "slots": {"instructor": None}},
+            {"date": "2026-04-05", "slots": {"instructor": instructor_member.id}},
+        ]
+        session.save()
+
+        response = client.post(
+            reverse("duty_roster:get_eligible_members_for_slot"),
+            {
+                "date": "2026-04-05",
+                "role": "instructor",
+                "current_member_id": "",
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert "eligible_members" in payload
+
     def test_publish_uses_draft_range_when_posted_range_differs(
         self, client, rostermeister, airfield
     ):
