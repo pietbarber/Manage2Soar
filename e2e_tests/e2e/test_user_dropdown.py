@@ -178,8 +178,8 @@ class TestUserDropdown(DjangoPlaywrightTestCase):
             checkride_link.count() == 1
         ), "Checkride progress link should appear for a student pilot"
 
-    def test_welcome_text_shows_member_name(self):
-        """The dropdown toggle shows 'Welcome, [First Name]'."""
+    def test_user_toggle_shows_member_name_without_welcome_prefix(self):
+        """The dropdown toggle shows member name without the 'Welcome' prefix."""
         self.create_test_member(
             username="namedpilot",
             first_name="Alice",
@@ -194,8 +194,8 @@ class TestUserDropdown(DjangoPlaywrightTestCase):
 
         toggle_text = self.page.locator("#userDropdown").inner_text()
         assert (
-            "Welcome" in toggle_text
-        ), f"Dropdown toggle should contain 'Welcome', got: {toggle_text!r}"
-        assert (
             "Alice" in toggle_text
         ), f"Dropdown toggle should contain the member's first name, got: {toggle_text!r}"
+        assert (
+            "Welcome" not in toggle_text
+        ), f"Dropdown toggle should not contain 'Welcome', got: {toggle_text!r}"
