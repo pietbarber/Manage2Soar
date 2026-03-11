@@ -1881,7 +1881,16 @@ def propose_roster(request):
     try:
         range_start, range_end = _resolve_proposal_range(request)
     except ValueError as exc:
-        messages.error(request, str(exc) or "Invalid roster date range.")
+        logger.warning("Invalid roster date range provided: %s", exc)
+        if "cannot exceed" in str(exc):
+            messages.error(
+                request,
+                f"Roster date range cannot exceed {MAX_PROPOSAL_RANGE_MONTHS} months.",
+            )
+        elif "cannot be after" in str(exc):
+            messages.error(request, "Invalid roster date range.")
+        else:
+            messages.error(request, "Invalid roster date range.")
         today = timezone.now().date()
         range_start, range_end = resolve_roster_date_range(
             year=today.year,
@@ -2035,13 +2044,8 @@ def propose_roster(request):
             default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
             created_assignments = []
             draft_entries = request.session.get("proposed_roster", [])
-            publish_dates = []
             member_ids = set()
             for entry in draft_entries:
-                try:
-                    publish_dates.append(dt_date.fromisoformat(entry["date"]))
-                except (KeyError, TypeError, ValueError):
-                    continue
                 for mem in entry.get("slots", {}).values():
                     if mem:
                         try:
@@ -2053,8 +2057,12 @@ def propose_roster(request):
 
             try:
                 with transaction.atomic():
-                    if publish_dates:
-                        DutyAssignment.objects.filter(date__in=publish_dates).delete()
+                    # Clear all assignments for the effective publish range so removed
+                    # draft dates do not leave stale assignments behind.
+                    DutyAssignment.objects.filter(
+                        date__gte=active_start,
+                        date__lte=active_end,
+                    ).delete()
 
                     for e in draft_entries:
                         try:

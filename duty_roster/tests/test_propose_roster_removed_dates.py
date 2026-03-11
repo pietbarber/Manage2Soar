@@ -622,6 +622,38 @@ class TestProposeRosterSessionTracking:
         )
         assert response["Location"].endswith(expected)
 
+    def test_publish_clears_stale_assignments_across_effective_range(
+        self, client, rostermeister, airfield
+    ):
+        """Publish should clear stale assignments for omitted dates in draft range."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        DutyAssignment.objects.create(date=date(2026, 3, 7), location=airfield)
+        DutyAssignment.objects.create(date=date(2026, 3, 14), location=airfield)
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "action": "publish",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        assert DutyAssignment.objects.filter(date=date(2026, 3, 7)).exists()
+        assert not DutyAssignment.objects.filter(date=date(2026, 3, 14)).exists()
+
     def test_rejects_proposal_ranges_longer_than_max(self, client, rostermeister):
         """Very large explicit date ranges should be rejected with a clear message."""
         client.login(username="rostermeister", password="testpass123")
