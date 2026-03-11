@@ -30,7 +30,7 @@ logger = logging.getLogger("duty_roster.ortools_scheduler")
 
 
 # Constants
-DEFAULT_MAX_ASSIGNMENTS = 2  # For members without DutyPreference
+DEFAULT_MAX_ASSIGNMENTS = 8  # For members without DutyPreference
 PAIRING_MULTIPLIER = 3  # Weight multiplier for preferred pairings
 FAIRNESS_PENALTY_WEIGHT = (
     200  # Weight for penalizing deviation from average assignments

@@ -322,3 +322,51 @@ class TestFractionalRangeCapParity:
 
         assert legacy_count <= expected_cap
         assert ortools_count <= expected_cap
+
+    @pytest.mark.django_db
+    def test_ortools_no_preference_default_cap_matches_legacy(self):
+        primary = Member.objects.create(
+            username="nopref_primary",
+            email="nopref_primary@test.com",
+            first_name="NoPref",
+            last_name="Primary",
+            instructor=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today(),
+        )
+        Member.objects.create(
+            username="nopref_secondary",
+            email="nopref_secondary@test.com",
+            first_name="NoPref",
+            last_name="Secondary",
+            instructor=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today(),
+        )
+
+        legacy = generate_roster_legacy(
+            roles=["instructor"],
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 5, 31),
+        )
+        ortools = generate_roster_ortools(
+            roles=["instructor"],
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 5, 31),
+        )
+
+        legacy_count = sum(
+            1
+            for entry in legacy
+            if entry.get("slots", {}).get("instructor") == primary.id
+        )
+        ortools_count = sum(
+            1
+            for entry in ortools
+            if entry.get("slots", {}).get("instructor") == primary.id
+        )
+
+        assert legacy_count > 2
+        assert ortools_count > 2
