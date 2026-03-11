@@ -1198,11 +1198,12 @@ def member_instruction_record(request, member_id):
         ),
         pk=member_id,
     )
-    visible_qualifications = [
-        mq
-        for mq in member.memberqualification_set.all()
-        if mq.is_qualified and not mq.qualification.is_obsolete
-    ]
+    visible_qualifications = list(
+        member.memberqualification_set.filter(
+            is_qualified=True,
+            qualification__is_obsolete=False,
+        ).select_related("qualification")
+    )
 
     # Flying summary by glider (uses aggregation, already efficient)
     flights_summary = get_flight_summary_for_member(member)
