@@ -327,6 +327,7 @@ def diagnose_empty_slot(
     }
 
     total_with_role = 0
+    default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, range_months)
 
     for m in members:
         # Check if member has the role flag
@@ -367,9 +368,6 @@ def diagnose_empty_slot(
                     f"{m.full_display_name} (did this role yesterday)"
                 )
                 continue
-            default_cap = calculate_assignment_cap(
-                DEFAULT_MAX_ASSIGNMENTS, range_months
-            )
             if assignments[m.id] >= default_cap:
                 reasons["max_assignments_reached"].append(
                     f"{m.full_display_name} ({assignments[m.id]}/{default_cap})"

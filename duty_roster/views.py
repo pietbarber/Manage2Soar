@@ -1940,8 +1940,8 @@ def propose_roster(request):
             else:
                 # Avoid presenting misleading single-year season bounds for multi-year ranges.
                 operational_info["range_spans_years"] = True
-        except Exception as e:
-            logger.warning(f"Error calculating operational season info: {e}")
+        except Exception:
+            logger.exception("Error calculating operational season info")
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -2027,11 +2027,20 @@ def propose_roster(request):
             created_assignments = []
             draft_entries = request.session.get("proposed_roster", [])
             publish_dates = []
+            member_ids = set()
             for entry in draft_entries:
                 try:
                     publish_dates.append(dt_date.fromisoformat(entry["date"]))
                 except (KeyError, TypeError, ValueError):
                     continue
+                for mem in entry.get("slots", {}).values():
+                    if mem:
+                        try:
+                            member_ids.add(int(mem))
+                        except (TypeError, ValueError):
+                            continue
+
+            members_by_id = Member.objects.in_bulk(member_ids)
 
             try:
                 with transaction.atomic():
@@ -2047,7 +2056,19 @@ def propose_roster(request):
                         for role, mem in e["slots"].items():
                             field_name = ROLE_FIELD_MAP.get(role)
                             if field_name and mem:
-                                assignment_data[field_name] = Member.objects.get(pk=mem)
+                                try:
+                                    member = members_by_id.get(int(mem))
+                                except (TypeError, ValueError):
+                                    member = None
+                                if member:
+                                    assignment_data[field_name] = member
+                                else:
+                                    logger.warning(
+                                        "Skipping missing/invalid member id %s for role %s on %s",
+                                        mem,
+                                        role,
+                                        edt.isoformat(),
+                                    )
 
                         assignment = DutyAssignment.objects.create(**assignment_data)
                         created_assignments.append(assignment)
