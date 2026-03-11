@@ -205,3 +205,53 @@ def test_resources_nav_includes_safety_team_links_for_safety_officer():
     titles = [item["title"] for item in context["resources_nav_items"]]
     assert "Safety Dashboard" in titles
     assert "Suggestion Box Reports" in titles
+
+
+@pytest.mark.django_db
+def test_resources_nav_filters_unsafe_footer_link_schemes():
+    member = User.objects.create_user(
+        username="member_footer_schemes",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    HomePageContent.objects.create(
+        title="Footer",
+        slug="footer",
+        audience="member",
+        content=(
+            '<p><a href="javascript:alert(1)">Bad JS</a> '
+            '<a href="data:text/plain,boom">Bad Data</a> '
+            '<a href="/cms/feedback/">Good Relative</a> '
+            '<a href="https://example.com/weather">Good HTTPS</a></p>'
+        ),
+    )
+
+    request = RequestFactory().get("/")
+    request.user = member
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    urls = [item["url"] for item in context["resources_nav_items"]]
+    assert "Bad JS" not in titles
+    assert "Bad Data" not in titles
+    assert "Good HTTPS" in titles
+    assert "/cms/feedback/" in urls
+
+
+@pytest.mark.django_db
+def test_resources_nav_ignores_promoted_pages_with_null_rank():
+    page = Page.objects.create(
+        title="Ranked Page",
+        slug="ranked-page",
+        is_public=True,
+        promote_to_navbar=True,
+        navbar_rank=10,
+    )
+    Page.objects.filter(pk=page.pk).update(navbar_rank=None)
+
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    assert "Ranked Page" not in titles

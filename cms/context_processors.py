@@ -1,4 +1,5 @@
 from html.parser import HTMLParser
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.urls import reverse
@@ -48,6 +49,16 @@ def _extract_footer_links(footer):
     return parser.links
 
 
+def _is_safe_nav_url(url):
+    """Allow relative URLs and absolute http(s) URLs only."""
+    if not url:
+        return False
+    parsed = urlparse(url)
+    if not parsed.scheme:
+        return True
+    return parsed.scheme in {"http", "https"}
+
+
 def _dedupe_resource_items(items):
     """Remove duplicate entries by URL while preserving first occurrence order."""
     seen_urls = set()
@@ -74,7 +85,7 @@ def _build_resources_nav_items(request, footer=None):
     access_request = request if hasattr(request, "session") else None
 
     promoted_pages = (
-        Page.objects.filter(promote_to_navbar=True)
+        Page.objects.filter(promote_to_navbar=True, navbar_rank__isnull=False)
         .prefetch_related("role_permissions", "member_permissions")
         .order_by("navbar_rank", "id")
     )
@@ -114,6 +125,8 @@ def _build_resources_nav_items(request, footer=None):
 
         # Promote member footer links (Weather/WeGlide/etc.) into Resources drawer.
         for idx, (title, url) in enumerate(_extract_footer_links(footer), start=0):
+            if not _is_safe_nav_url(url):
+                continue
             items.append(
                 {
                     "title": title,
@@ -140,17 +153,18 @@ def _build_resources_nav_items(request, footer=None):
             }
         )
 
-    webcam_url = SiteConfiguration.objects.values_list(
-        "webcam_snapshot_url", flat=True
-    ).first()
-    if request.user.is_authenticated and is_active_member(request.user) and webcam_url:
-        items.append(
-            {
-                "title": "Webcam",
-                "url": reverse("siteconfig:webcam"),
-                "rank": 940,
-            }
-        )
+    if request.user.is_authenticated and is_active_member(request.user):
+        webcam_url = SiteConfiguration.objects.values_list(
+            "webcam_snapshot_url", flat=True
+        ).first()
+        if webcam_url:
+            items.append(
+                {
+                    "title": "Webcam",
+                    "url": reverse("siteconfig:webcam"),
+                    "rank": 940,
+                }
+            )
 
     items = _dedupe_resource_items(items)
     return sorted(items, key=lambda item: (item["rank"], item["title"].lower()))
@@ -176,7 +190,7 @@ def footer_content(request):
                 "resources_nav_items": _build_resources_nav_items(request, footer),
             }
         except Exception:
-            # If CMS is not available or footer doesn't exist, fail gracefully
+            # If CMS is not available or an unexpected error occurs, fail gracefully.
             return {
                 "footer_content": None,
                 "google_oauth_configured": google_oauth_configured,

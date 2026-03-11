@@ -94,3 +94,15 @@ def test_page_admin_promotion_fields_editable_for_webmaster():
     assert "promote_to_navbar" not in readonly_fields
     assert "navbar_title" not in readonly_fields
     assert "navbar_rank" not in readonly_fields
+
+
+@pytest.mark.django_db
+def test_create_promoted_page_without_rank_fails_on_save():
+    with pytest.raises(ValidationError):
+        Page.objects.create(
+            title="Broken Promotion",
+            slug="broken-promotion",
+            is_public=True,
+            promote_to_navbar=True,
+            navbar_rank=None,
+        )

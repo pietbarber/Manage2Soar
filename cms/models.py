@@ -393,9 +393,10 @@ class Page(models.Model):
         # Enforce maximum nesting depth for all saves (Issue #596)
         self._validate_depth()
 
-        # Only run clean() if this is an update (pk exists) to prevent unnecessary queries
+        # Run clean() on both creates and updates to enforce model validations.
+        self.clean()
+
         if self.pk:
-            self.clean()
             # Only fix YouTube embeds if content has changed
             old_content = Page.objects.get(pk=self.pk).content
             if old_content != self.content:
