@@ -128,6 +128,13 @@ def _build_resources_nav_items(request, footer=None):
     ):
         items.append(
             {
+                "title": "Safety Dashboard",
+                "url": reverse("members:safety_officer_dashboard"),
+                "rank": 925,
+            }
+        )
+        items.append(
+            {
                 "title": "Suggestion Box Reports",
                 "url": reverse("members:safety_report_list"),
                 "rank": 930,

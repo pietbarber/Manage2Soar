@@ -88,3 +88,31 @@ def test_member_navbar_resources_includes_footer_links(client, django_user_model
 
     assert response.status_code == 200
     assert b"Weather" in response.content
+
+
+@pytest.mark.django_db
+def test_safety_officer_links_are_in_resources_not_top_level_safety(
+    client, django_user_model
+):
+    HomePageContent.objects.create(title="Home", slug="home", content="<p>Public</p>")
+    HomePageContent.objects.create(
+        title="Member Home",
+        slug="member-home",
+        audience="member",
+        content="<p>Member</p>",
+    )
+    user = django_user_model.objects.create_user(
+        username="safetymenu",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    user.safety_officer = True
+    user.save()
+
+    client.login(username="safetymenu", password="testpass123")
+    response = client.get(reverse("home"))
+
+    assert response.status_code == 200
+    assert b"Safety Dashboard" in response.content
+    assert b"Suggestion Box Reports" in response.content
+    assert b'id="safetyDropdown"' not in response.content

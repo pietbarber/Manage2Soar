@@ -171,3 +171,22 @@ def test_resources_nav_dedupes_report_issue_link_from_footer():
         if item["url"] == "/cms/feedback/"
     ]
     assert len(report_issue_items) == 1
+
+
+@pytest.mark.django_db
+def test_resources_nav_includes_safety_team_links_for_safety_officer():
+    safety_officer = User.objects.create_user(
+        username="safety_nav",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    safety_officer.safety_officer = True
+    safety_officer.save()
+
+    request = RequestFactory().get("/")
+    request.user = safety_officer
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    assert "Safety Dashboard" in titles
+    assert "Suggestion Box Reports" in titles
