@@ -2048,7 +2048,13 @@ def propose_roster(request):
                         DutyAssignment.objects.filter(date__in=publish_dates).delete()
 
                     for e in draft_entries:
-                        edt = dt_date.fromisoformat(e["date"])
+                        try:
+                            edt = dt_date.fromisoformat(e["date"])
+                        except (KeyError, TypeError, ValueError):
+                            logger.warning(
+                                "Skipping draft entry with invalid publish date: %r", e
+                            )
+                            continue
                         assignment_data = {
                             "date": edt,
                             "location": default_field,
@@ -2072,11 +2078,12 @@ def propose_roster(request):
 
                         assignment = DutyAssignment.objects.create(**assignment_data)
                         created_assignments.append(assignment)
-            except Exception as e:
+            except Exception:
                 logger.exception("Failed publishing proposed roster")
                 messages.error(
                     request,
-                    f"Could not publish roster due to an internal error: {str(e)}",
+                    "Could not publish roster due to an internal error. "
+                    "Please try again later or contact an administrator.",
                 )
                 return redirect("duty_roster:propose_roster")
 
@@ -2207,6 +2214,7 @@ def propose_roster(request):
     display_start, display_end = _effective_draft_range(
         request, request.session.get("proposed_roster", []), range_start, range_end
     )
+    display_month_span = count_calendar_months_inclusive(display_start, display_end)
     # Build list of removed dates for display in the template (scoped to range)
     removed_dates = _get_removed_dates_from_session(request, display_start, display_end)
 
@@ -2217,9 +2225,9 @@ def propose_roster(request):
             "draft": display,
             "year": year,
             "month": month,
-            "start_date": range_start,
-            "end_date": range_end,
-            "month_span": month_span,
+            "start_date": display_start,
+            "end_date": display_end,
+            "month_span": display_month_span,
             "incomplete": incomplete,
             "enabled_roles": enabled_roles,
             "no_scheduling": False,

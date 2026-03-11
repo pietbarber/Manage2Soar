@@ -566,3 +566,62 @@ class TestProposeRosterSessionTracking:
         assert any(
             "Duty roster published for 2026-03-01 to 2026-03-31" in m for m in messages
         )
+
+    def test_publish_skips_invalid_draft_entries(self, client, rostermeister, airfield):
+        """Malformed draft dates should be skipped instead of aborting publish."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        session = client.session
+        session["proposed_roster"] = [
+            {"date": "not-a-date", "slots": {}},
+            {"date": "2026-03-08", "slots": {}},
+        ]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "year": 2026,
+                "month": 3,
+                "action": "publish",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        assert DutyAssignment.objects.filter(date=date(2026, 3, 8)).exists()
+
+    def test_remove_dates_renders_effective_draft_range(
+        self, client, rostermeister, instructor_member
+    ):
+        """Non-roll actions should render the persisted draft range back to the form."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-15", "slots": {}}]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "action": "remove_dates",
+                "remove_date": ["2026-03-15"],
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.context["start_date"] == date(2026, 3, 1)
+        assert response.context["end_date"] == date(2026, 3, 31)
+        assert response.context["month_span"] == 1

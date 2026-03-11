@@ -567,6 +567,7 @@ def _generate_roster_legacy(
         for b in MemberBlackout.objects.filter(date__gte=start_date, date__lte=end_date)
     }
     assignments = defaultdict(int)
+    default_no_preference_cap = calculate_assignment_cap(8, month_span)
 
     def last_key(m):
         p = prefs.get(m.id)
@@ -574,9 +575,6 @@ def _generate_roster_legacy(
         return d or date(1900, 1, 1)
 
     def eligible(role, m, day, assigned):
-        # Default values for members without DutyPreference
-        DEFAULT_MAX_ASSIGNMENTS = 8
-
         p = prefs.get(m.id)
         if not p:
             # Member has no preference set - treat as eligible with defaults
@@ -602,10 +600,9 @@ def _generate_roster_legacy(
                     f"{m.full_display_name}: Not eligible for role {role} (flag is False)."
                 )
                 return False
-            default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, month_span)
-            if assignments[m.id] >= default_cap:
+            if assignments[m.id] >= default_no_preference_cap:
                 logger.debug(
-                    f"{m.full_display_name}: Max assignments reached (using default {default_cap})."
+                    f"{m.full_display_name}: Max assignments reached (using default {default_no_preference_cap})."
                 )
                 return False
             logger.debug(
