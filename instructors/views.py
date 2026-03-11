@@ -426,7 +426,11 @@ def fill_instruction_report(request, student_id, report_date):
 
     # Get existing qualifications and create qualification form
     existing_qualifications = (
-        MemberQualification.objects.filter(member=student)
+        MemberQualification.objects.filter(
+            member=student,
+            is_qualified=True,
+            qualification__is_obsolete=False,
+        )
         .select_related("qualification")
         .order_by("-date_awarded")
     )
@@ -871,7 +875,11 @@ def log_ground_instruction(request):
     qualification_form = None
     if student:
         existing_qualifications = (
-            MemberQualification.objects.filter(member=student)
+            MemberQualification.objects.filter(
+                member=student,
+                is_qualified=True,
+                qualification__is_obsolete=False,
+            )
             .select_related("qualification")
             .order_by("-date_awarded")
         )
@@ -961,7 +969,11 @@ def assign_qualification_modal(request, member_id):
             qualification = form.save()
             # Return success content with updated qualifications list
             updated_qualifications = (
-                MemberQualification.objects.filter(member=student)
+                MemberQualification.objects.filter(
+                    member=student,
+                    is_qualified=True,
+                    qualification__is_obsolete=False,
+                )
                 .select_related("qualification")
                 .order_by("-date_awarded")
             )
@@ -1199,6 +1211,11 @@ def member_instruction_record(request, member_id):
         ),
         pk=member_id,
     )
+    visible_qualifications = [
+        mq
+        for mq in member.memberqualification_set.all()
+        if mq.is_qualified and not mq.qualification.is_obsolete
+    ]
 
     # Flying summary by glider (uses aggregation, already efficient)
     flights_summary = get_flight_summary_for_member(member)
@@ -1497,6 +1514,7 @@ def member_instruction_record(request, member_id):
             "chart_rating_json": json.dumps(chart_rating),
             "chart_anchors_json": json.dumps(chart_anchors),
             "lesson_titles": lesson_titles,
+            "visible_qualifications": visible_qualifications,
         },
     )
 
