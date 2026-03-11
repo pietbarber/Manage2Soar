@@ -11,7 +11,7 @@ from django.test.client import RequestFactory
 from django.urls import reverse
 
 from cms.context_processors import footer_content
-from cms.models import Page
+from cms.models import HomePageContent, Page
 from siteconfig.models import SiteConfiguration
 
 User = get_user_model()
@@ -119,3 +119,55 @@ def test_resources_nav_includes_member_only_links_for_active_member():
     assert "Report Website Issue" in titles
     assert "Safety Suggestion Box" in titles
     assert "Webcam" in titles
+
+
+@pytest.mark.django_db
+def test_resources_nav_includes_member_footer_links_for_active_member():
+    member = User.objects.create_user(
+        username="member_footer_links",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    HomePageContent.objects.create(
+        title="Footer",
+        slug="footer",
+        audience="member",
+        content=(
+            '<p><a href="https://example.com/weather">Weather</a> '
+            '<a href="https://www.weglide.org">WeGlide</a></p>'
+        ),
+    )
+
+    request = RequestFactory().get("/")
+    request.user = member
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    assert "Weather" in titles
+    assert "WeGlide" in titles
+
+
+@pytest.mark.django_db
+def test_resources_nav_dedupes_report_issue_link_from_footer():
+    member = User.objects.create_user(
+        username="member_footer_dedupe",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    HomePageContent.objects.create(
+        title="Footer",
+        slug="footer",
+        audience="member",
+        content='<p><a href="/cms/feedback/">Report Website Issue</a></p>',
+    )
+
+    request = RequestFactory().get("/")
+    request.user = member
+    context = footer_content(request)
+
+    report_issue_items = [
+        item
+        for item in context["resources_nav_items"]
+        if item["url"] == "/cms/feedback/"
+    ]
+    assert len(report_issue_items) == 1

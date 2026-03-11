@@ -1,3 +1,5 @@
+from html.parser import HTMLParser
+
 from django.conf import settings
 from django.urls import reverse
 
@@ -6,7 +8,60 @@ from members.utils import is_active_member
 from siteconfig.models import SiteConfiguration
 
 
-def _build_resources_nav_items(request):
+class _AnchorExtractor(HTMLParser):
+    """Extract simple anchor tags from HTML content."""
+
+    def __init__(self):
+        super().__init__()
+        self.links = []
+        self._current_href = None
+        self._text_parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() != "a":
+            return
+        attrs_map = dict(attrs)
+        self._current_href = attrs_map.get("href")
+        self._text_parts = []
+
+    def handle_data(self, data):
+        if self._current_href is not None:
+            self._text_parts.append(data)
+
+    def handle_endtag(self, tag):
+        if tag.lower() != "a" or self._current_href is None:
+            return
+        title = "".join(self._text_parts).strip()
+        if self._current_href and title:
+            self.links.append((title, self._current_href))
+        self._current_href = None
+        self._text_parts = []
+
+
+def _extract_footer_links(footer):
+    """Extract title/url tuples from CMS footer rich text."""
+    if not footer or not footer.content:
+        return []
+    parser = _AnchorExtractor()
+    parser.feed(footer.content)
+    parser.close()
+    return parser.links
+
+
+def _dedupe_resource_items(items):
+    """Remove duplicate entries by URL while preserving first occurrence order."""
+    seen_urls = set()
+    deduped = []
+    for item in items:
+        url = item.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        deduped.append(item)
+    return deduped
+
+
+def _build_resources_nav_items(request, footer=None):
     """Build ordered Resources drawer links for the current user."""
     items = [
         {
@@ -58,6 +113,16 @@ def _build_resources_nav_items(request):
             }
         )
 
+        # Promote member footer links (Weather/WeGlide/etc.) into Resources drawer.
+        for idx, (title, url) in enumerate(_extract_footer_links(footer), start=0):
+            items.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "rank": 950 + idx,
+                }
+            )
+
     if request.user.is_authenticated and (
         getattr(request.user, "safety_officer", False) or request.user.is_superuser
     ):
@@ -81,6 +146,7 @@ def _build_resources_nav_items(request):
             }
         )
 
+    items = _dedupe_resource_items(items)
     return sorted(items, key=lambda item: (item["rank"], item["title"].lower()))
 
 
@@ -101,7 +167,7 @@ def footer_content(request):
             return {
                 "footer_content": footer,
                 "google_oauth_configured": google_oauth_configured,
-                "resources_nav_items": _build_resources_nav_items(request),
+                "resources_nav_items": _build_resources_nav_items(request, footer),
             }
         except Exception:
             # If CMS is not available or footer doesn't exist, fail gracefully
