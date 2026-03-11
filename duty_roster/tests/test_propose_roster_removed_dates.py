@@ -10,6 +10,7 @@ from datetime import date
 import pytest
 from django.urls import reverse
 
+from duty_roster.models import DutyPreference
 from duty_roster.roster_generator import (
     calculate_assignment_cap,
     clear_operational_season_cache,
@@ -479,3 +480,47 @@ class TestProposeRosterSessionTracking:
         assert operational_info.get("range_spans_years") is True
         assert "season_start" not in operational_info
         assert "season_end" not in operational_info
+
+    def test_slot_eligibility_uses_selected_range_month_span(
+        self, client, rostermeister, instructor_member
+    ):
+        """Eligibility caps should use selected start/end range, not only draft min/max."""
+        DutyPreference.objects.update_or_create(
+            member=instructor_member,
+            defaults={"max_assignments_per_month": 1},
+        )
+
+        client.login(username="rostermeister", password="testpass123")
+        session = client.session
+        session["proposed_roster"] = [
+            {
+                "date": "2026-04-04",
+                "slots": {"instructor": instructor_member.id},
+            },
+            {
+                "date": "2026-04-05",
+                "slots": {"instructor": None},
+            },
+        ]
+        session.save()
+
+        response = client.post(
+            reverse("duty_roster:get_eligible_members_for_slot"),
+            {
+                "date": "2026-04-05",
+                "role": "instructor",
+                "current_member_id": "",
+                "start_date": "2026-03-31",
+                "end_date": "2026-05-01",
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        member_row = next(
+            m for m in payload["eligible_members"] if m["id"] == instructor_member.id
+        )
+
+        # Range spans Mar/Apr/May -> 3 months, so cap should be 3 for monthly rate 1.
+        assert member_row["max_assignments"] == 3
+        assert member_row["warnings"]["at_max"] is False

@@ -1419,12 +1419,32 @@ def get_eligible_members_for_slot(request):
                 if member_id:
                     assignments[member_id] += 1
 
-        draft_dates = [dt_date.fromisoformat(entry["date"]) for entry in draft]
-        range_months = (
-            count_calendar_months_inclusive(min(draft_dates), max(draft_dates))
-            if draft_dates
-            else 1
-        )
+        range_months = 1
+        start_date_raw = request.POST.get("start_date")
+        end_date_raw = request.POST.get("end_date")
+
+        if start_date_raw and end_date_raw:
+            try:
+                selected_start, selected_end = resolve_roster_date_range(
+                    start_date=dt_date.fromisoformat(start_date_raw),
+                    end_date=dt_date.fromisoformat(end_date_raw),
+                )
+                range_months = count_calendar_months_inclusive(
+                    selected_start, selected_end
+                )
+            except (ValueError, TypeError):
+                logger.warning(
+                    "Invalid selected range in eligible-member request: %s to %s",
+                    start_date_raw,
+                    end_date_raw,
+                )
+
+        if range_months == 1:
+            draft_dates = [dt_date.fromisoformat(entry["date"]) for entry in draft]
+            if draft_dates:
+                range_months = count_calendar_months_inclusive(
+                    min(draft_dates), max(draft_dates)
+                )
 
         # Find eligible members
         DEFAULT_MAX_ASSIGNMENTS = 8

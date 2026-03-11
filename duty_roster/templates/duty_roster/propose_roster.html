@@ -378,6 +378,16 @@ function showEditSlotModal(role, date, currentMember) {
 
   modal.show();
 
+  const selectedStartDate = document.getElementById('startDate')?.value || '';
+  const selectedEndDate = document.getElementById('endDate')?.value || '';
+  const requestBody = new URLSearchParams({
+    date,
+    role,
+    current_member_id: currentMember || '',
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
+  }).toString();
+
   // Fetch eligible members
   fetch('{% url "duty_roster:get_eligible_members_for_slot" %}', {
     method: 'POST',
@@ -385,7 +395,7 @@ function showEditSlotModal(role, date, currentMember) {
       'Content-Type': 'application/x-www-form-urlencoded',
       'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
     },
-    body: `date=${date}&role=${role}&current_member_id=${currentMember || ''}`
+    body: requestBody
   })
   .then(response => {
     if (!response.ok) {
