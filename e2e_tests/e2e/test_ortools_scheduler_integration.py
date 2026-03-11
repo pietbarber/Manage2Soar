@@ -94,7 +94,7 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         assert "Propose Duty Roster" in self.page.content()
 
         # Click roll button to generate roster
-        roll_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_button = self.page.get_by_role("button", name="Generate For Range")
         assert roll_button.count() > 0, "Roll button should be present"
         roll_button.click()
 
@@ -130,7 +130,7 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         assert "Propose Duty Roster" in self.page.content()
 
         # Click roll button to generate roster
-        roll_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_button = self.page.get_by_role("button", name="Generate For Range")
         assert roll_button.count() > 0, "Roll button should be present"
         roll_button.click()
 
@@ -162,7 +162,7 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         )
         self.page.wait_for_selector("h2", timeout=10000)
 
-        roll_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_button = self.page.get_by_role("button", name="Generate For Range")
         assert roll_button.count() > 0, "Roll button should exist"
         roll_button.click()
         self.page.wait_for_load_state("networkidle", timeout=15000)
@@ -180,7 +180,7 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         )
         self.page.wait_for_selector("h2", timeout=10000)
 
-        roll_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_button = self.page.get_by_role("button", name="Generate For Range")
         assert roll_button.count() > 0, "Roll button should exist"
         roll_button.click()
         self.page.wait_for_load_state("networkidle", timeout=15000)
@@ -213,7 +213,7 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("h2", timeout=10000)
 
         # Generate initial roster
-        roll_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_button = self.page.get_by_role("button", name="Generate For Range")
         if roll_button.count() > 0:
             roll_button.click()
             self.page.wait_for_load_state("networkidle", timeout=15000)
@@ -222,7 +222,7 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         assert first_filled_count > 0, "Initial roster should have filled slots"
 
         # Click "Roll Again" button
-        roll_again_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_again_button = self.page.get_by_role("button", name="🔄 Roll Again")
         assert roll_again_button.count() > 0, "Roll Again button should be present"
         roll_again_button.click()
         self.page.wait_for_load_state("networkidle", timeout=15000)
@@ -253,7 +253,7 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("h2", timeout=10000)
 
         # Generate roster
-        roll_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_button = self.page.get_by_role("button", name="Generate For Range")
         if roll_button.count() > 0:
             roll_button.click()
             self.page.wait_for_load_state("networkidle", timeout=15000)

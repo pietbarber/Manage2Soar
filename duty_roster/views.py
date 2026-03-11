@@ -53,12 +53,21 @@ from .models import (
     MemberBlackout,
     OpsIntent,
 )
-from .roster_generator import generate_roster, is_within_operational_season
+from .roster_generator import (
+    calculate_assignment_cap,
+    count_calendar_months_inclusive,
+    generate_roster,
+    get_operational_season_bounds,
+    get_weekend_dates_in_range,
+    is_within_operational_season,
+    resolve_roster_date_range,
+)
 
 logger = logging.getLogger("duty_roster.views")
 
 # Allowed roles for roster slot editing/assignment endpoints
 ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
+MAX_PROPOSAL_RANGE_MONTHS = 12
 
 
 def calendar_refresh_response(year, month):
@@ -76,8 +85,6 @@ def roster_home(request):
 def blackout_manage(request):
     member = request.user
     preference, _ = DutyPreference.objects.get_or_create(member=member)
-
-    max_choices = preference._meta.get_field("max_assignments_per_month").choices
 
     existing = MemberBlackout.objects.filter(member=member)
     existing_dates = set(b.date for b in existing)
@@ -252,8 +259,6 @@ def blackout_manage(request):
             "all_other_members": all_other,
             "member_optgroups": member_optgroups,
             "form": form,
-            # pass the choices into the template:
-            "max_assignments_choices": max_choices,
         },
     )
 
@@ -1415,8 +1420,36 @@ def get_eligible_members_for_slot(request):
                 if member_id:
                     assignments[member_id] += 1
 
+        range_months = 1
+        start_date_raw = request.POST.get("start_date")
+        end_date_raw = request.POST.get("end_date")
+
+        if start_date_raw and end_date_raw:
+            try:
+                selected_start, selected_end = resolve_roster_date_range(
+                    start_date=dt_date.fromisoformat(start_date_raw),
+                    end_date=dt_date.fromisoformat(end_date_raw),
+                )
+                range_months = count_calendar_months_inclusive(
+                    selected_start, selected_end
+                )
+            except (ValueError, TypeError):
+                logger.warning(
+                    "Invalid selected range in eligible-member request: %s to %s",
+                    start_date_raw,
+                    end_date_raw,
+                )
+
+        if range_months == 1:
+            draft_range = _get_draft_date_range(draft)
+            if draft_range:
+                range_months = count_calendar_months_inclusive(
+                    draft_range[0], draft_range[1]
+                )
+
         # Find eligible members
         DEFAULT_MAX_ASSIGNMENTS = 8
+        default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, range_months)
         eligible_members = []
         for m in members:
             # Check if member has the role flag
@@ -1440,7 +1473,7 @@ def get_eligible_members_for_slot(request):
                         break
 
                 already_assigned = m in assigned_today
-                at_max = assignments[m.id] >= DEFAULT_MAX_ASSIGNMENTS
+                at_max = assignments[m.id] >= default_cap
 
                 eligible_members.append(
                     {
@@ -1451,8 +1484,8 @@ def get_eligible_members_for_slot(request):
                             "already_assigned": already_assigned,
                             "at_max": at_max,
                         },
-                        "assignments_this_month": assignments[m.id],
-                        "max_assignments": DEFAULT_MAX_ASSIGNMENTS,
+                        "assignments_in_range": assignments[m.id],
+                        "max_assignments": default_cap,
                     }
                 )
                 continue
@@ -1503,7 +1536,10 @@ def get_eligible_members_for_slot(request):
                 continue
 
             # Check max assignments
-            at_max = assignments[m.id] >= getattr(p, "max_assignments_per_month", 0)
+            member_cap = calculate_assignment_cap(
+                getattr(p, "max_assignments_per_month", 0), range_months
+            )
+            at_max = assignments[m.id] >= member_cap
 
             eligible_members.append(
                 {
@@ -1514,13 +1550,13 @@ def get_eligible_members_for_slot(request):
                         "already_assigned": already_assigned,
                         "at_max": at_max,
                     },
-                    "assignments_this_month": assignments[m.id],
-                    "max_assignments": getattr(p, "max_assignments_per_month", 0),
+                    "assignments_in_range": assignments[m.id],
+                    "max_assignments": member_cap,
                 }
             )
 
         # Sort by assignments (fewest first) and name
-        eligible_members.sort(key=lambda x: (x["assignments_this_month"], x["name"]))
+        eligible_members.sort(key=lambda x: (x["assignments_in_range"], x["name"]))
 
         return JsonResponse(
             {
@@ -1701,20 +1737,123 @@ def update_roster_slot(request):
     )
 
 
-def _get_removed_dates_from_session(request, year, month, clean_invalid=False):
+def _removed_dates_session_key(start_date, end_date):
+    """Build deterministic session key for removed proposed dates in a date range."""
+    _, month_last_day = calendar.monthrange(start_date.year, start_date.month)
+    if (
+        start_date.day == 1
+        and start_date.year == end_date.year
+        and start_date.month == end_date.month
+        and end_date.day == month_last_day
+    ):
+        return f"removed_roster_dates_{start_date.year}_{start_date.month:02d}"
+
+    return f"removed_roster_dates_{start_date.isoformat()}_{end_date.isoformat()}"
+
+
+def _set_proposed_roster_range(request, start_date, end_date):
+    """Persist the selected proposal range used to build session draft roster."""
+    request.session["proposed_roster_range"] = {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+    }
+
+
+def _get_proposed_roster_range(request):
+    """Read the persisted proposal range from session, if valid."""
+    stored = request.session.get("proposed_roster_range")
+    if not isinstance(stored, dict):
+        return None
+
+    start_raw = stored.get("start_date")
+    end_raw = stored.get("end_date")
+    if not start_raw or not end_raw:
+        return None
+
+    try:
+        return resolve_roster_date_range(
+            start_date=dt_date.fromisoformat(start_raw),
+            end_date=dt_date.fromisoformat(end_raw),
+        )
+    except ValueError:
+        return None
+
+
+def _get_draft_date_range(draft):
+    """Derive inclusive date range from draft entries, if any parseable dates exist."""
+    draft_dates = []
+    for entry in draft:
+        date_raw = entry.get("date")
+        if not date_raw:
+            continue
+        try:
+            draft_dates.append(dt_date.fromisoformat(date_raw))
+        except (TypeError, ValueError):
+            continue
+
+    if not draft_dates:
+        return None
+    return min(draft_dates), max(draft_dates)
+
+
+def _effective_draft_range(request, draft, fallback_start, fallback_end):
+    """Resolve effective range for draft-mutating actions.
+
+    Priority: persisted selection range -> draft-derived range -> request fallback.
     """
-    Parse removed dates from session for a given year/month.
+    session_range = _get_proposed_roster_range(request)
+    if session_range:
+        return session_range
+
+    draft_range = _get_draft_date_range(draft)
+    if draft_range:
+        return draft_range
+
+    return fallback_start, fallback_end
+
+
+def _resolve_proposal_range(request):
+    """Resolve scheduling date range from request parameters."""
+    start_raw = request.POST.get("start_date") or request.GET.get("start_date")
+    end_raw = request.POST.get("end_date") or request.GET.get("end_date")
+    year = request.POST.get("year") or request.GET.get("year")
+    month = request.POST.get("month") or request.GET.get("month")
+
+    start_date = dt_date.fromisoformat(start_raw) if start_raw else None
+    end_date = dt_date.fromisoformat(end_raw) if end_raw else None
+    year_val = int(year) if year else None
+    month_val = int(month) if month else None
+
+    range_start, range_end = resolve_roster_date_range(
+        year=year_val,
+        month=month_val,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    range_months = count_calendar_months_inclusive(range_start, range_end)
+    if range_months > MAX_PROPOSAL_RANGE_MONTHS:
+        raise ValueError(
+            f"Roster date range cannot exceed {MAX_PROPOSAL_RANGE_MONTHS} months."
+        )
+
+    return range_start, range_end
+
+
+def _get_removed_dates_from_session(request, start_date, end_date, clean_invalid=False):
+    """
+    Parse removed dates from session for a date range.
 
     Args:
         request: Django HttpRequest with session data
-        year: Year to filter removed dates
-        month: Month to filter removed dates
+        start_date: Inclusive range start date
+        end_date: Inclusive range end date
         clean_invalid: If True, update session to remove malformed dates
 
     Returns:
         List of datetime.date objects (malformed entries are skipped)
     """
-    session_key = f"removed_roster_dates_{year}_{month:02d}"
+    session_key = _removed_dates_session_key(start_date, end_date)
     removed_date_strs = request.session.get(session_key, [])
     exclude_dates = []
     cleaned_removed_date_strs = []
@@ -1739,13 +1878,27 @@ def _get_removed_dates_from_session(request, year, month, clean_invalid=False):
 @active_member_required
 @user_passes_test(is_rostermeister)
 def propose_roster(request):
-    year = request.POST.get("year") or request.GET.get("year")
-    month = request.POST.get("month") or request.GET.get("month")
-    if year and month:
-        year, month = int(year), int(month)
-    else:
+    try:
+        range_start, range_end = _resolve_proposal_range(request)
+    except ValueError as exc:
+        logger.warning("Invalid roster date range provided: %s", exc)
+        if "cannot exceed" in str(exc):
+            messages.error(
+                request,
+                f"Roster date range cannot exceed {MAX_PROPOSAL_RANGE_MONTHS} months.",
+            )
+        elif "cannot be after" in str(exc):
+            messages.error(request, "Invalid roster date range.")
+        else:
+            messages.error(request, "Invalid roster date range.")
         today = timezone.now().date()
-        year, month = today.year, today.month
+        range_start, range_end = resolve_roster_date_range(
+            year=today.year,
+            month=today.month,
+        )
+
+    year, month = range_start.year, range_start.month
+    month_span = count_calendar_months_inclusive(range_start, range_end)
     incomplete = False
 
     # Get site config and determine which roles to schedule
@@ -1772,6 +1925,9 @@ def propose_roster(request):
                 "draft": [],
                 "year": year,
                 "month": month,
+                "start_date": range_start,
+                "end_date": range_end,
+                "month_span": month_span,
                 "incomplete": False,
                 "enabled_roles": [],
                 "no_scheduling": True,
@@ -1782,34 +1938,35 @@ def propose_roster(request):
     operational_info = {}
     filtered_dates = []
     if siteconfig:
-        from .roster_generator import get_operational_season_bounds
-
         try:
-            season_start, season_end = get_operational_season_bounds(year)
+            all_weekend_dates = get_weekend_dates_in_range(range_start, range_end)
+            filtered_dates = [
+                d for d in all_weekend_dates if not is_within_operational_season(d)
+            ]
 
-            # Only show operational info if we have filtering enabled
-            if season_start or season_end:
-                if season_start:
-                    operational_info["season_start"] = season_start
-                if season_end:
-                    operational_info["season_end"] = season_end
+            if range_start.year == range_end.year:
+                season_start, season_end = get_operational_season_bounds(
+                    range_start.year
+                )
 
-                # Find which dates would be filtered out
-                cal = calendar.Calendar()
-                all_weekend_dates = [
-                    d
-                    for d in cal.itermonthdates(year, month)
-                    if d.month == month and d.weekday() in (5, 6)
-                ]
-                filtered_dates = [
-                    d for d in all_weekend_dates if not is_within_operational_season(d)
-                ]
-        except Exception as e:
-            logger.warning(f"Error calculating operational season info: {e}")
+                # Only show operational info if we have filtering enabled
+                if season_start or season_end:
+                    if season_start:
+                        operational_info["season_start"] = season_start
+                    if season_end:
+                        operational_info["season_end"] = season_end
+            else:
+                # Avoid presenting misleading single-year season bounds for multi-year ranges.
+                operational_info["range_spans_years"] = True
+        except Exception:
+            logger.exception("Error calculating operational season info")
 
     if request.method == "POST":
         action = request.POST.get("action")
         draft = request.session.get("proposed_roster", [])
+        active_start, active_end = _effective_draft_range(
+            request, draft, range_start, range_end
+        )
 
         if action == "remove_dates":
             # Handle removing specific dates from the roster
@@ -1831,8 +1988,8 @@ def propose_roster(request):
                 ]
                 request.session["proposed_roster"] = draft
 
-                # Track removed dates so Roll Again remembers them (scoped to year/month)
-                session_key = f"removed_roster_dates_{year}_{month:02d}"
+                # Track removed dates so Roll Again remembers them (scoped to date range)
+                session_key = _removed_dates_session_key(active_start, active_end)
                 previously_removed = set(request.session.get(session_key, []))
                 previously_removed.update(d.isoformat() for d in dates_to_remove_set)
                 request.session[session_key] = sorted(previously_removed)
@@ -1844,24 +2001,25 @@ def propose_roster(request):
                 )
 
         elif action == "roll":
-            # Retrieve dates previously removed by the user so we skip them (scoped to year/month)
+            # Retrieve dates previously removed by the user so we skip them (scoped to date range)
             exclude_dates = _get_removed_dates_from_session(
-                request, year, month, clean_invalid=True
+                request, range_start, range_end, clean_invalid=True
             )
 
             raw = generate_roster(
-                year, month, roles=enabled_roles, exclude_dates=exclude_dates
+                year,
+                month,
+                roles=enabled_roles,
+                exclude_dates=exclude_dates,
+                start_date=range_start,
+                end_date=range_end,
             )
             if not raw:
                 exclude_set = set(exclude_dates)
-                cal = calendar.Calendar()
                 weekend = [
                     d
-                    for d in cal.itermonthdates(year, month)
-                    if d.month == month
-                    and d.weekday() in (5, 6)
-                    and is_within_operational_season(d)
-                    and d not in exclude_set
+                    for d in get_weekend_dates_in_range(range_start, range_end)
+                    if is_within_operational_season(d) and d not in exclude_set
                 ]
                 raw = [
                     {"date": d, "slots": {r: None for r in enabled_roles}}
@@ -1877,73 +2035,148 @@ def propose_roster(request):
                 for e in raw
             ]
             request.session["proposed_roster"] = draft
+            _set_proposed_roster_range(request, range_start, range_end)
 
         elif action == "publish":
             from .models import DutyAssignment
             from .utils.email import send_roster_published_notifications
 
             default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
-            DutyAssignment.objects.filter(date__year=year, date__month=month).delete()
-
             created_assignments = []
-            for e in request.session.get("proposed_roster", []):
-                edt = dt_date.fromisoformat(e["date"])
-                assignment_data = {
-                    "date": edt,
-                    "location": default_field,
-                }
-                for role, mem in e["slots"].items():
-                    field_name = ROLE_FIELD_MAP.get(role)
-                    if field_name and mem:
-                        assignment_data[field_name] = Member.objects.get(pk=mem)
+            draft_entries = request.session.get("proposed_roster", [])
+            member_ids = set()
+            for entry in draft_entries:
+                for mem in entry.get("slots", {}).values():
+                    if mem:
+                        try:
+                            member_ids.add(int(mem))
+                        except (TypeError, ValueError):
+                            continue
 
-                assignment = DutyAssignment.objects.create(**assignment_data)
-                created_assignments.append(assignment)
+            members_by_id = Member.objects.in_bulk(member_ids)
+
+            try:
+                with transaction.atomic():
+                    # Clear all assignments for the effective publish range so removed
+                    # draft dates do not leave stale assignments behind.
+                    DutyAssignment.objects.filter(
+                        date__gte=active_start,
+                        date__lte=active_end,
+                    ).delete()
+
+                    for e in draft_entries:
+                        try:
+                            edt = dt_date.fromisoformat(e["date"])
+                        except (KeyError, TypeError, ValueError):
+                            logger.warning(
+                                "Skipping draft entry with invalid publish date: %r", e
+                            )
+                            continue
+                        assignment_data = {
+                            "date": edt,
+                            "location": default_field,
+                        }
+                        for role, mem in e["slots"].items():
+                            field_name = ROLE_FIELD_MAP.get(role)
+                            if field_name and mem:
+                                try:
+                                    member = members_by_id.get(int(mem))
+                                except (TypeError, ValueError):
+                                    member = None
+                                if member:
+                                    assignment_data[field_name] = member
+                                else:
+                                    logger.warning(
+                                        "Skipping missing/invalid member id %s for role %s on %s",
+                                        mem,
+                                        role,
+                                        edt.isoformat(),
+                                    )
+
+                        assignment = DutyAssignment.objects.create(**assignment_data)
+                        created_assignments.append(assignment)
+            except Exception:
+                logger.exception("Failed publishing proposed roster")
+                messages.error(
+                    request,
+                    "Could not publish roster due to an internal error. "
+                    "Please try again later or contact an administrator.",
+                )
+                return redirect("duty_roster:propose_roster")
 
             request.session.pop("proposed_roster", None)
-            # Clear removed dates for the current month
-            session_key = f"removed_roster_dates_{year}_{month:02d}"
+            request.session.pop("proposed_roster_range", None)
+            # Clear removed dates for the current range
+            session_key = _removed_dates_session_key(active_start, active_end)
             request.session.pop(session_key, None)
 
             # Send ICS calendar invites to all assigned members
             if created_assignments:
                 try:
-                    result = send_roster_published_notifications(
-                        year, month, created_assignments
-                    )
-                    if result["sent_count"] > 0:
+                    created_by_month = defaultdict(list)
+                    for assignment in created_assignments:
+                        key = (assignment.date.year, assignment.date.month)
+                        created_by_month[key].append(assignment)
+
+                    sent_count = 0
+                    all_errors = []
+                    for (group_year, group_month), month_assignments in sorted(
+                        created_by_month.items()
+                    ):
+                        result = send_roster_published_notifications(
+                            group_year,
+                            group_month,
+                            month_assignments,
+                        )
+                        sent_count += result["sent_count"]
+                        all_errors.extend(result["errors"])
+
+                    if sent_count > 0:
                         messages.success(
                             request,
-                            f"Duty roster published for {month}/{year}. "
-                            f"Calendar invites sent to {result['sent_count']} member(s).",
+                            "Duty roster published for "
+                            f"{active_start.isoformat()} to {active_end.isoformat()}. "
+                            f"Calendar invites sent to {sent_count} member(s).",
                         )
                     else:
                         messages.success(
-                            request, f"Duty roster published for {month}/{year}."
+                            request,
+                            "Duty roster published for "
+                            f"{active_start.isoformat()} to {active_end.isoformat()}.",
                         )
-                    if result["errors"]:
-                        for error in result["errors"]:
+                    if all_errors:
+                        for error in all_errors:
                             messages.warning(request, error)
                 except Exception as e:
                     messages.success(
-                        request, f"Duty roster published for {month}/{year}."
+                        request,
+                        "Duty roster published for "
+                        f"{active_start.isoformat()} to {active_end.isoformat()}.",
                     )
                     messages.warning(
                         request,
                         f"Could not send calendar invites: {str(e)}",
                     )
             else:
-                messages.success(request, f"Duty roster published for {month}/{year}.")
+                messages.success(
+                    request,
+                    "Duty roster published for "
+                    f"{active_start.isoformat()} to {active_end.isoformat()}.",
+                )
                 messages.info(
                     request,
                     "No duty assignments to notify, so no calendar invites were sent.",
                 )
 
-            return redirect("duty_roster:duty_calendar_month", year=year, month=month)
+            return redirect(
+                "duty_roster:duty_calendar_month",
+                year=active_start.year,
+                month=active_start.month,
+            )
 
         elif action == "restore_dates":
-            # Clear removed dates so Roll Again includes all dates again (scoped to year/month)
-            session_key = f"removed_roster_dates_{year}_{month:02d}"
+            # Clear removed dates so Roll Again includes all dates again (scoped to range)
+            session_key = _removed_dates_session_key(active_start, active_end)
             request.session.pop(session_key, None)
             messages.info(
                 request,
@@ -1953,27 +2186,29 @@ def propose_roster(request):
 
         elif action == "cancel":
             request.session.pop("proposed_roster", None)
-            # Clear removed dates for the current month
-            session_key = f"removed_roster_dates_{year}_{month:02d}"
+            request.session.pop("proposed_roster_range", None)
+            # Clear removed dates for the current range
+            session_key = _removed_dates_session_key(active_start, active_end)
             request.session.pop(session_key, None)
             return redirect("duty_roster:duty_calendar")
     else:
-        # Retrieve any previously removed dates for this year/month
-        exclude_dates = _get_removed_dates_from_session(request, year, month)
+        # Retrieve any previously removed dates for this range
+        exclude_dates = _get_removed_dates_from_session(request, range_start, range_end)
 
         raw = generate_roster(
-            year, month, roles=enabled_roles, exclude_dates=exclude_dates
+            year,
+            month,
+            roles=enabled_roles,
+            exclude_dates=exclude_dates,
+            start_date=range_start,
+            end_date=range_end,
         )
         if not raw:
             exclude_set = set(exclude_dates)
-            cal = calendar.Calendar()
             weekend = [
                 d
-                for d in cal.itermonthdates(year, month)
-                if d.month == month
-                and d.weekday() in (5, 6)
-                and is_within_operational_season(d)
-                and d not in exclude_set
+                for d in get_weekend_dates_in_range(range_start, range_end)
+                if is_within_operational_season(d) and d not in exclude_set
             ]
             raw = [
                 {"date": d, "slots": {r: None for r in enabled_roles}} for d in weekend
@@ -1988,6 +2223,7 @@ def propose_roster(request):
             for e in raw
         ]
         request.session["proposed_roster"] = draft
+        _set_proposed_roster_range(request, range_start, range_end)
     display = [
         {
             "date": dt_date.fromisoformat(e["date"]),
@@ -1996,8 +2232,12 @@ def propose_roster(request):
         }
         for e in request.session.get("proposed_roster", [])
     ]
-    # Build list of removed dates for display in the template (scoped to year/month)
-    removed_dates = _get_removed_dates_from_session(request, year, month)
+    display_start, display_end = _effective_draft_range(
+        request, request.session.get("proposed_roster", []), range_start, range_end
+    )
+    display_month_span = count_calendar_months_inclusive(display_start, display_end)
+    # Build list of removed dates for display in the template (scoped to range)
+    removed_dates = _get_removed_dates_from_session(request, display_start, display_end)
 
     return render(
         request,
@@ -2006,6 +2246,9 @@ def propose_roster(request):
             "draft": display,
             "year": year,
             "month": month,
+            "start_date": display_start,
+            "end_date": display_end,
+            "month_span": display_month_span,
             "incomplete": incomplete,
             "enabled_roles": enabled_roles,
             "no_scheduling": False,

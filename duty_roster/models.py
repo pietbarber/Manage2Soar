@@ -1,8 +1,10 @@
 import re
+from decimal import Decimal
 
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 from tinymce.models import HTMLField
@@ -200,11 +202,15 @@ class DutyPreference(models.Model):
     duty_officer_percent = models.PositiveIntegerField(default=0)
     ado_percent = models.PositiveIntegerField(default=0)
     towpilot_percent = models.PositiveIntegerField(default=0)
-    MAX_ASSIGN_CHOICES = [(i, str(i)) for i in range(0, 13)]  # 0–12 times
-    max_assignments_per_month = models.PositiveIntegerField(
-        choices=MAX_ASSIGN_CHOICES,
-        default=2,
-        help_text="How many times per month you’d like to be scheduled",
+    max_assignments_per_month = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("2.00"),
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("12.00")),
+        ],
+        help_text="Monthly assignment rate (0.5 means about once every two months over a range)",
     )
 
     allow_weekend_double = models.BooleanField(

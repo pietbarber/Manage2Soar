@@ -3,7 +3,8 @@ import logging
 import random
 import time
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
+from decimal import ROUND_CEILING, Decimal
 
 from duty_roster.models import (
     DutyAvoidance,
@@ -104,6 +105,73 @@ def is_within_operational_season(check_date: date) -> bool:
         logger.warning(f"Error checking operational season for {check_date}: {e}")
         # If there's any error parsing, default to allowing the date
         return True
+
+
+def resolve_roster_date_range(
+    year: int | None = None,
+    month: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> tuple[date, date]:
+    """Resolve scheduling range from either explicit dates or year/month."""
+    from django.utils.timezone import now
+
+    if start_date and end_date:
+        if start_date > end_date:
+            raise ValueError("start_date cannot be after end_date")
+        return start_date, end_date
+    if start_date or end_date:
+        raise ValueError(
+            "Both start_date and end_date must be provided together, "
+            "or neither to use the year/month fallback."
+        )
+
+    today = now().date()
+    year = year or today.year
+    month = month or today.month
+    _, month_last_day = calendar.monthrange(year, month)
+    return date(year, month, 1), date(year, month, month_last_day)
+
+
+def get_weekend_dates_in_range(start_date: date, end_date: date) -> list[date]:
+    """Return all Saturday/Sunday dates in inclusive [start_date, end_date] range."""
+    current = start_date
+    weekend_dates = []
+    while current <= end_date:
+        if current.weekday() in (5, 6):
+            weekend_dates.append(current)
+        current += timedelta(days=1)
+    return weekend_dates
+
+
+def count_calendar_months_inclusive(start_date: date, end_date: date) -> int:
+    """Count calendar months touched by an inclusive date range."""
+    return (
+        ((end_date.year - start_date.year) * 12)
+        + (end_date.month - start_date.month)
+        + 1
+    )
+
+
+def calculate_assignment_cap(
+    monthly_limit: int | float | Decimal,
+    month_span: int,
+) -> int:
+    """Translate a monthly rate into an integer assignment cap over month span.
+
+    Fractional totals are rounded up so members with small non-zero rates can still
+    receive assignments in shorter windows.
+    """
+    if month_span <= 0:
+        return 0
+    if monthly_limit is None:
+        return 0
+
+    raw_total = Decimal(str(monthly_limit)) * Decimal(month_span)
+    if raw_total <= 0:
+        return 0
+
+    return int(raw_total.to_integral_value(rounding=ROUND_CEILING))
 
 
 def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
@@ -230,6 +298,7 @@ def diagnose_empty_slot(
     assignments,
     assigned_today,
     last_assigned=None,
+    range_months=1,
 ):
     """
     Diagnose why a role slot couldn't be filled on a specific day.
@@ -258,6 +327,7 @@ def diagnose_empty_slot(
     }
 
     total_with_role = 0
+    default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, range_months)
 
     for m in members:
         # Check if member has the role flag
@@ -298,9 +368,9 @@ def diagnose_empty_slot(
                     f"{m.full_display_name} (did this role yesterday)"
                 )
                 continue
-            if assignments[m.id] >= DEFAULT_MAX_ASSIGNMENTS:
+            if assignments[m.id] >= default_cap:
                 reasons["max_assignments_reached"].append(
-                    f"{m.full_display_name} ({assignments[m.id]}/{DEFAULT_MAX_ASSIGNMENTS})"
+                    f"{m.full_display_name} ({assignments[m.id]}/{default_cap})"
                 )
                 continue
             # If we get here, member with no preference is actually eligible!
@@ -374,8 +444,10 @@ def diagnose_empty_slot(
             continue
 
         # Check max assignments
-        if assignments[m.id] >= getattr(p, "max_assignments_per_month", 0):
-            max_val = getattr(p, "max_assignments_per_month", 0)
+        max_val = calculate_assignment_cap(
+            getattr(p, "max_assignments_per_month", 0), range_months
+        )
+        if assignments[m.id] >= max_val:
             reasons["max_assignments_reached"].append(
                 f"{m.full_display_name} ({assignments[m.id]}/{max_val})"
             )
@@ -419,7 +491,14 @@ def diagnose_empty_slot(
     }
 
 
-def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=None):
+def _generate_roster_legacy(
+    year=None,
+    month=None,
+    roles=None,
+    exclude_dates=None,
+    start_date=None,
+    end_date=None,
+):
     """
     Generate a duty roster for a given month using legacy weighted-random algorithm.
 
@@ -432,6 +511,8 @@ def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=Non
         roles: List of roles to schedule (default: DEFAULT_ROLES from constants)
         exclude_dates: Optional set/list of datetime.date objects to skip
             (e.g. dates the user has already removed from the proposed roster).
+        start_date: Optional explicit scheduling range start (inclusive)
+        end_date: Optional explicit scheduling range end (inclusive)
 
     Returns:
         List of dicts, each with:
@@ -439,21 +520,18 @@ def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=Non
             - 'slots': mapping of role name to assigned Member.id (or None if unfilled)
             - 'diagnostics': per-date scheduling diagnostics/metadata
     """
-    from django.utils.timezone import now
-
-    today = now().date()
-    year = year or today.year
-    month = month or today.month
+    start_date, end_date = resolve_roster_date_range(
+        year=year,
+        month=month,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    month_span = count_calendar_months_inclusive(start_date, end_date)
 
     # Use provided roles or fall back to DEFAULT_ROLES
     roles_to_schedule = roles if roles is not None else DEFAULT_ROLES
 
-    cal = calendar.Calendar()
-    all_weekend_dates = [
-        d
-        for d in cal.itermonthdates(year, month)
-        if d.month == month and d.weekday() in (5, 6)
-    ]
+    all_weekend_dates = get_weekend_dates_in_range(start_date, end_date)
 
     # Filter weekend dates to only include those within operational season
     weekend_dates = [d for d in all_weekend_dates if is_within_operational_season(d)]
@@ -486,9 +564,10 @@ def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=Non
         pairings[p.member_id].add(p.pair_with_id)
     blackouts = {
         (b.member_id, b.date)
-        for b in MemberBlackout.objects.filter(date__year=year, date__month=month)
+        for b in MemberBlackout.objects.filter(date__gte=start_date, date__lte=end_date)
     }
     assignments = defaultdict(int)
+    default_no_preference_cap = calculate_assignment_cap(8, month_span)
 
     def last_key(m):
         p = prefs.get(m.id)
@@ -496,9 +575,6 @@ def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=Non
         return d or date(1900, 1, 1)
 
     def eligible(role, m, day, assigned):
-        # Default values for members without DutyPreference
-        DEFAULT_MAX_ASSIGNMENTS = 8
-
         p = prefs.get(m.id)
         if not p:
             # Member has no preference set - treat as eligible with defaults
@@ -524,9 +600,9 @@ def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=Non
                     f"{m.full_display_name}: Not eligible for role {role} (flag is False)."
                 )
                 return False
-            if assignments[m.id] >= DEFAULT_MAX_ASSIGNMENTS:
+            if assignments[m.id] >= default_no_preference_cap:
                 logger.debug(
-                    f"{m.full_display_name}: Max assignments per month reached (using default {DEFAULT_MAX_ASSIGNMENTS})."
+                    f"{m.full_display_name}: Max assignments reached (using default {default_no_preference_cap})."
                 )
                 return False
             logger.debug(
@@ -587,7 +663,10 @@ def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=Non
         if pct == 0:
             logger.debug(f"{m.full_display_name}: {role} percent is 0.")
             return False
-        if assignments[m.id] >= getattr(p, "max_assignments_per_month", 0):
+        member_cap = calculate_assignment_cap(
+            getattr(p, "max_assignments_per_month", 0), month_span
+        )
+        if assignments[m.id] >= member_cap:
             logger.debug(f"{m.full_display_name}: Max assignments per month reached.")
             return False
         logger.debug(
@@ -699,13 +778,21 @@ def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=Non
                     assignments,
                     assigned_today,
                     last_assigned,
+                    range_months=month_span,
                 )
         schedule.append({"date": day, "slots": slots, "diagnostics": diagnostics})
         last_assigned = slots.copy()
     return schedule
 
 
-def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
+def generate_roster(
+    year=None,
+    month=None,
+    roles=None,
+    exclude_dates=None,
+    start_date=None,
+    end_date=None,
+):
     """
     Generate duty roster using configured scheduler (OR-Tools or legacy).
 
@@ -723,6 +810,8 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
         roles: List of roles to schedule (default: DEFAULT_ROLES from constants)
         exclude_dates: Optional set/list of datetime.date objects to skip
             (e.g. dates the user has already removed from the proposed roster).
+        start_date: Optional explicit scheduling range start (inclusive)
+        end_date: Optional explicit scheduling range end (inclusive)
 
     Returns:
         List of dicts, each with:
@@ -731,11 +820,14 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
             - 'diagnostics': per-date scheduling diagnostics/metadata
     """
     # Normalize parameters to avoid None values in telemetry/logging
-    from django.utils.timezone import now
-
-    today = now().date()
-    year = year or today.year
-    month = month or today.month
+    start_date, end_date = resolve_roster_date_range(
+        year=year,
+        month=month,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    year = start_date.year
+    month = start_date.month
     roles = roles if roles is not None else DEFAULT_ROLES
     exclude_dates = exclude_dates or set()
 
@@ -760,7 +852,14 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
 
             from duty_roster.ortools_scheduler import generate_roster_ortools
 
-            schedule = generate_roster_ortools(year, month, roles, exclude_dates)
+            schedule = generate_roster_ortools(
+                year,
+                month,
+                roles,
+                exclude_dates,
+                start_date=start_date,
+                end_date=end_date,
+            )
 
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             logger.info(
@@ -771,6 +870,8 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
                     "month": month,
                     "num_days": len(schedule),
                     "scheduler": "ortools",
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
                 },
             )
             return schedule
@@ -790,7 +891,14 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
     )
     start_time = time.perf_counter()
 
-    schedule = _generate_roster_legacy(year, month, roles, exclude_dates)
+    schedule = _generate_roster_legacy(
+        year,
+        month,
+        roles,
+        exclude_dates,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
     logger.info(
@@ -801,12 +909,21 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
             "month": month,
             "num_days": len(schedule),
             "scheduler": "legacy",
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
         },
     )
     return schedule
 
 
-def generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=None):
+def generate_roster_legacy(
+    year=None,
+    month=None,
+    roles=None,
+    exclude_dates=None,
+    start_date=None,
+    end_date=None,
+):
     """
     Generate duty roster using legacy weighted-random algorithm.
 
@@ -827,4 +944,11 @@ def generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=None
     Returns:
         List of dicts, each with 'date', 'slots', and 'diagnostics'
     """
-    return _generate_roster_legacy(year, month, roles, exclude_dates)
+    return _generate_roster_legacy(
+        year,
+        month,
+        roles,
+        exclude_dates,
+        start_date=start_date,
+        end_date=end_date,
+    )

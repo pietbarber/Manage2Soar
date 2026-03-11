@@ -10,9 +10,16 @@ from datetime import date
 import pytest
 from django.urls import reverse
 
-from duty_roster.roster_generator import clear_operational_season_cache, generate_roster
+from duty_roster.models import DutyAssignment, DutyPreference
+from duty_roster.roster_generator import (
+    calculate_assignment_cap,
+    clear_operational_season_cache,
+    generate_roster,
+    resolve_roster_date_range,
+)
 from logsheet.models import Airfield
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -124,6 +131,45 @@ class TestGenerateRosterExcludeDates:
         )
 
         assert len(roster_default) == len(roster_empty)
+
+    def test_generate_roster_accepts_arbitrary_date_range(self):
+        """Date-range generation should include weekend days across month boundaries."""
+        Member.objects.create(
+            username="test_range",
+            email="range@test.com",
+            first_name="Range",
+            last_name="Tester",
+            instructor=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today(),
+        )
+
+        roster = generate_roster(
+            roles=["instructor"],
+            start_date=date(2026, 3, 28),
+            end_date=date(2026, 4, 6),
+        )
+        roster_dates = {entry["date"] for entry in roster}
+
+        assert date(2026, 3, 28) in roster_dates
+        assert date(2026, 3, 29) in roster_dates
+        assert date(2026, 4, 4) in roster_dates
+        assert date(2026, 4, 5) in roster_dates
+
+    def test_fractional_assignment_cap_rounds_up(self):
+        """Fractional monthly limits should convert to integer caps by rounding up."""
+        assert calculate_assignment_cap(0.5, 1) == 1
+        assert calculate_assignment_cap(0.5, 2) == 1
+        assert calculate_assignment_cap(1.25, 2) == 3
+
+    def test_resolve_range_requires_both_explicit_bounds(self):
+        """Providing only one explicit bound should fail fast."""
+        with pytest.raises(ValueError):
+            resolve_roster_date_range(start_date=date(2026, 3, 1))
+
+        with pytest.raises(ValueError):
+            resolve_roster_date_range(end_date=date(2026, 3, 31))
 
 
 @pytest.mark.django_db
@@ -336,3 +382,350 @@ class TestProposeRosterSessionTracking:
         session = client.session
         assert "proposed_roster" not in session
         assert removed_key not in session
+
+    def test_explicit_range_is_reflected_in_context(
+        self, client, rostermeister, instructor_member
+    ):
+        """Providing start/end dates should be reflected in template context."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-03-15",
+                "end_date": "2026-05-02",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.context["start_date"] == date(2026, 3, 15)
+        assert response.context["end_date"] == date(2026, 5, 2)
+        assert response.context["month_span"] == 3
+
+    def test_remove_dates_stores_in_range_session_key(
+        self, client, rostermeister, instructor_member
+    ):
+        """Removing dates in a custom range should use range-scoped session key."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-03-15",
+                "end_date": "2026-05-02",
+            },
+        )
+        assert response.status_code == 200
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-15", "slots": {}}]
+        session.save()
+
+        client.post(
+            url,
+            {
+                "start_date": "2026-03-15",
+                "end_date": "2026-05-02",
+                "action": "remove_dates",
+                "remove_date": ["2026-03-15"],
+            },
+        )
+
+        session = client.session
+        removed_key = "removed_roster_dates_2026-03-15_2026-05-02"
+        removed = session.get(removed_key, [])
+        assert "2026-03-15" in removed
+
+    def test_invalid_reversed_range_shows_error_and_falls_back(
+        self, client, rostermeister, instructor_member
+    ):
+        """Reversed range should show an error and fall back to default month range."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-05-02",
+                "end_date": "2026-03-15",
+            },
+        )
+
+        assert response.status_code == 200
+
+        messages = list(response.context["messages"])
+        assert any("Invalid roster date range." in str(m) for m in messages)
+
+        # Ensure fallback produced a valid range and did not retain reversed values.
+        assert response.context["start_date"] <= response.context["end_date"]
+        assert response.context["start_date"] != date(2026, 5, 2)
+
+    def test_cross_year_range_omits_single_year_season_summary(
+        self, client, rostermeister, instructor_member
+    ):
+        """Cross-year ranges should not expose misleading single-year season bounds."""
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.example.com",
+            club_abbreviation="TC",
+            schedule_instructors=True,
+        )
+
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-12-20",
+                "end_date": "2027-01-10",
+            },
+        )
+
+        assert response.status_code == 200
+        operational_info = response.context["operational_info"]
+        assert operational_info.get("range_spans_years") is True
+        assert "season_start" not in operational_info
+        assert "season_end" not in operational_info
+
+    def test_slot_eligibility_uses_selected_range_month_span(
+        self, client, rostermeister, instructor_member
+    ):
+        """Eligibility caps should use selected start/end range, not only draft min/max."""
+        DutyPreference.objects.update_or_create(
+            member=instructor_member,
+            defaults={"max_assignments_per_month": 1},
+        )
+
+        client.login(username="rostermeister", password="testpass123")
+        session = client.session
+        session["proposed_roster"] = [
+            {
+                "date": "2026-04-04",
+                "slots": {"instructor": instructor_member.id},
+            },
+            {
+                "date": "2026-04-05",
+                "slots": {"instructor": None},
+            },
+        ]
+        session.save()
+
+        response = client.post(
+            reverse("duty_roster:get_eligible_members_for_slot"),
+            {
+                "date": "2026-04-05",
+                "role": "instructor",
+                "current_member_id": "",
+                "start_date": "2026-03-31",
+                "end_date": "2026-05-01",
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        member_row = next(
+            m for m in payload["eligible_members"] if m["id"] == instructor_member.id
+        )
+
+        # Range spans Mar/Apr/May -> 3 months, so cap should be 3 for monthly rate 1.
+        assert member_row["max_assignments"] == 3
+        assert member_row["warnings"]["at_max"] is False
+
+    def test_slot_eligibility_handles_malformed_draft_dates(
+        self, client, rostermeister, instructor_member
+    ):
+        """Malformed draft dates should not cause eligible-member endpoint failures."""
+        client.login(username="rostermeister", password="testpass123")
+        session = client.session
+        session["proposed_roster"] = [
+            {"date": "not-a-date", "slots": {"instructor": None}},
+            {"date": "2026-04-05", "slots": {"instructor": instructor_member.id}},
+        ]
+        session.save()
+
+        response = client.post(
+            reverse("duty_roster:get_eligible_members_for_slot"),
+            {
+                "date": "2026-04-05",
+                "role": "instructor",
+                "current_member_id": "",
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert "eligible_members" in payload
+
+    def test_publish_uses_draft_range_when_posted_range_differs(
+        self, client, rostermeister, airfield
+    ):
+        """Publish should use the draft/session range, not edited POST range fields."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        DutyAssignment.objects.create(date=date(2026, 3, 7), location=airfield)
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "action": "publish",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        messages = [str(m) for m in response.context["messages"]]
+        assert any(
+            "Duty roster published for 2026-03-01 to 2026-03-31" in m for m in messages
+        )
+
+    def test_publish_redirects_to_effective_draft_month(
+        self, client, rostermeister, airfield
+    ):
+        """Publish should redirect to the month of the effective draft range."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "action": "publish",
+            },
+        )
+
+        assert response.status_code == 302
+        expected = reverse(
+            "duty_roster:duty_calendar_month", kwargs={"year": 2026, "month": 3}
+        )
+        assert response["Location"].endswith(expected)
+
+    def test_publish_clears_stale_assignments_across_effective_range(
+        self, client, rostermeister, airfield
+    ):
+        """Publish should clear stale assignments for omitted dates in draft range."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        DutyAssignment.objects.create(date=date(2026, 3, 7), location=airfield)
+        DutyAssignment.objects.create(date=date(2026, 3, 14), location=airfield)
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "action": "publish",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        assert DutyAssignment.objects.filter(date=date(2026, 3, 7)).exists()
+        assert not DutyAssignment.objects.filter(date=date(2026, 3, 14)).exists()
+
+    def test_rejects_proposal_ranges_longer_than_max(self, client, rostermeister):
+        """Very large explicit date ranges should be rejected with a clear message."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        response = client.get(
+            url,
+            {
+                "start_date": "2026-01-01",
+                "end_date": "2027-06-01",
+            },
+        )
+
+        assert response.status_code == 200
+        messages = [str(m) for m in response.context["messages"]]
+        assert any("cannot exceed 12 months" in m for m in messages)
+
+    def test_publish_skips_invalid_draft_entries(self, client, rostermeister, airfield):
+        """Malformed draft dates should be skipped instead of aborting publish."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        session = client.session
+        session["proposed_roster"] = [
+            {"date": "not-a-date", "slots": {}},
+            {"date": "2026-03-08", "slots": {}},
+        ]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "year": 2026,
+                "month": 3,
+                "action": "publish",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        assert DutyAssignment.objects.filter(date=date(2026, 3, 8)).exists()
+
+    def test_remove_dates_renders_effective_draft_range(
+        self, client, rostermeister, instructor_member
+    ):
+        """Non-roll actions should render the persisted draft range back to the form."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-15", "slots": {}}]
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "action": "remove_dates",
+                "remove_date": ["2026-03-15"],
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.context["start_date"] == date(2026, 3, 1)
+        assert response.context["end_date"] == date(2026, 3, 31)
+        assert response.context["month_span"] == 1

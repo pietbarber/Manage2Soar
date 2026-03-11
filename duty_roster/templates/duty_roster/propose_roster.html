@@ -9,7 +9,7 @@
 
 {% if incomplete %}
   <div class="alert alert-warning">
-    ⚠️ Could not fully auto-generate a complete roster for {{ month }}/{{ year }}.
+    ⚠️ Could not fully auto-generate a complete roster for {{ start_date }} to {{ end_date }}.
     Showing weekend dates so you can review (or try "🔄 Roll Again").
   </div>
 {% endif %}
@@ -22,6 +22,9 @@
   {% endif %}
   {% if operational_info.season_start and operational_info.season_end %}
     <p><strong>{{ year }} Season:</strong> {{ operational_info.season_start }} through {{ operational_info.season_end }}</p>
+  {% endif %}
+  {% if operational_info.range_spans_years %}
+    <p><strong>Selected range spans multiple years.</strong> Per-year season summary is hidden to avoid showing misleading single-year bounds.</p>
   {% endif %}
   {% if filtered_dates %}
     <div class="mt-2">
@@ -49,7 +52,7 @@
   </div>
 {% endif %}
 
-<h2>📝 Proposed Duty Roster — {{ month }}/{{ year }} (Draft)</h2>
+<h2>📝 Proposed Duty Roster — {{ start_date }} to {{ end_date }} (Draft)</h2>
 {% if no_scheduling %}
   <div class="alert alert-info">
     This club does not schedule operations. If you want to change this, please configure the site to schedule volunteers.
@@ -59,6 +62,25 @@
   {% csrf_token %}
   <input type="hidden" name="year"  value="{{ year }}">
   <input type="hidden" name="month" value="{{ month }}">
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label for="startDate" class="form-label">Start date</label>
+          <input id="startDate" name="start_date" type="date" class="form-control" value="{{ start_date|date:'Y-m-d' }}" required>
+        </div>
+        <div class="col-md-4">
+          <label for="endDate" class="form-label">End date</label>
+          <input id="endDate" name="end_date" type="date" class="form-control" value="{{ end_date|date:'Y-m-d' }}" required>
+        </div>
+        <div class="col-md-4">
+          <button name="action" value="roll" class="btn btn-primary w-100">Generate For Range</button>
+        </div>
+      </div>
+      <small class="text-muted">Range spans {{ month_span }} calendar month{{ month_span|pluralize }} (partial months round up).</small>
+    </div>
+  </div>
 
 
   {% if draft %}
@@ -356,6 +378,16 @@ function showEditSlotModal(role, date, currentMember) {
 
   modal.show();
 
+  const selectedStartDate = document.getElementById('startDate')?.value || '';
+  const selectedEndDate = document.getElementById('endDate')?.value || '';
+  const requestBody = new URLSearchParams({
+    date,
+    role,
+    current_member_id: currentMember || '',
+    start_date: selectedStartDate,
+    end_date: selectedEndDate,
+  }).toString();
+
   // Fetch eligible members
   fetch('{% url "duty_roster:get_eligible_members_for_slot" %}', {
     method: 'POST',
@@ -363,7 +395,7 @@ function showEditSlotModal(role, date, currentMember) {
       'Content-Type': 'application/x-www-form-urlencoded',
       'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
     },
-    body: `date=${date}&role=${role}&current_member_id=${currentMember || ''}`
+    body: requestBody
   })
   .then(response => {
     if (!response.ok) {
@@ -419,14 +451,14 @@ function renderEditSlotForm(data, roleName) {
       if (member.warnings.at_max) warnings.push('🎯 At max');
 
       const warningText = warnings.length > 0 ? ` (${warnings.join(', ')})` : '';
-      const assignmentText = ` [${member.assignments_this_month}/${member.max_assignments}]`;
+      const assignmentText = ` [${member.assignments_in_range}/${member.max_assignments}]`;
 
       html += `<option value="${escapeHtml(member.id)}" ${selected}>${escapeHtml(member.name)}${escapeHtml(assignmentText)}${escapeHtml(warningText)}</option>`;
     });
     html += '</select>';
 
     html += `<small class="form-text text-muted d-block mt-2">
-      <strong>Legend:</strong> [current/max assignments this month] |
+      <strong>Legend:</strong> [current/max assignments in range] |
       ⚠️ = Warning (you can still assign) |
       🎯 = At max assignments
     </small>`;
@@ -558,7 +590,7 @@ function showDiagnosticModal(role, date, diagnostic) {
   }
 
   if (reasons.max_assignments_reached && reasons.max_assignments_reached.length > 0) {
-    content += `<li><strong>🎯 At max assignments for month (${reasons.max_assignments_reached.length}):</strong> ${escapeNames(reasons.max_assignments_reached)}</li>`;
+    content += `<li><strong>🎯 At max assignments for this range (${reasons.max_assignments_reached.length}):</strong> ${escapeNames(reasons.max_assignments_reached)}</li>`;
   }
 
   if (reasons.scheduling_suspended && reasons.scheduling_suspended.length > 0) {
