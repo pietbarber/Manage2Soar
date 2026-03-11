@@ -5,7 +5,7 @@ from django.conf import settings
 from django.urls import reverse
 
 from cms.models import HomePageContent, Page
-from members.utils import is_active_member
+from members.utils import is_active_member, is_kiosk_session
 from siteconfig.templatetags.siteconfig_tags import webcam_enabled
 
 
@@ -84,12 +84,21 @@ def _build_resources_nav_items(request, footer=None):
     ]
 
     access_request = request if hasattr(request, "session") else None
+    is_kiosk = bool(access_request and is_kiosk_session(access_request))
 
-    promoted_pages = (
-        Page.objects.filter(promote_to_navbar=True, navbar_rank__isnull=False)
-        .prefetch_related("role_permissions", "member_permissions")
-        .order_by("navbar_rank", "id")
+    promoted_pages = Page.objects.filter(
+        promote_to_navbar=True,
+        navbar_rank__isnull=False,
     )
+    if request.user.is_authenticated or is_kiosk:
+        promoted_pages = promoted_pages.prefetch_related(
+            "role_permissions",
+            "member_permissions",
+        )
+    else:
+        promoted_pages = promoted_pages.filter(is_public=True)
+
+    promoted_pages = promoted_pages.order_by("navbar_rank", "id")
     for page in promoted_pages:
         if page.can_user_access(request.user, access_request):
             items.append(

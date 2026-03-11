@@ -97,6 +97,12 @@ def test_page_admin_promotion_fields_editable_for_webmaster():
 
 
 @pytest.mark.django_db
+def test_page_admin_navbar_fieldset_description_mentions_superusers():
+    description = PageAdmin(Page, AdminSite()).fieldsets[3][1]["description"]
+    assert "webmasters and superusers" in description
+
+
+@pytest.mark.django_db
 def test_create_promoted_page_without_rank_fails_on_save():
     with pytest.raises(ValidationError):
         Page.objects.create(

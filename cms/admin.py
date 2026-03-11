@@ -142,7 +142,7 @@ class PageAdmin(admin.ModelAdmin):
                 "fields": ("promote_to_navbar", "navbar_title", "navbar_rank"),
                 "description": (
                     "Promoted pages appear in the top navbar Resources drawer. "
-                    "Only webmasters can modify these fields."
+                    "Only webmasters and superusers can modify these fields."
                 ),
             },
         ),
