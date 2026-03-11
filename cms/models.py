@@ -390,11 +390,8 @@ class Page(models.Model):
         if not self.slug:
             self.slug = slugify(self.title)
 
-        # Enforce maximum nesting depth for all saves (Issue #596)
-        self._validate_depth()
-
-        # Run clean() on both creates and updates to enforce model validations.
-        self.clean()
+        # Run field validators and model clean() on all saves.
+        self.full_clean()
 
         if self.pk:
             # Only fix YouTube embeds if content has changed

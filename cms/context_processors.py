@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from cms.models import HomePageContent, Page
 from members.utils import is_active_member
-from siteconfig.models import SiteConfiguration
+from siteconfig.templatetags.siteconfig_tags import webcam_enabled
 
 
 class _AnchorExtractor(HTMLParser):
@@ -55,7 +55,8 @@ def _is_safe_nav_url(url):
         return False
     parsed = urlparse(url)
     if not parsed.scheme:
-        return True
+        # Reject protocol-relative URLs (e.g. //example.com).
+        return not parsed.netloc
     return parsed.scheme in {"http", "https"}
 
 
@@ -154,10 +155,7 @@ def _build_resources_nav_items(request, footer=None):
         )
 
     if request.user.is_authenticated and is_active_member(request.user):
-        webcam_url = SiteConfiguration.objects.values_list(
-            "webcam_snapshot_url", flat=True
-        ).first()
-        if webcam_url:
+        if webcam_enabled():
             items.append(
                 {
                     "title": "Webcam",

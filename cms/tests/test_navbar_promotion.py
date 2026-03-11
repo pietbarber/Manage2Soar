@@ -106,3 +106,15 @@ def test_create_promoted_page_without_rank_fails_on_save():
             promote_to_navbar=True,
             navbar_rank=None,
         )
+
+
+@pytest.mark.django_db
+def test_create_promoted_page_with_invalid_rank_fails_on_save():
+    with pytest.raises(ValidationError):
+        Page.objects.create(
+            title="Bad Rank",
+            slug="bad-rank",
+            is_public=True,
+            promote_to_navbar=True,
+            navbar_rank=0,
+        )
