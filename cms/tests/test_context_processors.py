@@ -4,8 +4,17 @@ and its effect on the login page template.
 """
 
 import pytest
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.test import override_settings
+from django.test.client import RequestFactory
 from django.urls import reverse
+
+from cms.context_processors import footer_content
+from cms.models import Page
+from siteconfig.models import SiteConfiguration
+
+User = get_user_model()
 
 
 @pytest.mark.django_db
@@ -38,3 +47,75 @@ def test_login_page_hides_google_button_when_not_configured(client):
     with override_settings(SOCIAL_AUTH_GOOGLE_OAUTH2_KEY=None):
         response = client.get(reverse("login"))
     assert b"Sign in with Google" not in response.content
+
+
+@pytest.mark.django_db
+def test_resources_nav_includes_document_root_for_anonymous():
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+
+    context = footer_content(request)
+    titles = [item["title"] for item in context["resources_nav_items"]]
+
+    assert "Document Root" in titles
+
+
+@pytest.mark.django_db
+def test_resources_nav_includes_promoted_public_page_for_anonymous():
+    Page.objects.create(
+        title="Weather",
+        slug="weather",
+        is_public=True,
+        promote_to_navbar=True,
+        navbar_rank=5,
+        navbar_title="Weather Links",
+    )
+
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    assert "Weather Links" in titles
+
+
+@pytest.mark.django_db
+def test_resources_nav_excludes_private_promoted_page_for_anonymous():
+    Page.objects.create(
+        title="Board Docs",
+        slug="board-docs",
+        is_public=False,
+        promote_to_navbar=True,
+        navbar_rank=6,
+    )
+
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    assert "Board Docs" not in titles
+
+
+@pytest.mark.django_db
+def test_resources_nav_includes_member_only_links_for_active_member():
+    member = User.objects.create_user(
+        username="member_nav",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        webcam_snapshot_url="https://example.com/webcam.jpg",
+    )
+
+    request = RequestFactory().get("/")
+    request.user = member
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    assert "Report Website Issue" in titles
+    assert "Safety Suggestion Box" in titles
+    assert "Webcam" in titles

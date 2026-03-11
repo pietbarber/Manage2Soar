@@ -1,6 +1,7 @@
 import threading
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.text import slugify
 from tinymce.models import HTMLField
@@ -10,6 +11,8 @@ from utils.upload_entropy import upload_cms_banner, upload_homepage_gallery
 
 # Thread-local storage for recursion guards
 _thread_locals = threading.local()
+NAVBAR_RANK_MIN = 1
+NAVBAR_RANK_MAX = 100
 
 # --- CMS Arbitrary Page and Document Models ---
 
@@ -239,6 +242,33 @@ class Page(models.Model):
     )
     content = HTMLField(blank=True)
     is_public = models.BooleanField(default=True)
+    promote_to_navbar = models.BooleanField(
+        default=False,
+        help_text=(
+            "Promote this page into the top navbar Resources drawer. "
+            "Only webmasters may change this setting."
+        ),
+    )
+    navbar_title = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text=(
+            "Optional display title in the Resources drawer. "
+            "If blank, page title is used."
+        ),
+    )
+    navbar_rank = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(NAVBAR_RANK_MIN),
+            MaxValueValidator(NAVBAR_RANK_MAX),
+        ],
+        help_text=(
+            "Order in the Resources drawer when promoted. "
+            "Lower ranks appear first (1-100)."
+        ),
+    )
     banner_image = models.ImageField(
         upload_to=upload_cms_banner,
         blank=True,
@@ -310,8 +340,21 @@ class Page(models.Model):
                 "Set 'is_public' to False to enable role-based access control."
             )
 
+        if self.promote_to_navbar and self.navbar_rank is None:
+            raise ValidationError(
+                {
+                    "navbar_rank": (
+                        "Navbar rank is required when 'Promote to navbar' is enabled."
+                    )
+                }
+            )
+
         # Enforce maximum nesting depth (Issue #596)
         self._validate_depth()
+
+    def effective_navbar_title(self):
+        """Return the Resources drawer label for this page."""
+        return self.navbar_title.strip() if self.navbar_title.strip() else self.title
 
     def _validate_depth(self):
         """Validate that page depth doesn't exceed MAX_CMS_DEPTH.
