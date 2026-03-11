@@ -428,7 +428,6 @@ def fill_instruction_report(request, student_id, report_date):
     existing_qualifications = (
         MemberQualification.objects.filter(
             member=student,
-            is_qualified=True,
             qualification__is_obsolete=False,
         )
         .select_related("qualification")
@@ -877,7 +876,6 @@ def log_ground_instruction(request):
         existing_qualifications = (
             MemberQualification.objects.filter(
                 member=student,
-                is_qualified=True,
                 qualification__is_obsolete=False,
             )
             .select_related("qualification")
@@ -967,23 +965,12 @@ def assign_qualification_modal(request, member_id):
         )
         if form.is_valid():
             qualification = form.save()
-            # Return success content with updated qualifications list
-            updated_qualifications = (
-                MemberQualification.objects.filter(
-                    member=student,
-                    is_qualified=True,
-                    qualification__is_obsolete=False,
-                )
-                .select_related("qualification")
-                .order_by("-date_awarded")
-            )
             return render(
                 request,
                 "instructors/_qualification_success.html",
                 {
                     "member": student,
                     "qualification": qualification,
-                    "updated_qualifications": updated_qualifications,
                 },
             )
         # If form has errors, fall through to return form with errors
