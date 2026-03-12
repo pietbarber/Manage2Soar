@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 anyio==4.11.0
 asgiref==3.9.1
-Authlib==1.6.6
+Authlib==1.6.7
 bandit==1.8.6
 black==25.9.0
 bleach==6.3.0
@@ -20,7 +20,7 @@ cyclonedx-python-lib==9.1.0
 defusedxml==0.7.1
 diff-match-patch==20241021
 distlib==0.4.0
-Django==5.2.11
+Django==5.2.12
 django-crispy-forms==2.4
 django-extensions==4.1
 django-htmx==1.23.2
