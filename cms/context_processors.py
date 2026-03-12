@@ -1,3 +1,4 @@
+import logging
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -8,6 +9,8 @@ from cms.constants import MAX_CMS_DEPTH
 from cms.models import HomePageContent, Page
 from members.utils import is_active_member, is_kiosk_session
 from siteconfig.templatetags.siteconfig_tags import webcam_enabled
+
+logger = logging.getLogger(__name__)
 
 
 class _AnchorExtractor(HTMLParser):
@@ -207,6 +210,7 @@ def _safe_resources_nav_items(request, footer=None):
     try:
         return _build_resources_nav_items(request, footer)
     except Exception:
+        logger.exception("Failed to build resources navigation items; using fallback")
         return _minimal_resources_nav_items()
 
 
@@ -231,6 +235,7 @@ def footer_content(request):
             }
         except Exception:
             # If CMS is not available or an unexpected error occurs, fail gracefully.
+            logger.exception("Failed to load footer content; using minimal resources")
             return {
                 "footer_content": None,
                 "google_oauth_configured": google_oauth_configured,

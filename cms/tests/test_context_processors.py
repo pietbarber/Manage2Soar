@@ -377,3 +377,43 @@ def test_footer_content_falls_back_to_minimal_resources_for_authenticated(
     assert context["resources_nav_items"] == [
         {"title": "Document Root", "url": reverse("cms:resources"), "rank": 0}
     ]
+
+
+@pytest.mark.django_db
+def test_footer_content_logs_when_resources_build_fails(monkeypatch, caplog):
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated build failure")
+
+    monkeypatch.setattr("cms.context_processors._build_resources_nav_items", _raise)
+
+    with caplog.at_level("ERROR"):
+        footer_content(request)
+
+    assert "Failed to build resources navigation items; using fallback" in caplog.text
+
+
+@pytest.mark.django_db
+def test_footer_content_logs_when_footer_query_fails(monkeypatch, caplog):
+    member = User.objects.create_user(
+        username="member_footer_query_fail",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    request = RequestFactory().get("/")
+    request.user = member
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated footer query failure")
+
+    monkeypatch.setattr(HomePageContent.objects, "filter", _raise)
+
+    with caplog.at_level("ERROR"):
+        context = footer_content(request)
+
+    assert "Failed to load footer content; using minimal resources" in caplog.text
+    assert context["resources_nav_items"] == [
+        {"title": "Document Root", "url": reverse("cms:resources"), "rank": 0}
+    ]
