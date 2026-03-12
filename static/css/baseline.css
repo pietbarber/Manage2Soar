@@ -488,7 +488,7 @@ table .duty-badge {
   border: 1px solid #fd7e14;
 }
 
-.duty-role-card-do > h6 {
+.duty-role-card-do>h6 {
   color: #fd7e14;
 }
 
@@ -673,21 +673,20 @@ table .duty-badge.badge-warning {
   border-left: 3px solid #dc3545;
 }
 
-@media (max-width: 575px) {
+@media (max-width: 991.98px) {
   .calendar-cell {
     min-height: 92px;
     padding: 6px !important;
+  }
+
+  .calendar-cell .duty-assignments {
+    display: none;
   }
 
   .calendar-cell .duty-assignments .duty-badge,
   .calendar-cell .status-alert-text,
   .calendar-cell .surge-alert-text {
     display: none !important;
-  }
-
-  .calendar-cell .duty-assignments {
-    gap: 2px;
-    margin-top: 2px;
   }
 
   .calendar-cell .calendar-role-icons {
@@ -716,6 +715,11 @@ table .duty-badge.badge-warning {
     justify-content: center;
     margin-right: 3px;
     width: 20px;
+  }
+
+  .calendar-cell .calendar-role-icon {
+    height: 22px;
+    width: 22px;
   }
 }
 
