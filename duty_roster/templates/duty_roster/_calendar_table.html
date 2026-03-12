@@ -43,13 +43,16 @@
             {% with surge=surge_needed_by_date|dict_get:day %}
               {% if surge.instructor or surge.towpilot %}
                 <div class="surge-alert-container">
+                  <span class="calendar-alert-icon" title="High demand alert" aria-label="High demand alert">
+                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                  </span>
                   {% if surge.instructor %}
-                    <span class="duty-badge badge-surge" title="At least {{ instruction_surge_threshold }} students requesting instruction">
+                    <span class="duty-badge badge-surge surge-alert-text" title="At least {{ instruction_surge_threshold }} students requesting instruction">
                       HIGH INSTRUCTION DEMAND
                     </span>
                   {% endif %}
                   {% if surge.towpilot %}
-                    <span class="duty-badge badge-surge" title="At least {{ tow_surge_threshold }} requests for tows">
+                    <span class="duty-badge badge-surge surge-alert-text" title="At least {{ tow_surge_threshold }} requests for tows">
                       HIGH TOW DEMAND
                     </span>
                   {% endif %}
@@ -60,17 +63,52 @@
             {% if day in assignments_by_date %}
               {% with a=assignments_by_date|dict_get:day %}
                 {% if not a.confirmed and not a.is_confirmed %}
-                  <div class="mb-2">
-                    <span class="duty-badge badge-warning">NOT CONFIRMED</span><br>
+                  <div class="mb-2 status-alert-container">
+                    <span class="calendar-alert-icon" title="Duty coverage alert" aria-label="Duty coverage alert">
+                      <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                    </span>
+                    <span class="duty-badge badge-warning status-alert-text">NOT CONFIRMED</span><br>
                     {% get_siteconfig as config %}
                     {% if not a.tow_pilot %}
-                      <span class="duty-badge badge-warning">{{ config.towpilot_title|default:'Tow Pilot' }} MISSING</span><br>
+                      <span class="duty-badge badge-warning status-alert-text">{{ config.towpilot_title|default:'Tow Pilot' }} MISSING</span><br>
                     {% endif %}
                     {% if not a.duty_officer %}
-                      <span class="duty-badge badge-warning">{{ config.duty_officer_title|default:'Duty Officer' }} MISSING</span><br>
+                      <span class="duty-badge badge-warning status-alert-text">{{ config.duty_officer_title|default:'Duty Officer' }} MISSING</span><br>
                     {% endif %}
                   </div>
                 {% endif %}
+                <div class="calendar-role-icons" aria-label="Assigned duty roles">
+                  {% if a.instructor %}
+                    <span class="calendar-role-icon role-instructor" title="Instructor assigned" aria-label="Instructor assigned">
+                      <i class="bi bi-mortarboard" aria-hidden="true"></i>
+                    </span>
+                  {% endif %}
+                  {% if a.tow_pilot %}
+                    <span class="calendar-role-icon role-tow-pilot" title="Tow pilot assigned" aria-label="Tow pilot assigned">
+                      <i class="bi bi-airplane" aria-hidden="true"></i>
+                    </span>
+                  {% endif %}
+                  {% if a.duty_officer %}
+                    <span class="calendar-role-icon role-duty-officer" title="Duty officer assigned" aria-label="Duty officer assigned">
+                      <i class="bi bi-clipboard-check" aria-hidden="true"></i>
+                    </span>
+                  {% endif %}
+                  {% if a.assistant_duty_officer %}
+                    <span class="calendar-role-icon role-assistant-duty-officer" title="Assistant duty officer assigned" aria-label="Assistant duty officer assigned">
+                      <i class="bi bi-person-badge" aria-hidden="true"></i>
+                    </span>
+                  {% endif %}
+                  {% if a.surge_instructor %}
+                    <span class="calendar-role-icon role-instructor" title="Surge instructor assigned" aria-label="Surge instructor assigned">
+                      <i class="bi bi-mortarboard" aria-hidden="true"></i>
+                    </span>
+                  {% endif %}
+                  {% if a.surge_tow_pilot %}
+                    <span class="calendar-role-icon role-tow-pilot" title="Surge tow pilot assigned" aria-label="Surge tow pilot assigned">
+                      <i class="bi bi-airplane" aria-hidden="true"></i>
+                    </span>
+                  {% endif %}
+                </div>
                 <div class="duty-assignments">
                   {% if a.instructor %}
                     <span class="duty-badge badge-instructor"><i class="bi bi-mortarboard" aria-hidden="true"></i> {{ a.instructor.last_name }}</span>
