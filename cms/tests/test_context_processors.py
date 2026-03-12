@@ -266,6 +266,34 @@ def test_resources_nav_filters_protocol_relative_footer_links():
 
 
 @pytest.mark.django_db
+def test_resources_nav_filters_whitespace_prefixed_unsafe_links():
+    member = User.objects.create_user(
+        username="member_footer_whitespace_unsafe",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    HomePageContent.objects.create(
+        title="Footer",
+        slug="footer",
+        audience="member",
+        content=(
+            '<p><a href=" javascript:alert(1)">Bad JS Space</a> '
+            '<a href=" //evil.example/path">Bad Proto Space</a> '
+            '<a href=" https://example.com/weather ">Good HTTPS Space</a></p>'
+        ),
+    )
+
+    request = RequestFactory().get("/")
+    request.user = member
+    context = footer_content(request)
+
+    titles = [item["title"] for item in context["resources_nav_items"]]
+    assert "Bad JS Space" not in titles
+    assert "Bad Proto Space" not in titles
+    assert "Good HTTPS Space" in titles
+
+
+@pytest.mark.django_db
 def test_resources_nav_ignores_promoted_pages_with_null_rank():
     page = Page.objects.create(
         title="Ranked Page",

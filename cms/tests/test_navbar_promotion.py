@@ -103,6 +103,12 @@ def test_page_admin_navbar_fieldset_description_mentions_superusers():
 
 
 @pytest.mark.django_db
+def test_promote_to_navbar_help_text_mentions_superusers():
+    help_text = Page._meta.get_field("promote_to_navbar").help_text
+    assert "webmasters and superusers" in help_text
+
+
+@pytest.mark.django_db
 def test_create_promoted_page_without_rank_fails_on_save():
     with pytest.raises(ValidationError):
         Page.objects.create(

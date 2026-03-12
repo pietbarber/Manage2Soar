@@ -246,7 +246,7 @@ class Page(models.Model):
         default=False,
         help_text=(
             "Promote this page into the top navbar Resources drawer. "
-            "Only webmasters may change this setting."
+            "Only webmasters and superusers may change this setting."
         ),
     )
     navbar_title = models.CharField(

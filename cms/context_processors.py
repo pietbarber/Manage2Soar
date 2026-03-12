@@ -53,11 +53,16 @@ def _is_safe_nav_url(url):
     """Allow relative URLs and absolute http(s) URLs only."""
     if not url:
         return False
-    parsed = urlparse(url)
-    if not parsed.scheme:
+    normalized_url = url.strip()
+    if not normalized_url:
+        return False
+
+    parsed = urlparse(normalized_url)
+    scheme = parsed.scheme.lower()
+    if not scheme:
         # Reject protocol-relative URLs (e.g. //example.com).
         return not parsed.netloc
-    return parsed.scheme in {"http", "https"}
+    return scheme in {"http", "https"}
 
 
 def _dedupe_resource_items(items):

@@ -260,7 +260,7 @@ class PageAdmin(admin.ModelAdmin):
                 )
             ):
                 raise ValidationError(
-                    "Only webmasters can change navbar promotion settings."
+                    "Only webmasters or superusers can change navbar promotion settings."
                 )
 
             # Call model's clean method to run custom validation
