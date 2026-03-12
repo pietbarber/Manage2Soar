@@ -1,6 +1,7 @@
 import threading
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.text import slugify
 from tinymce.models import HTMLField
@@ -10,6 +11,8 @@ from utils.upload_entropy import upload_cms_banner, upload_homepage_gallery
 
 # Thread-local storage for recursion guards
 _thread_locals = threading.local()
+NAVBAR_RANK_MIN = 1
+NAVBAR_RANK_MAX = 100
 
 # --- CMS Arbitrary Page and Document Models ---
 
@@ -239,6 +242,33 @@ class Page(models.Model):
     )
     content = HTMLField(blank=True)
     is_public = models.BooleanField(default=True)
+    promote_to_navbar = models.BooleanField(
+        default=False,
+        help_text=(
+            "Promote this page into the top navbar Resources drawer. "
+            "Only webmasters and superusers may change this setting."
+        ),
+    )
+    navbar_title = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text=(
+            "Optional display title in the Resources drawer. "
+            "If blank, page title is used."
+        ),
+    )
+    navbar_rank = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(NAVBAR_RANK_MIN),
+            MaxValueValidator(NAVBAR_RANK_MAX),
+        ],
+        help_text=(
+            "Order in the Resources drawer when promoted. "
+            "Lower ranks appear first (1-100)."
+        ),
+    )
     banner_image = models.ImageField(
         upload_to=upload_cms_banner,
         blank=True,
@@ -296,8 +326,10 @@ class Page(models.Model):
                            or if nesting depth exceeds MAX_CMS_DEPTH
 
         Note:
-            Only validates existing pages (with pk) since Many-to-Many relationships
-            don't exist during initial creation.
+            The public+role_permissions check is only applied to existing pages
+            (with pk) since Many-to-Many relationships don't exist during initial
+            creation. Other validations (e.g., navbar promotion rank and depth)
+            run on both creates and updates.
         """
         from django.core.exceptions import ValidationError
 
@@ -310,8 +342,22 @@ class Page(models.Model):
                 "Set 'is_public' to False to enable role-based access control."
             )
 
+        if self.promote_to_navbar and self.navbar_rank is None:
+            raise ValidationError(
+                {
+                    "navbar_rank": (
+                        "Navbar rank is required when 'Promote to navbar' is enabled."
+                    )
+                }
+            )
+
         # Enforce maximum nesting depth (Issue #596)
         self._validate_depth()
+
+    def effective_navbar_title(self):
+        """Return the Resources drawer label for this page."""
+        title = (self.navbar_title or "").strip()
+        return title or self.title
 
     def _validate_depth(self):
         """Validate that page depth doesn't exceed MAX_CMS_DEPTH.
@@ -347,12 +393,10 @@ class Page(models.Model):
         if not self.slug:
             self.slug = slugify(self.title)
 
-        # Enforce maximum nesting depth for all saves (Issue #596)
-        self._validate_depth()
+        # Run field validators and model clean() on all saves.
+        self.full_clean()
 
-        # Only run clean() if this is an update (pk exists) to prevent unnecessary queries
         if self.pk:
-            self.clean()
             # Only fix YouTube embeds if content has changed
             old_content = Page.objects.get(pk=self.pk).content
             if old_content != self.content:

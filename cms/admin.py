@@ -57,10 +57,15 @@ class PageMemberPermissionInline(admin.TabularInline):
 
 @admin.register(Page)
 class PageAdmin(admin.ModelAdmin):
+    NAVBAR_PROMOTION_FIELDS = ("promote_to_navbar", "navbar_title", "navbar_rank")
+
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
         extra_context["admin_helper_message"] = self.admin_helper_message
         return super().changelist_view(request, extra_context=extra_context)
+
+    def _can_manage_navbar_promotion(self, request):
+        return request.user.is_superuser or getattr(request.user, "webmaster", False)
 
     def get_queryset(self, request):
         """Prefetch role and member permissions to prevent N+1 queries in list view"""
@@ -81,6 +86,8 @@ class PageAdmin(admin.ModelAdmin):
         "slug",
         "parent",
         "is_public",
+        "promote_to_navbar",
+        "navbar_rank",
         "role_summary",
         "member_summary",
         "updated_at",
@@ -126,6 +133,16 @@ class PageAdmin(admin.ModelAdmin):
                     "Use the 'Content Editors' section below to grant specific members EDIT access in Django admin. "
                     "This works for both public and private pages - the page visibility remains unchanged, "
                     "but assigned members can edit the content."
+                ),
+            },
+        ),
+        (
+            "Resources Navbar Promotion",
+            {
+                "fields": ("promote_to_navbar", "navbar_title", "navbar_rank"),
+                "description": (
+                    "Promoted pages appear in the top navbar Resources drawer. "
+                    "Only webmasters and superusers can modify these fields."
                 ),
             },
         ),
@@ -226,11 +243,26 @@ class PageAdmin(admin.ModelAdmin):
             request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if not self._can_manage_navbar_promotion(request):
+            readonly.extend(self.NAVBAR_PROMOTION_FIELDS)
+        return readonly
+
     def save_model(self, request, obj, form, change):
         """Add validation when saving"""
         try:
-            # Call model's clean method to run custom validation
-            obj.full_clean()
+            if (
+                change
+                and not self._can_manage_navbar_promotion(request)
+                and any(
+                    field in form.changed_data for field in self.NAVBAR_PROMOTION_FIELDS
+                )
+            ):
+                raise ValidationError(
+                    "Only webmasters or superusers can change navbar promotion settings."
+                )
+
             super().save_model(request, obj, form, change)
         except ValidationError as e:
             from django.contrib import messages
