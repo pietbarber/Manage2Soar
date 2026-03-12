@@ -1,11 +1,20 @@
 from datetime import date, timedelta
 
 import pytest
+from django.core.cache import cache
 from django.urls import reverse
 
 from duty_roster.models import DutyAssignment, InstructionSlot
 from members.models import Member
 from siteconfig.models import SiteConfiguration
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """Avoid cross-test bleed from cached SiteConfiguration values."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.mark.django_db
