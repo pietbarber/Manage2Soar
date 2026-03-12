@@ -6,6 +6,7 @@ and its effect on the login page template.
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
 from django.test import override_settings
 from django.test.client import RequestFactory
 from django.urls import reverse
@@ -15,6 +16,11 @@ from cms.models import HomePageContent, Page
 from siteconfig.models import SiteConfiguration
 
 User = get_user_model()
+
+
+@pytest.fixture(autouse=True)
+def clear_siteconfig_cache_between_tests():
+    cache.clear()
 
 
 @pytest.mark.django_db

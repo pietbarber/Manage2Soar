@@ -263,8 +263,6 @@ class PageAdmin(admin.ModelAdmin):
                     "Only webmasters or superusers can change navbar promotion settings."
                 )
 
-            # Call model's clean method to run custom validation
-            obj.full_clean()
             super().save_model(request, obj, form, change)
         except ValidationError as e:
             from django.contrib import messages

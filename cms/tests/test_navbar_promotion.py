@@ -110,8 +110,14 @@ def test_page_admin_promotion_fields_editable_for_webmaster():
 
 @pytest.mark.django_db
 def test_page_admin_navbar_fieldset_description_mentions_superusers():
-    description = PageAdmin(Page, AdminSite()).fieldsets[3][1]["description"]
-    assert "webmasters and superusers" in description
+    admin = PageAdmin(Page, AdminSite())
+    navbar_fieldset_description = ""
+    for title, options in admin.fieldsets:
+        if title == "Resources Navbar Promotion":
+            navbar_fieldset_description = options.get("description", "")
+            break
+
+    assert "webmasters and superusers" in navbar_fieldset_description
 
 
 @pytest.mark.django_db
