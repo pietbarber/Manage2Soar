@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.urls import reverse
 
+from cms.constants import MAX_CMS_DEPTH
 from cms.models import HomePageContent, Page
 from members.utils import is_active_member, is_kiosk_session
 from siteconfig.templatetags.siteconfig_tags import webcam_enabled
@@ -91,10 +92,17 @@ def _build_resources_nav_items(request, footer=None):
     access_request = request if hasattr(request, "session") else None
     is_kiosk = bool(access_request and is_kiosk_session(access_request))
 
+    parent_select_related = ["parent"]
+    parent_path = "parent"
+    for _ in range(1, MAX_CMS_DEPTH):
+        parent_path = f"{parent_path}__parent"
+        parent_select_related.append(parent_path)
+
     promoted_pages = Page.objects.filter(
         promote_to_navbar=True,
         navbar_rank__isnull=False,
-    )
+    ).defer("content")
+    promoted_pages = promoted_pages.select_related(*parent_select_related)
     if request.user.is_authenticated or is_kiosk:
         promoted_pages = promoted_pages.prefetch_related(
             "role_permissions",

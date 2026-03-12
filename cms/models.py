@@ -326,8 +326,10 @@ class Page(models.Model):
                            or if nesting depth exceeds MAX_CMS_DEPTH
 
         Note:
-            Only validates existing pages (with pk) since Many-to-Many relationships
-            don't exist during initial creation.
+            The public+role_permissions check is only applied to existing pages
+            (with pk) since Many-to-Many relationships don't exist during initial
+            creation. Other validations (e.g., navbar promotion rank and depth)
+            run on both creates and updates.
         """
         from django.core.exceptions import ValidationError
 
