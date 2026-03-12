@@ -354,7 +354,8 @@ class Page(models.Model):
 
     def effective_navbar_title(self):
         """Return the Resources drawer label for this page."""
-        return self.navbar_title.strip() if self.navbar_title.strip() else self.title
+        title = (self.navbar_title or "").strip()
+        return title or self.title
 
     def _validate_depth(self):
         """Validate that page depth doesn't exceed MAX_CMS_DEPTH.

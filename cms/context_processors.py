@@ -183,6 +183,25 @@ def _build_resources_nav_items(request, footer=None):
     return sorted(items, key=lambda item: (item["rank"], item["title"].lower()))
 
 
+def _minimal_resources_nav_items():
+    """Return a DB-free minimal Resources list used by fail-safe paths."""
+    return [
+        {
+            "title": "Document Root",
+            "url": reverse("cms:resources"),
+            "rank": 0,
+        }
+    ]
+
+
+def _safe_resources_nav_items(request, footer=None):
+    """Build resources items with a safe fallback when DB/CMS access fails."""
+    try:
+        return _build_resources_nav_items(request, footer)
+    except Exception:
+        return _minimal_resources_nav_items()
+
+
 def footer_content(request):
     """
     Context processor to add footer content to all templates.
@@ -200,18 +219,18 @@ def footer_content(request):
             return {
                 "footer_content": footer,
                 "google_oauth_configured": google_oauth_configured,
-                "resources_nav_items": _build_resources_nav_items(request, footer),
+                "resources_nav_items": _safe_resources_nav_items(request, footer),
             }
         except Exception:
             # If CMS is not available or an unexpected error occurs, fail gracefully.
             return {
                 "footer_content": None,
                 "google_oauth_configured": google_oauth_configured,
-                "resources_nav_items": _build_resources_nav_items(request),
+                "resources_nav_items": _minimal_resources_nav_items(),
             }
     else:
         return {
             "footer_content": None,
             "google_oauth_configured": google_oauth_configured,
-            "resources_nav_items": _build_resources_nav_items(request),
+            "resources_nav_items": _safe_resources_nav_items(request),
         }

@@ -55,6 +55,18 @@ def test_effective_navbar_title_prefers_override_title():
 
 
 @pytest.mark.django_db
+def test_effective_navbar_title_handles_none():
+    page = Page(
+        title="Fallback Title",
+        slug="fallback-title",
+        is_public=True,
+        navbar_title=None,
+    )
+
+    assert page.effective_navbar_title() == "Fallback Title"
+
+
+@pytest.mark.django_db
 def test_page_admin_readonly_promotion_fields_for_non_webmaster():
     factory = RequestFactory()
     request = factory.get("/admin/cms/page/1/change/")

@@ -336,3 +336,44 @@ def test_resources_nav_ignores_promoted_pages_with_null_rank():
 
     titles = [item["title"] for item in context["resources_nav_items"]]
     assert "Ranked Page" not in titles
+
+
+@pytest.mark.django_db
+def test_footer_content_falls_back_to_minimal_resources_for_anonymous(monkeypatch):
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated build failure")
+
+    monkeypatch.setattr("cms.context_processors._build_resources_nav_items", _raise)
+
+    context = footer_content(request)
+
+    assert context["resources_nav_items"] == [
+        {"title": "Document Root", "url": reverse("cms:resources"), "rank": 0}
+    ]
+
+
+@pytest.mark.django_db
+def test_footer_content_falls_back_to_minimal_resources_for_authenticated(
+    monkeypatch,
+):
+    member = User.objects.create_user(
+        username="member_minimal_fallback",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    request = RequestFactory().get("/")
+    request.user = member
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated build failure")
+
+    monkeypatch.setattr("cms.context_processors._build_resources_nav_items", _raise)
+
+    context = footer_content(request)
+
+    assert context["resources_nav_items"] == [
+        {"title": "Document Root", "url": reverse("cms:resources"), "rank": 0}
+    ]
