@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
             name="promote_to_navbar",
             field=models.BooleanField(
                 default=False,
-                help_text="Promote this page into the top navbar Resources drawer. Only webmasters may change this setting.",
+                help_text="Promote this page into the top navbar Resources drawer. Only webmasters and superusers may change this setting.",
             ),
         ),
     ]

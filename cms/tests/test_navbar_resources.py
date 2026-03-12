@@ -108,6 +108,27 @@ def test_member_navbar_resources_includes_footer_links(client, django_user_model
 
 
 @pytest.mark.django_db
+def test_member_home_renders_without_footer_content(client, django_user_model):
+    HomePageContent.objects.create(title="Home", slug="home", content="<p>Public</p>")
+    HomePageContent.objects.create(
+        title="Member Home",
+        slug="member-home",
+        audience="member",
+        content="<p>Member</p>",
+    )
+    user = django_user_model.objects.create_user(
+        username="membernofooter",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+
+    client.login(username="membernofooter", password="testpass123")
+    response = client.get(reverse("home"))
+
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
 def test_safety_officer_links_are_in_resources_not_top_level_safety(
     client, django_user_model
 ):

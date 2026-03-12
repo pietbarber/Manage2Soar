@@ -294,6 +294,32 @@ def test_resources_nav_filters_whitespace_prefixed_unsafe_links():
 
 
 @pytest.mark.django_db
+def test_resources_nav_normalizes_whitespace_for_footer_url_dedupe():
+    member = User.objects.create_user(
+        username="member_footer_whitespace_dedupe",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    HomePageContent.objects.create(
+        title="Footer",
+        slug="footer",
+        audience="member",
+        content='<p><a href=" /cms/feedback/ ">Report Website Issue Footer</a></p>',
+    )
+
+    request = RequestFactory().get("/")
+    request.user = member
+    context = footer_content(request)
+
+    report_issue_items = [
+        item
+        for item in context["resources_nav_items"]
+        if item["url"] == "/cms/feedback/"
+    ]
+    assert len(report_issue_items) == 1
+
+
+@pytest.mark.django_db
 def test_resources_nav_ignores_promoted_pages_with_null_rank():
     page = Page.objects.create(
         title="Ranked Page",

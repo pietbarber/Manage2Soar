@@ -140,12 +140,13 @@ def _build_resources_nav_items(request, footer=None):
 
         # Promote member footer links (Weather/WeGlide/etc.) into Resources drawer.
         for idx, (title, url) in enumerate(_extract_footer_links(footer), start=0):
-            if not _is_safe_nav_url(url):
+            normalized_url = url.strip() if url is not None else None
+            if not normalized_url or not _is_safe_nav_url(normalized_url):
                 continue
             items.append(
                 {
                     "title": title,
-                    "url": url,
+                    "url": normalized_url,
                     "rank": 950 + idx,
                 }
             )
