@@ -2662,11 +2662,30 @@ def instructor_requests(request):
 
     today = date.today()
 
+    day_filter_options = [
+        ("7", "Next 7 days"),
+        ("14", "Next 14 days"),
+        ("30", "Next 30 days"),
+        ("all", "All upcoming"),
+    ]
+    selected_days = request.GET.get("days", "14")
+    valid_day_values = {value for value, _ in day_filter_options}
+    if selected_days not in valid_day_values:
+        selected_days = "14"
+
+    slot_filter = {"assignment__date__gte": today}
+    assignment_filter = {"date__gte": today}
+    if selected_days != "all":
+        day_window = int(selected_days)
+        end_date = today + timedelta(days=day_window - 1)
+        slot_filter["assignment__date__lte"] = end_date
+        assignment_filter["date__lte"] = end_date
+
     # Show all upcoming requests to any instructor (Issue #771).
     pending_slots = (
         InstructionSlot.objects.filter(
-            assignment__date__gte=today,
             instructor_response="pending",
+            **slot_filter,
         )
         .exclude(status="cancelled")
         .select_related(
@@ -2680,8 +2699,8 @@ def instructor_requests(request):
 
     accepted_slots = (
         InstructionSlot.objects.filter(
-            assignment__date__gte=today,
             instructor_response="accepted",
+            **slot_filter,
         )
         .exclude(status="cancelled")
         .select_related(
@@ -2695,9 +2714,7 @@ def instructor_requests(request):
 
     # Keep assignment-scoped data for the viewer's own duty days where
     # allocation controls are relevant.
-    assigned_assignments = DutyAssignment.objects.filter(
-        date__gte=today,
-    ).filter(
+    assigned_assignments = DutyAssignment.objects.filter(**assignment_filter).filter(
         models.Q(instructor=request.user) | models.Q(surge_instructor=request.user)
     )
 
@@ -2773,6 +2790,8 @@ def instructor_requests(request):
             "accepted_count": sum(len(v) for v in accepted_by_date.values()),
             "today": today,
             "instruction_surge_threshold": instruction_surge_threshold,
+            "day_filter_options": day_filter_options,
+            "selected_days": selected_days,
         },
     )
 

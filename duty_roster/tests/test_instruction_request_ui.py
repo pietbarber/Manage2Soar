@@ -63,7 +63,7 @@ def test_instructor_requests_shows_profile_link_long_note_and_revert_action(
     )
 
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests") + "?days=all")
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -310,7 +310,7 @@ def test_unassigned_instructor_can_view_student_request_details(
     )
 
     client.force_login(viewer)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests") + "?days=all")
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -346,7 +346,7 @@ def test_unassigned_instructor_gets_read_only_controls(client, django_user_model
     )
 
     client.force_login(viewer)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests") + "?days=all")
 
     assert response.status_code == 200
     content = response.content.decode()
