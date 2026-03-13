@@ -3,7 +3,7 @@ anyio==4.11.0
 asgiref==3.9.1
 Authlib==1.6.7
 bandit==1.8.6
-black==25.9.0
+black==26.3.1
 bleach==6.3.0
 boolean.py==5.0
 CacheControl==0.14.3
