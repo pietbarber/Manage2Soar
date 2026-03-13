@@ -15,6 +15,12 @@
   {% if request.user.instructor and request.user != member %}
     <a href="{% url 'instructors:log_ground_instruction' %}?student_id={{ member.id }}" class="btn btn-outline-primary btn-sm me-2">✍️ Log Ground Instruction</a>
   {% endif %}
+    <a href="{% url 'members:member_view' member_id=member.id %}"
+       class="btn btn-outline-secondary btn-sm me-2"
+       title="View Member Profile"
+       aria-label="View Member Profile for {{ member.full_display_name }}">
+      <i class="fas fa-id-badge" aria-hidden="true"></i>
+    </a>
     <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm me-2">📊 View Training Grid</a>
     {% if request.user == member %}
       <a href="{% url 'knowledgetest:member-test-history' %}" class="btn btn-outline-info btn-sm me-2">📝 My Written Tests</a>

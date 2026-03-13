@@ -17,4 +17,10 @@ Expected variables:
    aria-label="Instruction Record for {{ student.full_display_name }}"
    target="_blank"
    rel="noopener noreferrer"><i class="fas fa-clipboard-list fa-sm" aria-hidden="true"></i></a>
+<a href="{% url 'members:member_view' member_id=student.pk %}"
+   class="{{ lc }} text-muted"
+   title="Member Profile for {{ student.full_display_name }}"
+   aria-label="Member Profile for {{ student.full_display_name }}"
+   target="_blank"
+   rel="noopener noreferrer"><i class="fas fa-id-badge fa-sm" aria-hidden="true"></i></a>
 {% endwith %}

@@ -2849,6 +2849,64 @@ def instructor_respond(request, slot_id):
 
 @active_member_required
 @require_POST
+def revert_instruction_response(request, slot_id):
+    """Move an accepted student request back to pending for instructor review."""
+    from .models import InstructionSlot
+
+    if not request.user.instructor:
+        return HttpResponseForbidden("Only instructors can modify requests.")
+
+    slot = get_object_or_404(InstructionSlot, id=slot_id)
+    assignment = slot.assignment
+
+    if request.user not in [assignment.instructor, assignment.surge_instructor]:
+        return HttpResponseForbidden("You are not the instructor for this day.")
+
+    if slot.status == "cancelled":
+        messages.warning(request, "This request was already cancelled by the student.")
+        return redirect("duty_roster:instructor_requests")
+
+    if slot.instructor_response != "accepted":
+        messages.warning(
+            request,
+            "Only accepted requests can be moved back to pending.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    if assignment.instructor_id and assignment.surge_instructor_id:
+        reassigned_instructor = None
+    elif assignment.instructor_id:
+        reassigned_instructor = assignment.instructor
+    elif assignment.surge_instructor_id:
+        reassigned_instructor = assignment.surge_instructor
+    else:
+        reassigned_instructor = None
+
+    slot.instructor = reassigned_instructor
+    slot.instructor_response = "pending"
+    slot.status = "pending"
+    slot.instructor_note = ""
+    slot.instructor_response_at = None
+    slot.save(
+        update_fields=[
+            "instructor",
+            "instructor_response",
+            "status",
+            "instructor_note",
+            "instructor_response_at",
+            "updated_at",
+        ]
+    )
+
+    messages.success(
+        request,
+        f"Moved {slot.student.full_display_name} back to pending requests.",
+    )
+    return redirect("duty_roster:instructor_requests")
+
+
+@active_member_required
+@require_POST
 def request_surge_instructor(request, assignment_id):
     """
     Allow the primary instructor to manually request a surge instructor for their day.
