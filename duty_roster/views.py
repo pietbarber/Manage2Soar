@@ -2882,6 +2882,8 @@ def revert_instruction_response(request, slot_id):
     else:
         reassigned_instructor = None
 
+    prior_instructor_note = slot.instructor_note
+
     slot.instructor = reassigned_instructor
     slot.instructor_response = "pending"
     slot.status = "pending"
@@ -2897,6 +2899,20 @@ def revert_instruction_response(request, slot_id):
             "updated_at",
         ]
     )
+
+    try:
+        from .signals import send_request_reverted_to_pending_notification
+
+        send_request_reverted_to_pending_notification(
+            slot,
+            acting_instructor=request.user,
+            prior_instructor_note=prior_instructor_note,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to send pending-review notification for slot_id=%s",
+            slot.id,
+        )
 
     messages.success(
         request,

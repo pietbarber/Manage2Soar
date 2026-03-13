@@ -50,3 +50,23 @@ def test_instruction_record_shows_member_profile_icon_link(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert reverse("members:member_view", kwargs={"member_id": student.pk}) in content
+
+
+@pytest.mark.django_db
+def test_instruction_record_profile_photo_links_to_member_profile(client):
+    _ensure_full_member_status()
+    student = _make_member("record_student_photo")
+    student.profile_photo = "members/profile/record_student_photo.jpg"
+    student.save(update_fields=["profile_photo"])
+
+    profile_url = reverse("members:member_view", kwargs={"member_id": student.pk})
+
+    client.force_login(student)
+    response = client.get(
+        reverse("instructors:member_instruction_record", args=[student.pk])
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    # One link is the profile button; the second should wrap the profile image bubble.
+    assert content.count(profile_url) >= 2

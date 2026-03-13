@@ -6,7 +6,12 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
   <div class="d-flex align-items-center">
     {% if member.profile_photo %}
-      <img src="{{ member.profile_image_url_small }}" alt="{{ member.full_display_name }}" class="rounded-circle me-3" style="height:3.5em; width:3.5em; object-fit:cover; border:1px solid #ccc;" />
+      <a href="{% url 'members:member_view' member_id=member.id %}"
+         class="me-3"
+         title="View Member Profile"
+         aria-label="View Member Profile for {{ member.full_display_name }}">
+        <img src="{{ member.profile_image_url_small }}" alt="{{ member.full_display_name }}" class="rounded-circle" style="height:3.5em; width:3.5em; object-fit:cover; border:1px solid #ccc;" />
+      </a>
     {% endif %}
     <h2 class="mb-0">Instruction Record for {{ member.full_display_name }}</h2>
   </div>

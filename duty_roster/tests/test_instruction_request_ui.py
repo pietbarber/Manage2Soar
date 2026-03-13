@@ -1,9 +1,11 @@
 from datetime import date, timedelta
 
 import pytest
+from django.core import mail
 from django.urls import reverse
 
 from duty_roster.models import DutyAssignment, InstructionSlot
+from notifications.models import Notification
 from siteconfig.models import MembershipStatus
 
 
@@ -107,6 +109,18 @@ def test_revert_instruction_response_moves_accepted_slot_back_to_pending(
     assert slot.instructor is None
     assert slot.instructor_note == ""
     assert slot.instructor_response_at is None
+
+    # Student receives in-system notification and outbound email.
+    assert Notification.objects.filter(
+        user=student,
+        message__icontains="pending review",
+    ).exists()
+    assert len(mail.outbox) >= 1
+    email = mail.outbox[-1]
+    assert student.email in email.to or student.email in email.subject
+    assert "Update on your instruction request" in email.subject
+    assert "back to pending review" in email.body
+    assert "Accepted, see you then" in email.body
 
 
 @pytest.mark.django_db
