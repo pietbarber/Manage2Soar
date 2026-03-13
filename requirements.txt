@@ -3,7 +3,7 @@ anyio==4.11.0
 asgiref==3.9.1
 Authlib==1.6.7
 bandit==1.8.6
-black==25.9.0
+black==26.3.1
 bleach==6.3.0
 boolean.py==5.0
 CacheControl==0.14.3
@@ -67,7 +67,7 @@ oauthlib==3.3.1
 ortools==9.12.4544
 packageurl-python==0.17.5
 packaging==25.0
-pathspec==0.12.1
+pathspec==1.0.4
 pillow==12.1.1
 pip-api==0.0.34
 pip-requirements-parser==32.0.1
@@ -101,7 +101,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-slugify==8.0.4
 python3-openid==3.2.0
-pytokens==0.2.0
+pytokens==0.4.1
 pytz==2025.2
 PyYAML==6.0.3
 qrcode==8.2
