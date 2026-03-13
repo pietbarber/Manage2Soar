@@ -2650,7 +2650,7 @@ def my_instruction_requests(request):
 @active_member_required
 def instructor_requests(request):
     """
-    Show an instructor all pending instruction requests for days they are scheduled.
+    Show instructors upcoming instruction requests across all duty days.
 
     Only visible to members who are instructors.
     """
@@ -2662,27 +2662,25 @@ def instructor_requests(request):
 
     today = date.today()
 
-    # Get all future assignments where this user is the instructor
-    my_assignments = DutyAssignment.objects.filter(
-        date__gte=today,
-    ).filter(
-        models.Q(instructor=request.user) | models.Q(surge_instructor=request.user)
-    )
-
-    # Get all instruction slots for those assignments
+    # Show all upcoming requests to any instructor (Issue #771).
     pending_slots = (
         InstructionSlot.objects.filter(
-            assignment__in=my_assignments,
+            assignment__date__gte=today,
             instructor_response="pending",
         )
         .exclude(status="cancelled")
-        .select_related("assignment", "student")
+        .select_related(
+            "assignment",
+            "assignment__instructor",
+            "assignment__surge_instructor",
+            "student",
+        )
         .order_by("assignment__date", "created_at")
     )
 
     accepted_slots = (
         InstructionSlot.objects.filter(
-            assignment__in=my_assignments,
+            assignment__date__gte=today,
             instructor_response="accepted",
         )
         .exclude(status="cancelled")
@@ -2693,6 +2691,14 @@ def instructor_requests(request):
             "student",
         )
         .order_by("assignment__date", "created_at")
+    )
+
+    # Keep assignment-scoped data for the viewer's own duty days where
+    # allocation controls are relevant.
+    assigned_assignments = DutyAssignment.objects.filter(
+        date__gte=today,
+    ).filter(
+        models.Q(instructor=request.user) | models.Q(surge_instructor=request.user)
     )
 
     # Group by assignment date for easier display
@@ -2712,7 +2718,7 @@ def instructor_requests(request):
     # instructor, so the template can show the three-column split view (Issue #664).
     assignment_by_date = {
         a.date: a
-        for a in my_assignments.select_related("instructor", "surge_instructor")
+        for a in assigned_assignments.select_related("instructor", "surge_instructor")
     }
 
     # Build the allocation map for surge days (primary/surge/unassigned split).

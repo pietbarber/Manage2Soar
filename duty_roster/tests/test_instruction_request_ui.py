@@ -276,3 +276,89 @@ def test_revert_instruction_response_cancelled_message_is_neutral(
     assert response.status_code == 302
     messages = [m.message for m in get_messages(response.wsgi_request)]
     assert "This request is already cancelled." in messages
+
+
+@pytest.mark.django_db
+def test_unassigned_instructor_can_view_student_request_details(
+    client, django_user_model
+):
+    _ensure_full_member_status()
+    assigned = _make_member(django_user_model, "assigned_instr", instructor=True)
+    viewer = _make_member(django_user_model, "viewer_instr", instructor=True)
+    student = _make_member(django_user_model, "detail_student")
+    assignment = _make_assignment(assigned, date_offset=14)
+
+    pending_note = "Need WINGS check items and pre-solo landing pattern practice."
+    accepted_note = "Working toward consistency for checkride prep and radio calls."
+
+    InstructionSlot.objects.create(
+        assignment=assignment,
+        student=student,
+        instructor_response="pending",
+        status="pending",
+        instruction_types=["wings", "pre_solo"],
+        student_notes=pending_note,
+    )
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=21),
+        student=_make_member(django_user_model, "detail_student_accepted"),
+        instructor=assigned,
+        instructor_response="accepted",
+        status="confirmed",
+        instruction_types=["checkride_prep"],
+        student_notes=accepted_note,
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("duty_roster:instructor_requests"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert pending_note in content
+    assert accepted_note in content
+    assert "WINGS Program" in content
+    assert "Pre-Solo Practice" in content
+    assert "Checkride Preparation" in content
+
+
+@pytest.mark.django_db
+def test_unassigned_instructor_gets_read_only_controls(client, django_user_model):
+    _ensure_full_member_status()
+    assigned = _make_member(django_user_model, "readonly_assigned", instructor=True)
+    viewer = _make_member(django_user_model, "readonly_viewer", instructor=True)
+    student = _make_member(django_user_model, "readonly_student")
+    assignment = _make_assignment(assigned, date_offset=18)
+
+    pending_slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=student,
+        instructor_response="pending",
+        status="pending",
+        student_notes="Need a brief field check refresher.",
+    )
+    accepted_slot = InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=19),
+        student=_make_member(django_user_model, "readonly_student_accepted"),
+        instructor=assigned,
+        instructor_response="accepted",
+        status="confirmed",
+        student_notes="Accepted student request details.",
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("duty_roster:instructor_requests"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Read only" in content
+    assert (
+        reverse("duty_roster:instructor_respond", kwargs={"slot_id": pending_slot.pk})
+        not in content
+    )
+    assert (
+        reverse(
+            "duty_roster:revert_instruction_response",
+            kwargs={"slot_id": accepted_slot.pk},
+        )
+        not in content
+    )
