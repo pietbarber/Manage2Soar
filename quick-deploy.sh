@@ -6,8 +6,13 @@ set -e
 # 1. Builds Docker image
 # 2. Pushes to GCR
 # 3. Updates Kubernetes deployments
+# 4. Runs collectstatic on each tenant
+# 5. Optionally runs migrations when migration files changed
 #
 # Use this when you just want to deploy code changes without Ansible
+#
+# BREAK-GLASS USAGE ONLY:
+#   ./quick-deploy.sh --break-glass
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -20,6 +25,36 @@ PROJECT_ID="manage2soar"
 IMAGE_NAME="manage2soar"
 GCR_REGISTRY="gcr.io"
 TENANTS=("ssc" "masa")
+
+BREAK_GLASS_FLAG="--break-glass"
+BREAK_GLASS_ACK="I UNDERSTAND THIS BYPASSES IAC"
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    echo "Usage: ./quick-deploy.sh ${BREAK_GLASS_FLAG}"
+    echo ""
+    echo "This script is break-glass only and bypasses the normal Ansible IaC flow."
+    echo "Preferred path:"
+    echo "  cd infrastructure/ansible && ansible-playbook -i inventory/gcp_app.yml --vault-password-file ~/.ansible_vault_pass playbooks/gcp-app-deploy.yml"
+    exit 0
+fi
+
+if [[ "${1:-}" != "${BREAK_GLASS_FLAG}" ]]; then
+    echo -e "${RED}ERROR: quick-deploy.sh is break-glass only.${NC}"
+    echo ""
+    echo "Use the IaC-first Ansible workflow instead:"
+    echo "  cd infrastructure/ansible && ansible-playbook -i inventory/gcp_app.yml --vault-password-file ~/.ansible_vault_pass playbooks/gcp-app-deploy.yml"
+    echo ""
+    echo "If you must bypass Ansible for an emergency deploy, rerun with:"
+    echo "  ./quick-deploy.sh ${BREAK_GLASS_FLAG}"
+    exit 1
+fi
+
+echo -e "${YELLOW}BREAK-GLASS MODE: This bypasses the standard IaC Ansible deployment path.${NC}"
+read -p "Type exactly '${BREAK_GLASS_ACK}' to continue: " -r
+if [[ "$REPLY" != "${BREAK_GLASS_ACK}" ]]; then
+    echo "Deployment cancelled"
+    exit 1
+fi
 
 # Generate timestamp and git hash
 TIMESTAMP=$(date +%Y%m%d-%H%M)
@@ -89,15 +124,15 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Step 1: Build Docker image
-echo -e "\n${GREEN}[1/5] Building Docker image...${NC}"
+echo -e "\n${GREEN}[1/6] Building Docker image...${NC}"
 docker build --platform linux/amd64 -t "${FULL_IMAGE}" .
 
 # Step 2: Push to GCR
-echo -e "\n${GREEN}[2/5] Pushing to Google Container Registry...${NC}"
+echo -e "\n${GREEN}[2/6] Pushing to Google Container Registry...${NC}"
 docker push "${FULL_IMAGE}"
 
 # Step 3: Update deployments
-echo -e "\n${GREEN}[3/5] Updating Kubernetes deployments...${NC}"
+echo -e "\n${GREEN}[3/6] Updating Kubernetes deployments...${NC}"
 for tenant in "${TENANTS[@]}"; do
     namespace="tenant-${tenant}"
     deployment="django-app-${tenant}"
@@ -112,7 +147,7 @@ for tenant in "${TENANTS[@]}"; do
 done
 
 # Step 4: Verify
-echo -e "\n${GREEN}[4/5] Verifying deployment...${NC}"
+echo -e "\n${GREEN}[4/6] Verifying deployment...${NC}"
 for tenant in "${TENANTS[@]}"; do
     namespace="tenant-${tenant}"
     echo "  ${namespace}:"
@@ -125,9 +160,27 @@ for tenant in "${TENANTS[@]}"; do
     fi
 done
 
-# Step 5: Run migrations if needed
+# Step 5: Run collectstatic on each tenant
+echo -e "\n${GREEN}[5/6] Running collectstatic...${NC}"
+for tenant in "${TENANTS[@]}"; do
+    namespace="tenant-${tenant}"
+    deployment="django-app-${tenant}"
+    echo "  Running collectstatic for ${namespace}..."
+
+    # Get first pod name
+    POD=$(kubectl get pods -n "${namespace}" -l app=django-app-${tenant} -o jsonpath='{.items[0].metadata.name}')
+
+    if [ -n "$POD" ]; then
+        kubectl exec -n "${namespace}" "$POD" -c django -- python manage.py collectstatic --noinput
+        echo -e "  ${GREEN}✓ Collectstatic complete for ${namespace}${NC}"
+    else
+        echo -e "  ${RED}✗ No pod found for ${namespace}${NC}"
+    fi
+done
+
+# Step 6: Run migrations if needed
 if [ "$MIGRATION_CHANGES" -gt 0 ]; then
-    echo -e "\n${YELLOW}[5/5] Migration files changed - run migrations now?${NC}"
+    echo -e "\n${YELLOW}[6/6] Migration files changed - run migrations now?${NC}"
     read -p "Run 'python manage.py migrate' on all tenants? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -150,7 +203,7 @@ if [ "$MIGRATION_CHANGES" -gt 0 ]; then
         echo -e "${YELLOW}⚠ Skipped migrations - remember to run manually if needed!${NC}"
     fi
 else
-    echo -e "\n${GREEN}[5/5] No migration changes detected - skipping migration step${NC}"
+    echo -e "\n${GREEN}[6/6] No migration changes detected - skipping migration step${NC}"
 fi
 
 echo ""

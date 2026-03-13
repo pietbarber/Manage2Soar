@@ -59,8 +59,6 @@ spec:
             - secretRef:
                 name: {{ gke_secret_name }}
           volumeMounts:
-            - name: static-files
-              mountPath: /app/static
             - name: media-files
               mountPath: /app/media
 {% if gke_gcp_sa_key_file is defined and gke_gcp_sa_key_file | length > 0 %}
@@ -95,8 +93,6 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 6
       volumes:
-        - name: static-files
-          emptyDir: {}
         - name: media-files
           emptyDir: {}
 {% if gke_gcp_sa_key_file is defined and gke_gcp_sa_key_file | length > 0 %}
