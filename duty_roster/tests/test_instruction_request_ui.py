@@ -184,3 +184,39 @@ def test_my_instruction_requests_shows_full_student_note_content(
     content = response.content.decode()
     assert "My Request" in content
     assert long_note in content
+
+
+@pytest.mark.django_db
+@override_settings(EMAIL_DEV_MODE=False)
+def test_revert_instruction_response_single_instructor_clears_slot_instructor(
+    client, django_user_model
+):
+    """When only one instructor is on the assignment, reverting to pending
+    should still clear slot.instructor (consistent with initial pending state)."""
+    _ensure_full_member_status()
+    primary = _make_member(django_user_model, "single_primary", instructor=True)
+    student = _make_member(django_user_model, "single_student")
+    # Single-instructor assignment (no surge)
+    assignment = _make_assignment(primary, date_offset=55)
+
+    slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=student,
+        instructor=primary,
+        status="confirmed",
+        instructor_response="accepted",
+        instructor_note="See you on the field",
+    )
+
+    client.force_login(primary)
+    response = client.post(
+        reverse("duty_roster:revert_instruction_response", kwargs={"slot_id": slot.pk})
+    )
+
+    assert response.status_code == 302
+    slot.refresh_from_db()
+    assert slot.instructor_response == "pending"
+    assert slot.status == "pending"
+    assert slot.instructor is None
+    assert slot.instructor_note == ""
+    assert slot.instructor_response_at is None
