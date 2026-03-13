@@ -313,6 +313,77 @@ def send_request_response_email(slot):
         logger.exception("Failed to create in-system notification for student")
 
 
+def send_request_reverted_to_pending_notification(
+    slot, acting_instructor=None, prior_instructor_note=""
+):
+    """Notify student when an accepted request is moved back to pending."""
+    config = SiteConfiguration.objects.first()
+    site_url = get_canonical_url()
+
+    instructor = (
+        acting_instructor
+        or slot.instructor
+        or slot.assignment.instructor
+        or slot.assignment.surge_instructor
+    )
+    instructor_name = instructor.full_display_name if instructor else "an instructor"
+
+    # Always create an in-system notification, even if student has no email.
+    try:
+        message = (
+            f"{instructor_name} moved your instruction request for "
+            f"{slot.assignment.date} back to pending review."
+        )
+        url = reverse("duty_roster:my_instruction_requests")
+        _create_notification_if_not_exists(slot.student, message, url=url)
+    except Exception:
+        logger.exception("Failed to create in-system pending-review notification")
+
+    if not slot.student or not slot.student.email:
+        logger.warning(
+            "Student %s has no email, skipping pending-review email notification",
+            getattr(slot.student, "full_display_name", "unknown"),
+        )
+        return
+
+    context = _get_email_context(slot, config, site_url)
+    context["acting_instructor"] = instructor
+    context["instructor_name"] = instructor_name
+    context["prior_instructor_note"] = prior_instructor_note or ""
+    context["my_requests_url"] = build_absolute_url(
+        reverse("duty_roster:my_instruction_requests"), canonical=site_url
+    )
+    context["calendar_url"] = build_absolute_url(
+        reverse("duty_roster:duty_calendar"), canonical=site_url
+    )
+
+    from_email = _get_from_email(config)
+    subject = f"Update on your instruction request for {slot.assignment.date}"
+
+    html_message = render_to_string(
+        "instructors/emails/request_reverted_pending.html", context
+    )
+    text_message = render_to_string(
+        "instructors/emails/request_reverted_pending.txt", context
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=from_email,
+            recipient_list=[slot.student.email],
+            html_message=html_message,
+        )
+        logger.info(
+            "Sent pending-review email to %s for instruction date %s",
+            slot.student.email,
+            slot.assignment.date,
+        )
+    except Exception:
+        logger.exception("Failed to send pending-review email notification")
+
+
 @receiver(pre_save, sender="duty_roster.InstructionSlot")
 def store_original_instructor_response(sender, instance, **kwargs):
     """

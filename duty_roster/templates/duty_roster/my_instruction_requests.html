@@ -29,6 +29,7 @@
                 <th>Date</th>
                 <th>Instructor</th>
                 <th>Status</th>
+                <th>My Request</th>
                 <th>Instructor Response</th>
                 <th>Actions</th>
               </tr>
@@ -58,6 +59,22 @@
                       <span class="badge bg-info">Waitlist</span>
                     {% elif req.status == "cancelled" %}
                       <span class="badge bg-secondary">Cancelled</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if req.student_notes %}
+                      <span class="text-muted">
+                        {% if req.student_notes|length > 80 %}
+                          <details>
+                            <summary class="text-decoration-underline" style="cursor: pointer;">{{ req.student_notes|truncatechars:80 }}</summary>
+                            <span class="d-block mt-1">{{ req.student_notes }}</span>
+                          </details>
+                        {% else %}
+                          {{ req.student_notes }}
+                        {% endif %}
+                      </span>
+                    {% else %}
+                      <span class="text-muted">&mdash;</span>
                     {% endif %}
                   </td>
                   <td>

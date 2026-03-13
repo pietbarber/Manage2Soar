@@ -1,0 +1,22 @@
+Instruction Request Back to Pending Review
+{{ club_name }}
+
+Hello {{ student.first_name }},
+
+{{ instructor_name }} moved your instruction request for {{ instruction_date|date:"l, F j, Y" }} back to pending review.
+
+This means your request is not confirmed right now and is awaiting another instructor response.
+
+{% if prior_instructor_note %}
+Previous note from {{ instructor_name }}:
+"{{ prior_instructor_note }}"
+{% endif %}
+You can check your request status here:
+{% if my_requests_url %}{{ my_requests_url }}{% endif %}
+
+You can also browse other duty dates here:
+{% if calendar_url %}{{ calendar_url }}{% endif %}
+
+---
+This is an automated message from {{ club_name }}.
+{{ site_url }}

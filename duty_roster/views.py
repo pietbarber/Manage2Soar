@@ -2849,6 +2849,80 @@ def instructor_respond(request, slot_id):
 
 @active_member_required
 @require_POST
+def revert_instruction_response(request, slot_id):
+    """Move an accepted student request back to pending for instructor review."""
+    from .models import InstructionSlot
+
+    if not request.user.instructor:
+        return HttpResponseForbidden("Only instructors can modify requests.")
+
+    slot = get_object_or_404(InstructionSlot, id=slot_id)
+    assignment = slot.assignment
+
+    if assignment.date < date.today():
+        messages.warning(
+            request,
+            "Past duty dates cannot be modified.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    if request.user not in [assignment.instructor, assignment.surge_instructor]:
+        return HttpResponseForbidden("You are not the instructor for this day.")
+
+    if slot.status == "cancelled":
+        messages.warning(request, "This request is already cancelled.")
+        return redirect("duty_roster:instructor_requests")
+
+    if slot.instructor_response != "accepted":
+        messages.warning(
+            request,
+            "Only accepted requests can be moved back to pending.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    # Clear the instructor when reverting to pending - the "pending" state means
+    # no instructor has accepted yet, mirroring the initial slot creation state.
+    prior_instructor_note = slot.instructor_note
+
+    slot.instructor = None
+    slot.instructor_response = "pending"
+    slot.status = "pending"
+    slot.instructor_note = ""
+    slot.instructor_response_at = None
+    slot.save(
+        update_fields=[
+            "instructor",
+            "instructor_response",
+            "status",
+            "instructor_note",
+            "instructor_response_at",
+            "updated_at",
+        ]
+    )
+
+    try:
+        from .signals import send_request_reverted_to_pending_notification
+
+        send_request_reverted_to_pending_notification(
+            slot,
+            acting_instructor=request.user,
+            prior_instructor_note=prior_instructor_note,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to send pending-review notification for slot_id=%s",
+            slot.id,
+        )
+
+    messages.success(
+        request,
+        f"Moved {slot.student.full_display_name} back to pending requests.",
+    )
+    return redirect("duty_roster:instructor_requests")
+
+
+@active_member_required
+@require_POST
 def request_surge_instructor(request, assignment_id):
     """
     Allow the primary instructor to manually request a surge instructor for their day.

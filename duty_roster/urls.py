@@ -174,6 +174,11 @@ urlpatterns = [
         name="instructor_respond",
     ),
     path(
+        "instruction/revert-response/<int:slot_id>/",
+        views.revert_instruction_response,
+        name="revert_instruction_response",
+    ),
+    path(
         "instruction/request-surge/<int:assignment_id>/",
         views.request_surge_instructor,
         name="request_surge_instructor",

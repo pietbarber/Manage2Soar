@@ -48,7 +48,16 @@
                             <br><small><i class="fas fa-graduation-cap me-1 text-success"></i><strong>{{ slot.get_instruction_types_text }}</strong></small>
                           {% endif %}
                           {% if slot.student_notes %}
-                            <br><small class="text-muted"><i class="fas fa-comment me-1"></i>{{ slot.student_notes|truncatewords:20 }}</small>
+                            <br><span class="text-muted"><i class="fas fa-comment me-1"></i>
+                            {% if slot.student_notes|length > 80 %}
+                              <details class="d-inline">
+                                <summary class="d-inline text-decoration-underline" style="cursor: pointer;">{{ slot.student_notes|truncatechars:80 }}</summary>
+                                <span class="d-block mt-1">{{ slot.student_notes }}</span>
+                              </details>
+                            {% else %}
+                              {{ slot.student_notes }}
+                            {% endif %}
+                            </span>
                           {% endif %}
                           {% if slot.student.phone %}
                             <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
@@ -150,13 +159,33 @@
                         <br><small><i class="fas fa-graduation-cap me-1 text-success"></i>{{ slot.get_instruction_types_text }}</small>
                       {% endif %}
                       {% if slot.student_notes %}
-                        <br><small class="text-muted"><i class="fas fa-comment me-1"></i>{{ slot.student_notes|truncatewords:15 }}</small>
+                        <br><span class="text-muted"><i class="fas fa-comment me-1"></i>
+                        {% if slot.student_notes|length > 80 %}
+                          <details class="d-inline">
+                            <summary class="d-inline text-decoration-underline" style="cursor: pointer;">{{ slot.student_notes|truncatechars:80 }}</summary>
+                            <span class="d-block mt-1">{{ slot.student_notes }}</span>
+                          </details>
+                        {% else %}
+                          {{ slot.student_notes }}
+                        {% endif %}
+                        </span>
                       {% endif %}
                       {% if slot.student.phone %}
                         <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
                       {% endif %}
                     </div>
-                    <span class="badge bg-success">Confirmed</span>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="badge bg-success">Confirmed</span>
+                      <form action="{% url 'duty_roster:revert_instruction_response' slot_id=slot.id %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="btn btn-sm btn-outline-danger"
+                                title="Move student back to pending requests"
+                                aria-label="Move {{ slot.student.full_display_name }} back to pending requests">
+                          <i class="fas fa-trash" aria-hidden="true"></i>
+                        </button>
+                      </form>
+                    </div>
                   </div>
                 {% endfor %}
 
