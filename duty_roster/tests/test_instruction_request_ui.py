@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 import pytest
+from django.contrib.messages import get_messages
 from django.core import mail
 from django.test import override_settings
 from django.urls import reverse
@@ -220,3 +221,58 @@ def test_revert_instruction_response_single_instructor_clears_slot_instructor(
     assert slot.instructor is None
     assert slot.instructor_note == ""
     assert slot.instructor_response_at is None
+
+
+@pytest.mark.django_db
+def test_revert_instruction_response_blocks_past_dates(client, django_user_model):
+    _ensure_full_member_status()
+    primary = _make_member(django_user_model, "past_primary", instructor=True)
+    student = _make_member(django_user_model, "past_student")
+    assignment = _make_assignment(primary, date_offset=-2)
+
+    slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=student,
+        instructor=primary,
+        status="confirmed",
+        instructor_response="accepted",
+    )
+
+    client.force_login(primary)
+    response = client.post(
+        reverse("duty_roster:revert_instruction_response", kwargs={"slot_id": slot.pk})
+    )
+
+    assert response.status_code == 302
+    assert response["Location"].endswith(reverse("duty_roster:instructor_requests"))
+
+    slot.refresh_from_db()
+    assert slot.instructor_response == "accepted"
+    assert slot.status == "confirmed"
+
+
+@pytest.mark.django_db
+def test_revert_instruction_response_cancelled_message_is_neutral(
+    client, django_user_model
+):
+    _ensure_full_member_status()
+    primary = _make_member(django_user_model, "cancel_primary", instructor=True)
+    student = _make_member(django_user_model, "cancel_student")
+    assignment = _make_assignment(primary, date_offset=7)
+
+    slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=student,
+        instructor=primary,
+        status="cancelled",
+        instructor_response="declined",
+    )
+
+    client.force_login(primary)
+    response = client.post(
+        reverse("duty_roster:revert_instruction_response", kwargs={"slot_id": slot.pk})
+    )
+
+    assert response.status_code == 302
+    messages = [m.message for m in get_messages(response.wsgi_request)]
+    assert "This request is already cancelled." in messages

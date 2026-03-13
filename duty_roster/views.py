@@ -2859,11 +2859,18 @@ def revert_instruction_response(request, slot_id):
     slot = get_object_or_404(InstructionSlot, id=slot_id)
     assignment = slot.assignment
 
+    if assignment.date < date.today():
+        messages.warning(
+            request,
+            "Past duty dates cannot be modified.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
     if request.user not in [assignment.instructor, assignment.surge_instructor]:
         return HttpResponseForbidden("You are not the instructor for this day.")
 
     if slot.status == "cancelled":
-        messages.warning(request, "This request was already cancelled by the student.")
+        messages.warning(request, "This request is already cancelled.")
         return redirect("duty_roster:instructor_requests")
 
     if slot.instructor_response != "accepted":
