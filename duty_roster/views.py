@@ -2873,18 +2873,11 @@ def revert_instruction_response(request, slot_id):
         )
         return redirect("duty_roster:instructor_requests")
 
-    if assignment.instructor_id and assignment.surge_instructor_id:
-        reassigned_instructor = None
-    elif assignment.instructor_id:
-        reassigned_instructor = assignment.instructor
-    elif assignment.surge_instructor_id:
-        reassigned_instructor = assignment.surge_instructor
-    else:
-        reassigned_instructor = None
-
+    # Clear the instructor when reverting to pending - the "pending" state means
+    # no instructor has accepted yet, mirroring the initial slot creation state.
     prior_instructor_note = slot.instructor_note
 
-    slot.instructor = reassigned_instructor
+    slot.instructor = None
     slot.instructor_response = "pending"
     slot.status = "pending"
     slot.instructor_note = ""
