@@ -48,16 +48,16 @@
                             <br><small><i class="fas fa-graduation-cap me-1 text-success"></i><strong>{{ slot.get_instruction_types_text }}</strong></small>
                           {% endif %}
                           {% if slot.student_notes %}
-                            <br><small class="text-muted"><i class="fas fa-comment me-1"></i>
+                            <br><span class="text-muted"><i class="fas fa-comment me-1"></i>
                             {% if slot.student_notes|length > 80 %}
                               <details class="d-inline">
                                 <summary class="d-inline text-decoration-underline" style="cursor: pointer;">{{ slot.student_notes|truncatechars:80 }}</summary>
-                                <div class="mt-1">{{ slot.student_notes }}</div>
+                                <span class="d-block mt-1">{{ slot.student_notes }}</span>
                               </details>
                             {% else %}
                               {{ slot.student_notes }}
                             {% endif %}
-                            </small>
+                            </span>
                           {% endif %}
                           {% if slot.student.phone %}
                             <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
@@ -159,16 +159,16 @@
                         <br><small><i class="fas fa-graduation-cap me-1 text-success"></i>{{ slot.get_instruction_types_text }}</small>
                       {% endif %}
                       {% if slot.student_notes %}
-                        <br><small class="text-muted"><i class="fas fa-comment me-1"></i>
+                        <br><span class="text-muted"><i class="fas fa-comment me-1"></i>
                         {% if slot.student_notes|length > 80 %}
                           <details class="d-inline">
                             <summary class="d-inline text-decoration-underline" style="cursor: pointer;">{{ slot.student_notes|truncatechars:80 }}</summary>
-                            <div class="mt-1">{{ slot.student_notes }}</div>
+                            <span class="d-block mt-1">{{ slot.student_notes }}</span>
                           </details>
                         {% else %}
                           {{ slot.student_notes }}
                         {% endif %}
-                        </small>
+                        </span>
                       {% endif %}
                       {% if slot.student.phone %}
                         <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>

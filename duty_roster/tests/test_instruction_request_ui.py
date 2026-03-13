@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
 
 from duty_roster.models import DutyAssignment, InstructionSlot
@@ -77,6 +78,7 @@ def test_instructor_requests_shows_profile_link_long_note_and_revert_action(
 
 
 @pytest.mark.django_db
+@override_settings(EMAIL_DEV_MODE=False)
 def test_revert_instruction_response_moves_accepted_slot_back_to_pending(
     client, django_user_model
 ):
@@ -117,7 +119,7 @@ def test_revert_instruction_response_moves_accepted_slot_back_to_pending(
     ).exists()
     assert len(mail.outbox) >= 1
     email = mail.outbox[-1]
-    assert student.email in email.to or student.email in email.subject
+    assert student.email in email.to
     assert "Update on your instruction request" in email.subject
     assert "back to pending review" in email.body
     assert "Accepted, see you then" in email.body
