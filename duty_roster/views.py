@@ -2800,10 +2800,19 @@ def instructor_requests(request):
 
 def _redirect_instructor_requests_with_days(request):
     """Redirect to instructor requests while preserving an allowed days filter."""
-    allowed_values = {"7", "14", "30", "all"}
     days = (request.POST.get("days") or request.GET.get("days") or "").strip().lower()
-    if days in allowed_values:
-        return redirect(f"{reverse('duty_roster:instructor_requests')}?days={days}")
+    base_url = reverse("duty_roster:instructor_requests")
+
+    # Use explicit constants rather than interpolating user input into a URL.
+    if days == "7":
+        return redirect(f"{base_url}?days=7")
+    if days == "14":
+        return redirect(f"{base_url}?days=14")
+    if days == "30":
+        return redirect(f"{base_url}?days=30")
+    if days == "all":
+        return redirect(f"{base_url}?days=all")
+
     return redirect("duty_roster:instructor_requests")
 
 
