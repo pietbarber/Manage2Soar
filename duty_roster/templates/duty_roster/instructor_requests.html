@@ -76,7 +76,7 @@
                             {% endif %}
                             </span>
                           {% endif %}
-                          {% if slot.assignment.instructor_id == request.user.id or slot.assignment.surge_instructor_id == request.user.id %}
+                          {% if slot.is_assigned_to_request_user %}
                           {% if slot.student.phone %}
                             <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
                           {% endif %}
@@ -87,7 +87,7 @@
                           <br><small class="text-muted">Requested: {{ slot.created_at|date:"M j, g:i a" }}</small>
                         </div>
                         <div class="text-end">
-                          {% if slot.assignment.instructor_id == request.user.id or slot.assignment.surge_instructor_id == request.user.id %}
+                          {% if slot.is_assigned_to_request_user %}
                           <form action="{% url 'duty_roster:instructor_respond' slot_id=slot.id %}" method="post" class="d-inline">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="accept">
@@ -111,7 +111,7 @@
                     </div>
                   </div>
 
-                  {% if slot.assignment.instructor_id == request.user.id or slot.assignment.surge_instructor_id == request.user.id %}
+                  {% if slot.is_assigned_to_request_user %}
                   <!-- Reject Modal -->
                   <div class="modal fade" id="rejectModal{{ slot.id }}" tabindex="-1">
                     <div class="modal-dialog">
@@ -200,7 +200,7 @@
                         {% endif %}
                         </span>
                       {% endif %}
-                      {% if slot.assignment.instructor_id == request.user.id or slot.assignment.surge_instructor_id == request.user.id %}
+                      {% if slot.is_assigned_to_request_user %}
                       {% if slot.student.phone %}
                         <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
                       {% endif %}
@@ -208,7 +208,7 @@
                     </div>
                     <div class="d-flex align-items-center gap-2">
                       <span class="badge bg-success">Confirmed</span>
-                      {% if slot.assignment.instructor_id == request.user.id or slot.assignment.surge_instructor_id == request.user.id %}
+                      {% if slot.is_assigned_to_request_user %}
                       <form action="{% url 'duty_roster:revert_instruction_response' slot_id=slot.id %}" method="post" class="d-inline">
                         {% csrf_token %}
                         <input type="hidden" name="days" value="{{ selected_days }}">

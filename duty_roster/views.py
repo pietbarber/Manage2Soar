@@ -2720,14 +2720,21 @@ def instructor_requests(request):
     assigned_dates = set(assigned_assignments.values_list("date", flat=True))
 
     # Group by assignment date for easier display
-    from collections import defaultdict
 
     pending_by_date = defaultdict(list)
     for slot in pending_slots:
+        slot.is_assigned_to_request_user = request.user.id in (
+            slot.assignment.instructor_id,
+            slot.assignment.surge_instructor_id,
+        )
         pending_by_date[slot.assignment.date].append(slot)
 
     accepted_by_date = defaultdict(list)
     for slot in accepted_slots:
+        slot.is_assigned_to_request_user = request.user.id in (
+            slot.assignment.instructor_id,
+            slot.assignment.surge_instructor_id,
+        )
         accepted_by_date[slot.assignment.date].append(slot)
 
     _, instruction_surge_threshold = get_surge_thresholds()
