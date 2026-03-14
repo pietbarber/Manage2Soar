@@ -163,6 +163,42 @@ class TestTowPilotLogbookView:
         assert response.context["estimated_tach_total"] == Decimal("0.30")
         assert response.context["estimated_hobbs_total"] == Decimal("0.60")
 
+    def test_solo_day_without_closeout_uses_solo_estimate_label(self, client):
+        TowplaneCloseout.objects.filter(logsheet=self.logsheet_day_one).delete()
+
+        client.force_login(self.tow_pilot)
+        response = client.get(reverse("logsheet:tow_pilot_logbook"))
+
+        assert response.status_code == 200
+        rows = response.context["day_rows"]
+        day_one_row = next(r for r in rows if r["tow_date"] == self.day_one)
+        assert day_one_row["tow_hours"] == Decimal("0.20")
+        assert (
+            day_one_row["hours_source"]
+            == "Estimated (solo tow pilot day - no tach closeout)"
+        )
+
+    def test_day_grouping_uses_logsheet_airfield_when_flight_airfield_missing(
+        self, client
+    ):
+        Flight.objects.create(
+            logsheet=self.logsheet_day_one,
+            tow_pilot=self.tow_pilot,
+            towplane=self.towplane,
+            airfield=None,
+            flight_type="dual",
+        )
+
+        client.force_login(self.tow_pilot)
+        response = client.get(reverse("logsheet:tow_pilot_logbook"))
+
+        assert response.status_code == 200
+        rows = response.context["day_rows"]
+        assert len(rows) == 2
+        day_one_row = next(r for r in rows if r["tow_date"] == self.day_one)
+        assert day_one_row["airfield_identifier"] == "KSS1"
+        assert day_one_row["your_tows"] == 3
+
     def test_csv_export_contains_expected_columns_and_rows(self, client):
         client.force_login(self.tow_pilot)
         response = client.get(reverse("logsheet:tow_pilot_logbook_csv"))

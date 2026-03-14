@@ -231,10 +231,14 @@ def _get_tow_logbook_data(member, start_date):
     tow_flights = Flight.objects.filter(
         tow_pilot=member,
         logsheet__log_date__gte=start_date,
-    ).select_related("logsheet", "airfield")
+    ).select_related("logsheet", "logsheet__airfield")
 
     day_summaries = (
-        tow_flights.values("logsheet_id", "logsheet__log_date", "airfield__identifier")
+        tow_flights.values(
+            "logsheet_id",
+            "logsheet__log_date",
+            "logsheet__airfield__identifier",
+        )
         .annotate(your_tows=Count("id"))
         .order_by("-logsheet__log_date")
     )
@@ -266,7 +270,10 @@ def _get_tow_logbook_data(member, start_date):
 
         solo_towpilot_day = tow_pilot_counts.get(logsheet_id, 0) == 1
         tow_hours = None
-        hours_source = "Estimated (shared tow day)"
+        if solo_towpilot_day:
+            hours_source = "Estimated (solo tow pilot day - no tach closeout)"
+        else:
+            hours_source = "Estimated (shared tow day)"
 
         if solo_towpilot_day:
             closeouts = closeouts_by_logsheet.get(logsheet_id, [])
@@ -297,7 +304,7 @@ def _get_tow_logbook_data(member, start_date):
         day_rows.append(
             {
                 "tow_date": summary["logsheet__log_date"],
-                "airfield_identifier": summary["airfield__identifier"] or "—",
+                "airfield_identifier": summary["logsheet__airfield__identifier"] or "—",
                 "your_tows": your_tows,
                 "tow_hours": tow_hours,
                 "hours_source": hours_source,
@@ -334,6 +341,8 @@ def tow_pilot_logbook(request):
         {
             **tow_logbook_data,
             "start_date": start_date,
+            "estimated_tach_per_tow": TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW,
+            "estimated_hobbs_per_tow": TOW_LOGBOOK_ESTIMATED_HOBBS_PER_TOW,
         },
     )
 

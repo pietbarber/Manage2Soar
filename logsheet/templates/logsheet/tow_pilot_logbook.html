@@ -46,7 +46,7 @@
       <span><strong>Estimated Hobbs:</strong> {{ estimated_hobbs_total|floatformat:2 }} hr</span>
     </div>
     <small class="text-muted d-block mt-1">
-      Estimate only: uses 0.1 tach and 0.2 Hobbs per tow. Actual logged values may differ.
+      Estimate only: uses {{ estimated_tach_per_tow|floatformat:1 }} tach and {{ estimated_hobbs_per_tow|floatformat:1 }} Hobbs per tow. Actual logged values may differ.
     </small>
   </div>
 
