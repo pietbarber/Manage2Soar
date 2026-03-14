@@ -1,0 +1,22 @@
+/* Instructor request page accordion affordance */
+.day-accordion-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.day-accordion-summary::-webkit-details-marker {
+    display: none;
+}
+
+.day-accordion .accordion-chevron {
+    font-size: 0.85rem;
+    color: #6c757d;
+    transition: transform 0.18s ease-in-out;
+}
+
+.day-accordion[open] .accordion-chevron {
+    transform: rotate(90deg);
+}

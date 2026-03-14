@@ -4,6 +4,10 @@
 
 {% block title %}Instructor - Student Requests{% endblock %}
 
+{% block extra_css %}
+  <link href="{% static 'duty_roster/css/instructor_requests.css' %}" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <div class="container my-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
@@ -14,6 +18,16 @@
   </div>
 
   {% include "duty_roster/_messages.html" %}
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <span class="text-muted small">Show:</span>
+    {% for option in day_filter_options %}
+      <a href="?days={{ option.0 }}"
+         class="btn btn-sm {% if selected_days == option.0 %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        {{ option.1 }}
+      </a>
+    {% endfor %}
+  </div>
 
   <div class="row">
     <!-- Pending Requests Column -->
@@ -30,13 +44,16 @@
         <div class="card-body">
           {% if pending_by_date %}
             {% for day, slots in pending_by_date.items %}
-              <div class="mb-4">
-                <h6 class="border-bottom pb-2">
+              <details class="mb-3 day-accordion" {% if day in assigned_dates %}open{% endif %}>
+                <summary class="border-bottom pb-2 fw-semibold day-accordion-summary">
+                  <i class="fas fa-chevron-right accordion-chevron" aria-hidden="true"></i>
                   <i class="fas fa-calendar-day me-2"></i>{{ day|date:"l, F j, Y" }}
+                  <span class="badge bg-secondary ms-1">{{ slots|length }}</span>
                   {% if day == today %}
                     <span class="badge bg-danger ms-1">TODAY</span>
                   {% endif %}
-                </h6>
+                </summary>
+                <div class="pt-2">
                 {% for slot in slots %}
                   <div class="card mb-2">
                     <div class="card-body py-2 px-3">
@@ -59,18 +76,22 @@
                             {% endif %}
                             </span>
                           {% endif %}
+                          {% if slot.is_assigned_to_request_user %}
                           {% if slot.student.phone %}
                             <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
                           {% endif %}
                           {% if slot.student.email %}
                             <br><small class="text-muted"><i class="fas fa-envelope me-1"></i>{{ slot.student.email }}</small>
                           {% endif %}
+                          {% endif %}
                           <br><small class="text-muted">Requested: {{ slot.created_at|date:"M j, g:i a" }}</small>
                         </div>
                         <div class="text-end">
+                          {% if slot.is_assigned_to_request_user %}
                           <form action="{% url 'duty_roster:instructor_respond' slot_id=slot.id %}" method="post" class="d-inline">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="accept">
+                            <input type="hidden" name="days" value="{{ selected_days }}">
                             <button type="submit" class="btn btn-sm btn-success mb-1" title="Accept this student">
                               <i class="fas fa-check"></i>
                             </button>
@@ -82,11 +103,15 @@
                                   title="Decline with note">
                             <i class="fas fa-times"></i>
                           </button>
+                          {% else %}
+                          <span class="badge bg-secondary">Read only</span>
+                          {% endif %}
                         </div>
                       </div>
                     </div>
                   </div>
 
+                  {% if slot.is_assigned_to_request_user %}
                   <!-- Reject Modal -->
                   <div class="modal fade" id="rejectModal{{ slot.id }}" tabindex="-1">
                     <div class="modal-dialog">
@@ -94,6 +119,7 @@
                         <form action="{% url 'duty_roster:instructor_respond' slot_id=slot.id %}" method="post">
                           {% csrf_token %}
                           <input type="hidden" name="action" value="reject">
+                          <input type="hidden" name="days" value="{{ selected_days }}">
                           <div class="modal-header">
                             <h5 class="modal-title">Decline {{ slot.student.first_name }}?</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -115,8 +141,10 @@
                       </div>
                     </div>
                   </div>
+                  {% endif %}
                 {% endfor %}
-              </div>
+                </div>
+              </details>
             {% endfor %}
           {% else %}
             <div class="text-center py-4">
@@ -142,14 +170,16 @@
         <div class="card-body">
           {% if accepted_by_date %}
             {% for day, slots in accepted_by_date.items %}
-              <div class="mb-4">
-                <h6 class="border-bottom pb-2">
+              <details class="mb-3 day-accordion" {% if day in assigned_dates %}open{% endif %}>
+                <summary class="border-bottom pb-2 fw-semibold day-accordion-summary">
+                  <i class="fas fa-chevron-right accordion-chevron" aria-hidden="true"></i>
                   <i class="fas fa-calendar-day me-2"></i>{{ day|date:"l, F j, Y" }}
                   {% if day == today %}
                     <span class="badge bg-warning text-dark ms-1">TODAY</span>
                   {% endif %}
                   <span class="badge bg-secondary ms-1">{{ slots|length }} student{{ slots|length|pluralize }}</span>
-                </h6>
+                </summary>
+                <div class="pt-2">
                 {% for slot in slots %}
                   <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <div>
@@ -170,14 +200,18 @@
                         {% endif %}
                         </span>
                       {% endif %}
+                      {% if slot.is_assigned_to_request_user %}
                       {% if slot.student.phone %}
                         <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
+                      {% endif %}
                       {% endif %}
                     </div>
                     <div class="d-flex align-items-center gap-2">
                       <span class="badge bg-success">Confirmed</span>
+                      {% if slot.is_assigned_to_request_user %}
                       <form action="{% url 'duty_roster:revert_instruction_response' slot_id=slot.id %}" method="post" class="d-inline">
                         {% csrf_token %}
+                        <input type="hidden" name="days" value="{{ selected_days }}">
                         <button type="submit"
                                 class="btn btn-sm btn-outline-danger"
                                 title="Move student back to pending requests"
@@ -185,6 +219,9 @@
                           <i class="fas fa-trash" aria-hidden="true"></i>
                         </button>
                       </form>
+                      {% else %}
+                      <span class="badge bg-secondary">Read only</span>
+                      {% endif %}
                     </div>
                   </div>
                 {% endfor %}
@@ -204,6 +241,7 @@
                         </span>
                         <form action="{% url 'duty_roster:request_surge_instructor' assignment_id=assignment.id %}" method="post" class="d-inline">
                           {% csrf_token %}
+                          <input type="hidden" name="days" value="{{ selected_days }}">
                           {% if assignment.surge_notified %}
                             <button type="submit" class="btn btn-sm btn-warning" title="Send another surge request to the instructors list">
                               <i class="fas fa-redo me-1"></i>Re-send Surge Request
@@ -223,7 +261,8 @@
                     {% endif %}
                   {% endwith %}
                 {% endif %}
-              </div>
+                </div>
+              </details>
             {% endfor %}
           {% else %}
             <div class="text-center py-4">
