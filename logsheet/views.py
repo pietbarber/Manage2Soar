@@ -56,6 +56,9 @@ from .utils.flight_charges import quantize_currency, split_flight_costs
 
 logger = logging.getLogger(__name__)
 
+TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW = Decimal("0.1")
+TOW_LOGBOOK_ESTIMATED_HOBBS_PER_TOW = Decimal("0.2")
+
 
 def _sanitize_csv_cell(value):
     """Neutralize spreadsheet-formula strings in CSV cells."""
@@ -210,6 +213,169 @@ def _get_personal_charge_data(member, start_date):
     )
 
     return flight_rows, misc_charges
+
+
+def _tow_logbook_estimates(total_tows):
+    """Return summary-only estimated tach and Hobbs totals."""
+    estimated_tach = (
+        Decimal(total_tows) * TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW
+    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    estimated_hobbs = (
+        Decimal(total_tows) * TOW_LOGBOOK_ESTIMATED_HOBBS_PER_TOW
+    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return estimated_tach, estimated_hobbs
+
+
+def _get_tow_logbook_data(member, start_date):
+    """Build day-level tow logbook rows and summary metrics for a tow pilot member."""
+    tow_flights = Flight.objects.filter(
+        tow_pilot=member,
+        logsheet__log_date__gte=start_date,
+    ).select_related("logsheet", "airfield")
+
+    day_summaries = (
+        tow_flights.values("logsheet_id", "logsheet__log_date", "airfield__identifier")
+        .annotate(your_tows=Count("id"))
+        .order_by("-logsheet__log_date")
+    )
+
+    logsheet_ids = [row["logsheet_id"] for row in day_summaries]
+    tow_pilot_counts = {
+        row["logsheet_id"]: row["pilot_count"]
+        for row in Flight.objects.filter(
+            logsheet_id__in=logsheet_ids, tow_pilot__isnull=False
+        )
+        .values("logsheet_id")
+        .annotate(pilot_count=Count("tow_pilot", distinct=True))
+    }
+
+    closeouts_by_logsheet = {}
+    for closeout in TowplaneCloseout.objects.filter(
+        logsheet_id__in=logsheet_ids
+    ).select_related("towplane"):
+        closeouts_by_logsheet.setdefault(closeout.logsheet_id, []).append(closeout)
+
+    day_rows = []
+    total_tow_hours = Decimal("0.00")
+    total_tows = 0
+
+    for summary in day_summaries:
+        logsheet_id = summary["logsheet_id"]
+        your_tows = summary["your_tows"]
+        total_tows += your_tows
+
+        solo_towpilot_day = tow_pilot_counts.get(logsheet_id, 0) == 1
+        tow_hours = None
+        hours_source = "Estimated (shared tow day)"
+
+        if solo_towpilot_day:
+            closeouts = closeouts_by_logsheet.get(logsheet_id, [])
+            closeout_total = Decimal("0.00")
+            has_actual = False
+            for closeout in closeouts:
+                if closeout.tach_time is not None:
+                    closeout_total += Decimal(closeout.tach_time)
+                    has_actual = True
+                elif closeout.start_tach is not None and closeout.end_tach is not None:
+                    closeout_total += Decimal(closeout.end_tach) - Decimal(
+                        closeout.start_tach
+                    )
+                    has_actual = True
+
+            if has_actual:
+                tow_hours = closeout_total.quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                hours_source = "Actual tach (solo tow pilot day)"
+
+        if tow_hours is None:
+            tow_hours = (
+                Decimal(your_tows) * TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        total_tow_hours += tow_hours
+        day_rows.append(
+            {
+                "tow_date": summary["logsheet__log_date"],
+                "airfield_identifier": summary["airfield__identifier"] or "—",
+                "your_tows": your_tows,
+                "tow_hours": tow_hours,
+                "hours_source": hours_source,
+            }
+        )
+
+    distinct_tow_days = len(day_rows)
+    total_tow_hours = total_tow_hours.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    estimated_tach_total, estimated_hobbs_total = _tow_logbook_estimates(total_tows)
+
+    return {
+        "day_rows": day_rows,
+        "total_tows": total_tows,
+        "distinct_tow_days": distinct_tow_days,
+        "total_tow_hours": total_tow_hours,
+        "estimated_tach_total": estimated_tach_total,
+        "estimated_hobbs_total": estimated_hobbs_total,
+    }
+
+
+@active_member_required
+def tow_pilot_logbook(request):
+    """Show the current member's tow activity summary for the last 12 months."""
+    if not getattr(request.user, "towpilot", False):
+        messages.error(request, "Only tow pilots can access the tow logbook.")
+        return redirect("home")
+
+    start_date = timezone.localdate() - timedelta(days=365)
+    tow_logbook_data = _get_tow_logbook_data(request.user, start_date)
+
+    return render(
+        request,
+        "logsheet/tow_pilot_logbook.html",
+        {
+            **tow_logbook_data,
+            "start_date": start_date,
+        },
+    )
+
+
+@active_member_required
+def tow_pilot_logbook_csv(request):
+    """Export a tow pilot member's day-level tow logbook rows as CSV."""
+    if not getattr(request.user, "towpilot", False):
+        messages.error(request, "Only tow pilots can export the tow logbook.")
+        return redirect("home")
+
+    start_date = timezone.localdate() - timedelta(days=365)
+    tow_logbook_data = _get_tow_logbook_data(request.user, start_date)
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="tow_logbook_{timezone.localdate().isoformat()}.csv"'
+    )
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "Date",
+            "Airfield",
+            "Your Tows",
+            "Tow Hours (Tach)",
+            "Hours Source",
+        ]
+    )
+
+    for row in tow_logbook_data["day_rows"]:
+        writer.writerow(
+            [
+                row["tow_date"].isoformat(),
+                _sanitize_csv_cell(row["airfield_identifier"]),
+                row["your_tows"],
+                f"{row['tow_hours']:.2f}",
+                row["hours_source"],
+            ]
+        )
+
+    return response
 
 
 @active_member_required
