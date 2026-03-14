@@ -90,7 +90,7 @@ pydenticon==0.3.1
 pyee==13.0.0
 pyflakes==3.4.0
 Pygments==2.19.2
-PyJWT==2.10.1
+PyJWT==2.12.0
 pyparsing==3.2.5
 pytest==8.4.2
 pytest-base-url==2.1.0
