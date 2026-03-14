@@ -447,6 +447,61 @@ def test_assigned_instructor_day_accordions_start_expanded(client, django_user_m
         assert out_of_range_note not in content
 
     @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "days_value,in_range_offset,out_of_range_offset",
+        [
+            ("14", 13, 15),
+            ("30", 29, 31),
+        ],
+    )
+    def test_instructor_requests_days_filter_boundaries_for_14_and_30_days(
+        client,
+        django_user_model,
+        days_value,
+        in_range_offset,
+        out_of_range_offset,
+    ):
+        _ensure_full_member_status()
+        assigned = _make_member(
+            django_user_model,
+            f"days_assigned_{days_value}",
+            instructor=True,
+        )
+        viewer = _make_member(
+            django_user_model,
+            f"days_viewer_{days_value}",
+            instructor=True,
+        )
+
+        in_range_note = f"Within {days_value}-day window"
+        out_of_range_note = f"Outside {days_value}-day window"
+
+        InstructionSlot.objects.create(
+            assignment=_make_assignment(assigned, date_offset=in_range_offset),
+            student=_make_member(django_user_model, f"days_student_in_{days_value}"),
+            instructor_response="pending",
+            status="pending",
+            student_notes=in_range_note,
+        )
+        InstructionSlot.objects.create(
+            assignment=_make_assignment(assigned, date_offset=out_of_range_offset),
+            student=_make_member(django_user_model, f"days_student_out_{days_value}"),
+            instructor_response="pending",
+            status="pending",
+            student_notes=out_of_range_note,
+        )
+
+        client.force_login(viewer)
+        response = client.get(
+            reverse("duty_roster:instructor_requests") + f"?days={days_value}"
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert in_range_note in content
+        assert out_of_range_note not in content
+
+    @pytest.mark.django_db
     def test_instructor_requests_invalid_days_defaults_to_14_days(
         client, django_user_model
     ):
@@ -510,4 +565,33 @@ def test_assigned_instructor_day_accordions_start_expanded(client, django_user_m
         assert response.status_code == 302
         assert response["Location"].endswith(
             reverse("duty_roster:instructor_requests") + "?days=30"
+        )
+
+    @pytest.mark.django_db
+    def test_instructor_respond_preserves_days_filter_on_redirect(
+        client, django_user_model
+    ):
+        _ensure_full_member_status()
+        primary = _make_member(
+            django_user_model, "days_respond_primary", instructor=True
+        )
+        student = _make_member(django_user_model, "days_respond_student")
+        assignment = _make_assignment(primary, date_offset=9)
+
+        slot = InstructionSlot.objects.create(
+            assignment=assignment,
+            student=student,
+            instructor_response="pending",
+            status="pending",
+        )
+
+        client.force_login(primary)
+        response = client.post(
+            reverse("duty_roster:instructor_respond", kwargs={"slot_id": slot.pk}),
+            {"action": "accept", "days": "14"},
+        )
+
+        assert response.status_code == 302
+        assert response["Location"].endswith(
+            reverse("duty_roster:instructor_requests") + "?days=14"
         )
