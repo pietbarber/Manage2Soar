@@ -242,6 +242,7 @@ def _get_tow_logbook_data(member, start_date):
         .annotate(your_tows=Count("id"))
         .order_by("-logsheet__log_date")
     )
+    day_summaries = list(day_summaries)
 
     logsheet_ids = [row["logsheet_id"] for row in day_summaries]
     tow_pilot_counts = {
@@ -311,7 +312,7 @@ def _get_tow_logbook_data(member, start_date):
             }
         )
 
-    distinct_tow_days = len(day_rows)
+    distinct_tow_days = len({row["tow_date"] for row in day_rows})
     total_tow_hours = total_tow_hours.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     estimated_tach_total, estimated_hobbs_total = _tow_logbook_estimates(total_tows)
 

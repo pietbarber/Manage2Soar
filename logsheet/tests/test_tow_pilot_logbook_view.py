@@ -199,6 +199,31 @@ class TestTowPilotLogbookView:
         assert day_one_row["airfield_identifier"] == "KSS1"
         assert day_one_row["your_tows"] == 3
 
+    def test_distinct_tow_days_counts_unique_dates_not_logsheets(self, client):
+        second_airfield_same_date = Airfield.objects.create(
+            name="Skyline West",
+            identifier="KSS2",
+        )
+        extra_logsheet_same_date = Logsheet.objects.create(
+            log_date=self.day_one,
+            airfield=second_airfield_same_date,
+            created_by=self.tow_pilot,
+            finalized=True,
+        )
+        Flight.objects.create(
+            logsheet=extra_logsheet_same_date,
+            tow_pilot=self.tow_pilot,
+            towplane=self.towplane,
+            airfield=second_airfield_same_date,
+            flight_type="dual",
+        )
+
+        client.force_login(self.tow_pilot)
+        response = client.get(reverse("logsheet:tow_pilot_logbook"))
+
+        assert response.status_code == 200
+        assert response.context["distinct_tow_days"] == 2
+
     def test_csv_export_contains_expected_columns_and_rows(self, client):
         client.force_login(self.tow_pilot)
         response = client.get(reverse("logsheet:tow_pilot_logbook_csv"))
