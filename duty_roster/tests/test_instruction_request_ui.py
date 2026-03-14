@@ -411,3 +411,103 @@ def test_assigned_instructor_day_accordions_start_expanded(client, django_user_m
     assert response.status_code == 200
     content = response.content.decode()
     assert 'day-accordion" open' in content
+
+    @pytest.mark.django_db
+    def test_instructor_requests_days_filter_excludes_out_of_range_slots(
+        client, django_user_model
+    ):
+        _ensure_full_member_status()
+        assigned = _make_member(django_user_model, "days_assigned", instructor=True)
+        viewer = _make_member(django_user_model, "days_viewer", instructor=True)
+
+        in_range_note = "Within 7-day window"
+        out_of_range_note = "Outside 7-day window"
+
+        InstructionSlot.objects.create(
+            assignment=_make_assignment(assigned, date_offset=6),
+            student=_make_member(django_user_model, "days_student_in"),
+            instructor_response="pending",
+            status="pending",
+            student_notes=in_range_note,
+        )
+        InstructionSlot.objects.create(
+            assignment=_make_assignment(assigned, date_offset=8),
+            student=_make_member(django_user_model, "days_student_out"),
+            instructor_response="pending",
+            status="pending",
+            student_notes=out_of_range_note,
+        )
+
+        client.force_login(viewer)
+        response = client.get(reverse("duty_roster:instructor_requests") + "?days=7")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert in_range_note in content
+        assert out_of_range_note not in content
+
+    @pytest.mark.django_db
+    def test_instructor_requests_invalid_days_defaults_to_14_days(
+        client, django_user_model
+    ):
+        _ensure_full_member_status()
+        assigned = _make_member(django_user_model, "invalid_assigned", instructor=True)
+        viewer = _make_member(django_user_model, "invalid_viewer", instructor=True)
+
+        within_default_note = "Within default 14-day window"
+        outside_default_note = "Outside default 14-day window"
+
+        InstructionSlot.objects.create(
+            assignment=_make_assignment(assigned, date_offset=12),
+            student=_make_member(django_user_model, "invalid_student_in"),
+            instructor_response="pending",
+            status="pending",
+            student_notes=within_default_note,
+        )
+        InstructionSlot.objects.create(
+            assignment=_make_assignment(assigned, date_offset=16),
+            student=_make_member(django_user_model, "invalid_student_out"),
+            instructor_response="pending",
+            status="pending",
+            student_notes=outside_default_note,
+        )
+
+        client.force_login(viewer)
+        response = client.get(reverse("duty_roster:instructor_requests") + "?days=nope")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert within_default_note in content
+        assert outside_default_note not in content
+
+    @pytest.mark.django_db
+    def test_revert_instruction_response_preserves_days_filter_on_redirect(
+        client, django_user_model
+    ):
+        _ensure_full_member_status()
+        primary = _make_member(
+            django_user_model, "days_revert_primary", instructor=True
+        )
+        student = _make_member(django_user_model, "days_revert_student")
+        assignment = _make_assignment(primary, date_offset=10)
+
+        slot = InstructionSlot.objects.create(
+            assignment=assignment,
+            student=student,
+            instructor=primary,
+            status="confirmed",
+            instructor_response="accepted",
+        )
+
+        client.force_login(primary)
+        response = client.post(
+            reverse(
+                "duty_roster:revert_instruction_response", kwargs={"slot_id": slot.pk}
+            ),
+            {"days": "30"},
+        )
+
+        assert response.status_code == 302
+        assert response["Location"].endswith(
+            reverse("duty_roster:instructor_requests") + "?days=30"
+        )

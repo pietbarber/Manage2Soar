@@ -89,6 +89,7 @@
                           <form action="{% url 'duty_roster:instructor_respond' slot_id=slot.id %}" method="post" class="d-inline">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="accept">
+                            <input type="hidden" name="days" value="{{ selected_days }}">
                             <button type="submit" class="btn btn-sm btn-success mb-1" title="Accept this student">
                               <i class="fas fa-check"></i>
                             </button>
@@ -116,6 +117,7 @@
                         <form action="{% url 'duty_roster:instructor_respond' slot_id=slot.id %}" method="post">
                           {% csrf_token %}
                           <input type="hidden" name="action" value="reject">
+                          <input type="hidden" name="days" value="{{ selected_days }}">
                           <div class="modal-header">
                             <h5 class="modal-title">Decline {{ slot.student.first_name }}?</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -205,6 +207,7 @@
                       {% if slot.assignment.instructor_id == request.user.id or slot.assignment.surge_instructor_id == request.user.id %}
                       <form action="{% url 'duty_roster:revert_instruction_response' slot_id=slot.id %}" method="post" class="d-inline">
                         {% csrf_token %}
+                        <input type="hidden" name="days" value="{{ selected_days }}">
                         <button type="submit"
                                 class="btn btn-sm btn-outline-danger"
                                 title="Move student back to pending requests"
@@ -234,6 +237,7 @@
                         </span>
                         <form action="{% url 'duty_roster:request_surge_instructor' assignment_id=assignment.id %}" method="post" class="d-inline">
                           {% csrf_token %}
+                          <input type="hidden" name="days" value="{{ selected_days }}">
                           {% if assignment.surge_notified %}
                             <button type="submit" class="btn btn-sm btn-warning" title="Send another surge request to the instructors list">
                               <i class="fas fa-redo me-1"></i>Re-send Surge Request

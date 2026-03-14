@@ -2717,7 +2717,7 @@ def instructor_requests(request):
     assigned_assignments = DutyAssignment.objects.filter(**assignment_filter).filter(
         models.Q(instructor=request.user) | models.Q(surge_instructor=request.user)
     )
-    assigned_dates = list(assigned_assignments.values_list("date", flat=True))
+    assigned_dates = set(assigned_assignments.values_list("date", flat=True))
 
     # Group by assignment date for easier display
     from collections import defaultdict
@@ -2798,6 +2798,15 @@ def instructor_requests(request):
     )
 
 
+def _redirect_instructor_requests_with_days(request):
+    """Redirect to instructor requests while preserving an allowed days filter."""
+    allowed_values = {"7", "14", "30", "all"}
+    days = (request.POST.get("days") or request.GET.get("days") or "").strip().lower()
+    if days in allowed_values:
+        return redirect(f"{reverse('duty_roster:instructor_requests')}?days={days}")
+    return redirect("duty_roster:instructor_requests")
+
+
 @active_member_required
 @require_POST
 def instructor_respond(request, slot_id):
@@ -2820,12 +2829,12 @@ def instructor_respond(request, slot_id):
     # Check if already responded
     if slot.instructor_response != "pending":
         messages.warning(request, "You have already responded to this request.")
-        return redirect("duty_roster:instructor_requests")
+        return _redirect_instructor_requests_with_days(request)
 
     action = request.POST.get("action")
     if action not in ["accept", "reject"]:
         messages.error(request, "Invalid action.")
-        return redirect("duty_roster:instructor_requests")
+        return _redirect_instructor_requests_with_days(request)
 
     # Per-instructor capacity check (Issue #665).
     # Only applies when BOTH a primary and surge instructor are assigned; each
@@ -2847,7 +2856,7 @@ def instructor_respond(request, slot_id):
                 f"You have reached your student capacity ({instruction_threshold}) for this day. "
                 "The other instructor may still accept this student.",
             )
-            return redirect("duty_roster:instructor_requests")
+            return _redirect_instructor_requests_with_days(request)
 
     form = InstructorResponseForm(request.POST, instance=slot, instructor=request.user)
 
@@ -2871,7 +2880,7 @@ def instructor_respond(request, slot_id):
             )
             # HTML email sent via signal (send_request_response_email)
 
-    return redirect("duty_roster:instructor_requests")
+    return _redirect_instructor_requests_with_days(request)
 
 
 @active_member_required
@@ -2891,21 +2900,21 @@ def revert_instruction_response(request, slot_id):
             request,
             "Past duty dates cannot be modified.",
         )
-        return redirect("duty_roster:instructor_requests")
+        return _redirect_instructor_requests_with_days(request)
 
     if request.user not in [assignment.instructor, assignment.surge_instructor]:
         return HttpResponseForbidden("You are not the instructor for this day.")
 
     if slot.status == "cancelled":
         messages.warning(request, "This request is already cancelled.")
-        return redirect("duty_roster:instructor_requests")
+        return _redirect_instructor_requests_with_days(request)
 
     if slot.instructor_response != "accepted":
         messages.warning(
             request,
             "Only accepted requests can be moved back to pending.",
         )
-        return redirect("duty_roster:instructor_requests")
+        return _redirect_instructor_requests_with_days(request)
 
     # Clear the instructor when reverting to pending - the "pending" state means
     # no instructor has accepted yet, mirroring the initial slot creation state.
@@ -2945,7 +2954,7 @@ def revert_instruction_response(request, slot_id):
         request,
         f"Moved {slot.student.full_display_name} back to pending requests.",
     )
-    return redirect("duty_roster:instructor_requests")
+    return _redirect_instructor_requests_with_days(request)
 
 
 @active_member_required
@@ -2975,7 +2984,7 @@ def request_surge_instructor(request, assignment_id):
             request,
             "A surge instructor is already assigned for this day; no new request was sent.",
         )
-        return redirect("duty_roster:instructor_requests")
+        return _redirect_instructor_requests_with_days(request)
 
     accepted_count = (
         InstructionSlot.objects.filter(
@@ -3002,7 +3011,7 @@ def request_surge_instructor(request, assignment_id):
             "Verify that an instructors e-mail address is configured in Site Configuration.",
         )
 
-    return redirect("duty_roster:instructor_requests")
+    return _redirect_instructor_requests_with_days(request)
 
 
 @active_member_required
