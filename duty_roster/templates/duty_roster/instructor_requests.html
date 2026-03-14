@@ -4,6 +4,10 @@
 
 {% block title %}Instructor - Student Requests{% endblock %}
 
+{% block extra_css %}
+  <link href="{% static 'duty_roster/css/instructor_requests.css' %}" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <div class="container my-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
@@ -40,8 +44,9 @@
         <div class="card-body">
           {% if pending_by_date %}
             {% for day, slots in pending_by_date.items %}
-              <details class="mb-3" {% if day == today or forloop.first %}open{% endif %}>
-                <summary class="border-bottom pb-2 fw-semibold" style="cursor: pointer; list-style: none;">
+              <details class="mb-3 day-accordion" {% if day in assigned_dates %}open{% endif %}>
+                <summary class="border-bottom pb-2 fw-semibold day-accordion-summary">
+                  <i class="fas fa-chevron-right accordion-chevron" aria-hidden="true"></i>
                   <i class="fas fa-calendar-day me-2"></i>{{ day|date:"l, F j, Y" }}
                   <span class="badge bg-secondary ms-1">{{ slots|length }}</span>
                   {% if day == today %}
@@ -161,8 +166,9 @@
         <div class="card-body">
           {% if accepted_by_date %}
             {% for day, slots in accepted_by_date.items %}
-              <details class="mb-3" {% if day == today or forloop.first %}open{% endif %}>
-                <summary class="border-bottom pb-2 fw-semibold" style="cursor: pointer; list-style: none;">
+              <details class="mb-3 day-accordion" {% if day in assigned_dates %}open{% endif %}>
+                <summary class="border-bottom pb-2 fw-semibold day-accordion-summary">
+                  <i class="fas fa-chevron-right accordion-chevron" aria-hidden="true"></i>
                   <i class="fas fa-calendar-day me-2"></i>{{ day|date:"l, F j, Y" }}
                   {% if day == today %}
                     <span class="badge bg-warning text-dark ms-1">TODAY</span>

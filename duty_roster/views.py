@@ -2717,6 +2717,7 @@ def instructor_requests(request):
     assigned_assignments = DutyAssignment.objects.filter(**assignment_filter).filter(
         models.Q(instructor=request.user) | models.Q(surge_instructor=request.user)
     )
+    assigned_dates = list(assigned_assignments.values_list("date", flat=True))
 
     # Group by assignment date for easier display
     from collections import defaultdict
@@ -2792,6 +2793,7 @@ def instructor_requests(request):
             "instruction_surge_threshold": instruction_surge_threshold,
             "day_filter_options": day_filter_options,
             "selected_days": selected_days,
+            "assigned_dates": assigned_dates,
         },
     )
 

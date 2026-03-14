@@ -362,3 +362,52 @@ def test_unassigned_instructor_gets_read_only_controls(client, django_user_model
         )
         not in content
     )
+
+
+@pytest.mark.django_db
+def test_unassigned_instructor_day_accordions_start_collapsed(
+    client, django_user_model
+):
+    _ensure_full_member_status()
+    assigned = _make_member(django_user_model, "accordion_assigned", instructor=True)
+    viewer = _make_member(django_user_model, "accordion_viewer", instructor=True)
+    student = _make_member(django_user_model, "accordion_student")
+
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=6),
+        student=student,
+        instructor_response="pending",
+        status="pending",
+        student_notes="Accordion collapse check",
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("duty_roster:instructor_requests") + "?days=all")
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert 'day-accordion" open' not in content
+
+
+@pytest.mark.django_db
+def test_assigned_instructor_day_accordions_start_expanded(client, django_user_model):
+    _ensure_full_member_status()
+    assigned = _make_member(
+        django_user_model, "accordion_assigned_open", instructor=True
+    )
+    student = _make_member(django_user_model, "accordion_student_open")
+
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=8),
+        student=student,
+        instructor_response="pending",
+        status="pending",
+        student_notes="Accordion open check",
+    )
+
+    client.force_login(assigned)
+    response = client.get(reverse("duty_roster:instructor_requests") + "?days=all")
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert 'day-accordion" open' in content
