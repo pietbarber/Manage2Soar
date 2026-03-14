@@ -326,7 +326,11 @@ def test_unassigned_instructor_gets_read_only_controls(client, django_user_model
     _ensure_full_member_status()
     assigned = _make_member(django_user_model, "readonly_assigned", instructor=True)
     viewer = _make_member(django_user_model, "readonly_viewer", instructor=True)
-    student = _make_member(django_user_model, "readonly_student")
+    student = _make_member(
+        django_user_model,
+        "readonly_student",
+        phone="555-111-2222",
+    )
     assignment = _make_assignment(assigned, date_offset=18)
 
     pending_slot = InstructionSlot.objects.create(
@@ -362,6 +366,8 @@ def test_unassigned_instructor_gets_read_only_controls(client, django_user_model
         )
         not in content
     )
+    assert student.email not in content
+    assert "555-111-2222" not in content
 
 
 @pytest.mark.django_db
@@ -412,186 +418,185 @@ def test_assigned_instructor_day_accordions_start_expanded(client, django_user_m
     content = response.content.decode()
     assert 'day-accordion" open' in content
 
-    @pytest.mark.django_db
-    def test_instructor_requests_days_filter_excludes_out_of_range_slots(
-        client, django_user_model
-    ):
-        _ensure_full_member_status()
-        assigned = _make_member(django_user_model, "days_assigned", instructor=True)
-        viewer = _make_member(django_user_model, "days_viewer", instructor=True)
 
-        in_range_note = "Within 7-day window"
-        out_of_range_note = "Outside 7-day window"
+@pytest.mark.django_db
+def test_instructor_requests_days_filter_excludes_out_of_range_slots(
+    client, django_user_model
+):
+    _ensure_full_member_status()
+    assigned = _make_member(django_user_model, "days_assigned", instructor=True)
+    viewer = _make_member(django_user_model, "days_viewer", instructor=True)
 
-        InstructionSlot.objects.create(
-            assignment=_make_assignment(assigned, date_offset=6),
-            student=_make_member(django_user_model, "days_student_in"),
-            instructor_response="pending",
-            status="pending",
-            student_notes=in_range_note,
-        )
-        InstructionSlot.objects.create(
-            assignment=_make_assignment(assigned, date_offset=8),
-            student=_make_member(django_user_model, "days_student_out"),
-            instructor_response="pending",
-            status="pending",
-            student_notes=out_of_range_note,
-        )
+    in_range_note = "Within 7-day window"
+    out_of_range_note = "Outside 7-day window"
 
-        client.force_login(viewer)
-        response = client.get(reverse("duty_roster:instructor_requests") + "?days=7")
-
-        assert response.status_code == 200
-        content = response.content.decode()
-        assert in_range_note in content
-        assert out_of_range_note not in content
-
-    @pytest.mark.django_db
-    @pytest.mark.parametrize(
-        "days_value,in_range_offset,out_of_range_offset",
-        [
-            ("14", 13, 15),
-            ("30", 29, 31),
-        ],
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=6),
+        student=_make_member(django_user_model, "days_student_in"),
+        instructor_response="pending",
+        status="pending",
+        student_notes=in_range_note,
     )
-    def test_instructor_requests_days_filter_boundaries_for_14_and_30_days(
-        client,
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=8),
+        student=_make_member(django_user_model, "days_student_out"),
+        instructor_response="pending",
+        status="pending",
+        student_notes=out_of_range_note,
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("duty_roster:instructor_requests") + "?days=7")
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert in_range_note in content
+    assert out_of_range_note not in content
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "days_value,in_range_offset,out_of_range_offset",
+    [
+        ("14", 13, 15),
+        ("30", 29, 31),
+    ],
+)
+def test_instructor_requests_days_filter_boundaries_for_14_and_30_days(
+    client,
+    django_user_model,
+    days_value,
+    in_range_offset,
+    out_of_range_offset,
+):
+    _ensure_full_member_status()
+    assigned = _make_member(
         django_user_model,
-        days_value,
-        in_range_offset,
-        out_of_range_offset,
-    ):
-        _ensure_full_member_status()
-        assigned = _make_member(
-            django_user_model,
-            f"days_assigned_{days_value}",
-            instructor=True,
-        )
-        viewer = _make_member(
-            django_user_model,
-            f"days_viewer_{days_value}",
-            instructor=True,
-        )
+        f"days_assigned_{days_value}",
+        instructor=True,
+    )
+    viewer = _make_member(
+        django_user_model,
+        f"days_viewer_{days_value}",
+        instructor=True,
+    )
 
-        in_range_note = f"Within {days_value}-day window"
-        out_of_range_note = f"Outside {days_value}-day window"
+    in_range_note = f"Within {days_value}-day window"
+    out_of_range_note = f"Outside {days_value}-day window"
 
-        InstructionSlot.objects.create(
-            assignment=_make_assignment(assigned, date_offset=in_range_offset),
-            student=_make_member(django_user_model, f"days_student_in_{days_value}"),
-            instructor_response="pending",
-            status="pending",
-            student_notes=in_range_note,
-        )
-        InstructionSlot.objects.create(
-            assignment=_make_assignment(assigned, date_offset=out_of_range_offset),
-            student=_make_member(django_user_model, f"days_student_out_{days_value}"),
-            instructor_response="pending",
-            status="pending",
-            student_notes=out_of_range_note,
-        )
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=in_range_offset),
+        student=_make_member(django_user_model, f"days_student_in_{days_value}"),
+        instructor_response="pending",
+        status="pending",
+        student_notes=in_range_note,
+    )
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=out_of_range_offset),
+        student=_make_member(django_user_model, f"days_student_out_{days_value}"),
+        instructor_response="pending",
+        status="pending",
+        student_notes=out_of_range_note,
+    )
 
-        client.force_login(viewer)
-        response = client.get(
-            reverse("duty_roster:instructor_requests") + f"?days={days_value}"
-        )
+    client.force_login(viewer)
+    response = client.get(
+        reverse("duty_roster:instructor_requests") + f"?days={days_value}"
+    )
 
-        assert response.status_code == 200
-        content = response.content.decode()
-        assert in_range_note in content
-        assert out_of_range_note not in content
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert in_range_note in content
+    assert out_of_range_note not in content
 
-    @pytest.mark.django_db
-    def test_instructor_requests_invalid_days_defaults_to_14_days(
-        client, django_user_model
-    ):
-        _ensure_full_member_status()
-        assigned = _make_member(django_user_model, "invalid_assigned", instructor=True)
-        viewer = _make_member(django_user_model, "invalid_viewer", instructor=True)
 
-        within_default_note = "Within default 14-day window"
-        outside_default_note = "Outside default 14-day window"
+@pytest.mark.django_db
+def test_instructor_requests_invalid_days_defaults_to_14_days(
+    client, django_user_model
+):
+    _ensure_full_member_status()
+    assigned = _make_member(django_user_model, "invalid_assigned", instructor=True)
+    viewer = _make_member(django_user_model, "invalid_viewer", instructor=True)
 
-        InstructionSlot.objects.create(
-            assignment=_make_assignment(assigned, date_offset=12),
-            student=_make_member(django_user_model, "invalid_student_in"),
-            instructor_response="pending",
-            status="pending",
-            student_notes=within_default_note,
-        )
-        InstructionSlot.objects.create(
-            assignment=_make_assignment(assigned, date_offset=16),
-            student=_make_member(django_user_model, "invalid_student_out"),
-            instructor_response="pending",
-            status="pending",
-            student_notes=outside_default_note,
-        )
+    within_default_note = "Within default 14-day window"
+    outside_default_note = "Outside default 14-day window"
 
-        client.force_login(viewer)
-        response = client.get(reverse("duty_roster:instructor_requests") + "?days=nope")
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=12),
+        student=_make_member(django_user_model, "invalid_student_in"),
+        instructor_response="pending",
+        status="pending",
+        student_notes=within_default_note,
+    )
+    InstructionSlot.objects.create(
+        assignment=_make_assignment(assigned, date_offset=16),
+        student=_make_member(django_user_model, "invalid_student_out"),
+        instructor_response="pending",
+        status="pending",
+        student_notes=outside_default_note,
+    )
 
-        assert response.status_code == 200
-        content = response.content.decode()
-        assert within_default_note in content
-        assert outside_default_note not in content
+    client.force_login(viewer)
+    response = client.get(reverse("duty_roster:instructor_requests") + "?days=nope")
 
-    @pytest.mark.django_db
-    def test_revert_instruction_response_preserves_days_filter_on_redirect(
-        client, django_user_model
-    ):
-        _ensure_full_member_status()
-        primary = _make_member(
-            django_user_model, "days_revert_primary", instructor=True
-        )
-        student = _make_member(django_user_model, "days_revert_student")
-        assignment = _make_assignment(primary, date_offset=10)
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert within_default_note in content
+    assert outside_default_note not in content
 
-        slot = InstructionSlot.objects.create(
-            assignment=assignment,
-            student=student,
-            instructor=primary,
-            status="confirmed",
-            instructor_response="accepted",
-        )
 
-        client.force_login(primary)
-        response = client.post(
-            reverse(
-                "duty_roster:revert_instruction_response", kwargs={"slot_id": slot.pk}
-            ),
-            {"days": "30"},
-        )
+@pytest.mark.django_db
+def test_revert_instruction_response_preserves_days_filter_on_redirect(
+    client, django_user_model
+):
+    _ensure_full_member_status()
+    primary = _make_member(django_user_model, "days_revert_primary", instructor=True)
+    student = _make_member(django_user_model, "days_revert_student")
+    assignment = _make_assignment(primary, date_offset=10)
 
-        assert response.status_code == 302
-        assert response["Location"].endswith(
-            reverse("duty_roster:instructor_requests") + "?days=30"
-        )
+    slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=student,
+        instructor=primary,
+        status="confirmed",
+        instructor_response="accepted",
+    )
 
-    @pytest.mark.django_db
-    def test_instructor_respond_preserves_days_filter_on_redirect(
-        client, django_user_model
-    ):
-        _ensure_full_member_status()
-        primary = _make_member(
-            django_user_model, "days_respond_primary", instructor=True
-        )
-        student = _make_member(django_user_model, "days_respond_student")
-        assignment = _make_assignment(primary, date_offset=9)
+    client.force_login(primary)
+    response = client.post(
+        reverse("duty_roster:revert_instruction_response", kwargs={"slot_id": slot.pk}),
+        {"days": "30"},
+    )
 
-        slot = InstructionSlot.objects.create(
-            assignment=assignment,
-            student=student,
-            instructor_response="pending",
-            status="pending",
-        )
+    assert response.status_code == 302
+    assert response["Location"].endswith(
+        reverse("duty_roster:instructor_requests") + "?days=30"
+    )
 
-        client.force_login(primary)
-        response = client.post(
-            reverse("duty_roster:instructor_respond", kwargs={"slot_id": slot.pk}),
-            {"action": "accept", "days": "14"},
-        )
 
-        assert response.status_code == 302
-        assert response["Location"].endswith(
-            reverse("duty_roster:instructor_requests") + "?days=14"
-        )
+@pytest.mark.django_db
+def test_instructor_respond_preserves_days_filter_on_redirect(
+    client, django_user_model
+):
+    _ensure_full_member_status()
+    primary = _make_member(django_user_model, "days_respond_primary", instructor=True)
+    student = _make_member(django_user_model, "days_respond_student")
+    assignment = _make_assignment(primary, date_offset=9)
+
+    slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=student,
+        instructor_response="pending",
+        status="pending",
+    )
+
+    client.force_login(primary)
+    response = client.post(
+        reverse("duty_roster:instructor_respond", kwargs={"slot_id": slot.pk}),
+        {"action": "accept", "days": "14"},
+    )
+
+    assert response.status_code == 302
+    assert response["Location"].endswith(
+        reverse("duty_roster:instructor_requests") + "?days=14"
+    )
