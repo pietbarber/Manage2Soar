@@ -240,7 +240,11 @@ def _get_tow_logbook_data(member, start_date):
             "logsheet__airfield__identifier",
         )
         .annotate(your_tows=Count("id"))
-        .order_by("-logsheet__log_date")
+        .order_by(
+            "-logsheet__log_date",
+            "logsheet__airfield__identifier",
+            "-logsheet_id",
+        )
     )
     day_summaries = list(day_summaries)
 

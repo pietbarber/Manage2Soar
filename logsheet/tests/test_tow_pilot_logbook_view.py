@@ -223,6 +223,15 @@ class TestTowPilotLogbookView:
 
         assert response.status_code == 200
         assert response.context["distinct_tow_days"] == 2
+        same_day_rows = [
+            row
+            for row in response.context["day_rows"]
+            if row["tow_date"] == self.day_one
+        ]
+        assert [row["airfield_identifier"] for row in same_day_rows] == [
+            "KSS1",
+            "KSS2",
+        ]
 
     def test_csv_export_contains_expected_columns_and_rows(self, client):
         client.force_login(self.tow_pilot)

@@ -10,7 +10,7 @@
   </div>
 
   <p class="text-muted mb-4">
-    Showing tow activity by day from {{ start_date|date:"Y-m-d" }} to today (most recent first).
+    Showing tow activity by operations logsheet (date + airfield) from {{ start_date|date:"Y-m-d" }} to today (most recent first).
   </p>
 
   <div class="row g-3 mb-3">
@@ -34,6 +34,7 @@
       <div class="card h-100">
         <div class="card-body">
           <p class="text-muted mb-1">Tow Hours (by day)</p>
+          <small class="text-muted d-block">Aggregated from per-logsheet rows</small>
           <p class="h3 mb-0">{{ total_tow_hours|floatformat:2 }}</p>
         </div>
       </div>
