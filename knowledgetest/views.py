@@ -1,6 +1,8 @@
 import json
 import logging
 
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
@@ -23,6 +25,7 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from members.decorators import active_member_required
+from utils.url_helpers import build_absolute_url
 
 try:
     from notifications.models import Notification
@@ -64,12 +67,24 @@ def get_presets():
     return TestPreset.get_presets_as_dict()
 
 
+def can_access_written_test(template, user):
+    """Shared authorization check for start and submit endpoints."""
+    has_assignment = WrittenTestAssignment.objects.filter(
+        template=template, student=user
+    ).exists()
+    is_creator = template.created_by_id == user.id
+    return user.is_staff or has_assignment or is_creator
+
+
+@method_decorator(active_member_required, name="dispatch")
 class WrittenTestStartView(TemplateView):
     template_name = "written_test/start.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         tmpl = get_object_or_404(WrittenTestTemplate, pk=kwargs["pk"])
+        if not can_access_written_test(tmpl, self.request.user):
+            raise PermissionDenied("You are not allowed to take this test.")
         qs = tmpl.questions.all().values(
             # from knowledgetest.views import get_presets
         )
@@ -192,19 +207,36 @@ class CreateWrittenTestView(FormView):
                 pass_percentage=data["pass_percentage"],
                 created_by=self.request.user,
             )
-            WrittenTestAssignment.objects.create(
-                template=tmpl, student=data["student"], instructor=self.request.user
-            )
-        # Create notification for the student
-        try:
-            if Notification is not None:
-                Notification.objects.create(
-                    user=data["student"],
-                    message=f"You have been assigned a new written test: {tmpl.name}",
-                    url=reverse("knowledgetest:quiz-pending"),
+            is_self_practice = data["student"] == self.request.user
+            if not is_self_practice:
+                WrittenTestAssignment.objects.create(
+                    template=tmpl, student=data["student"], instructor=self.request.user
                 )
-        except Exception as e:
-            logging.warning(f"Failed to create notification for test assignment: {e}")
+
+        if is_self_practice:
+            practice_url = build_absolute_url(
+                reverse("knowledgetest:quiz-start", args=[tmpl.pk])
+            )
+            messages.warning(
+                self.request,
+                "Practice test created for yourself. No assignment was created, "
+                "it will not appear on Pending Tests, and completion will not be "
+                "added to your instruction record. "
+                f"Use this URL to take it: {practice_url}",
+            )
+        else:
+            # Create notification for the assigned student
+            try:
+                if Notification is not None:
+                    Notification.objects.create(
+                        user=data["student"],
+                        message=f"You have been assigned a new written test: {tmpl.name}",
+                        url=reverse("knowledgetest:quiz-pending"),
+                    )
+            except Exception as e:
+                logging.warning(
+                    f"Failed to create notification for test assignment: {e}"
+                )
         order = 1
         # 3. First, include forced questions
         for qnum in must:
@@ -244,6 +276,8 @@ class WrittenTestSubmitView(View):
 
     def post(self, request, pk):
         tmpl = get_object_or_404(WrittenTestTemplate, pk=pk)
+        if not can_access_written_test(tmpl, request.user):
+            return HttpResponseForbidden("You are not allowed to take this test.")
         form = TestSubmissionForm(request.POST)
         if not form.is_valid():
             form.add_error(None, "Invalid answer payload")
@@ -294,6 +328,7 @@ class WrittenTestSubmitView(View):
         breakdown_txt = generate_test_subject_breakdown(attempt)
 
         # 1) Mark any assignment complete
+        asn = None
         try:
             asn = WrittenTestAssignment.objects.get(
                 template=tmpl, student=request.user, completed=False
@@ -345,7 +380,7 @@ class WrittenTestSubmitView(View):
 
         # 2) Log into InstructionReport, using the instructor who created the test
         proctor = tmpl.created_by
-        if proctor:
+        if proctor and asn is not None:
             # build a subject‐count breakdown
             breakdown_txt = generate_test_subject_breakdown(attempt)
 

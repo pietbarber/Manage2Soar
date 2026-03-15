@@ -2348,6 +2348,17 @@ class CreateWrittenTestView(FormView):
                     )
             except Exception as e:
                 print(f"Failed to create notification: {e}")
+        else:
+            practice_url = build_absolute_url(
+                reverse("knowledgetest:quiz-start", args=[tmpl.pk])
+            )
+            messages.warning(
+                self.request,
+                "Practice test created for yourself. No assignment was created, "
+                "it will not appear on Pending Tests, and completion will not be "
+                "added to your instruction record. "
+                f"Use this URL to take it: {practice_url}",
+            )
         order = 1
         # 3. First, include forced questions
         for qnum in must:
