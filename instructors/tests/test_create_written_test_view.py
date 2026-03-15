@@ -2,7 +2,12 @@ import pytest
 from django.test import TestCase
 from django.urls import reverse
 
-from knowledgetest.models import QuestionCategory
+from knowledgetest.models import (
+    Question,
+    QuestionCategory,
+    WrittenTestAssignment,
+    WrittenTestTemplate,
+)
 from members.models import Member
 from siteconfig.models import MembershipStatus
 
@@ -59,3 +64,42 @@ class TestCreateWrittenTestView(TestCase):
         assert "weight_fields" in response.context
         assert list(response.context["weight_fields"]) == []
         assert b"No question categories are configured yet." in response.content
+
+    def test_self_assigned_test_shows_practice_warning_and_no_assignment(self):
+        category = QuestionCategory.objects.create(code="PRE", description="Pre-Solo")
+        Question.objects.create(
+            qnum=9001,
+            category=category,
+            question_text="Practice question?",
+            option_a="A",
+            option_b="B",
+            option_c="C",
+            option_d="D",
+            correct_answer="A",
+        )
+
+        self.client.force_login(self.instructor)
+        response = self.client.post(
+            self.url,
+            {
+                "student": self.instructor.pk,
+                "pass_percentage": "100",
+                "description": "Self practice",
+                "must_include": "",
+                "weight_PRE": "1",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        template = WrittenTestTemplate.objects.latest("pk")
+        assert not WrittenTestAssignment.objects.filter(
+            template=template, student=self.instructor
+        ).exists()
+
+        messages = [m.message for m in response.context["messages"]]
+        assert any("Practice test created for yourself" in msg for msg in messages)
+        assert any(
+            reverse("knowledgetest:quiz-start", args=[template.pk]) in msg
+            for msg in messages
+        )

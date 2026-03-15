@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
@@ -64,12 +65,19 @@ def get_presets():
     return TestPreset.get_presets_as_dict()
 
 
+@method_decorator(active_member_required, name="dispatch")
 class WrittenTestStartView(TemplateView):
     template_name = "written_test/start.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         tmpl = get_object_or_404(WrittenTestTemplate, pk=kwargs["pk"])
+        has_assignment = WrittenTestAssignment.objects.filter(
+            template=tmpl, student=self.request.user
+        ).exists()
+        is_creator = tmpl.created_by_id == self.request.user.id
+        if not (self.request.user.is_staff or has_assignment or is_creator):
+            raise PermissionDenied("You are not allowed to take this test.")
         qs = tmpl.questions.all().values(
             # from knowledgetest.views import get_presets
         )
@@ -244,6 +252,12 @@ class WrittenTestSubmitView(View):
 
     def post(self, request, pk):
         tmpl = get_object_or_404(WrittenTestTemplate, pk=pk)
+        has_assignment = WrittenTestAssignment.objects.filter(
+            template=tmpl, student=request.user
+        ).exists()
+        is_creator = tmpl.created_by_id == request.user.id
+        if not (request.user.is_staff or has_assignment or is_creator):
+            return HttpResponseForbidden("You are not allowed to take this test.")
         form = TestSubmissionForm(request.POST)
         if not form.is_valid():
             form.add_error(None, "Invalid answer payload")
@@ -294,6 +308,7 @@ class WrittenTestSubmitView(View):
         breakdown_txt = generate_test_subject_breakdown(attempt)
 
         # 1) Mark any assignment complete
+        asn = None
         try:
             asn = WrittenTestAssignment.objects.get(
                 template=tmpl, student=request.user, completed=False
@@ -345,7 +360,8 @@ class WrittenTestSubmitView(View):
 
         # 2) Log into InstructionReport, using the instructor who created the test
         proctor = tmpl.created_by
-        if proctor:
+        practice_self_test = tmpl.created_by_id == request.user.id
+        if proctor and asn is not None and not practice_self_test:
             # build a subject‐count breakdown
             breakdown_txt = generate_test_subject_breakdown(attempt)
 

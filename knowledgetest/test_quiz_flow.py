@@ -10,6 +10,7 @@ from knowledgetest.models import (
     Question,
     QuestionCategory,
     WrittenTestAnswer,
+    WrittenTestAssignment,
     WrittenTestAttempt,
     WrittenTestTemplate,
 )
@@ -231,6 +232,55 @@ class QuizFlowTests(TestCase):
         attempt = WrittenTestAttempt.objects.get(student=self.student)
         expected_url = reverse("knowledgetest:quiz-result", args=[attempt.pk])
         self.assertIn(expected_url, report.report_text)
+
+    def test_creator_can_access_start_without_assignment(self):
+        self.tmpl.created_by = self.student
+        self.tmpl.save(update_fields=["created_by"])
+        WrittenTestAssignment.objects.filter(
+            template=self.tmpl, student=self.student
+        ).delete()
+
+        url = reverse("knowledgetest:quiz-start", args=[self.tmpl.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_unassigned_non_creator_cannot_access_start(self):
+        other_member = User.objects.create_user(
+            username="other-member", password="pass"
+        )
+        other_member.membership_status = "Full Member"
+        other_member.save()
+
+        self.client.logout()
+        self.client.login(username="other-member", password="pass")
+
+        url = reverse("knowledgetest:quiz-start", args=[self.tmpl.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_self_practice_submission_creates_no_instruction_report(self):
+        self.tmpl.created_by = self.student
+        self.tmpl.save(update_fields=["created_by"])
+        WrittenTestAssignment.objects.filter(
+            template=self.tmpl, student=self.student
+        ).delete()
+
+        submit_url = reverse("knowledgetest:quiz-submit", args=[self.tmpl.pk])
+        payload = {"answers": json.dumps({"1": "A", "2": "C"})}
+        response = self.client.post(submit_url, payload)
+
+        self.assertEqual(response.status_code, 302)
+        attempt = WrittenTestAttempt.objects.filter(
+            template=self.tmpl, student=self.student
+        ).latest("pk")
+        self.assertIsNotNone(attempt)
+        self.assertFalse(
+            InstructionReport.objects.filter(
+                student=self.student,
+                instructor=self.student,
+                report_text__icontains='Written test "Pre-solo Test" completed',
+            ).exists()
+        )
 
 
 class WrittenTestDeleteTests(TestCase):
