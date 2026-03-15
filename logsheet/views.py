@@ -285,12 +285,17 @@ def _get_tow_logbook_data(member, start_date):
             closeout_total = Decimal("0.00")
             has_actual = False
             for closeout in closeouts:
+                rental_hours = Decimal(closeout.rental_hours_chargeable or 0)
                 if closeout.tach_time is not None:
-                    closeout_total += Decimal(closeout.tach_time)
+                    closeout_total += max(
+                        Decimal("0.00"), Decimal(closeout.tach_time) - rental_hours
+                    )
                     has_actual = True
                 elif closeout.start_tach is not None and closeout.end_tach is not None:
-                    closeout_total += Decimal(closeout.end_tach) - Decimal(
-                        closeout.start_tach
+                    closeout_total += max(
+                        Decimal("0.00"),
+                        (Decimal(closeout.end_tach) - Decimal(closeout.start_tach))
+                        - rental_hours,
                     )
                     has_actual = True
 

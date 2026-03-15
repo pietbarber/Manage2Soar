@@ -178,6 +178,20 @@ class TestTowPilotLogbookView:
             == "Estimated (solo tow pilot day - no tach closeout)"
         )
 
+    def test_solo_day_actual_tach_excludes_rental_hours_chargeable(self, client):
+        closeout = TowplaneCloseout.objects.get(logsheet=self.logsheet_day_one)
+        closeout.rental_hours_chargeable = Decimal("0.3")
+        closeout.save(update_fields=["rental_hours_chargeable"])
+
+        client.force_login(self.tow_pilot)
+        response = client.get(reverse("logsheet:tow_pilot_logbook"))
+
+        assert response.status_code == 200
+        rows = response.context["day_rows"]
+        day_one_row = next(r for r in rows if r["tow_date"] == self.day_one)
+        assert day_one_row["tow_hours"] == Decimal("1.10")
+        assert day_one_row["hours_source"] == "Actual tach (solo tow pilot day)"
+
     def test_day_grouping_uses_logsheet_airfield_when_flight_airfield_missing(
         self, client
     ):
