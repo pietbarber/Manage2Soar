@@ -1,3 +1,4 @@
+from datetime import time
 from decimal import Decimal
 
 import pytest
@@ -51,6 +52,63 @@ def test_summary_by_flight_table_layout(client, active_member, logsheet_with_fli
     # Check that the table footer has proper structure
     assert 'colspan="3"' in content
     assert "Totals:" in content
+
+
+@pytest.mark.django_db
+def test_finances_uses_computed_duration_when_duration_is_null(
+    client, active_member, logsheet_with_flights, another_member
+):
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    assert flight is not None, "Test setup failed: no Flight created."
+
+    # Render the finalized View Split modal path where data-duration is used.
+    flight.split_with = another_member
+    flight.split_type = "even"
+    flight.save(update_fields=["split_with", "split_type"])
+    logsheet_with_flights.finalized = True
+    logsheet_with_flights.save(update_fields=["finalized"])
+
+    # Simulate legacy/backfill gap where stored DurationField is null.
+    Flight.objects.filter(pk=flight.pk).update(duration=None)
+    flight.refresh_from_db()
+    assert flight.duration is None
+    assert flight.computed_duration is not None
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "<td>None</td>" not in content
+    assert str(flight.computed_duration) in content
+    assert f'data-duration="{flight.computed_duration}"' in content
+    assert 'data-duration="None"' not in content
+
+
+@pytest.mark.django_db
+def test_finances_preserves_zero_computed_duration(
+    client, active_member, logsheet_with_flights
+):
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    assert flight is not None, "Test setup failed: no Flight created."
+
+    # A true zero-duration flight should render as 0:00:00, not the fallback em-dash.
+    Flight.objects.filter(pk=flight.pk).update(
+        duration=None,
+        launch_time=time(10, 0),
+        landing_time=time(10, 0),
+    )
+    flight.refresh_from_db()
+    assert str(flight.computed_duration) == "0:00:00"
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "0:00:00" in content
 
 
 @pytest.mark.django_db
