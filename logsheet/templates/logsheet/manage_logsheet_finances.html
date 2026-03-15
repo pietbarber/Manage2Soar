@@ -513,6 +513,39 @@
     return null;
   }
 
+  function keepMissingDurationsLast(table) {
+    const headerCells = table.querySelectorAll('th');
+    let durationColIndex = -1;
+
+    headerCells.forEach((th, idx) => {
+      if (th.getAttribute('data-sort-method') === 'duration') {
+        durationColIndex = idx;
+      }
+    });
+
+    if (durationColIndex === -1) {
+      return;
+    }
+
+    table.querySelectorAll('tbody').forEach(tbody => {
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const missing = [];
+      const nonMissing = [];
+
+      rows.forEach(row => {
+        const cell = row.cells[durationColIndex];
+        const text = cell ? String(cell.textContent || '').trim() : '';
+        if (!text || text === '—') {
+          missing.push(row);
+        } else {
+          nonMissing.push(row);
+        }
+      });
+
+      nonMissing.concat(missing).forEach(row => tbody.appendChild(row));
+    });
+  }
+
   // Initialize all sortable tables on page load
   document.addEventListener('DOMContentLoaded', function() {
     if (typeof Tablesort !== 'undefined') {
@@ -548,6 +581,10 @@
     tables.forEach(table => {
       if (typeof Tablesort !== 'undefined') {
         new Tablesort(table);
+        table.addEventListener('afterSort', function() {
+          keepMissingDurationsLast(table);
+        });
+        keepMissingDurationsLast(table);
       }
     });
   });

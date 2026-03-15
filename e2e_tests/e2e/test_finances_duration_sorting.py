@@ -133,6 +133,20 @@ class TestFinancesDurationSortingE2E(DjangoPlaywrightTestCase):
                 f"{durations}"
             )
 
+    def _assert_desc_sorted_with_missing_last(self, durations):
+        parsed = [self._duration_to_seconds(value) for value in durations]
+        non_missing = [value for value in parsed if value is not None]
+
+        assert non_missing == sorted(non_missing, reverse=True), (
+            "Expected non-missing durations sorted descending, got " f"{durations}"
+        )
+
+        if None in parsed:
+            assert parsed[-1] is None, (
+                "Expected missing duration placeholder to remain last in descending sort, got "
+                f"{durations}"
+            )
+
     def test_duration_sort_is_numeric_and_missing_is_last(self):
         self.login(username="do_duration")
         self.page.goto(
@@ -160,3 +174,9 @@ class TestFinancesDurationSortingE2E(DjangoPlaywrightTestCase):
             durations = self._read_duration_cells()
 
         self._assert_sorted_with_missing_last(durations)
+
+        # Toggle to descending and ensure missing values still stay last.
+        duration_header.click()
+        self.page.wait_for_timeout(150)
+        desc_durations = self._read_duration_cells()
+        self._assert_desc_sorted_with_missing_last(desc_durations)
