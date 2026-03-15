@@ -513,37 +513,37 @@
     return null;
   }
 
-  if (typeof Tablesort !== 'undefined') {
-    try {
-      Tablesort.extend('duration', function(item) {
-        return item.indexOf(':') !== -1 || item.indexOf('—') !== -1;
-      }, function(a, b) {
-        const aText = a && a.textContent ? a.textContent : a;
-        const bText = b && b.textContent ? b.textContent : b;
-        const aSeconds = parseDurationToSeconds(aText);
-        const bSeconds = parseDurationToSeconds(bText);
-        const aMissing = aSeconds === null;
-        const bMissing = bSeconds === null;
-
-        if (aMissing && bMissing) {
-          return 0;
-        }
-        if (aMissing) {
-          return 1;
-        }
-        if (bMissing) {
-          return -1;
-        }
-
-        return aSeconds - bSeconds;
-      });
-    } catch (e) {
-      // already defined; ignore
-    }
-  }
-
   // Initialize all sortable tables on page load
   document.addEventListener('DOMContentLoaded', function() {
+    if (typeof Tablesort !== 'undefined') {
+      try {
+        Tablesort.extend('duration', function(item) {
+          return item.indexOf(':') !== -1 || item.indexOf('—') !== -1;
+        }, function(a, b) {
+          const aText = a && a.textContent ? a.textContent : a;
+          const bText = b && b.textContent ? b.textContent : b;
+          const aSeconds = parseDurationToSeconds(aText);
+          const bSeconds = parseDurationToSeconds(bText);
+          const aMissing = aSeconds === null;
+          const bMissing = bSeconds === null;
+
+          if (aMissing && bMissing) {
+            return 0;
+          }
+          if (aMissing) {
+            return 1;
+          }
+          if (bMissing) {
+            return -1;
+          }
+
+          return aSeconds - bSeconds;
+        });
+      } catch (e) {
+        // already defined; ignore
+      }
+    }
+
     const tables = document.querySelectorAll('[data-sort]');
     tables.forEach(table => {
       if (typeof Tablesort !== 'undefined') {
