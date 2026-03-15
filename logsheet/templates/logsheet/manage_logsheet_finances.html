@@ -490,6 +490,43 @@
 
 <!-- Table Sorting: use shared initializer. Attach page-specific behavior after tablesort is ready -->
 <script>
+  function parseDurationToSeconds(value) {
+    if (!value) {
+      return -1;
+    }
+    const text = String(value).trim();
+    if (!text || text === '—') {
+      return -1;
+    }
+
+    const parts = text.split(':').map(Number);
+    if (parts.some(Number.isNaN)) {
+      return -1;
+    }
+
+    if (parts.length === 3) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+    if (parts.length === 2) {
+      return parts[0] * 60 + parts[1];
+    }
+    return -1;
+  }
+
+  if (typeof Tablesort !== 'undefined') {
+    try {
+      Tablesort.extend('duration', function(item) {
+        return item.indexOf(':') !== -1 || item.indexOf('—') !== -1;
+      }, function(a, b) {
+        const aText = a && a.textContent ? a.textContent : a;
+        const bText = b && b.textContent ? b.textContent : b;
+        return parseDurationToSeconds(aText) - parseDurationToSeconds(bText);
+      });
+    } catch (e) {
+      // already defined; ignore
+    }
+  }
+
   // Initialize all sortable tables on page load
   document.addEventListener('DOMContentLoaded', function() {
     const tables = document.querySelectorAll('[data-sort]');
