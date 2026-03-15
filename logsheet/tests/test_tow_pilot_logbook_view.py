@@ -210,6 +210,51 @@ class TestTowPilotLogbookView:
         assert day_one_row["tow_hours"] == Decimal("0.20")
         assert day_one_row["hours_source"] == "Estimated (shared tow day)"
 
+    def test_virtual_or_null_towplane_entries_are_excluded(self, client):
+        virtual_towplane = Towplane.objects.create(
+            name="Virtual Winch",
+            n_number="WINCH",
+        )
+
+        # Should not count toward tow rows because towplane is NULL.
+        Flight.objects.create(
+            logsheet=self.logsheet_day_one,
+            tow_pilot=self.tow_pilot,
+            towplane=None,
+            release_altitude=1200,
+            flight_type="dual",
+        )
+
+        # Should not count toward tow rows because towplane is virtual.
+        Flight.objects.create(
+            logsheet=self.logsheet_day_one,
+            tow_pilot=self.tow_pilot,
+            towplane=virtual_towplane,
+            release_altitude=1300,
+            flight_type="dual",
+        )
+
+        # Should not force shared classification when reference is on virtual towplane.
+        Flight.objects.create(
+            logsheet=self.logsheet_day_one,
+            towplane=virtual_towplane,
+            guest_towpilot_name="Virtual Guest",
+            release_altitude=1000,
+            flight_type="dual",
+        )
+
+        client.force_login(self.tow_pilot)
+        response = client.get(reverse("logsheet:tow_pilot_logbook"))
+
+        assert response.status_code == 200
+        rows = response.context["day_rows"]
+        day_one_row = next(r for r in rows if r["tow_date"] == self.day_one)
+
+        # Original two real tows remain the only counted tows for day one.
+        assert day_one_row["your_tows"] == 2
+        assert day_one_row["tow_hours"] == Decimal("1.40")
+        assert day_one_row["hours_source"] == "Actual tach (solo tow pilot day)"
+
     def test_day_grouping_uses_logsheet_airfield_when_flight_airfield_missing(
         self, client
     ):

@@ -228,10 +228,18 @@ def _tow_logbook_estimates(total_tows):
 
 def _get_tow_logbook_data(member, start_date):
     """Build day-level tow logbook rows and summary metrics for a tow pilot member."""
-    tow_flights = Flight.objects.filter(
-        tow_pilot=member,
-        logsheet__log_date__gte=start_date,
-    ).select_related("logsheet", "logsheet__airfield")
+    tow_launch_filter = Q(towplane__isnull=False) & ~Q(
+        towplane__n_number__in=Towplane.VIRTUAL_N_NUMBERS
+    )
+
+    tow_flights = (
+        Flight.objects.filter(
+            tow_pilot=member,
+            logsheet__log_date__gte=start_date,
+        )
+        .filter(tow_launch_filter)
+        .select_related("logsheet", "logsheet__airfield")
+    )
 
     day_summaries = (
         tow_flights.values(
@@ -254,12 +262,14 @@ def _get_tow_logbook_data(member, start_date):
         for row in Flight.objects.filter(
             logsheet_id__in=logsheet_ids, tow_pilot__isnull=False
         )
+        .filter(tow_launch_filter)
         .values("logsheet_id")
         .annotate(pilot_count=Count("tow_pilot", distinct=True))
     }
 
     logsheet_ids_with_guest_or_legacy_tow_refs = set(
         Flight.objects.filter(logsheet_id__in=logsheet_ids)
+        .filter(tow_launch_filter)
         .filter(
             Q(guest_towpilot_name__isnull=False) & ~Q(guest_towpilot_name="")
             | Q(legacy_towpilot_name__isnull=False) & ~Q(legacy_towpilot_name="")
