@@ -336,31 +336,36 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Member Requests Swap] --> B[System Checks Eligibility]
-    B --> C{Target Member Available?}
+    A[Assigned Member Creates Swap Request] --> B[System Validates Role and Date]
+    B --> C{Request Type}
 
-    C -->|Yes| D[Send Swap Request]
-    C -->|No| E[Suggest Alternatives]
+    C -->|Direct| D[Notify Target Member]
+    C -->|General| E[Notify Eligible Members]
 
-    D --> F[Await Response]
-    F --> G{Request Accepted?}
+    D --> F[Member Makes Offer or Declines Direct Request]
+    E --> G[Member Makes Offer]
 
-    G -->|Yes| H[Process Swap]
-    G -->|No| I[Notify Requester]
+    F --> H[Offer Saved as Pending]
+    G --> H
 
-    E --> J[Member Selects Alternative]
-    J --> D
+    H --> I[Notify Requester of New Offer]
+    I --> J[Requester Reviews Pending Offers]
+    J --> K{Requester Decision}
 
-    H --> K[Update Assignments]
-    K --> L[Notify Both Members]
-    L --> M[Update Calendar Systems]
+    K -->|Accept Offer| L[Mark Offer Accepted and Request Fulfilled]
+    K -->|Decline Offer| M[Mark Offer Declined]
 
-    I --> N{Try Another Approach?}
-    N -->|Yes| E
-    N -->|No| O[Swap Request Closed]
+    L --> N[Auto-decline Other Pending Offers]
+    N --> O[Update Duty Assignments]
+    O --> P[Notify Requester and Offerer]
+    P --> Q[Update Calendar Systems]
 
-    style H fill:#e8f5e8
-    style O fill:#ffebee
+    M --> R{More Pending Offers?}
+    R -->|Yes| J
+    R -->|No| S[Request Remains Open for New Offers]
+
+    style L fill:#e8f5e8
+    style S fill:#fff3e0
 ```
 
 ### **Emergency Coverage Process**
