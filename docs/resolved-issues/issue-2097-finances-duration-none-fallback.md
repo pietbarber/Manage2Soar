@@ -1,7 +1,7 @@
 # Logsheet 2097: Finances Duration Displayed None While Flights Had Times
 
 **Issue**: Production incident on logsheet `2097` (tenant `tenant-ssc`)  
-**PR**: _Pending_  
+**PR**: [#779](https://github.com/pietbarber/Manage2Soar/pull/779)  
 **Resolved**: March 14, 2026
 
 ## Summary
