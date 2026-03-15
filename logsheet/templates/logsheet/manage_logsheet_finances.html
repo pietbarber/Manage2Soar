@@ -553,7 +553,7 @@
 
   // Initialize all sortable tables on page load
   document.addEventListener('DOMContentLoaded', function() {
-    if (typeof Tablesort !== 'undefined') {
+    if (typeof Tablesort !== 'undefined' && !window.__m2sDurationSortExtended) {
       try {
         Tablesort.extend('duration', function(item) {
           return false;
@@ -577,8 +577,10 @@
 
           return bSeconds - aSeconds;
         });
+        window.__m2sDurationSortExtended = true;
       } catch (e) {
-        // already defined; ignore
+        // Keep false here so a later safe retry can still register the sorter.
+        window.__m2sDurationSortExtended = false;
       }
     }
 
