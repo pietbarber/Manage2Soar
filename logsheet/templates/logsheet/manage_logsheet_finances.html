@@ -531,13 +531,13 @@
             return 0;
           }
           if (aMissing) {
-            return 1;
-          }
-          if (bMissing) {
             return -1;
           }
+          if (bMissing) {
+            return 1;
+          }
 
-          return aSeconds - bSeconds;
+          return bSeconds - aSeconds;
         });
       } catch (e) {
         // already defined; ignore
