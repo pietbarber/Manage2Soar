@@ -228,11 +228,11 @@ def _tow_logbook_estimates(total_tows):
 
 def _get_tow_logbook_data(member, start_date):
     """Build day-level tow logbook rows and summary metrics for a tow pilot member."""
-    non_virtual_towplane_q = Q()
+    virtual_towplane_q = Q()
     for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
-        non_virtual_towplane_q |= Q(towplane__n_number__iexact=virtual_n_number)
+        virtual_towplane_q |= Q(towplane__n_number__iexact=virtual_n_number)
 
-    tow_launch_filter = Q(towplane__isnull=False) & ~non_virtual_towplane_q
+    tow_launch_filter = Q(towplane__isnull=False) & ~virtual_towplane_q
 
     tow_flights = (
         Flight.objects.filter(
@@ -286,14 +286,10 @@ def _get_tow_logbook_data(member, start_date):
         .distinct()
     )
 
-    non_virtual_closeout_q = Q()
-    for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
-        non_virtual_closeout_q |= Q(towplane__n_number__iexact=virtual_n_number)
-
     closeouts_by_logsheet = {}
     for closeout in (
         TowplaneCloseout.objects.filter(logsheet_id__in=logsheet_ids)
-        .exclude(non_virtual_closeout_q)
+        .exclude(virtual_towplane_q)
         .select_related("towplane")
     ):
         member_towplane_ids = member_towplane_ids_by_logsheet.get(
