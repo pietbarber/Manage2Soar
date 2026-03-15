@@ -65,6 +65,15 @@ def get_presets():
     return TestPreset.get_presets_as_dict()
 
 
+def can_access_written_test(template, user):
+    """Shared authorization check for start and submit endpoints."""
+    has_assignment = WrittenTestAssignment.objects.filter(
+        template=template, student=user
+    ).exists()
+    is_creator = template.created_by_id == user.id
+    return user.is_staff or has_assignment or is_creator
+
+
 @method_decorator(active_member_required, name="dispatch")
 class WrittenTestStartView(TemplateView):
     template_name = "written_test/start.html"
@@ -72,11 +81,7 @@ class WrittenTestStartView(TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         tmpl = get_object_or_404(WrittenTestTemplate, pk=kwargs["pk"])
-        has_assignment = WrittenTestAssignment.objects.filter(
-            template=tmpl, student=self.request.user
-        ).exists()
-        is_creator = tmpl.created_by_id == self.request.user.id
-        if not (self.request.user.is_staff or has_assignment or is_creator):
+        if not can_access_written_test(tmpl, self.request.user):
             raise PermissionDenied("You are not allowed to take this test.")
         qs = tmpl.questions.all().values(
             # from knowledgetest.views import get_presets
@@ -252,11 +257,7 @@ class WrittenTestSubmitView(View):
 
     def post(self, request, pk):
         tmpl = get_object_or_404(WrittenTestTemplate, pk=pk)
-        has_assignment = WrittenTestAssignment.objects.filter(
-            template=tmpl, student=request.user
-        ).exists()
-        is_creator = tmpl.created_by_id == request.user.id
-        if not (request.user.is_staff or has_assignment or is_creator):
+        if not can_access_written_test(tmpl, request.user):
             return HttpResponseForbidden("You are not allowed to take this test.")
         form = TestSubmissionForm(request.POST)
         if not form.is_valid():

@@ -258,6 +258,42 @@ class QuizFlowTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 403)
 
+    def test_unassigned_non_creator_cannot_submit(self):
+        other_member = User.objects.create_user(
+            username="other-submit", password="pass"
+        )
+        other_member.membership_status = "Full Member"
+        other_member.save()
+
+        self.client.logout()
+        self.client.login(username="other-submit", password="pass")
+
+        submit_url = reverse("knowledgetest:quiz-submit", args=[self.tmpl.pk])
+        payload = {"answers": json.dumps({"1": "A", "2": "C"})}
+        response = self.client.post(submit_url, payload)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            WrittenTestAttempt.objects.filter(student=other_member).exists()
+        )
+
+    def test_staff_can_submit_without_assignment(self):
+        staff_user = User.objects.create_user(
+            username="staff-submit", password="pass", is_staff=True
+        )
+        staff_user.membership_status = "Full Member"
+        staff_user.save()
+
+        self.client.logout()
+        self.client.login(username="staff-submit", password="pass")
+
+        submit_url = reverse("knowledgetest:quiz-submit", args=[self.tmpl.pk])
+        payload = {"answers": json.dumps({"1": "A", "2": "C"})}
+        response = self.client.post(submit_url, payload)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(WrittenTestAttempt.objects.filter(student=staff_user).exists())
+
     def test_self_practice_submission_creates_no_instruction_report(self):
         self.tmpl.created_by = self.student
         self.tmpl.save(update_fields=["created_by"])
