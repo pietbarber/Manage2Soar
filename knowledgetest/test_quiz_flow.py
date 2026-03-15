@@ -348,6 +348,24 @@ class QuizFlowTests(TestCase):
             ).exists()
         )
 
+    def test_assigned_creator_submission_creates_instruction_report(self):
+        # Keep assignment in place, but set creator to the assigned student.
+        self.tmpl.created_by = self.student
+        self.tmpl.save(update_fields=["created_by"])
+
+        submit_url = reverse("knowledgetest:quiz-submit", args=[self.tmpl.pk])
+        payload = {"answers": json.dumps({"1": "A", "2": "C"})}
+        response = self.client.post(submit_url, payload)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            InstructionReport.objects.filter(
+                student=self.student,
+                instructor=self.student,
+                report_text__icontains='Written test "Pre-solo Test" completed',
+            ).exists()
+        )
+
     def test_self_practice_submission_creates_no_completion_notifications(self):
         self.tmpl.created_by = self.student
         self.tmpl.save(update_fields=["created_by"])

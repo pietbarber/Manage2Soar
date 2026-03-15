@@ -380,8 +380,7 @@ class WrittenTestSubmitView(View):
 
         # 2) Log into InstructionReport, using the instructor who created the test
         proctor = tmpl.created_by
-        practice_self_test = tmpl.created_by_id == request.user.id
-        if proctor and asn is not None and not practice_self_test:
+        if proctor and asn is not None:
             # build a subject‐count breakdown
             breakdown_txt = generate_test_subject_breakdown(attempt)
 
