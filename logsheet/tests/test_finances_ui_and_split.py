@@ -54,6 +54,28 @@ def test_summary_by_flight_table_layout(client, active_member, logsheet_with_fli
 
 
 @pytest.mark.django_db
+def test_finances_uses_computed_duration_when_duration_is_null(
+    client, active_member, logsheet_with_flights
+):
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    assert flight is not None, "Test setup failed: no Flight created."
+
+    # Simulate legacy/backfill gap where stored DurationField is null.
+    Flight.objects.filter(pk=flight.pk).update(duration=None)
+    flight.refresh_from_db()
+    assert flight.duration is None
+    assert flight.computed_duration is not None
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert "<td>None</td>" not in response.content.decode("utf-8")
+    assert str(flight.computed_duration) in response.content.decode("utf-8")
+
+
+@pytest.mark.django_db
 def test_update_flight_split_ajax(
     client, active_member, logsheet_with_flights, another_member
 ):
