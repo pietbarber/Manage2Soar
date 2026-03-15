@@ -56,10 +56,17 @@ def test_summary_by_flight_table_layout(client, active_member, logsheet_with_fli
 
 @pytest.mark.django_db
 def test_finances_uses_computed_duration_when_duration_is_null(
-    client, active_member, logsheet_with_flights
+    client, active_member, logsheet_with_flights, another_member
 ):
     flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
     assert flight is not None, "Test setup failed: no Flight created."
+
+    # Render the finalized View Split modal path where data-duration is used.
+    flight.split_with = another_member
+    flight.split_type = "even"
+    flight.save(update_fields=["split_with", "split_type"])
+    logsheet_with_flights.finalized = True
+    logsheet_with_flights.save(update_fields=["finalized"])
 
     # Simulate legacy/backfill gap where stored DurationField is null.
     Flight.objects.filter(pk=flight.pk).update(duration=None)
@@ -72,8 +79,11 @@ def test_finances_uses_computed_duration_when_duration_is_null(
     response = client.get(url)
 
     assert response.status_code == 200
-    assert "<td>None</td>" not in response.content.decode("utf-8")
-    assert str(flight.computed_duration) in response.content.decode("utf-8")
+    content = response.content.decode("utf-8")
+    assert "<td>None</td>" not in content
+    assert str(flight.computed_duration) in content
+    assert f'data-duration="{flight.computed_duration}"' in content
+    assert 'data-duration="None"' not in content
 
 
 @pytest.mark.django_db

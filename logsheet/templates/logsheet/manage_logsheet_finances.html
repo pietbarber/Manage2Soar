@@ -492,16 +492,16 @@
 <script>
   function parseDurationToSeconds(value) {
     if (!value) {
-      return -1;
+      return null;
     }
     const text = String(value).trim();
     if (!text || text === '—') {
-      return -1;
+      return null;
     }
 
     const parts = text.split(':').map(Number);
     if (parts.some(Number.isNaN)) {
-      return -1;
+      return null;
     }
 
     if (parts.length === 3) {
@@ -510,7 +510,7 @@
     if (parts.length === 2) {
       return parts[0] * 60 + parts[1];
     }
-    return -1;
+    return null;
   }
 
   if (typeof Tablesort !== 'undefined') {
@@ -520,7 +520,22 @@
       }, function(a, b) {
         const aText = a && a.textContent ? a.textContent : a;
         const bText = b && b.textContent ? b.textContent : b;
-        return parseDurationToSeconds(aText) - parseDurationToSeconds(bText);
+        const aSeconds = parseDurationToSeconds(aText);
+        const bSeconds = parseDurationToSeconds(bText);
+        const aMissing = aSeconds === null;
+        const bMissing = bSeconds === null;
+
+        if (aMissing && bMissing) {
+          return 0;
+        }
+        if (aMissing) {
+          return 1;
+        }
+        if (bMissing) {
+          return -1;
+        }
+
+        return aSeconds - bSeconds;
       });
     } catch (e) {
       // already defined; ignore
