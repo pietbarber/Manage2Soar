@@ -126,6 +126,26 @@ class TestFinancesDurationSortingE2E(DjangoPlaywrightTestCase):
         )
         return rows
 
+    def _click_header_and_wait_sort_change(self, header_locator):
+        before = header_locator.get_attribute("aria-sort")
+        handle = header_locator.element_handle()
+        assert handle is not None
+
+        header_locator.click()
+        self.page.wait_for_function(
+            """
+            ({ el, previous }) => {
+                const th = el;
+                if (!th) {
+                    return false;
+                }
+                const current = th.getAttribute('aria-sort');
+                return current && current !== previous;
+            }
+            """,
+            arg={"el": handle, "previous": before},
+        )
+
     def _assert_sorted_with_missing_last(self, durations):
         parsed = [self._duration_to_seconds(value) for value in durations]
         non_missing = [value for value in parsed if value is not None]
@@ -160,14 +180,14 @@ class TestFinancesDurationSortingE2E(DjangoPlaywrightTestCase):
             f"{self.live_server_url}/logsheet/manage/{self.logsheet.pk}/finances/"
         )
 
-        duration_header = self.page.locator(
+        duration_header_selector = (
             "h4:has-text('Summary by Flight') + div table th:has-text('Duration')"
         )
+        duration_header = self.page.locator(duration_header_selector)
         assert duration_header.count() == 1
 
         # Click once; if initial sort direction is descending, click again.
-        duration_header.click()
-        self.page.wait_for_timeout(150)
+        self._click_header_and_wait_sort_change(duration_header)
         durations = self._read_duration_cells()
 
         parsed = [self._duration_to_seconds(value) for value in durations]
@@ -176,15 +196,13 @@ class TestFinancesDurationSortingE2E(DjangoPlaywrightTestCase):
         missing_last = (None not in parsed) or (parsed[-1] is None)
 
         if not (is_ascending and missing_last):
-            duration_header.click()
-            self.page.wait_for_timeout(150)
+            self._click_header_and_wait_sort_change(duration_header)
             durations = self._read_duration_cells()
 
         self._assert_sorted_with_missing_last(durations)
 
         # Toggle to descending and ensure missing values still stay last.
-        duration_header.click()
-        self.page.wait_for_timeout(150)
+        self._click_header_and_wait_sort_change(duration_header)
         desc_durations = self._read_duration_cells()
         self._assert_desc_sorted_with_missing_last(desc_durations)
 
@@ -194,13 +212,13 @@ class TestFinancesDurationSortingE2E(DjangoPlaywrightTestCase):
             f"{self.live_server_url}/logsheet/manage/{self.logsheet.pk}/finances/"
         )
 
-        pilot_header = self.page.locator(
+        pilot_header_selector = (
             "h4:has-text('Summary by Flight') + div table th:has-text('Pilot')"
         )
+        pilot_header = self.page.locator(pilot_header_selector)
         assert pilot_header.count() == 1
 
-        pilot_header.click()
-        self.page.wait_for_timeout(150)
+        self._click_header_and_wait_sort_change(pilot_header)
         pilot_names = self._read_pilot_cells()
 
         assert pilot_names == sorted(pilot_names), (
