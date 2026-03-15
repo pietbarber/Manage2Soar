@@ -35,10 +35,10 @@ Targeted backfill was run only for logsheet `2097`:
 ### Template fix
 Updated `logsheet/templates/logsheet/manage_logsheet_finances.html` to use `computed_duration` fallback:
 
-- Table duration cell now renders `flight.computed_duration|default:"—"`
+- Table duration cell now renders `flight.computed_duration|default_if_none:"—"`
 - Split modal `data-duration` now uses the same fallback
 
-This prevents `None` from appearing when stored duration is missing.
+Using `default_if_none` (instead of `default`) is important: it only falls back for `None` values and preserves valid zero durations (`0:00:00`) for zero-length flights.
 
 ### Tests added
 File: `logsheet/tests/test_finances_ui_and_split.py`
