@@ -188,6 +188,36 @@ class QuizFlowTests(TestCase):
         n = cast(Notification, n)
         self.assertIn("has completed the written test", n.message)
 
+    def test_completion_notifies_instructor_and_creator_when_distinct(self):
+        creator = User.objects.create_user(username="creator", password="pw")
+        creator.membership_status = "Full Member"
+        creator.save()
+
+        instructor = User.objects.create_user(username="grader", password="pw")
+        instructor.membership_status = "Full Member"
+        instructor.save()
+
+        self.tmpl.created_by = creator
+        self.tmpl.save(update_fields=["created_by"])
+
+        asn = WrittenTestAssignment.objects.get(
+            template=self.tmpl, student=self.student
+        )
+        asn.instructor = instructor
+        asn.save(update_fields=["instructor"])
+
+        submit_url = reverse("knowledgetest:quiz-submit", args=[self.tmpl.pk])
+        payload = {"answers": json.dumps({"1": "A", "2": "C"})}
+        response = self.client.post(submit_url, payload)
+
+        self.assertEqual(response.status_code, 302)
+        completion_qs = Notification.objects.filter(
+            message__icontains="has completed the written test"
+        )
+        self.assertTrue(completion_qs.filter(user=instructor).exists())
+        self.assertTrue(completion_qs.filter(user=creator).exists())
+        self.assertFalse(completion_qs.filter(user=self.student).exists())
+
     def test_invalid_payload_returns_error(self):
         submit_url = reverse("knowledgetest:quiz-submit", args=[self.tmpl.pk])
         # malformed JSON
@@ -315,6 +345,25 @@ class QuizFlowTests(TestCase):
                 student=self.student,
                 instructor=self.student,
                 report_text__icontains='Written test "Pre-solo Test" completed',
+            ).exists()
+        )
+
+    def test_self_practice_submission_creates_no_completion_notifications(self):
+        self.tmpl.created_by = self.student
+        self.tmpl.save(update_fields=["created_by"])
+        WrittenTestAssignment.objects.filter(
+            template=self.tmpl, student=self.student
+        ).delete()
+        Notification.objects.all().delete()
+
+        submit_url = reverse("knowledgetest:quiz-submit", args=[self.tmpl.pk])
+        payload = {"answers": json.dumps({"1": "A", "2": "C"})}
+        response = self.client.post(submit_url, payload)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            Notification.objects.filter(
+                message__icontains="has completed the written test"
             ).exists()
         )
 

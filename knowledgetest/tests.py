@@ -15,6 +15,11 @@ from knowledgetest.models import (
     WrittenTestTemplate,
 )
 
+try:
+    from notifications.models import Notification
+except ImportError:
+    Notification = None
+
 User = get_user_model()
 
 
@@ -578,6 +583,34 @@ class TestPresetViewIntegrationTests(TestCase):
             sort_order=20,
         )
 
+        # Add questions so POST create requests can build real tests.
+        Question.objects.create(
+            qnum=7001,
+            category=self.cat_gf,
+            question_text="GF integration question?",
+            option_a="A",
+            option_b="B",
+            option_c="C",
+            option_d="D",
+            correct_answer="A",
+        )
+        Question.objects.create(
+            qnum=7002,
+            category=self.cat_st,
+            question_text="ST integration question?",
+            option_a="A",
+            option_b="B",
+            option_c="C",
+            option_d="D",
+            correct_answer="B",
+        )
+
+        self.other_member = User.objects.create_user(
+            username="integration-student",
+            password="pass",
+            membership_status="Full Member",
+        )
+
     def test_get_presets_function(self):
         """Test that get_presets() returns active presets from database"""
         from knowledgetest.views import get_presets
@@ -639,3 +672,66 @@ class TestPresetViewIntegrationTests(TestCase):
         self.assertGreaterEqual(len(weight_fields), 2)
         self.assertContains(response, 'name="weight_GF"')
         self.assertContains(response, 'name="weight_ST"')
+
+    def test_create_self_practice_skips_assignment_and_notification(self):
+        self.client.login(username="testuser", password="pass")
+        if Notification is not None:
+            Notification.objects.all().delete()
+
+        response = self.client.post(
+            reverse("knowledgetest:create"),
+            {
+                "student": self.user.pk,
+                "pass_percentage": "100",
+                "description": "Self practice integration",
+                "must_include": "",
+                "weight_GF": "1",
+                "weight_ST": "0",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        template = WrittenTestTemplate.objects.latest("pk")
+        self.assertFalse(
+            WrittenTestAssignment.objects.filter(
+                template=template, student=self.user
+            ).exists()
+        )
+        if Notification is not None:
+            self.assertFalse(Notification.objects.filter(user=self.user).exists())
+
+    def test_create_assigned_member_creates_assignment_and_notification(self):
+        self.client.login(username="testuser", password="pass")
+        if Notification is not None:
+            Notification.objects.all().delete()
+
+        response = self.client.post(
+            reverse("knowledgetest:create"),
+            {
+                "student": self.other_member.pk,
+                "pass_percentage": "100",
+                "description": "Assigned integration",
+                "must_include": "",
+                "weight_GF": "1",
+                "weight_ST": "0",
+            },
+            follow=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        template = WrittenTestTemplate.objects.latest("pk")
+        self.assertTrue(
+            WrittenTestAssignment.objects.filter(
+                template=template,
+                student=self.other_member,
+                instructor=self.user,
+            ).exists()
+        )
+        if Notification is not None:
+            self.assertTrue(
+                Notification.objects.filter(
+                    user=self.other_member,
+                    message__icontains="assigned a new written test",
+                ).exists()
+            )

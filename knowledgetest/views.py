@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed
@@ -24,6 +25,7 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from members.decorators import active_member_required
+from utils.url_helpers import build_absolute_url
 
 try:
     from notifications.models import Notification
@@ -205,19 +207,36 @@ class CreateWrittenTestView(FormView):
                 pass_percentage=data["pass_percentage"],
                 created_by=self.request.user,
             )
-            WrittenTestAssignment.objects.create(
-                template=tmpl, student=data["student"], instructor=self.request.user
-            )
-        # Create notification for the student
-        try:
-            if Notification is not None:
-                Notification.objects.create(
-                    user=data["student"],
-                    message=f"You have been assigned a new written test: {tmpl.name}",
-                    url=reverse("knowledgetest:quiz-pending"),
+            is_self_practice = data["student"] == self.request.user
+            if not is_self_practice:
+                WrittenTestAssignment.objects.create(
+                    template=tmpl, student=data["student"], instructor=self.request.user
                 )
-        except Exception as e:
-            logging.warning(f"Failed to create notification for test assignment: {e}")
+
+        if is_self_practice:
+            practice_url = build_absolute_url(
+                reverse("knowledgetest:quiz-start", args=[tmpl.pk])
+            )
+            messages.warning(
+                self.request,
+                "Practice test created for yourself. No assignment was created, "
+                "it will not appear on Pending Tests, and completion will not be "
+                "added to your instruction record. "
+                f"Use this URL to take it: {practice_url}",
+            )
+        else:
+            # Create notification for the assigned student
+            try:
+                if Notification is not None:
+                    Notification.objects.create(
+                        user=data["student"],
+                        message=f"You have been assigned a new written test: {tmpl.name}",
+                        url=reverse("knowledgetest:quiz-pending"),
+                    )
+            except Exception as e:
+                logging.warning(
+                    f"Failed to create notification for test assignment: {e}"
+                )
         order = 1
         # 3. First, include forced questions
         for qnum in must:
