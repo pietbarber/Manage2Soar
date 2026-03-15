@@ -258,6 +258,16 @@ def _get_tow_logbook_data(member, start_date):
         .annotate(pilot_count=Count("tow_pilot", distinct=True))
     }
 
+    logsheet_ids_with_guest_or_legacy_tow_refs = set(
+        Flight.objects.filter(logsheet_id__in=logsheet_ids)
+        .filter(
+            Q(guest_towpilot_name__isnull=False) & ~Q(guest_towpilot_name="")
+            | Q(legacy_towpilot_name__isnull=False) & ~Q(legacy_towpilot_name="")
+        )
+        .values_list("logsheet_id", flat=True)
+        .distinct()
+    )
+
     closeouts_by_logsheet = {}
     for closeout in TowplaneCloseout.objects.filter(
         logsheet_id__in=logsheet_ids
@@ -273,7 +283,10 @@ def _get_tow_logbook_data(member, start_date):
         your_tows = summary["your_tows"]
         total_tows += your_tows
 
-        solo_towpilot_day = tow_pilot_counts.get(logsheet_id, 0) == 1
+        solo_towpilot_day = (
+            tow_pilot_counts.get(logsheet_id, 0) == 1
+            and logsheet_id not in logsheet_ids_with_guest_or_legacy_tow_refs
+        )
         tow_hours = None
         if solo_towpilot_day:
             hours_source = "Estimated (solo tow pilot day - no tach closeout)"

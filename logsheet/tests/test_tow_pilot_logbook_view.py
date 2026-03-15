@@ -192,6 +192,24 @@ class TestTowPilotLogbookView:
         assert day_one_row["tow_hours"] == Decimal("1.10")
         assert day_one_row["hours_source"] == "Actual tach (solo tow pilot day)"
 
+    def test_guest_or_legacy_towpilot_reference_marks_day_as_shared(self, client):
+        Flight.objects.create(
+            logsheet=self.logsheet_day_one,
+            towplane=self.towplane,
+            guest_towpilot_name="Guest Tow Pilot",
+            release_altitude=2000,
+            flight_type="dual",
+        )
+
+        client.force_login(self.tow_pilot)
+        response = client.get(reverse("logsheet:tow_pilot_logbook"))
+
+        assert response.status_code == 200
+        rows = response.context["day_rows"]
+        day_one_row = next(r for r in rows if r["tow_date"] == self.day_one)
+        assert day_one_row["tow_hours"] == Decimal("0.20")
+        assert day_one_row["hours_source"] == "Estimated (shared tow day)"
+
     def test_day_grouping_uses_logsheet_airfield_when_flight_airfield_missing(
         self, client
     ):
