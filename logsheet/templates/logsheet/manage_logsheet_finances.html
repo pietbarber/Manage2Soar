@@ -518,7 +518,7 @@
     if (typeof Tablesort !== 'undefined') {
       try {
         Tablesort.extend('duration', function(item) {
-          return item.indexOf(':') !== -1 || item.indexOf('—') !== -1;
+          return false;
         }, function(a, b) {
           const aText = a && a.textContent ? a.textContent : a;
           const bText = b && b.textContent ? b.textContent : b;
