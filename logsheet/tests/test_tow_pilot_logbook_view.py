@@ -255,6 +255,63 @@ class TestTowPilotLogbookView:
         assert day_one_row["tow_hours"] == Decimal("1.40")
         assert day_one_row["hours_source"] == "Actual tach (solo tow pilot day)"
 
+    def test_virtual_towplane_filter_is_case_insensitive(self, client):
+        mixed_case_virtual = Towplane.objects.create(
+            name="Virtual Self",
+            n_number="sElF",
+        )
+
+        Flight.objects.create(
+            logsheet=self.logsheet_day_one,
+            tow_pilot=self.tow_pilot,
+            towplane=mixed_case_virtual,
+            release_altitude=1100,
+            flight_type="dual",
+        )
+
+        client.force_login(self.tow_pilot)
+        response = client.get(reverse("logsheet:tow_pilot_logbook"))
+
+        assert response.status_code == 200
+        rows = response.context["day_rows"]
+        day_one_row = next(r for r in rows if r["tow_date"] == self.day_one)
+        assert day_one_row["your_tows"] == 2
+        assert day_one_row["tow_hours"] == Decimal("1.40")
+
+    def test_solo_day_actual_tach_uses_only_members_non_virtual_towplanes(self, client):
+        virtual_towplane = Towplane.objects.create(
+            name="Virtual Other",
+            n_number="other",
+        )
+
+        # Same-logsheet closeout on a different real towplane should not inflate
+        # this member's solo-day actual tach.
+        TowplaneCloseout.objects.create(
+            logsheet=self.logsheet_day_one,
+            towplane=self.towplane_two,
+            start_tach=Decimal("70.00"),
+            end_tach=Decimal("72.00"),
+            tach_time=Decimal("2.00"),
+        )
+
+        # Virtual closeout should also be excluded.
+        TowplaneCloseout.objects.create(
+            logsheet=self.logsheet_day_one,
+            towplane=virtual_towplane,
+            start_tach=Decimal("10.00"),
+            end_tach=Decimal("13.00"),
+            tach_time=Decimal("3.00"),
+        )
+
+        client.force_login(self.tow_pilot)
+        response = client.get(reverse("logsheet:tow_pilot_logbook"))
+
+        assert response.status_code == 200
+        rows = response.context["day_rows"]
+        day_one_row = next(r for r in rows if r["tow_date"] == self.day_one)
+        assert day_one_row["tow_hours"] == Decimal("1.40")
+        assert day_one_row["hours_source"] == "Actual tach (solo tow pilot day)"
+
     def test_day_grouping_uses_logsheet_airfield_when_flight_airfield_missing(
         self, client
     ):

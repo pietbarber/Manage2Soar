@@ -228,9 +228,11 @@ def _tow_logbook_estimates(total_tows):
 
 def _get_tow_logbook_data(member, start_date):
     """Build day-level tow logbook rows and summary metrics for a tow pilot member."""
-    tow_launch_filter = Q(towplane__isnull=False) & ~Q(
-        towplane__n_number__in=Towplane.VIRTUAL_N_NUMBERS
-    )
+    non_virtual_towplane_q = Q()
+    for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
+        non_virtual_towplane_q |= Q(towplane__n_number__iexact=virtual_n_number)
+
+    tow_launch_filter = Q(towplane__isnull=False) & ~non_virtual_towplane_q
 
     tow_flights = (
         Flight.objects.filter(
@@ -256,6 +258,12 @@ def _get_tow_logbook_data(member, start_date):
     )
     day_summaries = list(day_summaries)
 
+    member_towplane_ids_by_logsheet = {}
+    for row in tow_flights.values("logsheet_id", "towplane_id").distinct():
+        member_towplane_ids_by_logsheet.setdefault(row["logsheet_id"], set()).add(
+            row["towplane_id"]
+        )
+
     logsheet_ids = [row["logsheet_id"] for row in day_summaries]
     tow_pilot_counts = {
         row["logsheet_id"]: row["pilot_count"]
@@ -278,11 +286,21 @@ def _get_tow_logbook_data(member, start_date):
         .distinct()
     )
 
+    non_virtual_closeout_q = Q()
+    for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
+        non_virtual_closeout_q |= Q(towplane__n_number__iexact=virtual_n_number)
+
     closeouts_by_logsheet = {}
-    for closeout in TowplaneCloseout.objects.filter(
-        logsheet_id__in=logsheet_ids
-    ).select_related("towplane"):
-        closeouts_by_logsheet.setdefault(closeout.logsheet_id, []).append(closeout)
+    for closeout in (
+        TowplaneCloseout.objects.filter(logsheet_id__in=logsheet_ids)
+        .exclude(non_virtual_closeout_q)
+        .select_related("towplane")
+    ):
+        member_towplane_ids = member_towplane_ids_by_logsheet.get(
+            closeout.logsheet_id, set()
+        )
+        if closeout.towplane_id in member_towplane_ids:
+            closeouts_by_logsheet.setdefault(closeout.logsheet_id, []).append(closeout)
 
     day_rows = []
     total_tow_hours = Decimal("0.00")
@@ -360,7 +378,7 @@ def _get_tow_logbook_data(member, start_date):
 
 @active_member_required
 def tow_pilot_logbook(request):
-    """Show the current member's tow activity summary for the last 12 months."""
+    """Show the current member's tow activity summary for the last 365 days."""
     if not getattr(request.user, "towpilot", False):
         messages.error(request, "Only tow pilots can access the tow logbook.")
         return redirect("home")
