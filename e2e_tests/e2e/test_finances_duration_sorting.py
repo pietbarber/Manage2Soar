@@ -119,6 +119,13 @@ class TestFinancesDurationSortingE2E(DjangoPlaywrightTestCase):
         )
         return rows
 
+    def _read_pilot_cells(self):
+        rows = self.page.eval_on_selector_all(
+            "h4:has-text('Summary by Flight') + div table tbody tr",
+            "rows => rows.map(r => r.cells[0].textContent.trim())",
+        )
+        return rows
+
     def _assert_sorted_with_missing_last(self, durations):
         parsed = [self._duration_to_seconds(value) for value in durations]
         non_missing = [value for value in parsed if value is not None]
@@ -180,3 +187,23 @@ class TestFinancesDurationSortingE2E(DjangoPlaywrightTestCase):
         self.page.wait_for_timeout(150)
         desc_durations = self._read_duration_cells()
         self._assert_desc_sorted_with_missing_last(desc_durations)
+
+    def test_non_duration_sort_is_not_reordered_by_duration_logic(self):
+        self.login(username="do_duration")
+        self.page.goto(
+            f"{self.live_server_url}/logsheet/manage/{self.logsheet.pk}/finances/"
+        )
+
+        pilot_header = self.page.locator(
+            "h4:has-text('Summary by Flight') + div table th:has-text('Pilot')"
+        )
+        assert pilot_header.count() == 1
+
+        pilot_header.click()
+        self.page.wait_for_timeout(150)
+        pilot_names = self._read_pilot_cells()
+
+        assert pilot_names == sorted(pilot_names), (
+            "Expected Pilot sort to remain pure alphabetical order without "
+            "duration-based row reordering"
+        )

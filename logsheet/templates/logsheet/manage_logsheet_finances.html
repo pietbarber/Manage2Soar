@@ -516,14 +516,19 @@
   function keepMissingDurationsLast(table) {
     const headerCells = table.querySelectorAll('th');
     let durationColIndex = -1;
+    let activeSortIsDuration = false;
 
     headerCells.forEach((th, idx) => {
       if (th.getAttribute('data-sort-method') === 'duration') {
         durationColIndex = idx;
       }
+      const ariaSort = th.getAttribute('aria-sort');
+      if ((ariaSort === 'ascending' || ariaSort === 'descending') && th.getAttribute('data-sort-method') === 'duration') {
+        activeSortIsDuration = true;
+      }
     });
 
-    if (durationColIndex === -1) {
+    if (durationColIndex === -1 || !activeSortIsDuration) {
       return;
     }
 
@@ -584,7 +589,6 @@
         table.addEventListener('afterSort', function() {
           keepMissingDurationsLast(table);
         });
-        keepMissingDurationsLast(table);
       }
     });
   });
