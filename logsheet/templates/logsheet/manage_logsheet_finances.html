@@ -300,7 +300,7 @@
         <tr>
           <td>{{ flight.pilot|full_display_name }}</td>
           <td>{{ flight.glider }}</td>
-          <td>{{ flight.computed_duration|default:"—" }}</td>
+          <td>{{ flight.computed_duration|default_if_none:"—" }}</td>
           <td class="text-end">${{ costs.tow|floatformat:2 }}</td>
           <td class="text-end">${{ costs.rental|floatformat:2 }}</td>
           <td class="text-end fw-bold">${{ costs.total|floatformat:2 }}</td>
@@ -329,7 +329,7 @@
                   data-split-with-name="{{ flight.split_with|full_display_name }}"
                   data-split-type="{{ flight.split_type }}"
                   data-glider="{{ flight.glider }}"
-                  data-duration="{{ flight.computed_duration|default:'—' }}"
+                  data-duration="{{ flight.computed_duration|default_if_none:'—' }}"
                   data-tow-cost="{{ costs.tow|floatformat:2 }}"
                   data-rental-cost="{{ costs.rental|floatformat:2 }}"
                   data-total-cost="{{ costs.total|floatformat:2 }}">
