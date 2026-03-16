@@ -681,11 +681,12 @@ class Document(models.Model):
                     kwargs["update_fields"] = tuple(update_fields) + (
                         "file_size_bytes",
                     )
-            except Exception:
+            except Exception as exc:
                 # Keep save non-blocking if storage metadata is temporarily unavailable.
                 logger.warning(
-                    "Unable to determine file size for CMS document '%s'",
+                    "Unable to determine file size for CMS document '%s': %s",
                     self.file.name,
+                    exc,
                 )
         super().save(*args, **kwargs)
 

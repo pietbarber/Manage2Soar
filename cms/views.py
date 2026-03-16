@@ -5,11 +5,10 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -234,33 +233,6 @@ def cms_page(request, **kwargs):
         "can_edit_page": can_edit,
         "can_create_subpage": can_create_subpage,
     }
-
-    # Cache rendered responses for anonymous traffic on pages with documents.
-    # Avoid authenticated-user full-page cache to prevent session-specific
-    # token mismatches (e.g., logout CSRF token rendered in base template).
-    if has_documents and not request.user.is_authenticated:
-        docs_max = max(
-            (doc.uploaded_at for doc in documents if doc.uploaded_at), default=None
-        )
-        docs_count = len(documents)
-        page_updated = int(page.updated_at.timestamp()) if page.updated_at else 0
-        docs_updated = int(docs_max.timestamp()) if docs_max else 0
-        access_segment = "u:anon"
-        cache_key = (
-            "cms:page:v3:"
-            f"p:{page.pk}:"
-            f"{access_segment}:"
-            f"edit:{int(bool(can_edit))}:"
-            f"create:{int(bool(can_create_subpage))}:"
-            f"pu:{page_updated}:du:{docs_updated}:dc:{docs_count}"
-        )
-        cached_html = cache.get(cache_key)
-        if cached_html is not None:
-            return HttpResponse(cached_html)
-
-        rendered_html = render_to_string("cms/page.html", context, request=request)
-        cache.set(cache_key, rendered_html, timeout=600)
-        return HttpResponse(rendered_html)
 
     return render(
         request,

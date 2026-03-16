@@ -76,7 +76,7 @@ class Command(BaseCommand):
                     Document.objects.filter(pk=doc.pk).update(file_size_bytes=size)
 
             self.stdout.write(
-                f"Processed {processed}/{total} documents, pending updates: {updated}"
+                f"Processed {processed}/{total} documents, updates so far: {updated}"
             )
 
         self.stdout.write(
