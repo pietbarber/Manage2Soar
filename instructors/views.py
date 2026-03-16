@@ -78,11 +78,18 @@ except ImportError:
     Notification = None
 
 
+@active_member_required
 @require_POST
-@csrf_exempt
 def logbook_loading(request):
     # Redirect to logbook with show_all_years=1
-    target_url = reverse("instructors:member_logbook") + "?show_all_years=1"
+    member_id = request.POST.get("member_id")
+    if member_id and member_id.isdigit():
+        target_url = (
+            reverse("instructors:member_logbook_member", args=[int(member_id)])
+            + "?show_all_years=1"
+        )
+    else:
+        target_url = reverse("instructors:member_logbook") + "?show_all_years=1"
     return render(
         request, "instructors/logbook_loading.html", {"target_url": target_url}
     )
@@ -1572,7 +1579,7 @@ def public_syllabus_full(request):
 
 
 @active_member_required
-def member_logbook(request):
+def member_logbook(request, member_id=None):
 
     def format_hhmm(duration):
         if not duration:
@@ -1582,6 +1589,10 @@ def member_logbook(request):
         return f"{h}:{m:02d}"
 
     member = request.user
+    if member_id is not None:
+        member = get_object_or_404(Member, pk=member_id)
+        if request.user != member and not request.user.instructor:
+            raise PermissionDenied
     # Determine which years to show
 
     import datetime
@@ -2414,9 +2425,13 @@ class WrittenTestReviewView(DjangoView):
 
 
 @active_member_required
-def export_member_logbook_csv(request):
+def export_member_logbook_csv(request, member_id=None):
     """Export the member's logbook as CSV for Excel/Google Sheets with explicit instructor, pilot, passenger columns and constructed comments."""
     member = request.user
+    if member_id is not None:
+        member = get_object_or_404(Member, pk=member_id)
+        if request.user != member and not request.user.instructor:
+            raise PermissionDenied
 
     def format_hhmm(duration):
         if not duration:

@@ -27,6 +27,9 @@
       <i class="fas fa-id-badge" aria-hidden="true"></i>
     </a>
     <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm me-2">📊 View Training Grid</a>
+    {% if request.user == member or request.user.instructor %}
+      <a href="{% url 'instructors:member_logbook_member' member.id %}" class="btn btn-outline-success btn-sm me-2">📘 View Logbook</a>
+    {% endif %}
     {% if request.user == member %}
       <a href="{% url 'knowledgetest:member-test-history' %}" class="btn btn-outline-info btn-sm me-2">📝 My Written Tests</a>
       <a href="{% url 'knowledgetest:quiz-pending' %}" class="btn btn-outline-warning btn-sm">📋 Pending Tests</a>

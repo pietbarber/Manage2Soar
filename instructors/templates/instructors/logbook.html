@@ -11,11 +11,12 @@
 <div id="top"></div>
 <h2>Logbook for {{ member.full_display_name }}</h2>
 
-<a href="{% url 'instructors:member_logbook_export_csv' %}" class="btn btn-success mb-3">Export as CSV (Excel/Google Sheets)</a>
+<a href="{% url 'instructors:member_logbook_export_csv_member' member.id %}" class="btn btn-success mb-3">Export as CSV (Excel/Google Sheets)</a>
 
 <!-- Show All Years Button -->
 <form method="post" action="{% url 'instructors:logbook_loading' %}" id="show-all-years-form" style="margin-bottom: 1em;">
   {% csrf_token %}
+  <input type="hidden" name="member_id" value="{{ member.id }}">
   <button type="submit" class="btn btn-warning">
     <span style="font-size:1.2em;">⏳</span> Show All Years
   </button>
