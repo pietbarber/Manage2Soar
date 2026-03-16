@@ -47,6 +47,12 @@
                   Training Record
                 </a>
               </li>
+              <li>
+                <a class="dropdown-item"
+                   href="{% url 'instructors:member_logbook_member' m.pk %}">
+                  Logbook
+                </a>
+              </li>
              {% if show_progress %}
               <li>
                 <a class="dropdown-item"
