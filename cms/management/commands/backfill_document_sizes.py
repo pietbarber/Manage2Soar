@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from cms.models import Document
 
@@ -28,6 +28,9 @@ class Command(BaseCommand):
         batch_size = options["batch_size"]
         only_missing = options["only_missing"]
         dry_run = options["dry_run"]
+
+        if batch_size < 1:
+            raise CommandError("--batch-size must be >= 1")
 
         base_queryset = Document.objects.all()
         if only_missing:

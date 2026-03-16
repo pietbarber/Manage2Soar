@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.urls import reverse
 
 from cms.models import Document, Page
@@ -98,3 +99,9 @@ def test_cms_page_hides_documents_section_when_no_pdfs(client, settings, tmp_pat
 
     assert response.status_code == 200
     assert b"<h2>Documents</h2>" not in response.content
+
+
+@pytest.mark.django_db
+def test_backfill_document_sizes_rejects_invalid_batch_size():
+    with pytest.raises(CommandError, match="--batch-size must be >= 1"):
+        call_command("backfill_document_sizes", "--batch-size", "0")

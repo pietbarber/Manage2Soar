@@ -452,7 +452,16 @@
       delegate_to: localhost
       register: backfill_document_sizes_result
       changed_when: >
-        'updated' in (backfill_document_sizes_result.stdout | default(''))
+        (not (gke_backfill_document_sizes_dry_run | bool)) and
+        (
+          (
+            backfill_document_sizes_result.stdout
+            | default('')
+            | regex_search('Documents updated: ([0-9]+)\\.', '\\1')
+            | default('0', true)
+            | int
+          ) > 0
+        )
       loop: "{{ gke_deploy_tenants }}"
       loop_control:
         loop_var: tenant
