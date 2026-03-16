@@ -78,8 +78,8 @@ except ImportError:
     Notification = None
 
 
+@active_member_required
 @require_POST
-@csrf_exempt
 def logbook_loading(request):
     # Redirect to logbook with show_all_years=1
     member_id = request.POST.get("member_id")
