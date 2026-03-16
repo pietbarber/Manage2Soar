@@ -5,10 +5,11 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
-from django.http import HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -208,8 +209,10 @@ def cms_page(request, **kwargs):
     for par in parents:
         breadcrumbs.append({"title": par.title, "url": par.get_absolute_url()})
 
-    # Whether the current page has documents (avoid calling .exists in template)
-    has_documents = page.documents.exists()
+    # Load documents once so templates do not re-evaluate querysets repeatedly.
+    documents = list(page.documents.select_related("uploaded_by").all())
+    pdf_documents = [doc for doc in documents if doc.is_pdf]
+    has_documents = bool(documents)
 
     # Get role information for the current page (avoiding template database queries)
     # role_permissions are already prefetched from the page traversal loop
@@ -217,20 +220,53 @@ def cms_page(request, **kwargs):
 
     # Check if user can create subpages under this page (Issue #596)
     can_create_subpage = can_create_in_directory(request.user, page)
+    can_edit = can_edit_page(request.user, page)
+
+    context = {
+        "page": page,
+        "subpages": subpages,
+        "breadcrumbs": breadcrumbs,
+        "has_documents": has_documents,
+        "documents": documents,
+        "pdf_documents": pdf_documents,
+        "page_has_role_restrictions": page.has_role_restrictions(),
+        "page_required_roles": page_required_roles,
+        "can_edit_page": can_edit,
+        "can_create_subpage": can_create_subpage,
+    }
+
+    # Cache rendered responses for pages that include documents to reduce
+    # repeated template work on high-traffic archive pages.
+    if has_documents:
+        docs_max = max(
+            (doc.uploaded_at for doc in documents if doc.uploaded_at), default=None
+        )
+        docs_count = len(documents)
+        page_updated = int(page.updated_at.timestamp()) if page.updated_at else 0
+        docs_updated = int(docs_max.timestamp()) if docs_max else 0
+        access_segment = (
+            f"u:{request.user.pk}" if request.user.is_authenticated else "u:anon"
+        )
+        cache_key = (
+            "cms:page:v3:"
+            f"p:{page.pk}:"
+            f"{access_segment}:"
+            f"edit:{int(bool(can_edit))}:"
+            f"create:{int(bool(can_create_subpage))}:"
+            f"pu:{page_updated}:du:{docs_updated}:dc:{docs_count}"
+        )
+        cached_html = cache.get(cache_key)
+        if cached_html is not None:
+            return HttpResponse(cached_html)
+
+        rendered_html = render_to_string("cms/page.html", context, request=request)
+        cache.set(cache_key, rendered_html, timeout=600)
+        return HttpResponse(rendered_html)
 
     return render(
         request,
         "cms/page.html",
-        {
-            "page": page,
-            "subpages": subpages,
-            "breadcrumbs": breadcrumbs,
-            "has_documents": has_documents,
-            "page_has_role_restrictions": page.has_role_restrictions(),
-            "page_required_roles": page_required_roles,
-            "can_edit_page": can_edit_page(request.user, page),
-            "can_create_subpage": can_create_subpage,
-        },
+        context,
     )
 
 

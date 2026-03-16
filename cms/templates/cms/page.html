@@ -144,16 +144,13 @@
     <h2>Documents</h2>
     <nav class="doc-nav">
       <ul>
-        {% for doc in page.documents.all %}
-          {% if doc.is_pdf %}
-            <li><a href="#heading{{ forloop.counter }}">{{ doc.title|default:doc.file.name }}</a></li>
-          {% endif %}
+        {% for doc in pdf_documents %}
+          <li><a href="#heading{{ forloop.counter }}">{{ doc.title|default:doc.file.name }}</a></li>
         {% endfor %}
       </ul>
     </nav>
     <div class="accordion" id="pdfAccordion">
-      {% for doc in page.documents.all %}
-        {% if doc.is_pdf %}
+      {% for doc in pdf_documents %}
         <div class="accordion-item">
           <h2 class="accordion-header" id="heading{{ forloop.counter }}">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
@@ -162,7 +159,7 @@
                 <span style="font-size:0.95em;color:#555;">
                   {% if doc.uploaded_by %}Uploaded by {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}{% endif %}
                   {% if doc.uploaded_at %} on {{ doc.uploaded_at|date:"Y-m-d H:i" }}{% endif %}
-                  {% if doc.file.size %} &bull; {{ doc.file.size|filesizeformat }}{% endif %}
+                  {% if doc.file_size_bytes %} &bull; {{ doc.file_size_bytes|filesizeformat }}{% endif %}
                 </span>
               </div>
             </button>
@@ -184,7 +181,6 @@
             </div>
           </div>
         </div>
-        {% endif %}
       {% endfor %}
     </div>
     <script>

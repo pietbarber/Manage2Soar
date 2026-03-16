@@ -1,3 +1,4 @@
+import logging
 import threading
 
 from django.conf import settings
@@ -13,6 +14,7 @@ from utils.upload_entropy import upload_cms_banner, upload_homepage_gallery
 _thread_locals = threading.local()
 NAVBAR_RANK_MIN = 1
 NAVBAR_RANK_MAX = 100
+logger = logging.getLogger(__name__)
 
 # --- CMS Arbitrary Page and Document Models ---
 
@@ -644,6 +646,11 @@ class Document(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    file_size_bytes = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Cached document size in bytes to avoid storage metadata lookups during page render.",
+    )
 
     class Meta:
         verbose_name = "CMS Document"
@@ -652,6 +659,18 @@ class Document(models.Model):
 
     def __str__(self):
         return self.title or self.file.name
+
+    def save(self, *args, **kwargs):
+        if self.file:
+            try:
+                self.file_size_bytes = self.file.size
+            except Exception:
+                # Keep save non-blocking if storage metadata is temporarily unavailable.
+                logger.warning(
+                    "Unable to determine file size for CMS document '%s'",
+                    self.file.name,
+                )
+        super().save(*args, **kwargs)
 
     @property
     def is_pdf(self):

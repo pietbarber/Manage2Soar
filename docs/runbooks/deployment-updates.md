@@ -114,6 +114,14 @@ kubectl get cronjobs -n tenant-masa
 
 # Verify static files serve correctly
 curl -I https://ssc.manage2soar.com/static/css/baseline.css
+
+# Issue #577: Backfill cached CMS document sizes after schema deploy
+# (safe to re-run; use --dry-run first if you want a preview)
+kubectl exec -n tenant-ssc deployment/django-app-ssc -- \
+  python manage.py backfill_document_sizes --only-missing --batch-size 200
+
+kubectl exec -n tenant-masa deployment/django-app-masa -- \
+  python manage.py backfill_document_sizes --only-missing --batch-size 200
 ```
 
 #### 5. Functional Tests
