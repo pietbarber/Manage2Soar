@@ -1,3 +1,4 @@
+import logging
 import threading
 
 from django.conf import settings
@@ -13,6 +14,7 @@ from utils.upload_entropy import upload_cms_banner, upload_homepage_gallery
 _thread_locals = threading.local()
 NAVBAR_RANK_MIN = 1
 NAVBAR_RANK_MAX = 100
+logger = logging.getLogger(__name__)
 
 # --- CMS Arbitrary Page and Document Models ---
 
@@ -644,6 +646,11 @@ class Document(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    file_size_bytes = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Cached document size in bytes to avoid storage metadata lookups during page render.",
+    )
 
     class Meta:
         verbose_name = "CMS Document"
@@ -652,6 +659,45 @@ class Document(models.Model):
 
     def __str__(self):
         return self.title or self.file.name
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        refresh_size = False
+        if self.file:
+            if self._state.adding:
+                refresh_size = True
+            elif update_fields is None:
+                # Refresh when size is missing or the file has changed.
+                if self.file_size_bytes is None:
+                    refresh_size = True
+                elif self.pk:
+                    previous_file = (
+                        type(self)
+                        .objects.filter(pk=self.pk)
+                        .values_list("file", flat=True)
+                        .first()
+                    )
+                    refresh_size = previous_file != self.file.name
+            else:
+                update_fields_set = set(update_fields)
+                # Recompute only when the file itself is being updated.
+                refresh_size = "file" in update_fields_set
+
+        if refresh_size:
+            try:
+                self.file_size_bytes = self.file.size
+                if update_fields is not None and "file_size_bytes" not in update_fields:
+                    kwargs["update_fields"] = tuple(update_fields) + (
+                        "file_size_bytes",
+                    )
+            except Exception as exc:
+                # Keep save non-blocking if storage metadata is temporarily unavailable.
+                logger.warning(
+                    "Unable to determine file size for CMS document '%s': %s",
+                    self.file.name,
+                    exc,
+                )
+        super().save(*args, **kwargs)
 
     @property
     def is_pdf(self):

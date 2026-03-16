@@ -208,8 +208,11 @@ def cms_page(request, **kwargs):
     for par in parents:
         breadcrumbs.append({"title": par.title, "url": par.get_absolute_url()})
 
-    # Whether the current page has documents (avoid calling .exists in template)
-    has_documents = page.documents.exists()
+    # Load only rendered documents (PDFs) to avoid materializing non-PDF rows.
+    pdf_documents = list(
+        page.documents.filter(file__iendswith=".pdf").select_related("uploaded_by")
+    )
+    has_documents = bool(pdf_documents)
 
     # Get role information for the current page (avoiding template database queries)
     # role_permissions are already prefetched from the page traversal loop
@@ -217,20 +220,24 @@ def cms_page(request, **kwargs):
 
     # Check if user can create subpages under this page (Issue #596)
     can_create_subpage = can_create_in_directory(request.user, page)
+    can_edit = can_edit_page(request.user, page)
+
+    context = {
+        "page": page,
+        "subpages": subpages,
+        "breadcrumbs": breadcrumbs,
+        "has_documents": has_documents,
+        "pdf_documents": pdf_documents,
+        "page_has_role_restrictions": page.has_role_restrictions(),
+        "page_required_roles": page_required_roles,
+        "can_edit_page": can_edit,
+        "can_create_subpage": can_create_subpage,
+    }
 
     return render(
         request,
         "cms/page.html",
-        {
-            "page": page,
-            "subpages": subpages,
-            "breadcrumbs": breadcrumbs,
-            "has_documents": has_documents,
-            "page_has_role_restrictions": page.has_role_restrictions(),
-            "page_required_roles": page_required_roles,
-            "can_edit_page": can_edit_page(request.user, page),
-            "can_create_subpage": can_create_subpage,
-        },
+        context,
     )
 
 
