@@ -80,3 +80,21 @@ def test_backfill_document_sizes_command_updates_missing_sizes(settings, tmp_pat
 
     doc.refresh_from_db()
     assert doc.file_size_bytes == len(payload)
+
+
+@pytest.mark.django_db
+def test_cms_page_hides_documents_section_when_no_pdfs(client, settings, tmp_path):
+    _use_filesystem_storage(settings)
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "notes.txt").write_text("plain text notes", encoding="utf-8")
+
+    page = Page.objects.create(title="Notes", slug="notes-page", is_public=True)
+    Document.objects.create(page=page, title="Notes", file="docs/notes.txt")
+
+    response = client.get(reverse("cms:cms_page", kwargs={"path": page.slug}))
+
+    assert response.status_code == 200
+    assert b"<h2>Documents</h2>" not in response.content

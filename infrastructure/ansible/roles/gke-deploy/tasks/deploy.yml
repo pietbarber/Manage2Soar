@@ -175,6 +175,32 @@
   run_once: true
 
 # ============================================================
+# OPTIONAL POST-DEPLOY BACKFILL COMMANDS
+# ============================================================
+
+- name: Run CMS document size backfill
+  ansible.builtin.command:
+    cmd: >
+      kubectl exec deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --
+      python manage.py backfill_document_sizes
+      {% if gke_backfill_document_sizes_only_missing | bool %} --only-missing{% endif %}
+      --batch-size {{ gke_backfill_document_sizes_batch_size }}
+      {% if gke_backfill_document_sizes_dry_run | bool %} --dry-run{% endif %}
+  delegate_to: localhost
+  run_once: true
+  when: gke_run_backfill_document_sizes | bool
+  register: backfill_document_sizes_result
+
+- name: Display CMS document size backfill result
+  ansible.builtin.debug:
+    msg: "{{ backfill_document_sizes_result.stdout_lines }}"
+  when:
+    - gke_run_backfill_document_sizes | bool
+    - backfill_document_sizes_result.stdout_lines is defined
+  delegate_to: localhost
+  run_once: true
+
+# ============================================================
 # CLEANUP
 # ============================================================
 # NOTE: Deployment manifests are cleaned at the end to allow debugging.

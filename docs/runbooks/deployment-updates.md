@@ -115,13 +115,21 @@ kubectl get cronjobs -n tenant-masa
 # Verify static files serve correctly
 curl -I https://ssc.manage2soar.com/static/css/baseline.css
 
-# Issue #577: Backfill cached CMS document sizes after schema deploy
-# (safe to re-run; use --dry-run first if you want a preview)
-kubectl exec -n tenant-ssc deployment/django-app-ssc -- \
-  python manage.py backfill_document_sizes --only-missing --batch-size 200
+# Issue #577: Backfill cached CMS document sizes after schema deploy (IaC-first)
+# Preferred: run as an optional Ansible deploy task (safe to re-run).
+cd infrastructure/ansible
+ansible-playbook -i inventory/gcp_app.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-app-deploy.yml \
+  -e gke_run_backfill_document_sizes=true \
+  -e gke_backfill_document_sizes_only_missing=true \
+  -e gke_backfill_document_sizes_batch_size=200
 
-kubectl exec -n tenant-masa deployment/django-app-masa -- \
-  python manage.py backfill_document_sizes --only-missing --batch-size 200
+# Manual fallback (only if Ansible is unavailable):
+# kubectl exec -n tenant-ssc deployment/django-app-ssc -- \
+#   python manage.py backfill_document_sizes --only-missing --batch-size 200
+# kubectl exec -n tenant-masa deployment/django-app-masa -- \
+#   python manage.py backfill_document_sizes --only-missing --batch-size 200
 ```
 
 #### 5. Functional Tests

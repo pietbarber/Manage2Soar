@@ -238,6 +238,12 @@ gke_collect_static: true
 # Keep generated manifest files for debugging (default: clean up after deployment)
 gke_keep_manifests: false
 
+# Run CMS document size backfill as an optional post-deploy management command.
+gke_run_backfill_document_sizes: false
+gke_backfill_document_sizes_only_missing: true
+gke_backfill_document_sizes_batch_size: 200
+gke_backfill_document_sizes_dry_run: false
+
 # Docker build context directory (relative to playbook or absolute path)
 gke_docker_context: "."
 

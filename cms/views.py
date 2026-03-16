@@ -211,7 +211,7 @@ def cms_page(request, **kwargs):
     # Load documents once so templates do not re-evaluate querysets repeatedly.
     documents = list(page.documents.select_related("uploaded_by").all())
     pdf_documents = [doc for doc in documents if doc.is_pdf]
-    has_documents = bool(documents)
+    has_documents = bool(pdf_documents)
 
     # Get role information for the current page (avoiding template database queries)
     # role_permissions are already prefetched from the page traversal loop
