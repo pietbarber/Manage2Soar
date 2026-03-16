@@ -208,9 +208,10 @@ def cms_page(request, **kwargs):
     for par in parents:
         breadcrumbs.append({"title": par.title, "url": par.get_absolute_url()})
 
-    # Load documents once so templates do not re-evaluate querysets repeatedly.
-    documents = list(page.documents.select_related("uploaded_by").all())
-    pdf_documents = [doc for doc in documents if doc.is_pdf]
+    # Load only rendered documents (PDFs) to avoid materializing non-PDF rows.
+    pdf_documents = list(
+        page.documents.filter(file__iendswith=".pdf").select_related("uploaded_by")
+    )
     has_documents = bool(pdf_documents)
 
     # Get role information for the current page (avoiding template database queries)

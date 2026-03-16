@@ -188,7 +188,9 @@
       {% if gke_backfill_document_sizes_dry_run | bool %} --dry-run{% endif %}
   delegate_to: localhost
   run_once: true
-  when: gke_run_backfill_document_sizes | bool
+  when:
+    - gke_run_backfill_document_sizes | bool
+    - gke_run_migrations | bool
   register: backfill_document_sizes_result
 
 - name: Display CMS document size backfill result
@@ -196,6 +198,7 @@
     msg: "{{ backfill_document_sizes_result.stdout_lines }}"
   when:
     - gke_run_backfill_document_sizes | bool
+    - gke_run_migrations | bool
     - backfill_document_sizes_result.stdout_lines is defined
   delegate_to: localhost
   run_once: true

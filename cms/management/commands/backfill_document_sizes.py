@@ -52,6 +52,8 @@ class Command(BaseCommand):
             if not batch:
                 break
 
+            docs_to_update = []
+
             for doc in batch:
                 last_id = doc.id
                 processed += 1
@@ -73,7 +75,15 @@ class Command(BaseCommand):
 
                 updated += 1
                 if not dry_run:
-                    Document.objects.filter(pk=doc.pk).update(file_size_bytes=size)
+                    doc.file_size_bytes = size
+                    docs_to_update.append(doc)
+
+            if docs_to_update and not dry_run:
+                Document.objects.bulk_update(
+                    docs_to_update,
+                    ["file_size_bytes"],
+                    batch_size=batch_size,
+                )
 
             self.stdout.write(
                 f"Processed {processed}/{total} documents, updates so far: {updated}"

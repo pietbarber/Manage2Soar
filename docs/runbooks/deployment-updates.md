@@ -117,6 +117,7 @@ curl -I https://ssc.manage2soar.com/static/css/baseline.css
 
 # Issue #577: Backfill cached CMS document sizes after schema deploy (IaC-first)
 # Preferred: run as an optional Ansible deploy task (safe to re-run).
+# In multi-tenant deployments this runs in post_tasks after migration checks/apply.
 cd infrastructure/ansible
 ansible-playbook -i inventory/gcp_app.yml \
   --vault-password-file ~/.ansible_vault_pass \

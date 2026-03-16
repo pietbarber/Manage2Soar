@@ -360,6 +360,8 @@
         # Disable the role's own migration step - post_tasks handles it via
         # migrate --check detection to avoid running migrations twice.
         gke_run_migrations: false
+        # Run backfill in post_tasks after migrations for multi-tenant safety.
+        gke_run_backfill_document_sizes: false
       loop: "{{ gke_deploy_tenants }}"
       loop_control:
         loop_var: tenant
@@ -436,6 +438,42 @@
           {% endfor %}
           ========================================
       when: migrate_check_results is defined
+      tags: [migrations]
+
+    - name: Run CMS document size backfill after migrations
+      ansible.builtin.command:
+        cmd: >
+          kubectl exec deployment/django-app-{{ tenant.prefix }}
+          -n {{ tenant.namespace | default('tenant-' + tenant.prefix) }} --
+          python manage.py backfill_document_sizes
+          --batch-size {{ gke_backfill_document_sizes_batch_size }}
+          {% if gke_backfill_document_sizes_only_missing | bool %} --only-missing{% endif %}
+          {% if gke_backfill_document_sizes_dry_run | bool %} --dry-run{% endif %}
+      delegate_to: localhost
+      register: backfill_document_sizes_result
+      changed_when: >
+        'updated' in (backfill_document_sizes_result.stdout | default(''))
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        loop_var: tenant
+        label: "{{ tenant.prefix }}"
+      when: gke_run_backfill_document_sizes | default(false) | bool
+      tags: [migrations]
+
+    - name: Display backfill results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          CMS Document Size Backfill Results
+          ========================================
+          {% for result in backfill_document_sizes_result.results | default([]) %}
+          {{ result.tenant.prefix }}:
+          {{ (result.stdout_lines | default([])) | join('\n') }}
+          {% endfor %}
+          ========================================
+      when:
+        - gke_run_backfill_document_sizes | default(false) | bool
+        - backfill_document_sizes_result is defined
       tags: [migrations]
 
     # Create superuser for each tenant (if enabled)
