@@ -446,13 +446,13 @@
           kubectl exec deployment/django-app-{{ tenant.prefix }}
           -n {{ tenant.namespace | default('tenant-' + tenant.prefix) }} --
           python manage.py backfill_document_sizes
-          --batch-size {{ gke_backfill_document_sizes_batch_size }}
-          {% if gke_backfill_document_sizes_only_missing | bool %} --only-missing{% endif %}
-          {% if gke_backfill_document_sizes_dry_run | bool %} --dry-run{% endif %}
+          --batch-size {{ gke_backfill_document_sizes_batch_size | default(200) }}
+          {% if gke_backfill_document_sizes_only_missing | default(true) | bool %} --only-missing{% endif %}
+          {% if gke_backfill_document_sizes_dry_run | default(false) | bool %} --dry-run{% endif %}
       delegate_to: localhost
       register: backfill_document_sizes_result
       changed_when: >
-        (not (gke_backfill_document_sizes_dry_run | bool)) and
+        (not (gke_backfill_document_sizes_dry_run | default(false) | bool)) and
         (
           (
             backfill_document_sizes_result.stdout

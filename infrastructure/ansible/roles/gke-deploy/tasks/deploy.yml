@@ -192,6 +192,27 @@
   failed_when: false
   changed_when: false
 
+- name: Fail backfill when migration check command fails
+  ansible.builtin.fail:
+    msg: |
+      Cannot run backfill_document_sizes because migration readiness check failed.
+      This indicates an infrastructure/runtime issue (for example: kubectl auth,
+      missing deployment/pod, or exec/runtime failure).
+
+      stdout:
+      {{ backfill_migrate_check.stdout | default('') }}
+
+      stderr:
+      {{ backfill_migrate_check.stderr | default('') }}
+  when:
+    - gke_run_backfill_document_sizes | bool
+    - not (gke_multi_tenant | default(false) | bool)
+    - backfill_migrate_check is defined
+    - backfill_migrate_check.rc not in [0, 1] or
+      (backfill_migrate_check.rc != 0 and
+       (backfill_migrate_check.stderr | default('') |
+        regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container')))
+
 - name: Fail backfill when unapplied migrations exist
   ansible.builtin.fail:
     msg: |
@@ -202,7 +223,7 @@
     - gke_run_backfill_document_sizes | bool
     - not (gke_multi_tenant | default(false) | bool)
     - backfill_migrate_check is defined
-    - backfill_migrate_check.rc != 0
+    - backfill_migrate_check.rc == 1
 
 - name: Run CMS document size backfill
   ansible.builtin.command:
