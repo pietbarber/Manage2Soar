@@ -36,6 +36,29 @@ def test_document_save_populates_file_size_bytes(settings, tmp_path):
 
 
 @pytest.mark.django_db
+def test_document_save_refreshes_file_size_when_file_replaced(settings, tmp_path):
+    _use_filesystem_storage(settings)
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    original = b"%PDF-1.4 original"
+    replacement = b"%PDF-1.4 replacement with longer payload"
+    (docs_dir / "original.pdf").write_bytes(original)
+    (docs_dir / "replacement.pdf").write_bytes(replacement)
+
+    page = Page.objects.create(title="Docs", slug="docs-replace", is_public=True)
+    doc = Document.objects.create(page=page, title="Doc", file="docs/original.pdf")
+    assert doc.file_size_bytes == len(original)
+
+    doc.file = "docs/replacement.pdf"
+    doc.save()
+    doc.refresh_from_db()
+
+    assert doc.file_size_bytes == len(replacement)
+
+
+@pytest.mark.django_db
 def test_cms_page_does_not_call_storage_size_when_file_size_cached(
     client, settings, tmp_path
 ):

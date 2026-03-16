@@ -188,14 +188,28 @@
       {% if gke_backfill_document_sizes_dry_run | bool %} --dry-run{% endif %}
   delegate_to: localhost
   run_once: true
-  when: gke_run_backfill_document_sizes | bool
+  when:
+    - gke_run_backfill_document_sizes | bool
+    - not (gke_multi_tenant | default(false) | bool)
   register: backfill_document_sizes_result
+  changed_when: >
+    (not (gke_backfill_document_sizes_dry_run | bool)) and
+    (
+      (
+        backfill_document_sizes_result.stdout
+        | default('')
+        | regex_search('Documents updated: ([0-9]+)\\.', '\\1')
+        | default('0', true)
+        | int
+      ) > 0
+    )
 
 - name: Display CMS document size backfill result
   ansible.builtin.debug:
     msg: "{{ backfill_document_sizes_result.stdout_lines }}"
   when:
     - gke_run_backfill_document_sizes | bool
+    - not (gke_multi_tenant | default(false) | bool)
     - backfill_document_sizes_result.stdout_lines is defined
   delegate_to: localhost
   run_once: true

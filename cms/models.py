@@ -667,8 +667,17 @@ class Document(models.Model):
             if self._state.adding:
                 refresh_size = True
             elif update_fields is None:
-                # Avoid repeated storage metadata calls on routine saves.
-                refresh_size = self.file_size_bytes is None
+                # Refresh when size is missing or the file has changed.
+                if self.file_size_bytes is None:
+                    refresh_size = True
+                elif self.pk:
+                    previous_file = (
+                        type(self)
+                        .objects.filter(pk=self.pk)
+                        .values_list("file", flat=True)
+                        .first()
+                    )
+                    refresh_size = previous_file != self.file.name
             else:
                 update_fields_set = set(update_fields)
                 # Recompute only when the file itself is being updated.
