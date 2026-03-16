@@ -211,7 +211,7 @@
     - backfill_migrate_check.rc not in [0, 1] or
       (backfill_migrate_check.rc != 0 and
        (backfill_migrate_check.stderr | default('') |
-        regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container')))
+        regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container|You must be logged in to the server|Unauthorized|Forbidden|connection refused|i/o timeout|TLS handshake timeout|context deadline exceeded')))
 
 - name: Fail backfill when unapplied migrations exist
   ansible.builtin.fail:
