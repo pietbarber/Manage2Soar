@@ -8,9 +8,19 @@ from django.urls import reverse
 from cms.models import Document, Page
 
 
+def _use_filesystem_storage(settings):
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+            "OPTIONS": {},
+        },
+    }
+
+
 @pytest.mark.django_db
 def test_document_save_populates_file_size_bytes(settings, tmp_path):
-    settings.DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    _use_filesystem_storage(settings)
     settings.MEDIA_ROOT = str(tmp_path)
 
     docs_dir = tmp_path / "docs"
@@ -28,7 +38,7 @@ def test_document_save_populates_file_size_bytes(settings, tmp_path):
 def test_cms_page_does_not_call_storage_size_when_file_size_cached(
     client, settings, tmp_path
 ):
-    settings.DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    _use_filesystem_storage(settings)
     settings.MEDIA_ROOT = str(tmp_path)
 
     docs_dir = tmp_path / "docs"
@@ -51,7 +61,7 @@ def test_cms_page_does_not_call_storage_size_when_file_size_cached(
 
 @pytest.mark.django_db
 def test_backfill_document_sizes_command_updates_missing_sizes(settings, tmp_path):
-    settings.DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    _use_filesystem_storage(settings)
     settings.MEDIA_ROOT = str(tmp_path)
 
     docs_dir = Path(tmp_path) / "docs"

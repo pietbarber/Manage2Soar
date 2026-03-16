@@ -226,7 +226,6 @@ def cms_page(request, **kwargs):
         "subpages": subpages,
         "breadcrumbs": breadcrumbs,
         "has_documents": has_documents,
-        "documents": documents,
         "pdf_documents": pdf_documents,
         "page_has_role_restrictions": page.has_role_restrictions(),
         "page_required_roles": page_required_roles,
