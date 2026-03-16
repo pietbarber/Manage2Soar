@@ -661,9 +661,26 @@ class Document(models.Model):
         return self.title or self.file.name
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        refresh_size = False
         if self.file:
+            if self._state.adding:
+                refresh_size = True
+            elif update_fields is None:
+                # Avoid repeated storage metadata calls on routine saves.
+                refresh_size = self.file_size_bytes is None
+            else:
+                update_fields_set = set(update_fields)
+                # Recompute only when the file itself is being updated.
+                refresh_size = "file" in update_fields_set
+
+        if refresh_size:
             try:
                 self.file_size_bytes = self.file.size
+                if update_fields is not None and "file_size_bytes" not in update_fields:
+                    kwargs["update_fields"] = tuple(update_fields) + (
+                        "file_size_bytes",
+                    )
             except Exception:
                 # Keep save non-blocking if storage metadata is temporarily unavailable.
                 logger.warning(

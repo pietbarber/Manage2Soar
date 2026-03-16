@@ -159,7 +159,7 @@
                 <span style="font-size:0.95em;color:#555;">
                   {% if doc.uploaded_by %}Uploaded by {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}{% endif %}
                   {% if doc.uploaded_at %} on {{ doc.uploaded_at|date:"Y-m-d H:i" }}{% endif %}
-                  {% if doc.file_size_bytes %} &bull; {{ doc.file_size_bytes|filesizeformat }}{% endif %}
+                  {% if doc.file_size_bytes != None %} &bull; {{ doc.file_size_bytes|filesizeformat }}{% endif %}
                 </span>
               </div>
             </button>

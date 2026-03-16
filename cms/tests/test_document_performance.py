@@ -40,7 +40,8 @@ def test_cms_page_does_not_call_storage_size_when_file_size_cached(
     assert doc.file_size_bytes is not None
 
     with patch(
-        "django.db.models.fields.files.FieldFile.size", side_effect=AssertionError
+        "django.core.files.storage.FileSystemStorage.size",
+        side_effect=AssertionError,
     ):
         response = client.get(reverse("cms:cms_page", kwargs={"path": page.slug}))
 

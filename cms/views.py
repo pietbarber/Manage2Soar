@@ -235,18 +235,17 @@ def cms_page(request, **kwargs):
         "can_create_subpage": can_create_subpage,
     }
 
-    # Cache rendered responses for pages that include documents to reduce
-    # repeated template work on high-traffic archive pages.
-    if has_documents:
+    # Cache rendered responses for anonymous traffic on pages with documents.
+    # Avoid authenticated-user full-page cache to prevent session-specific
+    # token mismatches (e.g., logout CSRF token rendered in base template).
+    if has_documents and not request.user.is_authenticated:
         docs_max = max(
             (doc.uploaded_at for doc in documents if doc.uploaded_at), default=None
         )
         docs_count = len(documents)
         page_updated = int(page.updated_at.timestamp()) if page.updated_at else 0
         docs_updated = int(docs_max.timestamp()) if docs_max else 0
-        access_segment = (
-            f"u:{request.user.pk}" if request.user.is_authenticated else "u:anon"
-        )
+        access_segment = "u:anon"
         cache_key = (
             "cms:page:v3:"
             f"p:{page.pk}:"

@@ -29,13 +29,14 @@ class Command(BaseCommand):
         only_missing = options["only_missing"]
         dry_run = options["dry_run"]
 
-        queryset = Document.objects.all().order_by("id")
+        base_queryset = Document.objects.all()
         if only_missing:
-            queryset = queryset.filter(file_size_bytes__isnull=True)
+            base_queryset = base_queryset.filter(file_size_bytes__isnull=True)
 
-        total = queryset.count()
+        total = base_queryset.count()
         processed = 0
         updated = 0
+        last_id = 0
 
         self.stdout.write(
             self.style.NOTICE(
@@ -45,11 +46,14 @@ class Command(BaseCommand):
         )
 
         while True:
-            batch = list(queryset[processed : processed + batch_size])
+            batch = list(
+                base_queryset.filter(id__gt=last_id).order_by("id")[:batch_size]
+            )
             if not batch:
                 break
 
             for doc in batch:
+                last_id = doc.id
                 processed += 1
                 if not doc.file:
                     continue
@@ -69,8 +73,7 @@ class Command(BaseCommand):
 
                 updated += 1
                 if not dry_run:
-                    doc.file_size_bytes = size
-                    doc.save(update_fields=["file_size_bytes"])
+                    Document.objects.filter(pk=doc.pk).update(file_size_bytes=size)
 
             self.stdout.write(
                 f"Processed {processed}/{total} documents, pending updates: {updated}"
