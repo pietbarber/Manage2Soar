@@ -178,6 +178,32 @@
 # OPTIONAL POST-DEPLOY BACKFILL COMMANDS
 # ============================================================
 
+- name: Check migration readiness before CMS document size backfill
+  ansible.builtin.command:
+    cmd: >
+      kubectl exec deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --
+      python manage.py migrate --check --noinput
+  delegate_to: localhost
+  run_once: true
+  when:
+    - gke_run_backfill_document_sizes | bool
+    - not (gke_multi_tenant | default(false) | bool)
+  register: backfill_migrate_check
+  failed_when: false
+  changed_when: false
+
+- name: Fail backfill when unapplied migrations exist
+  ansible.builtin.fail:
+    msg: |
+      Cannot run backfill_document_sizes because there are unapplied migrations.
+      Apply migrations first (set gke_run_migrations=true or run migrations separately),
+      then rerun with gke_run_backfill_document_sizes=true.
+  when:
+    - gke_run_backfill_document_sizes | bool
+    - not (gke_multi_tenant | default(false) | bool)
+    - backfill_migrate_check is defined
+    - backfill_migrate_check.rc != 0
+
 - name: Run CMS document size backfill
   ansible.builtin.command:
     cmd: >
@@ -191,6 +217,8 @@
   when:
     - gke_run_backfill_document_sizes | bool
     - not (gke_multi_tenant | default(false) | bool)
+    - backfill_migrate_check is defined
+    - backfill_migrate_check.rc == 0
   register: backfill_document_sizes_result
   changed_when: >
     (not (gke_backfill_document_sizes_dry_run | bool)) and
@@ -210,6 +238,8 @@
   when:
     - gke_run_backfill_document_sizes | bool
     - not (gke_multi_tenant | default(false) | bool)
+    - backfill_migrate_check is defined
+    - backfill_migrate_check.rc == 0
     - backfill_document_sizes_result.stdout_lines is defined
   delegate_to: localhost
   run_once: true
