@@ -173,12 +173,13 @@ def detect_original_list(msg, recipients):
     """
     original_to = None
 
-    # Try To header first (most reliable for content filters)
-    to_header = msg.get('To')
-    if to_header:
-        _, to_addr = parseaddr(to_header)
+    # Try To header first (most reliable for content filters).
+    # Use getaddresses() so multi-address To headers are parsed correctly.
+    to_addresses = getaddresses(msg.get_all('To', []))
+    for _, to_addr in to_addresses:
         if to_addr and to_addr.lower() in ALL_KNOWN_LISTS:
             original_to = to_addr.lower()
+            break
 
     # Check Cc headers for reply-all workflows.
     if not original_to:
@@ -191,10 +192,10 @@ def detect_original_list(msg, recipients):
     preferred_domain = None
     if original_to and '@' in original_to:
         preferred_domain = original_to.split('@')[1]
-    elif to_header:
-        _, to_addr = parseaddr(to_header)
-        if to_addr and '@' in to_addr:
-            preferred_domain = to_addr.split('@')[1]
+    elif to_addresses:
+        first_to_addr = to_addresses[0][1]
+        if first_to_addr and '@' in first_to_addr:
+            preferred_domain = first_to_addr.split('@')[1]
 
     # Envelope recipients catch direct BCC where list address is still present.
     if not original_to:

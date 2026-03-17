@@ -72,6 +72,27 @@ def test_to_header_detection():
     assert original_to == "webmaster@skylinesoaring.org"
 
 
+def test_to_header_detection_with_multiple_addresses_list_not_first():
+    """List in multi-address To is detected even when not first."""
+    ns = load_template_namespace()
+    detect_original_list = get_callable(ns, "detect_original_list")
+
+    msg = EmailMessage()
+    msg["From"] = "user@example.com"
+    msg["To"] = (
+        '"Doe, Jane" <jane@example.com>, '
+        '"Club Webmaster" <webmaster@skylinesoaring.org>'
+    )
+    msg["Subject"] = "Test multi-address To"
+    msg.set_content("Body")
+
+    original_to = detect_original_list(
+        msg,
+        ["jane@example.com", "webmaster@skylinesoaring.org"],
+    )
+    assert original_to == "webmaster@skylinesoaring.org"
+
+
 def test_cc_header_detection():
     """List in Cc header is detected by production logic."""
     ns = load_template_namespace()
