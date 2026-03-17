@@ -126,7 +126,7 @@ sudo grep "delivered via maillist-rewriter service" /var/log/mail.log
 
 **Headers not rewritten:**
 - Verify `/etc/postfix/virtual` contains correct aliases
-- Check recipients match virtual alias definition exactly
+- Check recipients either match virtual alias definition exactly or contain it as a subset (e.g., BCC list plus direct recipients)
 - Ensure MAILING_LISTS set in script includes the list address
 
 **SMTP2Go rejections:**

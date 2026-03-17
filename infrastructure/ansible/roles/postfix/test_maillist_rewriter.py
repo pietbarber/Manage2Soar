@@ -33,9 +33,10 @@ def load_template_namespace():
     )
 
     # Avoid filesystem dependency during module import.
-    source = source.replace(
-        "ALL_KNOWN_LISTS = MAILING_LISTS | _load_lists_from_virtual()",
+    source = re.sub(
+        r"ALL_KNOWN_LISTS\s*=\s*MAILING_LISTS\s*\|\s*_load_lists_from_virtual\(\)",
         "ALL_KNOWN_LISTS = MAILING_LISTS.copy()",
+        source,
     )
 
     namespace = {"__name__": "maillist_rewriter_under_test"}
@@ -131,6 +132,37 @@ def test_reverse_lookup_subset_match_for_bcc_plus_direct_recipient():
     virtual_content = (
         "members@skylinesoaring.org member1@example.com,member2@example.com\n"
         "webmaster@skylinesoaring.org admin@example.com\n"
+    )
+
+    with patch("builtins.open", mock_open(read_data=virtual_content)):
+        original_to = detect_original_list(msg, recipients)
+
+    assert original_to == "members@skylinesoaring.org"
+
+
+def test_reverse_lookup_prefers_most_specific_subset_match_deterministically():
+    """Overlapping subset candidates choose the largest alias set consistently."""
+    ns = load_template_namespace()
+    detect_original_list = get_callable(ns, "detect_original_list")
+
+    msg = EmailMessage()
+    msg["From"] = "user@example.com"
+    msg["To"] = "user@example.com"
+    msg["Subject"] = "Test email"
+    msg.set_content("Body")
+
+    # Incoming recipients include a small list (board) and larger list (members).
+    recipients = [
+        "board1@example.com",
+        "board2@example.com",
+        "member3@example.com",
+        "member4@example.com",
+        "user@example.com",
+    ]
+
+    virtual_content = (
+        "board@skylinesoaring.org board1@example.com,board2@example.com\n"
+        "members@skylinesoaring.org board1@example.com,board2@example.com,member3@example.com,member4@example.com\n"
     )
 
     with patch("builtins.open", mock_open(read_data=virtual_content)):

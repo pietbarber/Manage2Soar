@@ -137,22 +137,28 @@ def find_list_from_recipients(recipients, preferred_domain=None):
                         # Prefer exact matches, but accept subset matches so
                         # BCC+To-self works after virtual alias expansion.
                         if incoming_recipients == alias_recipients:
-                            exact_matches.append(list_addr)
+                            exact_matches.append((list_addr, len(alias_recipients)))
                             break
                         if alias_recipients.issubset(incoming_recipients):
-                            subset_matches.append(list_addr)
+                            subset_matches.append((list_addr, len(alias_recipients)))
                             break
 
         matches = exact_matches if exact_matches else subset_matches
 
-        # If we have a preferred domain, try to find a match with that domain first
-        if preferred_domain and matches:
-            for match in matches:
-                if match.endswith('@' + preferred_domain):
-                    return match
+        if not matches:
+            return None
 
-        # Otherwise return first match
-        return matches[0] if matches else None
+        # Deterministic best-match selection:
+        # 1) preferred domain when provided
+        # 2) largest alias recipient set (most specific)
+        # 3) stable lexical address tie-break
+        if preferred_domain:
+            domain_matches = [m for m in matches if m[0].endswith('@' + preferred_domain)]
+            if domain_matches:
+                matches = domain_matches
+
+        best = sorted(matches, key=lambda item: (-item[1], item[0]))[0]
+        return best[0]
     except Exception as e:
         sys.stderr.write(f"maillist-rewriter: error reading /etc/postfix/virtual in find_list_from_recipients: {e}\n")
 
