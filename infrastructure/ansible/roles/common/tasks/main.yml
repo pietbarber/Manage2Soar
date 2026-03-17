@@ -129,6 +129,13 @@
     creates: /etc/letsencrypt/live/{{ mail_hostname }}/fullchain.pem
   when: letsencrypt_email is defined
 
+- name: Deploy postfix-sasl fail2ban filter
+  ansible.builtin.template:
+    src: fail2ban-postfix-sasl.conf.j2
+    dest: /etc/fail2ban/filter.d/postfix-sasl.conf
+    mode: "0644"
+  notify: Restart fail2ban
+
 - name: Configure fail2ban for postfix
   ansible.builtin.copy:
     dest: /etc/fail2ban/jail.local
