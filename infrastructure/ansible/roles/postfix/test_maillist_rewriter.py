@@ -152,7 +152,7 @@ def test_reverse_lookup_subset_match_for_bcc_plus_direct_recipient():
 
     msg = EmailMessage()
     msg["From"] = "user@example.com"
-    msg["To"] = "user@example.com"
+    msg["To"] = "user@skylinesoaring.org"
     msg["Subject"] = "Test email"
     msg.set_content("Body")
 
@@ -170,6 +170,28 @@ def test_reverse_lookup_subset_match_for_bcc_plus_direct_recipient():
     assert original_to == "members@skylinesoaring.org"
 
 
+def test_subset_match_does_not_trigger_for_non_list_direct_group_email():
+    """Subset overlap alone should not classify direct group email as list traffic."""
+    ns = load_template_namespace()
+    detect_original_list = get_callable(ns, "detect_original_list")
+
+    msg = EmailMessage()
+    msg["From"] = "user@example.com"
+    msg["To"] = "friend@external.example"
+    msg["Subject"] = "Direct group email"
+    msg.set_content("Body")
+
+    # Looks like board recipients plus an extra direct recipient.
+    recipients = ["board1@example.com", "board2@example.com", "friend@external.example"]
+
+    virtual_content = "board@skylinesoaring.org board1@example.com,board2@example.com\n"
+
+    with patch("builtins.open", mock_open(read_data=virtual_content)):
+        original_to = detect_original_list(msg, recipients)
+
+    assert original_to is None
+
+
 def test_reverse_lookup_prefers_most_specific_subset_match_deterministically():
     """Overlapping subset candidates choose the largest alias set consistently."""
     ns = load_template_namespace()
@@ -177,7 +199,7 @@ def test_reverse_lookup_prefers_most_specific_subset_match_deterministically():
 
     msg = EmailMessage()
     msg["From"] = "user@example.com"
-    msg["To"] = "user@example.com"
+    msg["To"] = "user@skylinesoaring.org"
     msg["Subject"] = "Test email"
     msg.set_content("Body")
 

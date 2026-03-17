@@ -143,8 +143,15 @@ def find_list_from_recipients(recipients, preferred_domain=None):
                             exact_matches.append((list_addr, len(alias_recipients)))
                             break
                         if alias_recipients.issubset(incoming_recipients):
-                            subset_matches.append((list_addr, len(alias_recipients)))
-                            break
+                            # Tighten subset matching to reduce false positives:
+                            # only allow when a preferred domain exists, list
+                            # domain matches that preference, and extras are small.
+                            if not preferred_domain or not list_addr.endswith('@' + preferred_domain):
+                                continue
+                            extra_recipient_count = len(incoming_recipients - alias_recipients)
+                            if extra_recipient_count <= 2:
+                                subset_matches.append((list_addr, len(alias_recipients)))
+                                break
 
         matches = exact_matches if exact_matches else subset_matches
 
