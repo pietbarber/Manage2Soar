@@ -27,6 +27,18 @@ The `maillist-rewriter.py` script is a Postfix content filter that rewrites emai
 ### Why Reverse Lookup?
 Postfix's content_filter runs **after** virtual alias expansion, so the original list address is lost. The script reads `/etc/postfix/virtual` and matches the recipient set to find which list the email was sent to.
 
+### BCC Support (Issue #759)
+The script supports mailing lists in the BCC field with two paths:
+
+1. If the list address is still present in SMTP envelope recipients, the script detects it directly.
+2. If Postfix has already expanded the list address away, the script falls back to reverse lookup in `/etc/postfix/virtual`.
+
+For reverse lookup, the script now supports both:
+- **Exact recipient-set matches**
+- **Subset matches** (list members are a subset of actual envelope recipients)
+
+Subset matching is important for BCC+To-self scenarios, where envelope recipients can include both expanded list members and additional direct recipients.
+
 ## Configuration
 
 ### Postfix Integration (master.cf)
@@ -114,7 +126,7 @@ sudo grep "delivered via maillist-rewriter service" /var/log/mail.log
 
 **Headers not rewritten:**
 - Verify `/etc/postfix/virtual` contains correct aliases
-- Check recipients match virtual alias definition exactly
+- Check recipients either match virtual alias definition exactly or contain it as a subset (e.g., BCC list plus direct recipients)
 - Ensure MAILING_LISTS set in script includes the list address
 
 **SMTP2Go rejections:**
