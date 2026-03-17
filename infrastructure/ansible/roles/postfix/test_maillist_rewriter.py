@@ -8,11 +8,8 @@ Note: This test uses mock objects to simulate the Postfix environment without
 requiring a full mail server setup.
 """
 
-import email
-import io
-import sys
 from email.message import EmailMessage
-from unittest.mock import MagicMock, patch
+from email.utils import getaddresses, parseaddr
 
 # Mock MAILING_LISTS and ALL_KNOWN_LISTS
 MAILING_LISTS = {
@@ -22,6 +19,31 @@ MAILING_LISTS = {
     "board@skylinesoaring.org",
 }
 ALL_KNOWN_LISTS = MAILING_LISTS.copy()
+
+
+def detect_list_recipient(msg, recipients):
+    """Mirror the production list-detection order: To, Cc, then envelope."""
+    original_to = None
+
+    to_header = msg.get("To")
+    if to_header:
+        _, to_addr = parseaddr(to_header)
+        if to_addr and to_addr.lower() in ALL_KNOWN_LISTS:
+            original_to = to_addr.lower()
+
+    if not original_to:
+        for _, cc_addr in getaddresses(msg.get_all("Cc", []) + msg.get_all("CC", [])):
+            if cc_addr and cc_addr.lower() in ALL_KNOWN_LISTS:
+                original_to = cc_addr.lower()
+                break
+
+    if not original_to:
+        for recipient in recipients:
+            if recipient.lower() in ALL_KNOWN_LISTS:
+                original_to = recipient.lower()
+                break
+
+    return original_to
 
 
 def rewrite_headers(msg, recipient):
@@ -62,15 +84,7 @@ def test_to_header_detection():
     msg["Subject"] = "Test email to list"
     msg.set_content("Body")
 
-    # Simulate the header checking logic from maillist-rewriter.py
-    original_to = None
-    to_header = msg.get("To")
-    if to_header:
-        from email.utils import parseaddr
-
-        _, to_addr = parseaddr(to_header)
-        if to_addr and to_addr.lower() in ALL_KNOWN_LISTS:
-            original_to = to_addr.lower()
+    original_to = detect_list_recipient(msg, ["webmaster@skylinesoaring.org"])
 
     assert original_to == "webmaster@skylinesoaring.org"
     print("✓ To header detection works")
@@ -85,23 +99,7 @@ def test_cc_header_detection():
     msg["Subject"] = "Test email to list"
     msg.set_content("Body")
 
-    # Simulate the header checking logic
-    original_to = None
-    to_header = msg.get("To")
-    if to_header:
-        from email.utils import parseaddr
-
-        _, to_addr = parseaddr(to_header)
-        if to_addr and to_addr.lower() in ALL_KNOWN_LISTS:
-            original_to = to_addr.lower()
-
-    if not original_to:
-        from email.utils import getaddresses
-
-        for _, cc_addr in getaddresses(msg.get_all("Cc", []) + msg.get_all("CC", [])):
-            if cc_addr and cc_addr.lower() in ALL_KNOWN_LISTS:
-                original_to = cc_addr.lower()
-                break
+    original_to = detect_list_recipient(msg, ["someone@example.com"])
 
     assert original_to == "webmaster@skylinesoaring.org"
     print("✓ Cc header detection works")
@@ -122,31 +120,7 @@ def test_bcc_envelope_detection():
     # Simulate the SMTP envelope recipients (as passed to maillist-rewriter.py)
     recipients = ["user@example.com", "webmaster@skylinesoaring.org"]
 
-    # Simulate the detection logic from maillist-rewriter.py
-    original_to = None
-    to_header = msg.get("To")
-    if to_header:
-        from email.utils import parseaddr
-
-        _, to_addr = parseaddr(to_header)
-        if to_addr and to_addr.lower() in ALL_KNOWN_LISTS:
-            original_to = to_addr.lower()
-
-    if not original_to:
-        from email.utils import getaddresses
-
-        for _, cc_addr in getaddresses(msg.get_all("Cc", []) + msg.get_all("CC", [])):
-            if cc_addr and cc_addr.lower() in ALL_KNOWN_LISTS:
-                original_to = cc_addr.lower()
-                break
-
-    # NEW: Check SMTP envelope recipients for mailing list addresses
-    # This is the fix for issue #759
-    if not original_to:
-        for recipient in recipients:
-            if recipient.lower() in ALL_KNOWN_LISTS:
-                original_to = recipient.lower()
-                break
+    original_to = detect_list_recipient(msg, recipients)
 
     assert original_to == "webmaster@skylinesoaring.org"
     print("✓ BCC envelope detection works (Issue #759 fix)")
@@ -161,7 +135,6 @@ def test_header_rewriting_with_bcc():
     msg.set_content("Body")
 
     # Rewrite headers for the BCC list
-    recipients = ["john@example.com", "webmaster@skylinesoaring.org"]
     list_to_rewrite = "webmaster@skylinesoaring.org"
 
     rewrite_headers(msg, list_to_rewrite)
@@ -191,28 +164,7 @@ def test_multiple_recipients_with_list():
         "members@skylinesoaring.org",
     ]
 
-    original_to = None
-    to_header = msg.get("To")
-    if to_header:
-        from email.utils import parseaddr
-
-        _, to_addr = parseaddr(to_header)
-        if to_addr and to_addr.lower() in ALL_KNOWN_LISTS:
-            original_to = to_addr.lower()
-
-    if not original_to:
-        from email.utils import getaddresses
-
-        for _, cc_addr in getaddresses(msg.get_all("Cc", []) + msg.get_all("CC", [])):
-            if cc_addr and cc_addr.lower() in ALL_KNOWN_LISTS:
-                original_to = cc_addr.lower()
-                break
-
-    if not original_to:
-        for recipient in recipients:
-            if recipient.lower() in ALL_KNOWN_LISTS:
-                original_to = recipient.lower()
-                break
+    original_to = detect_list_recipient(msg, recipients)
 
     assert original_to == "members@skylinesoaring.org"
     print("✓ Multiple recipients with list detection works")
