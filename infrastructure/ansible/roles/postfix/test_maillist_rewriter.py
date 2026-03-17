@@ -245,3 +245,31 @@ def test_reverse_lookup_domain_preference_is_case_insensitive():
         original_to = detect_original_list(msg, recipients)
 
     assert original_to == "members@ssc.manage2soar.com"
+
+
+def test_reverse_lookup_uses_exact_alias_token_not_prefix_match():
+    """Exact alias key matching avoids members vs members-ops collisions."""
+    ns = load_template_namespace()
+    detect_original_list = get_callable(ns, "detect_original_list")
+
+    msg = EmailMessage()
+    msg["From"] = "user@example.com"
+    msg["To"] = '"Pilot" <pilot@skylinesoaring.org>'
+    msg["Subject"] = "Test alias exact matching"
+    msg.set_content("Body")
+
+    recipients = [
+        "member1@example.com",
+        "member2@example.com",
+        "pilot@skylinesoaring.org",
+    ]
+
+    virtual_content = (
+        "members-ops@skylinesoaring.org member1@example.com,member2@example.com\n"
+        "members@skylinesoaring.org member1@example.com,member2@example.com\n"
+    )
+
+    with patch("builtins.open", mock_open(read_data=virtual_content)):
+        original_to = detect_original_list(msg, recipients)
+
+    assert original_to == "members@skylinesoaring.org"

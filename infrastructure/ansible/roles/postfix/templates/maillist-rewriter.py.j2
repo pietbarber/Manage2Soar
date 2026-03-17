@@ -128,30 +128,35 @@ def find_list_from_recipients(recipients, preferred_domain=None):
         for list_addr in ALL_KNOWN_LISTS:
             # Look for line like: "webmaster@domain  user1@...,user2@...,user3@..."
             for line in virtual_content.split('\n'):
-                if line.startswith(list_addr):
-                    # Extract the recipient list after the address
-                    parts = line.split(None, 1)
-                    if len(parts) == 2:
-                        alias_recipients = {
-                            r.strip().lower() for r in parts[1].split(',') if r.strip()
-                        }
-                        if not alias_recipients:
-                            continue
-                        # Prefer exact matches, but accept subset matches so
-                        # BCC+To-self works after virtual alias expansion.
-                        if incoming_recipients == alias_recipients:
-                            exact_matches.append((list_addr, len(alias_recipients)))
-                            break
-                        if alias_recipients.issubset(incoming_recipients):
-                            # Tighten subset matching to reduce false positives:
-                            # only allow when a preferred domain exists, list
-                            # domain matches that preference, and extras are small.
-                            if not preferred_domain or not list_addr.endswith('@' + preferred_domain):
-                                continue
-                            extra_recipient_count = len(incoming_recipients - alias_recipients)
-                            if extra_recipient_count <= 2:
-                                subset_matches.append((list_addr, len(alias_recipients)))
-                                break
+                # Match exact alias key token to avoid prefix collisions
+                # (e.g. members@... matching members-ops@...).
+                parts = line.split(None, 1)
+                if len(parts) != 2:
+                    continue
+                alias_addr = parts[0].strip().lower()
+                if alias_addr != list_addr:
+                    continue
+
+                alias_recipients = {
+                    r.strip().lower() for r in parts[1].split(',') if r.strip()
+                }
+                if not alias_recipients:
+                    continue
+                # Prefer exact matches, but accept subset matches so
+                # BCC+To-self works after virtual alias expansion.
+                if incoming_recipients == alias_recipients:
+                    exact_matches.append((list_addr, len(alias_recipients)))
+                    break
+                if alias_recipients.issubset(incoming_recipients):
+                    # Tighten subset matching to reduce false positives:
+                    # only allow when a preferred domain exists, list
+                    # domain matches that preference, and extras are small.
+                    if not preferred_domain or not list_addr.endswith('@' + preferred_domain):
+                        continue
+                    extra_recipient_count = len(incoming_recipients - alias_recipients)
+                    if extra_recipient_count <= 2:
+                        subset_matches.append((list_addr, len(alias_recipients)))
+                        break
 
         matches = exact_matches if exact_matches else subset_matches
 
