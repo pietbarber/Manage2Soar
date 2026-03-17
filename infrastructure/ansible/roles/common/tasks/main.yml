@@ -137,6 +137,10 @@
       bantime = 3600
       findtime = 600
       maxretry = 5
+      datepattern = %%Y-%%m-%%dT%%H:%%M:%%S
+                    {^LN-BEG}%%Y-%%m-%%dT%%H:%%M:%%S
+                    %%b %%e %%H:%%M:%%S
+                    {^LN-BEG}%%b %%e %%H:%%M:%%S
 
       [postfix]
       enabled = true
@@ -149,5 +153,6 @@
       port = smtp,submission
       filter = postfix-sasl
       logpath = /var/log/mail.log
+      maxretry = 3
     mode: "0644"
   notify: Restart fail2ban
