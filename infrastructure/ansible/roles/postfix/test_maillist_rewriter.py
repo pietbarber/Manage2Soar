@@ -24,6 +24,7 @@ def load_template_namespace():
         r"MAILING_LISTS\s*=\s*\{\n.*?\n\}",
         """MAILING_LISTS = {
     'members@skylinesoaring.org',
+    'members@ssc.manage2soar.com',
     'instructors@skylinesoaring.org',
     'webmaster@skylinesoaring.org',
     'board@skylinesoaring.org',
@@ -198,3 +199,27 @@ def test_reverse_lookup_prefers_most_specific_subset_match_deterministically():
         original_to = detect_original_list(msg, recipients)
 
     assert original_to == "members@skylinesoaring.org"
+
+
+def test_reverse_lookup_domain_preference_is_case_insensitive():
+    """Mixed-case To domain still applies preferred-domain filtering."""
+    ns = load_template_namespace()
+    detect_original_list = get_callable(ns, "detect_original_list")
+
+    msg = EmailMessage()
+    msg["From"] = "user@example.com"
+    msg["To"] = '"Pilot" <pilot@SSC.MANAGE2SOAR.COM>'
+    msg["Subject"] = "Test domain preference"
+    msg.set_content("Body")
+
+    recipients = ["member1@example.com", "member2@example.com"]
+
+    virtual_content = (
+        "members@skylinesoaring.org member1@example.com,member2@example.com\n"
+        "members@ssc.manage2soar.com member1@example.com,member2@example.com\n"
+    )
+
+    with patch("builtins.open", mock_open(read_data=virtual_content)):
+        original_to = detect_original_list(msg, recipients)
+
+    assert original_to == "members@ssc.manage2soar.com"

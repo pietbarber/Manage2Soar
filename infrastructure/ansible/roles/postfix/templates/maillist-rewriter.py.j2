@@ -113,6 +113,9 @@ def find_list_from_recipients(recipients, preferred_domain=None):
     If preferred_domain is specified, prefer list addresses with that domain
     """
     try:
+        if preferred_domain:
+            preferred_domain = preferred_domain.lower()
+
         with open('/etc/postfix/virtual', 'r') as f:
             virtual_content = f.read()
 
@@ -195,7 +198,7 @@ def detect_original_list(msg, recipients):
     elif to_addresses:
         first_to_addr = to_addresses[0][1]
         if first_to_addr and '@' in first_to_addr:
-            preferred_domain = first_to_addr.split('@')[1]
+            preferred_domain = first_to_addr.split('@')[1].lower()
 
     # Envelope recipients catch direct BCC where list address is still present.
     if not original_to:
