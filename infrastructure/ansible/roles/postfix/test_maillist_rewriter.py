@@ -20,7 +20,7 @@ def load_template_namespace():
     source = _TEMPLATE_PATH.read_text(encoding="utf-8")
 
     # Replace Jinja MAILING_LISTS block with deterministic static test data.
-    source = re.sub(
+    source, mailing_lists_replacements = re.subn(
         r"MAILING_LISTS\s*=\s*\{\n.*?\n\}",
         """MAILING_LISTS = {
     'members@skylinesoaring.org',
@@ -31,12 +31,20 @@ def load_template_namespace():
         source,
         flags=re.DOTALL,
     )
+    assert mailing_lists_replacements == 1, (
+        "Failed to replace MAILING_LISTS block in maillist-rewriter template; "
+        "template structure may have changed"
+    )
 
     # Avoid filesystem dependency during module import.
-    source = re.sub(
+    source, all_known_lists_replacements = re.subn(
         r"ALL_KNOWN_LISTS\s*=\s*MAILING_LISTS\s*\|\s*_load_lists_from_virtual\(\)",
         "ALL_KNOWN_LISTS = MAILING_LISTS.copy()",
         source,
+    )
+    assert all_known_lists_replacements == 1, (
+        "Failed to replace ALL_KNOWN_LISTS initialization in maillist-rewriter "
+        "template; template structure may have changed"
     )
 
     namespace = {"__name__": "maillist_rewriter_under_test"}
