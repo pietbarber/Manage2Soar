@@ -107,7 +107,7 @@
 
 - name: Build UFW submission source candidate list
   ansible.builtin.set_fact:
-    ufw_smtp_submission_sources_candidate: "{{ gcp_smtp_submission_allowed_sources | default((trusted_relay_ips | default([])) + (admin_ssh_ips | default([]))) }}"
+    ufw_smtp_submission_sources_candidate: "{{ gcp_smtp_submission_allowed_sources | default(((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])) + ((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list)) | unique | list) }}"
 
 - name: Build effective UFW submission source list
   ansible.builtin.set_fact:
