@@ -261,17 +261,6 @@
   become: false
   when: gcp_create_firewall_rules and gcp_allow_ssh and gcp_ssh_allowed_sources | length > 0
 
-- name: Validate inbound SMTP source ranges when enabled
-  ansible.builtin.assert:
-    that:
-      - (gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) | length) > 0
-    fail_msg: >-
-      Inbound SMTP firewall is enabled but no source ranges are configured.
-      Set gcp_smtp_inbound_sources (preferred) or gcp_smtp_allowed_sources.
-  when:
-    - gcp_create_firewall_rules
-    - gcp_enable_inbound_smtp | default(false)
-
 - name: Remove inbound SMTP firewall rule (port 25) when disabled
   google.cloud.gcp_compute_firewall:
     name: "{{ gcp_firewall_name_prefix }}-allow-smtp"
@@ -298,6 +287,17 @@
     - gcp_create_firewall_rules
     - gcp_enable_inbound_smtp | default(false)
     - (gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) | length) == 0
+
+- name: Validate inbound SMTP source ranges when enabled
+  ansible.builtin.assert:
+    that:
+      - (gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) | length) > 0
+    fail_msg: >-
+      Inbound SMTP firewall is enabled but no source ranges are configured.
+      Set gcp_smtp_inbound_sources (preferred) or gcp_smtp_allowed_sources.
+  when:
+    - gcp_create_firewall_rules
+    - gcp_enable_inbound_smtp | default(false)
 
 - name: Build submission SMTP source candidate list
   ansible.builtin.set_fact:

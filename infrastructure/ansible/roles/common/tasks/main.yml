@@ -122,6 +122,18 @@
       Remove 0.0.0.0/0 from gcp_smtp_submission_allowed_sources or set gcp_allow_public_submission=true intentionally.
   when: ufw_smtp_submission_sources_candidate is defined
 
+- name: Remove existing UFW submission allow rules (587)
+  ansible.builtin.shell: |
+    set -o pipefail
+    ufw status numbered | awk '/587\/tcp/ && /ALLOW IN/ {gsub(/\[|\]/, "", $1); print $1}' | sort -rn | while read -r rule_no; do
+      ufw --force delete "$rule_no"
+    done
+  args:
+    executable: /bin/bash
+  register: ufw_remove_submission_allow_rules
+  changed_when: ufw_remove_submission_allow_rules.stdout | length > 0
+  when: not ansible_check_mode
+
 - name: Allow submission (587) from trusted app/admin sources
   community.general.ufw:
     rule: allow
