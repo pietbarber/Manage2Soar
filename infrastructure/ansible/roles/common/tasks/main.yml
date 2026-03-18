@@ -139,8 +139,8 @@
       maxretry = 5
       datepattern = %%Y-%%m-%%dT%%H:%%M:%%S
                     {^LN-BEG}%%Y-%%m-%%dT%%H:%%M:%%S
-                    %%b %%e %%H:%%M:%%S
-                    {^LN-BEG}%%b %%e %%H:%%M:%%S
+                    %%b %%d %%H:%%M:%%S
+                    {^LN-BEG}%%b %%d %%H:%%M:%%S
 
       [postfix]
       enabled = true
