@@ -1,0 +1,19 @@
+# Fail2Ban filter for Postfix SASL authentication failures
+# Deployed by Ansible - do not edit manually
+#
+# Matches lines like:
+#   warning: unknown[1.2.3.4]: SASL LOGIN authentication failed: authentication failure
+#   warning: unknown[1.2.3.4]: SASL PLAIN authentication failed: UGFzcw==
+
+[INCLUDES]
+before = common.conf
+
+[Definition]
+_daemon = postfix/smtpd
+
+failregex = ^%(__prefix_line)swarning: [-._\w]+\[<HOST>\]: SASL ((?i)LOGIN|PLAIN|(?:CRAM|DIGEST)-MD5) authentication failed(: [ \w\W]+)?$
+
+ignoreregex =
+
+[Init]
+journalmatch = _SYSTEMD_UNIT=postfix.service
