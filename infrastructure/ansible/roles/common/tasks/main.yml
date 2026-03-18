@@ -98,15 +98,31 @@
     port: "25"
     proto: tcp
 
-- name: Allow submission (587)
+- name: Remove legacy open submission rule (587)
   community.general.ufw:
     rule: allow
     port: "587"
     proto: tcp
+    delete: true
 
-- name: Allow HTTP (80) for Let's Encrypt certificate renewal
+- name: Allow submission (587) from trusted app/admin sources
   community.general.ufw:
     rule: allow
+    port: "587"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ gcp_smtp_submission_allowed_sources | default((trusted_relay_ips | default([])) + (admin_ssh_ips | default([]))) }}"
+
+- name: Remove legacy open HTTP rule (80)
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+    delete: true
+
+- name: Deny HTTP (80)
+  community.general.ufw:
+    rule: deny
     port: "80"
     proto: tcp
 
