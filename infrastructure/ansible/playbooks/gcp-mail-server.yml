@@ -62,6 +62,20 @@
         fail_msg: |
           GCP project is required. Set gcp_project in your group_vars.
 
+    - name: Validate SMTP ACL source configuration when SMTP firewall flags are enabled
+      ansible.builtin.assert:
+        that:
+          - not (gcp_enable_inbound_smtp | default(false)) or (gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) | length > 0)
+          - not (gcp_enable_submission_smtp | default(false)) or ((gcp_smtp_submission_allowed_sources | default((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])) + ((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list)) | unique | list) | length > 0)
+        fail_msg: |
+          SMTP firewall flags are enabled, but required source ranges are missing.
+
+          Update the mail vars file and define:
+            - gcp_smtp_inbound_sources (or legacy gcp_smtp_allowed_sources)
+            - gcp_smtp_submission_allowed_sources (preferred), or trusted_relay_ips/admin_ssh_ips
+
+          File: infrastructure/ansible/group_vars/gcp_mail/vars.yml
+
     - name: Display provisioning plan
       ansible.builtin.debug:
         msg: |
