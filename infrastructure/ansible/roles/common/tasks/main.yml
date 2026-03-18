@@ -119,12 +119,29 @@
     port: "80"
     proto: tcp
     delete: true
+  when: letsencrypt_email is not defined
 
 - name: Deny HTTP (80)
   community.general.ufw:
     rule: deny
     port: "80"
     proto: tcp
+  when: letsencrypt_email is not defined
+
+- name: Remove HTTP deny rule (80) when Let's Encrypt is enabled
+  community.general.ufw:
+    rule: deny
+    port: "80"
+    proto: tcp
+    delete: true
+  when: letsencrypt_email is defined
+
+- name: Allow HTTP (80) for Let's Encrypt HTTP-01 challenge
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+  when: letsencrypt_email is defined
 
 - name: Enable UFW
   community.general.ufw:

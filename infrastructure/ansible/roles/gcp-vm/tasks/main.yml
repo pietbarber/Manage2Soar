@@ -273,13 +273,16 @@
       - ip_protocol: tcp
         ports:
           - "25"
-    source_ranges: "{{ gcp_smtp_inbound_sources | default(['0.0.0.0/0']) }}"
+    source_ranges: "{{ gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) }}"
     target_tags: "{{ gcp_network_tags }}"
     description: "Allow inbound SMTP (port 25) for mailing-list traffic"
     state: present
   delegate_to: localhost
   become: false
-  when: gcp_create_firewall_rules
+  when:
+    - gcp_create_firewall_rules
+    - gcp_enable_inbound_smtp | default(false)
+    - (gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) | length > 0)
 
 - name: Create SMTP submission firewall rule (port 587)
   google.cloud.gcp_compute_firewall:
@@ -299,7 +302,10 @@
     state: present
   delegate_to: localhost
   become: false
-  when: gcp_create_firewall_rules and (gcp_smtp_submission_allowed_sources | default((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list) | length > 0)
+  when:
+    - gcp_create_firewall_rules
+    - gcp_enable_submission_smtp | default(false)
+    - (gcp_smtp_submission_allowed_sources | default((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list) | length > 0)
 
 # Issue #529: HTTP firewall rule for Let's Encrypt HTTP-01 challenge validation
 # This rule allows ACME servers to reach port 80 for certificate renewal
