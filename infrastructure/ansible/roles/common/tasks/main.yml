@@ -105,14 +105,22 @@
     proto: tcp
     delete: true
 
+- name: Build UFW submission source candidate list
+  ansible.builtin.set_fact:
+    ufw_smtp_submission_sources_candidate: "{{ gcp_smtp_submission_allowed_sources | default((trusted_relay_ips | default([])) + (admin_ssh_ips | default([]))) }}"
+
+- name: Build effective UFW submission source list
+  ansible.builtin.set_fact:
+    ufw_smtp_submission_sources_effective: "{{ ufw_smtp_submission_sources_candidate if (gcp_allow_public_submission | default(false)) else (ufw_smtp_submission_sources_candidate | reject('equalto', '0.0.0.0/0') | list) }}"
+
 - name: Validate UFW submission sources are not public by default
   ansible.builtin.assert:
     that:
-      - (gcp_allow_public_submission | default(false)) or ('0.0.0.0/0' not in (gcp_smtp_submission_allowed_sources | default([])))
+      - (gcp_allow_public_submission | default(false)) or ('0.0.0.0/0' not in (ufw_smtp_submission_sources_candidate | default([])))
     fail_msg: >-
       UFW submission sources include 0.0.0.0/0, which would expose port 587 publicly.
       Remove 0.0.0.0/0 from gcp_smtp_submission_allowed_sources or set gcp_allow_public_submission=true intentionally.
-  when: gcp_smtp_submission_allowed_sources is defined
+  when: ufw_smtp_submission_sources_candidate is defined
 
 - name: Allow submission (587) from trusted app/admin sources
   community.general.ufw:
@@ -120,7 +128,7 @@
     port: "587"
     proto: tcp
     from_ip: "{{ item }}"
-  loop: "{{ (gcp_smtp_submission_allowed_sources | default((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])))) | reject('equalto', '0.0.0.0/0') | list }}"
+  loop: "{{ ufw_smtp_submission_sources_effective | default([]) }}"
 
 - name: Remove legacy open HTTP rule (80)
   community.general.ufw:

@@ -48,6 +48,9 @@
   connection: local
   gather_facts: false
   tags: [gcp-provision]
+  vars:
+    gcp_enable_inbound_smtp: true
+    gcp_enable_submission_smtp: true
   vars_files:
     - ../group_vars/all.yml
     - ../group_vars/gcp_mail/vars.yml
@@ -95,8 +98,6 @@
       tags: [gcp-provision]
       vars:
         gcp_target_inventory_group: gcp_mail_servers
-        gcp_enable_inbound_smtp: true
-        gcp_enable_submission_smtp: true
 
 # ============================================================
 # PHASE 2: Mail Server Configuration
