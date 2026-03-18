@@ -261,6 +261,28 @@
   become: false
   when: gcp_create_firewall_rules and gcp_allow_ssh and gcp_ssh_allowed_sources | length > 0
 
+- name: Validate inbound SMTP source ranges when enabled
+  ansible.builtin.assert:
+    that:
+      - (gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) | length) > 0
+    fail_msg: >-
+      Inbound SMTP firewall is enabled but no source ranges are configured.
+      Set gcp_smtp_inbound_sources (preferred) or gcp_smtp_allowed_sources.
+  when:
+    - gcp_create_firewall_rules
+    - gcp_enable_inbound_smtp | default(false)
+
+- name: Validate submission SMTP source ranges when enabled
+  ansible.builtin.assert:
+    that:
+      - (gcp_smtp_submission_allowed_sources | default(((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])) + ((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list)) | unique | list) | length) > 0
+    fail_msg: >-
+      Submission SMTP firewall is enabled but no source ranges are configured.
+      Set gcp_smtp_submission_allowed_sources or define trusted_relay_ips/admin_ssh_ips.
+  when:
+    - gcp_create_firewall_rules
+    - gcp_enable_submission_smtp | default(false)
+
 - name: Create inbound SMTP firewall rule (port 25)
   google.cloud.gcp_compute_firewall:
     name: "{{ gcp_firewall_name_prefix }}-allow-smtp"
@@ -296,7 +318,7 @@
       - ip_protocol: tcp
         ports:
           - "587"
-    source_ranges: "{{ gcp_smtp_submission_allowed_sources | default((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list) }}"
+    source_ranges: "{{ gcp_smtp_submission_allowed_sources | default(((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])) + ((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list)) | unique | list) }}"
     target_tags: "{{ gcp_network_tags }}"
     description: "Allow SMTP submission (port 587) only from trusted app/admin sources"
     state: present
@@ -305,7 +327,7 @@
   when:
     - gcp_create_firewall_rules
     - gcp_enable_submission_smtp | default(false)
-    - (gcp_smtp_submission_allowed_sources | default((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list) | length > 0)
+    - (gcp_smtp_submission_allowed_sources | default(((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])) + ((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list)) | unique | list) | length > 0)
 
 # Issue #529: HTTP firewall rule for Let's Encrypt HTTP-01 challenge validation
 # This rule allows ACME servers to reach port 80 for certificate renewal
