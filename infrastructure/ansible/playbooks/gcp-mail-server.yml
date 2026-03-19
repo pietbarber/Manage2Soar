@@ -78,6 +78,7 @@
             - gcp_smtp_submission_allowed_sources (preferred), or trusted_relay_ips/admin_ssh_ips
 
           File: infrastructure/ansible/group_vars/gcp_mail/vars.yml
+      when: gcp_create_firewall_rules | default(true)
 
     - name: Display provisioning plan
       ansible.builtin.debug:

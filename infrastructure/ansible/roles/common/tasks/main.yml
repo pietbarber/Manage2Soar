@@ -122,6 +122,15 @@
       Remove 0.0.0.0/0 from gcp_smtp_submission_allowed_sources or set gcp_allow_public_submission=true intentionally.
   when: ufw_smtp_submission_sources_candidate is defined
 
+- name: Validate UFW submission sources are present when submission is enabled
+  ansible.builtin.assert:
+    that:
+      - (ufw_smtp_submission_sources_effective | default([]) | length) > 0
+    fail_msg: >-
+      Submission SMTP is enabled, but no trusted UFW source ranges were configured.
+      Set gcp_smtp_submission_allowed_sources, or define trusted_relay_ips/admin_ssh_ips.
+  when: gcp_enable_submission_smtp | default(true)
+
 - name: Remove existing UFW submission allow rules (587)
   ansible.builtin.shell: |
     set -o pipefail

@@ -109,9 +109,11 @@ gcp_postgresql_allowed_sources: []
 
 # SMTP firewall source ranges (required when gcp_enable_*_smtp flags are true)
 # Port 25 inbound SMTP allow-list (preferred variable)
+# WARNING: Real inbound SMTP from the internet requires 0.0.0.0/0.
+# Restrict only if your mail ingress architecture uses known upstream relays.
 # Legacy fallback: gcp_smtp_allowed_sources
 gcp_smtp_inbound_sources:
-  - "10.0.0.0/14"     # Example: trusted internal CIDR
+  - "0.0.0.0/0"       # Internet-open for inbound SMTP (port 25)
 
 # Port 587 submission allow-list (preferred variable)
 # If omitted, role falls back to trusted_relay_ips + admin_ssh_ips (+ filtered legacy list)
