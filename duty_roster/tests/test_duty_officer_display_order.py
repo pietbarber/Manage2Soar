@@ -123,17 +123,23 @@ def test_calendar_agenda_shows_bootstrap_icons_for_do_and_ado(client):
     content = response.content.decode()
 
     do_card_match = re.search(
-        r'<div class="duty-role-card duty-role-card-do rounded p-3">.*?AgendaDoUnique Member.*?</div>\s*</div>',
+        r'<div[^>]+class="([^"]*\bduty-role-card-do\b[^"]*)"[^>]*>.*?AgendaDoUnique Member.*?</div>',
         content,
         flags=re.DOTALL,
     )
     assert do_card_match is not None
+    do_classes = do_card_match.group(1).split()
+    assert "duty-role-card" in do_classes
+    assert "duty-role-card-do" in do_classes
     assert "bi bi-clipboard-check" in do_card_match.group(0)
 
     ado_card_match = re.search(
-        r'<div class="duty-role-card bg-secondary bg-opacity-10 border border-secondary rounded p-3">.*?AgendaAdoUnique Member.*?</div>\s*</div>',
+        r'<div[^>]+class="([^"]*\bduty-role-card\b[^"]*\bbg-secondary\b[^"]*)"[^>]*>.*?AgendaAdoUnique Member.*?</div>',
         content,
         flags=re.DOTALL,
     )
     assert ado_card_match is not None
+    ado_classes = ado_card_match.group(1).split()
+    assert "duty-role-card" in ado_classes
+    assert "bg-secondary" in ado_classes
     assert "bi bi-person-badge" in ado_card_match.group(0)
