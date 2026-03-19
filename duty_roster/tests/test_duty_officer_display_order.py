@@ -1,3 +1,4 @@
+import re
 from datetime import date, timedelta
 
 import pytest
@@ -15,12 +16,13 @@ def _ensure_full_member_status():
     )
 
 
-def _make_member(username):
+def _make_member(username, **kwargs):
     return Member.objects.create_user(
         username=username,
         password="password",
         membership_status="Full Member",
         email=f"{username}@example.com",
+        **kwargs,
     )
 
 
@@ -31,10 +33,26 @@ def test_calendar_day_modal_orders_do_ado_before_surge_roles(client):
     viewer = _make_member("duty_modal_viewer")
     instructor = _make_member("duty_modal_instructor")
     tow = _make_member("duty_modal_tow")
-    do_member = _make_member("duty_modal_do")
-    ado_member = _make_member("duty_modal_ado")
-    surge_instructor = _make_member("duty_modal_surge_instructor")
-    surge_tow = _make_member("duty_modal_surge_tow")
+    do_member = _make_member(
+        "duty_modal_do",
+        first_name="RoleDoUnique",
+        last_name="Member",
+    )
+    ado_member = _make_member(
+        "duty_modal_ado",
+        first_name="RoleAdoUnique",
+        last_name="Member",
+    )
+    surge_instructor = _make_member(
+        "duty_modal_surge_instructor",
+        first_name="RoleSurgeInstrUnique",
+        last_name="Member",
+    )
+    surge_tow = _make_member(
+        "duty_modal_surge_tow",
+        first_name="RoleSurgeTowUnique",
+        last_name="Member",
+    )
 
     target_day = date.today() + timedelta(days=7)
     assignment = DutyAssignment.objects.create(
@@ -62,10 +80,10 @@ def test_calendar_day_modal_orders_do_ado_before_surge_roles(client):
     assert response.status_code == 200
     content = response.content.decode()
 
-    do_idx = content.index("Duty Officer")
-    ado_idx = content.index("Assistant DO")
-    surge_instructor_idx = content.index("Surge Instructor")
-    surge_tow_idx = content.index("Surge Tow Pilot")
+    do_idx = content.index("RoleDoUnique Member")
+    ado_idx = content.index("RoleAdoUnique Member")
+    surge_instructor_idx = content.index("RoleSurgeInstrUnique Member")
+    surge_tow_idx = content.index("RoleSurgeTowUnique Member")
 
     assert do_idx < ado_idx < surge_instructor_idx < surge_tow_idx
 
@@ -75,8 +93,16 @@ def test_calendar_agenda_shows_bootstrap_icons_for_do_and_ado(client):
     _ensure_full_member_status()
 
     viewer = _make_member("duty_agenda_viewer")
-    do_member = _make_member("duty_agenda_do")
-    ado_member = _make_member("duty_agenda_ado")
+    do_member = _make_member(
+        "duty_agenda_do",
+        first_name="AgendaDoUnique",
+        last_name="Member",
+    )
+    ado_member = _make_member(
+        "duty_agenda_ado",
+        first_name="AgendaAdoUnique",
+        last_name="Member",
+    )
 
     target_day = date.today() + timedelta(days=10)
     DutyAssignment.objects.create(
@@ -95,5 +121,19 @@ def test_calendar_agenda_shows_bootstrap_icons_for_do_and_ado(client):
 
     assert response.status_code == 200
     content = response.content.decode()
-    assert "bi bi-clipboard-check" in content
-    assert "bi bi-person-badge" in content
+
+    do_card_match = re.search(
+        r'<div class="duty-role-card duty-role-card-do rounded p-3">.*?AgendaDoUnique Member.*?</div>\s*</div>',
+        content,
+        flags=re.DOTALL,
+    )
+    assert do_card_match is not None
+    assert "bi bi-clipboard-check" in do_card_match.group(0)
+
+    ado_card_match = re.search(
+        r'<div class="duty-role-card bg-secondary bg-opacity-10 border border-secondary rounded p-3">.*?AgendaAdoUnique Member.*?</div>\s*</div>',
+        content,
+        flags=re.DOTALL,
+    )
+    assert ado_card_match is not None
+    assert "bi bi-person-badge" in ado_card_match.group(0)

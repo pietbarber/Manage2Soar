@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from django.urls import reverse
 
@@ -156,5 +158,10 @@ def test_logbook_training_modal_uses_large_dialog_class(client):
 
     assert response.status_code == 200
     content = response.content.decode()
-    assert 'id="trainingModal"' in content
-    assert "modal-dialog modal-lg modal-dialog-centered" in content
+    modal_match = re.search(
+        r'<div[^>]*id="trainingModal"[^>]*>.*?<div[^>]*class="([^"]*modal-dialog[^"]*)"',
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    assert modal_match is not None
+    assert "modal-lg" in modal_match.group(1)
