@@ -108,12 +108,12 @@
 - name: Build UFW submission source candidate list
   ansible.builtin.set_fact:
     ufw_smtp_submission_sources_candidate: "{{ gcp_smtp_submission_allowed_sources | default(((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])) + ((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list)) | unique | list) }}"
-  when: gcp_enable_submission_smtp | default(true)
+  when: (gcp_enable_submission_smtp | default(true)) | bool
 
 - name: Build effective UFW submission source list
   ansible.builtin.set_fact:
     ufw_smtp_submission_sources_effective: "{{ ufw_smtp_submission_sources_candidate if (gcp_allow_public_submission | default(false)) else (ufw_smtp_submission_sources_candidate | reject('equalto', '0.0.0.0/0') | list) }}"
-  when: gcp_enable_submission_smtp | default(true)
+  when: (gcp_enable_submission_smtp | default(true)) | bool
 
 - name: Validate UFW submission sources are not public by default
   ansible.builtin.assert:
@@ -123,7 +123,7 @@
       UFW submission sources include 0.0.0.0/0, which would expose port 587 publicly.
       Remove 0.0.0.0/0 from gcp_smtp_submission_allowed_sources or set gcp_allow_public_submission=true intentionally.
   when:
-    - gcp_enable_submission_smtp | default(true)
+    - (gcp_enable_submission_smtp | default(true)) | bool
     - ufw_smtp_submission_sources_candidate is defined
 
 - name: Validate UFW submission sources are present when submission is enabled
@@ -133,7 +133,7 @@
     fail_msg: >-
       Submission SMTP is enabled, but no trusted UFW source ranges were configured.
       Set gcp_smtp_submission_allowed_sources, or define trusted_relay_ips/admin_ssh_ips.
-  when: gcp_enable_submission_smtp | default(true)
+  when: (gcp_enable_submission_smtp | default(true)) | bool
 
 - name: Remove existing UFW submission allow rules (587) when submission enabled
   ansible.builtin.shell: |
@@ -147,7 +147,7 @@
   changed_when: ufw_remove_submission_allow_rules.stdout | length > 0
   when:
     - not ansible_check_mode
-    - gcp_enable_submission_smtp | default(true)
+    - (gcp_enable_submission_smtp | default(true)) | bool
 
 - name: Allow submission (587) from trusted app/admin sources
   community.general.ufw:
@@ -156,7 +156,7 @@
     proto: tcp
     from_ip: "{{ item }}"
   loop: "{{ ufw_smtp_submission_sources_effective | default([]) }}"
-  when: gcp_enable_submission_smtp | default(true)
+  when: (gcp_enable_submission_smtp | default(true)) | bool
 
 - name: Remove existing UFW submission allow rules (587) when submission disabled
   ansible.builtin.shell: |
@@ -170,14 +170,14 @@
   changed_when: ufw_remove_submission_allow_rules_disabled.stdout | length > 0
   when:
     - not ansible_check_mode
-    - not (gcp_enable_submission_smtp | default(true))
+    - not ((gcp_enable_submission_smtp | default(true)) | bool)
 
 - name: Deny submission (587) when submission disabled
   community.general.ufw:
     rule: deny
     port: "587"
     proto: tcp
-  when: not (gcp_enable_submission_smtp | default(true))
+  when: not ((gcp_enable_submission_smtp | default(true)) | bool)
 
 - name: Remove submission deny rule (587) when submission enabled
   community.general.ufw:
@@ -185,7 +185,7 @@
     port: "587"
     proto: tcp
     delete: true
-  when: gcp_enable_submission_smtp | default(true)
+  when: (gcp_enable_submission_smtp | default(true)) | bool
 
 - name: Remove legacy open HTTP rule (80)
   community.general.ufw:

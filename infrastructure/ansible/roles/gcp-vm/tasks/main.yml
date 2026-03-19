@@ -284,21 +284,21 @@
       Set gcp_smtp_inbound_sources (preferred) or gcp_smtp_allowed_sources.
   when:
     - gcp_create_firewall_rules
-    - gcp_enable_inbound_smtp | default(false)
+    - (gcp_enable_inbound_smtp | default(false)) | bool
 
 - name: Build submission SMTP source candidate list
   ansible.builtin.set_fact:
     gcp_smtp_submission_sources_candidate: "{{ gcp_smtp_submission_allowed_sources | default(((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])) + ((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list)) | unique | list) }}"
   when:
     - gcp_create_firewall_rules
-    - gcp_enable_submission_smtp | default(false)
+    - (gcp_enable_submission_smtp | default(false)) | bool
 
 - name: Build effective submission SMTP source list
   ansible.builtin.set_fact:
     gcp_smtp_submission_sources_effective: "{{ gcp_smtp_submission_sources_candidate if (gcp_allow_public_submission | default(false)) else (gcp_smtp_submission_sources_candidate | reject('equalto', '0.0.0.0/0') | list) }}"
   when:
     - gcp_create_firewall_rules
-    - gcp_enable_submission_smtp | default(false)
+    - (gcp_enable_submission_smtp | default(false)) | bool
 
 - name: Remove submission SMTP firewall rule (port 587) when disabled
   google.cloud.gcp_compute_firewall:
@@ -323,7 +323,7 @@
       Set gcp_smtp_submission_allowed_sources or define trusted_relay_ips/admin_ssh_ips.
   when:
     - gcp_create_firewall_rules
-    - gcp_enable_submission_smtp | default(false)
+    - (gcp_enable_submission_smtp | default(false)) | bool
 
 - name: Validate submission SMTP does not allow public CIDR by default
   ansible.builtin.assert:
@@ -334,7 +334,7 @@
       Remove 0.0.0.0/0 from gcp_smtp_submission_allowed_sources or set gcp_allow_public_submission=true intentionally.
   when:
     - gcp_create_firewall_rules
-    - gcp_enable_submission_smtp | default(false)
+    - (gcp_enable_submission_smtp | default(false)) | bool
     - gcp_smtp_submission_sources_candidate is defined
 
 - name: Create inbound SMTP firewall rule (port 25)
@@ -357,7 +357,7 @@
   become: false
   when:
     - gcp_create_firewall_rules
-    - gcp_enable_inbound_smtp | default(false)
+    - (gcp_enable_inbound_smtp | default(false)) | bool
     - (gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) | length > 0)
 
 - name: Create SMTP submission firewall rule (port 587)
@@ -380,7 +380,7 @@
   become: false
   when:
     - gcp_create_firewall_rules
-    - gcp_enable_submission_smtp | default(false)
+    - (gcp_enable_submission_smtp | default(false)) | bool
     - (gcp_smtp_submission_sources_effective | default([]) | length > 0)
 
 # Issue #529: HTTP firewall rule for Let's Encrypt HTTP-01 challenge validation
