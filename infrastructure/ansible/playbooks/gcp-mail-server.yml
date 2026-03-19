@@ -54,6 +54,11 @@
     - ../group_vars/gcp_mail/vault.yml
 
   pre_tasks:
+    - name: Default SMTP firewall toggles when not explicitly configured
+      ansible.builtin.set_fact:
+        gcp_enable_inbound_smtp: "{{ (gcp_enable_inbound_smtp | default(true)) | bool }}"
+        gcp_enable_submission_smtp: "{{ (gcp_enable_submission_smtp | default(true)) | bool }}"
+
     - name: Validate GCP configuration
       ansible.builtin.assert:
         that:
@@ -61,6 +66,36 @@
           - gcp_project | length > 0
         fail_msg: |
           GCP project is required. Set gcp_project in your group_vars.
+
+    - name: Validate SMTP ACL source configuration when SMTP firewall flags are enabled
+      ansible.builtin.assert:
+        that:
+          - not ((gcp_enable_inbound_smtp | default(false)) | bool) or (gcp_smtp_inbound_sources | default(gcp_smtp_allowed_sources | default([])) | length > 0)
+          - not ((gcp_enable_submission_smtp | default(false)) | bool) or ((gcp_smtp_submission_allowed_sources | default((trusted_relay_ips | default([])) + (admin_ssh_ips | default([])) + ((gcp_smtp_allowed_sources | default([])) | reject('equalto', '0.0.0.0/0') | list)) | unique | list) | length > 0)
+        fail_msg: |
+          SMTP firewall flags are enabled, but required source ranges are missing.
+
+          Update the mail vars file and define:
+            - gcp_smtp_inbound_sources (or legacy gcp_smtp_allowed_sources)
+            - gcp_smtp_submission_allowed_sources (preferred), or trusted_relay_ips/admin_ssh_ips
+
+          File: infrastructure/ansible/group_vars/gcp_mail/vars.yml
+      when: gcp_create_firewall_rules | default(true)
+
+    - name: Validate HTTP-01 requires GCP HTTP firewall when certbot is enabled
+      ansible.builtin.assert:
+        that:
+          - (letsencrypt_email | default('') | length == 0) or ((gcp_enable_http_firewall | default(false)) | bool)
+        fail_msg: |
+          Let's Encrypt HTTP-01 is enabled (letsencrypt_email is set), but gcp_enable_http_firewall is false.
+
+          Certbot standalone HTTP-01 validation requires port 80 open at both layers:
+            - Host firewall (UFW)
+            - GCP firewall (gcp_enable_http_firewall=true)
+
+          Set gcp_enable_http_firewall: true in infrastructure/ansible/group_vars/gcp_mail/vars.yml
+          or clear letsencrypt_email to disable HTTP-01 on this host.
+      when: gcp_create_firewall_rules | default(true)
 
     - name: Display provisioning plan
       ansible.builtin.debug:
@@ -103,6 +138,11 @@
     m2s_sync_dir: /opt/m2s-mail-sync
 
   pre_tasks:
+    - name: Default SMTP firewall toggles when not explicitly configured
+      ansible.builtin.set_fact:
+        gcp_enable_inbound_smtp: "{{ (gcp_enable_inbound_smtp | default(true)) | bool }}"
+        gcp_enable_submission_smtp: "{{ (gcp_enable_submission_smtp | default(true)) | bool }}"
+
     - name: Validate required variables
       ansible.builtin.assert:
         that:
