@@ -125,7 +125,7 @@
 - name: Remove existing UFW submission allow rules (587)
   ansible.builtin.shell: |
     set -o pipefail
-    ufw status numbered | awk '/587\/tcp/ && /ALLOW IN/ {gsub(/\[|\]/, "", $1); print $1}' | sort -rn | while read -r rule_no; do
+    ufw status numbered | awk -F'[\[\]]' '/587\/tcp/ && /ALLOW IN/ {gsub(/ /, "", $2); if ($2 != "") print $2}' | sort -rn | while read -r rule_no; do
       ufw --force delete "$rule_no"
     done
   args:
