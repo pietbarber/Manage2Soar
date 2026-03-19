@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from django.urls import reverse
 
@@ -144,3 +146,22 @@ def test_progress_dashboard_dropdown_shows_logbook_link(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert reverse("instructors:member_logbook_member", args=[student.pk]) in content
+
+
+@pytest.mark.django_db
+def test_logbook_training_modal_uses_large_dialog_class(client):
+    _ensure_full_member_status()
+    student = _make_member("logbook_modal_margin_check")
+
+    client.force_login(student)
+    response = client.get(reverse("instructors:member_logbook"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    modal_match = re.search(
+        r'<div[^>]*id="trainingModal"[^>]*>.*?<div[^>]*class="([^"]*modal-dialog[^"]*)"',
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    assert modal_match is not None
+    assert "modal-lg" in modal_match.group(1)

@@ -125,7 +125,7 @@
                   <div class="col-md-6 mb-3">
                     <div class="duty-role-card duty-role-card-do rounded p-3">
                       <h6 class="mb-2">
-                        <i class="fas fa-clipboard-list me-2"></i>
+                        <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>
                         {{ config.duty_officer_title|default:'Duty Officer' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.duty_officer.full_display_name }}</p>
@@ -140,7 +140,7 @@
                   <div class="col-md-6 mb-3">
                     <div class="duty-role-card bg-secondary bg-opacity-10 border border-secondary rounded p-3">
                       <h6 class="text-secondary mb-2">
-                        <i class="fas fa-hands-helping me-2"></i>
+                        <i class="bi bi-person-badge me-2" aria-hidden="true"></i>
                         {{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.assistant_duty_officer.full_display_name }}</p>
