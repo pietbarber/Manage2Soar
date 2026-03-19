@@ -48,15 +48,17 @@
   connection: local
   gather_facts: false
   tags: [gcp-provision]
-  vars:
-    gcp_enable_inbound_smtp: true
-    gcp_enable_submission_smtp: true
   vars_files:
     - ../group_vars/all.yml
     - ../group_vars/gcp_mail/vars.yml
     - ../group_vars/gcp_mail/vault.yml
 
   pre_tasks:
+    - name: Default SMTP firewall toggles when not explicitly configured
+      ansible.builtin.set_fact:
+        gcp_enable_inbound_smtp: "{{ gcp_enable_inbound_smtp | default(true) }}"
+        gcp_enable_submission_smtp: "{{ gcp_enable_submission_smtp | default(true) }}"
+
     - name: Validate GCP configuration
       ansible.builtin.assert:
         that:
@@ -121,6 +123,11 @@
     m2s_sync_dir: /opt/m2s-mail-sync
 
   pre_tasks:
+    - name: Default SMTP firewall toggles when not explicitly configured
+      ansible.builtin.set_fact:
+        gcp_enable_inbound_smtp: "{{ gcp_enable_inbound_smtp | default(true) }}"
+        gcp_enable_submission_smtp: "{{ gcp_enable_submission_smtp | default(true) }}"
+
     - name: Validate required variables
       ansible.builtin.assert:
         that:
