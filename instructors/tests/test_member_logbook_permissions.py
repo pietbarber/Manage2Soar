@@ -144,3 +144,17 @@ def test_progress_dashboard_dropdown_shows_logbook_link(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert reverse("instructors:member_logbook_member", args=[student.pk]) in content
+
+
+@pytest.mark.django_db
+def test_logbook_training_modal_uses_large_dialog_class(client):
+    _ensure_full_member_status()
+    student = _make_member("logbook_modal_margin_check")
+
+    client.force_login(student)
+    response = client.get(reverse("instructors:member_logbook"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert 'id="trainingModal"' in content
+    assert "modal-dialog modal-lg modal-dialog-centered" in content
