@@ -360,9 +360,13 @@
         # Disable the role's own migration step - post_tasks handles it via
         # migrate --check detection to avoid running migrations twice.
         gke_run_migrations: false
-        # Multi-tenant mode applies each manifest first, then waits for all
-        # rollouts in parallel in the next task.
-        gke_wait_for_rollout: false
+        # For multi-tenant deploys with rollout waiting enabled, apply first and
+        # wait in parallel in the next task. Otherwise honor the global setting.
+        gke_wait_for_rollout: >-
+          {{
+            (gke_deploy_tenants | length > 1 and (gke_wait_for_rollout | default(true)))
+            | ternary(false, gke_wait_for_rollout | default(true))
+          }}
         # Run backfill in post_tasks after migrations for multi-tenant safety.
         gke_run_backfill_document_sizes: false
       loop: "{{ gke_deploy_tenants }}"
@@ -376,6 +380,7 @@
         set -euo pipefail
         declare -a pids=()
         declare -a names=()
+        declare -a namespaces=()
         declare -a failed=()
 
         {% for tenant in gke_deploy_tenants %}
@@ -384,6 +389,7 @@
           --timeout={{ gke_rollout_timeout }}s &
         pids+=("$!")
         names+=("{{ tenant.prefix }}")
+        namespaces+=("{{ tenant.namespace | default('tenant-' + tenant.prefix) }}")
         {% endfor %}
 
         idx=0
@@ -396,13 +402,46 @@
 
         if [[ -n "${failed[*]:-}" ]]; then
           echo "Rollout failed for tenant(s): ${failed[*]}" >&2
+          echo "Attempting rollback for failed tenant(s)..." >&2
+
+          for failed_tenant in "${failed[@]}"; do
+            tenant_idx=-1
+            idx=0
+            for tenant_name in "${names[@]}"; do
+              if [[ "$tenant_name" == "$failed_tenant" ]]; then
+                tenant_idx=$idx
+                break
+              fi
+              idx=$((idx + 1))
+            done
+
+            if [[ "$tenant_idx" -lt 0 ]]; then
+              echo "Unable to determine namespace for failed tenant $failed_tenant" >&2
+              continue
+            fi
+
+            tenant_namespace="${namespaces[$tenant_idx]}"
+            history_lines=$(kubectl rollout history "deployment/django-app-$failed_tenant" -n "$tenant_namespace" | wc -l | tr -d ' ')
+
+            if [[ "$history_lines" -gt 2 ]]; then
+              kubectl rollout undo "deployment/django-app-$failed_tenant" -n "$tenant_namespace"
+              if ! kubectl rollout status "deployment/django-app-$failed_tenant" -n "$tenant_namespace" --timeout={{ gke_rollout_timeout }}s; then
+                echo "Rollback failed for tenant $failed_tenant" >&2
+              fi
+            else
+              echo "Skipping rollback for tenant $failed_tenant (no rollout history)" >&2
+            fi
+          done
+
           exit 1
         fi
       args:
         executable: /bin/bash
       delegate_to: localhost
-      register: parallel_rollout_result
       changed_when: false
+      when:
+        - (gke_deploy_tenants | length) > 1
+        - gke_wait_for_rollout | default(true) | bool
       tags: [deploy, healthcheck]
 
   post_tasks:
