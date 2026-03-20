@@ -19,6 +19,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.html import format_html
 from django.utils.timezone import now
 from django.views import View as DjangoView
 from django.views.decorators.csrf import csrf_exempt
@@ -1776,25 +1777,20 @@ def member_logbook(request, member_id=None):
             instructor_cert = ""
             if f.instructor and hasattr(f.instructor, "pilot_certificate_number"):
                 instructor_cert = f.instructor.pilot_certificate_number or ""
-            # Build signature_html for template
+            # Build signature_html for template (use format_html to escape names)
             signature_html = ""
             if "/s/" in comments:
                 pre, post = comments.split("/s/", 1)
                 # Only the instructor name and cert get cursive, not the /s/
                 post = post.strip()
-                # Split post into name and (optional) cert
-                if "," in post:
-                    name, rest = post.split(",", 1)
-                    name = name.strip()
-                    rest = rest.strip()
-                else:
-                    name = post
-                    rest = ""
+                # Preserve full name (do not split on commas — suffixes like "Jr" must be kept)
+                name = post
                 cert_part = f" {instructor_cert}CFI" if instructor_cert else ""
-                signature_html = (
-                    f"{pre.strip()}<br>"
-                    f"/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{name}</span>"
-                    f"{cert_part}"
+                signature_html = format_html(
+                    "{}<br>/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{}</span>{}",
+                    pre.strip(),
+                    name,
+                    cert_part,
                 )
             else:
                 signature_html = comments
@@ -1847,10 +1843,11 @@ def member_logbook(request, member_id=None):
             if g.instructor:
                 comments += f" /s/ {g.instructor.full_display_name}"
                 cert_part = f" {instructor_cert}CFI" if instructor_cert else ""
-                signature_html = (
-                    f"{', '.join(codes)}<br>"
-                    f"/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{g.instructor.full_display_name}</span>"
-                    f"{cert_part}"
+                signature_html = format_html(
+                    "{}<br>/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{}</span>{}",
+                    ", ".join(codes),
+                    g.instructor.full_display_name,
+                    cert_part,
                 )
 
             row = {
@@ -1865,7 +1862,6 @@ def member_logbook(request, member_id=None):
                 "release": "",
                 "maxh": "",
                 "location": g.location or "",
-                "comments": comments,
                 "ground_inst": format_hhmm(timedelta(minutes=gm)),
                 "dual_received": "",
                 "solo": "",

@@ -201,10 +201,15 @@ def test_instruction_report_detail_keeps_notes_inside_modal_body(client):
 
     assert response.status_code == 200
     content = response.content.decode()
-    assert '<div class="modal-body">' in content
-    assert '<div class="cms-content px-1">' in content
-    # Ensure notes are rendered before modal-body closes.
-    assert content.find('<div class="cms-content px-1">') < content.rfind("</div>")
+    modal_body_match = re.search(
+        r'<div[^>]*class="[^"]*modal-body[^"]*"[^>]*>(?P<body>.*?)</div>',
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    assert modal_body_match is not None
+    modal_body_inner_html = modal_body_match.group("body")
+    # Ensure the notes block is rendered inside the modal-body.
+    assert '<div class="cms-content px-1">' in modal_body_inner_html
 
 
 @pytest.mark.django_db
