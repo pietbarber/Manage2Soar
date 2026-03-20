@@ -421,12 +421,21 @@
             fi
 
             tenant_namespace="${namespaces[$tenant_idx]}"
-            history_lines=$(kubectl rollout history "deployment/django-app-$failed_tenant" -n "$tenant_namespace" | wc -l | tr -d ' ')
+            # Avoid aborting the whole script on history lookup failure.
+            if ! history_output=$(kubectl rollout history "deployment/django-app-$failed_tenant" -n "$tenant_namespace" 2>/dev/null); then
+              history_lines=0
+            else
+              history_lines=$(printf '%s\n' "$history_output" | wc -l | tr -d ' ')
+            fi
 
             if [[ "$history_lines" -gt 2 ]]; then
-              kubectl rollout undo "deployment/django-app-$failed_tenant" -n "$tenant_namespace"
+              # Keep processing other tenants even if rollback command fails.
+              if ! kubectl rollout undo "deployment/django-app-$failed_tenant" -n "$tenant_namespace"; then
+                echo "Rollback command failed for tenant $failed_tenant" >&2
+                continue
+              fi
               if ! kubectl rollout status "deployment/django-app-$failed_tenant" -n "$tenant_namespace" --timeout={{ gke_rollout_timeout }}s; then
-                echo "Rollback failed for tenant $failed_tenant" >&2
+                echo "Rollback verification failed for tenant $failed_tenant" >&2
               fi
             else
               echo "Skipping rollback for tenant $failed_tenant (no rollout history)" >&2
