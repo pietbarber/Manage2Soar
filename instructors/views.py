@@ -1595,9 +1595,16 @@ def member_logbook(request, member_id=None):
     )
 
     def build_signature_html(prefix, signer_name, cert_part=""):
+        if prefix:
+            return format_html(
+                '{}<br>/s/ <span style="{}">{}</span>{}',
+                prefix,
+                signature_span_style,
+                signer_name,
+                cert_part,
+            )
         return format_html(
-            '{}<br>/s/ <span style="{}">{}</span>{}',
-            prefix,
+            '/s/ <span style="{}">{}</span>{}',
             signature_span_style,
             signer_name,
             cert_part,

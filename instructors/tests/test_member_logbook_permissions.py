@@ -289,3 +289,57 @@ def test_logbook_signature_renders_on_new_line_for_flight_and_ground(client):
     assert "3303513CFI" in ground_row["signature_html"]
     assert ", 3303513CFI" not in ground_row["signature_html"]
     assert ground_row["airfield"] == "Briefing room"
+
+
+@pytest.mark.django_db
+def test_logbook_signature_without_lesson_codes_has_no_leading_line_break(client):
+    _ensure_full_member_status()
+    student = _make_member("signature_no_codes_student")
+    instructor = Member.objects.create_user(
+        username="signature_no_codes_instructor",
+        password="password",
+        membership_status="Full Member",
+        instructor=True,
+        email="signature_no_codes_instructor@example.com",
+        first_name="Pat",
+        last_name="Lee",
+        pilot_certificate_number="112233",
+    )
+    airfield = Airfield.objects.create(name="Front Royal", identifier="KFRR")
+    glider = Glider.objects.create(
+        make="Schweizer",
+        model="2-33",
+        n_number="N321BA",
+        is_active=True,
+    )
+
+    flight_day = date.today()
+    logsheet = Logsheet.objects.create(
+        log_date=flight_day, airfield=airfield, created_by=student
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=student,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(11, 0),
+        landing_time=time(11, 20),
+        duration=timedelta(minutes=20),
+    )
+    # Intentionally no LessonScore rows on this report.
+    InstructionReport.objects.create(
+        student=student,
+        instructor=instructor,
+        report_date=flight_day,
+    )
+
+    client.force_login(student)
+    response = client.get(reverse("instructors:member_logbook") + "?show_all_years=1")
+
+    assert response.status_code == 200
+    rows = response.context["pages"][0]["rows"]
+    flight_row = next((r for r in rows if r.get("flight_id")), None)
+    assert flight_row is not None
+    assert "/s/" in flight_row["signature_html"]
+    assert not flight_row["signature_html"].startswith("<br>/s/")
