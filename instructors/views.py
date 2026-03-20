@@ -1793,7 +1793,14 @@ def member_logbook(request, member_id=None):
                     cert_part,
                 )
             else:
-                signature_html = comments
+                if is_passenger and f.pilot:
+                    signature_html = format_html(
+                        "{} (<i>{}</i>)",
+                        f.pilot.full_display_name,
+                        member.full_display_name,
+                    )
+                else:
+                    signature_html = format_html("{}", comments)
             row = {
                 "flight_id": flight_id,
                 "date": date,
@@ -1839,7 +1846,7 @@ def member_logbook(request, member_id=None):
             instructor_cert = ""
             if g.instructor and hasattr(g.instructor, "pilot_certificate_number"):
                 instructor_cert = g.instructor.pilot_certificate_number or ""
-            signature_html = comments
+            signature_html = format_html("{}", comments)
             if g.instructor:
                 comments += f" /s/ {g.instructor.full_display_name}"
                 cert_part = f" {instructor_cert}CFI" if instructor_cert else ""
@@ -1862,6 +1869,7 @@ def member_logbook(request, member_id=None):
                 "release": "",
                 "maxh": "",
                 "location": g.location or "",
+                "airfield": g.location or "",
                 "ground_inst": format_hhmm(timedelta(minutes=gm)),
                 "dual_received": "",
                 "solo": "",

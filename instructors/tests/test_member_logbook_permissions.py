@@ -274,11 +274,18 @@ def test_logbook_signature_renders_on_new_line_for_flight_and_ground(client):
 
     assert response.status_code == 200
     rows = response.context["pages"][0]["rows"]
-    signature_rows = [
-        r for r in rows if r.get("signature_html") and "/s/" in r["signature_html"]
-    ]
-    assert signature_rows
-    for row in signature_rows:
-        assert "<br>/s/" in row["signature_html"]
-        assert "3303513CFI" in row["signature_html"]
-        assert ", 3303513CFI" not in row["signature_html"]
+
+    flight_row = next((r for r in rows if r.get("flight_id")), None)
+    ground_row = next((r for r in rows if r.get("ground_inst_m", 0) > 0), None)
+
+    assert flight_row is not None
+    assert ground_row is not None
+
+    assert "<br>/s/" in flight_row["signature_html"]
+    assert "3303513CFI" in flight_row["signature_html"]
+    assert ", 3303513CFI" not in flight_row["signature_html"]
+
+    assert "<br>/s/" in ground_row["signature_html"]
+    assert "3303513CFI" in ground_row["signature_html"]
+    assert ", 3303513CFI" not in ground_row["signature_html"]
+    assert ground_row["airfield"] == "Briefing room"
