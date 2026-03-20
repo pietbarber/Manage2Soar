@@ -1,8 +1,17 @@
 import re
+from datetime import date, time, timedelta
 
 import pytest
 from django.urls import reverse
 
+from instructors.models import (
+    GroundInstruction,
+    GroundLessonScore,
+    InstructionReport,
+    LessonScore,
+    TrainingLesson,
+)
+from logsheet.models import Airfield, Flight, Glider, Logsheet
 from members.models import Member
 from siteconfig.models import MembershipStatus
 
@@ -165,3 +174,172 @@ def test_logbook_training_modal_uses_large_dialog_class(client):
     )
     assert modal_match is not None
     assert "modal-lg" in modal_match.group(1)
+
+
+@pytest.mark.django_db
+def test_instruction_report_detail_keeps_notes_inside_modal_body(client):
+    _ensure_full_member_status()
+    student = _make_member("instruction_modal_student")
+    instructor = _make_member("instruction_modal_instructor", instructor=True)
+    lesson = TrainingLesson.objects.create(
+        code="1a",
+        title="Preflight",
+        description="Test lesson",
+    )
+    report = InstructionReport.objects.create(
+        student=student,
+        instructor=instructor,
+        report_date=date.today(),
+        report_text="<p>Notes paragraph</p>",
+    )
+    LessonScore.objects.create(report=report, lesson=lesson, score="2")
+
+    client.force_login(student)
+    response = client.get(
+        reverse("instructors:instruction_report_detail", args=[report.pk])
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    modal_body_match = re.search(
+        r'<div[^>]*class="[^"]*modal-body[^"]*"[^>]*>(?P<body>.*?)</div>',
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    assert modal_body_match is not None
+    modal_body_inner_html = modal_body_match.group("body")
+    # Ensure the notes block is rendered inside the modal-body.
+    assert '<div class="cms-content px-1">' in modal_body_inner_html
+
+
+@pytest.mark.django_db
+def test_logbook_signature_renders_on_new_line_for_flight_and_ground(client):
+    _ensure_full_member_status()
+    student = _make_member("signature_student")
+    instructor = Member.objects.create_user(
+        username="signature_instructor",
+        password="password",
+        membership_status="Full Member",
+        instructor=True,
+        email="signature_instructor@example.com",
+        first_name="Brian",
+        last_name="Clark",
+        pilot_certificate_number="3303513",
+    )
+    airfield = Airfield.objects.create(name="Front Royal", identifier="KFRR")
+    glider = Glider.objects.create(
+        make="Schweizer",
+        model="2-33",
+        n_number="N123AB",
+        is_active=True,
+    )
+    lesson = TrainingLesson.objects.create(
+        code="1c",
+        title="Cockpit Familiarization",
+        description="Test lesson",
+    )
+
+    flight_day = date.today()
+    logsheet = Logsheet.objects.create(
+        log_date=flight_day, airfield=airfield, created_by=student
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=student,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 20),
+        duration=timedelta(minutes=20),
+    )
+    report = InstructionReport.objects.create(
+        student=student,
+        instructor=instructor,
+        report_date=flight_day,
+    )
+    LessonScore.objects.create(report=report, lesson=lesson, score="2")
+
+    ground = GroundInstruction.objects.create(
+        student=student,
+        instructor=instructor,
+        date=flight_day,
+        duration=timedelta(minutes=30),
+        location="Briefing room",
+    )
+    GroundLessonScore.objects.create(session=ground, lesson=lesson, score="2")
+
+    client.force_login(student)
+    response = client.get(reverse("instructors:member_logbook") + "?show_all_years=1")
+
+    assert response.status_code == 200
+    rows = response.context["pages"][0]["rows"]
+
+    flight_row = next((r for r in rows if r.get("flight_id")), None)
+    ground_row = next((r for r in rows if r.get("ground_inst_m", 0) > 0), None)
+
+    assert flight_row is not None
+    assert ground_row is not None
+
+    assert "<br>/s/" in flight_row["signature_html"]
+    assert "3303513CFI" in flight_row["signature_html"]
+    assert ", 3303513CFI" not in flight_row["signature_html"]
+
+    assert "<br>/s/" in ground_row["signature_html"]
+    assert "3303513CFI" in ground_row["signature_html"]
+    assert ", 3303513CFI" not in ground_row["signature_html"]
+    assert ground_row["airfield"] == "Briefing room"
+
+
+@pytest.mark.django_db
+def test_logbook_signature_without_lesson_codes_has_no_leading_line_break(client):
+    _ensure_full_member_status()
+    student = _make_member("signature_no_codes_student")
+    instructor = Member.objects.create_user(
+        username="signature_no_codes_instructor",
+        password="password",
+        membership_status="Full Member",
+        instructor=True,
+        email="signature_no_codes_instructor@example.com",
+        first_name="Pat",
+        last_name="Lee",
+        pilot_certificate_number="112233",
+    )
+    airfield = Airfield.objects.create(name="Front Royal", identifier="KFRR")
+    glider = Glider.objects.create(
+        make="Schweizer",
+        model="2-33",
+        n_number="N321BA",
+        is_active=True,
+    )
+
+    flight_day = date.today()
+    logsheet = Logsheet.objects.create(
+        log_date=flight_day, airfield=airfield, created_by=student
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=student,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(11, 0),
+        landing_time=time(11, 20),
+        duration=timedelta(minutes=20),
+    )
+    # Intentionally no LessonScore rows on this report.
+    InstructionReport.objects.create(
+        student=student,
+        instructor=instructor,
+        report_date=flight_day,
+    )
+
+    client.force_login(student)
+    response = client.get(reverse("instructors:member_logbook") + "?show_all_years=1")
+
+    assert response.status_code == 200
+    rows = response.context["pages"][0]["rows"]
+    flight_row = next((r for r in rows if r.get("flight_id")), None)
+    assert flight_row is not None
+    assert "/s/" in flight_row["signature_html"]
+    assert not flight_row["signature_html"].startswith("<br>/s/")
