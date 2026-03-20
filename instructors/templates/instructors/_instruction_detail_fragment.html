@@ -16,13 +16,12 @@
     {% else %}
       <p class="text-muted">No training record found for this date.</p>
     {% endif %}
+    {% if report.report_text %}
+      <hr class="my-3">
+      <h6 class="mb-2">Instructor Notes</h6>
+      <div class="cms-content px-1">
+        {{ report.report_text|safe }}
+      </div>
+    {% endif %}
   </div>
-{# New instructor essay block #}
-  {% if report.report_text %}
-    <hr>
-    <h6>Instructor Notes</h6>
-    <div class="cms-content">
-      {{ report.report_text|safe }}
-    </div>
-  {% endif %}
 </div>

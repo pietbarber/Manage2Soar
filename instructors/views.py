@@ -1790,9 +1790,9 @@ def member_logbook(request, member_id=None):
                 else:
                     name = post
                     rest = ""
-                cert_part = f", {instructor_cert}CFI" if instructor_cert else ""
+                cert_part = f" {instructor_cert}CFI" if instructor_cert else ""
                 signature_html = (
-                    f"{pre.strip()} "
+                    f"{pre.strip()}<br>"
                     f"/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{name}</span>"
                     f"{cert_part}"
                 )
@@ -1843,8 +1843,15 @@ def member_logbook(request, member_id=None):
             instructor_cert = ""
             if g.instructor and hasattr(g.instructor, "pilot_certificate_number"):
                 instructor_cert = g.instructor.pilot_certificate_number or ""
+            signature_html = comments
             if g.instructor:
                 comments += f" /s/ {g.instructor.full_display_name}"
+                cert_part = f" {instructor_cert}CFI" if instructor_cert else ""
+                signature_html = (
+                    f"{', '.join(codes)}<br>"
+                    f"/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{g.instructor.full_display_name}</span>"
+                    f"{cert_part}"
+                )
 
             row = {
                 "date": ground_date,
@@ -1865,7 +1872,7 @@ def member_logbook(request, member_id=None):
                 "pic": "",
                 "inst_given": "",
                 "total": "",
-                "comments": ", ".join(ls.lesson.code for ls in g.lesson_scores.all()),
+                "comments": comments,
                 # raw-minute fields (all zero except ground_inst_m)
                 "ground_inst_m": gm,
                 "dual_received_m": 0,
@@ -1874,6 +1881,7 @@ def member_logbook(request, member_id=None):
                 "inst_given_m": 0,
                 "total_m": 0,
                 "instructor_certificate_number": instructor_cert,
+                "signature_html": signature_html,
             }
             rows.append(row)
 
