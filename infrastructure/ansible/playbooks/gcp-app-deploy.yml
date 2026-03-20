@@ -364,8 +364,8 @@
         # wait in parallel in the next task. Otherwise honor the global setting.
         gke_wait_for_rollout: >-
           {{
-            (gke_deploy_tenants | length > 1 and (gke_wait_for_rollout | default(true)))
-            | ternary(false, gke_wait_for_rollout | default(true))
+            (gke_deploy_tenants | length == 1)
+            and (gke_wait_for_rollout | default(true) | bool)
           }}
         # Run backfill in post_tasks after migrations for multi-tenant safety.
         gke_run_backfill_document_sizes: false
@@ -404,22 +404,19 @@
           echo "Rollout failed for tenant(s): ${failed[*]}" >&2
           echo "Attempting rollback for failed tenant(s)..." >&2
 
-          for failed_tenant in "${failed[@]}"; do
-            tenant_idx=-1
-            idx=0
-            for tenant_name in "${names[@]}"; do
-              if [[ "$tenant_name" == "$failed_tenant" ]]; then
-                tenant_idx=$idx
-                break
-              fi
-              idx=$((idx + 1))
-            done
+          # Build a map from tenant name to index for direct namespace lookup.
+          declare -A tenant_index_map
+          for idx in "${!names[@]}"; do
+            tenant_index_map["${names[$idx]}"]=$idx
+          done
 
-            if [[ "$tenant_idx" -lt 0 ]]; then
+          for failed_tenant in "${failed[@]}"; do
+            if [[ -z "${tenant_index_map[$failed_tenant]+_}" ]]; then
               echo "Unable to determine namespace for failed tenant $failed_tenant" >&2
               continue
             fi
 
+            tenant_idx=${tenant_index_map[$failed_tenant]}
             tenant_namespace="${namespaces[$tenant_idx]}"
             # Avoid aborting the whole script on history lookup failure.
             if ! history_output=$(kubectl rollout history "deployment/django-app-$failed_tenant" -n "$tenant_namespace" 2>/dev/null); then
