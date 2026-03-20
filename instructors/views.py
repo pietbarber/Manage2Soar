@@ -1589,6 +1589,20 @@ def member_logbook(request, member_id=None):
         h, m = divmod(total_minutes, 60)
         return f"{h}:{m:02d}"
 
+    signature_span_style = (
+        "font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', "
+        "cursive, sans-serif; font-size: 1.1em;"
+    )
+
+    def build_signature_html(prefix, signer_name, cert_part=""):
+        return format_html(
+            '{}<br>/s/ <span style="{}">{}</span>{}',
+            prefix,
+            signature_span_style,
+            signer_name,
+            cert_part,
+        )
+
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
@@ -1786,12 +1800,7 @@ def member_logbook(request, member_id=None):
                 # Preserve full name (do not split on commas — suffixes like "Jr" must be kept)
                 name = post
                 cert_part = f" {instructor_cert}CFI" if instructor_cert else ""
-                signature_html = format_html(
-                    "{}<br>/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{}</span>{}",
-                    pre.strip(),
-                    name,
-                    cert_part,
-                )
+                signature_html = build_signature_html(pre.strip(), name, cert_part)
             else:
                 if is_passenger and f.pilot:
                     signature_html = format_html(
@@ -1850,8 +1859,7 @@ def member_logbook(request, member_id=None):
             if g.instructor:
                 comments += f" /s/ {g.instructor.full_display_name}"
                 cert_part = f" {instructor_cert}CFI" if instructor_cert else ""
-                signature_html = format_html(
-                    "{}<br>/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{}</span>{}",
+                signature_html = build_signature_html(
                     ", ".join(codes),
                     g.instructor.full_display_name,
                     cert_part,
