@@ -458,6 +458,28 @@
         - gke_wait_for_rollout | default(true) | bool
       tags: [deploy, healthcheck, ingress, tls, cert-cleanup]
 
+    - name: Verify each tenant after parallel rollout
+      ansible.builtin.include_role:
+        name: gke-deploy
+        tasks_from: verify.yml
+      vars:
+        gke_club_prefix: "{{ tenant.prefix }}"
+        gke_namespace: "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}"
+        gke_deployment_name: "django-app-{{ tenant.prefix }}"
+        gke_service_name: "django-app-{{ tenant.prefix }}"
+        gke_secret_name: "manage2soar-env-{{ tenant.prefix }}"
+        gke_wait_for_rollout: true
+        gke_image_tag: "{{ gke_shared_image_tag | trim }}"
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        loop_var: tenant
+        label: "{{ tenant.prefix }}"
+      when:
+        - (gke_deploy_tenants | length) > 1
+        - gke_wait_for_rollout | default(true) | bool
+        - not ansible_check_mode
+      tags: [verify]
+
   post_tasks:
     # Auto-run migrations for any tenant with unapplied migrations.
     # Uses 'migrate --check' (exits non-zero if unapplied migrations exist) to detect

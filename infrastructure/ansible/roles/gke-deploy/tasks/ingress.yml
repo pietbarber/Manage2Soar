@@ -138,6 +138,7 @@
   failed_when: false
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, ip]
 
 - name: Select IPv4 address from gateway status addresses
@@ -150,7 +151,7 @@
          | list | first | default('') }}
   run_once: true
   when:
-    - gateway_live_ip_raw.rc == 0
+    - (gateway_live_ip_raw.rc | default(-1)) == 0
     - (gateway_live_ip_raw.stdout | default('') | trim) | length > 0
   tags: [ingress, ip]
 
@@ -308,7 +309,9 @@
   changed_when: false
   delegate_to: localhost
   run_once: true
-  when: gke_enable_tls | default(true) | bool
+  when:
+    - not ansible_check_mode
+    - gke_enable_tls | default(true) | bool
   tags: [ingress, tls, gateway]
 
 - name: Build combined SSL cert annotation (preserve existing certs during transition)
@@ -324,7 +327,7 @@
   run_once: true
   when:
     - gke_enable_tls | default(true) | bool
-    - gateway_current_certs.rc == 0
+    - (gateway_current_certs.rc | default(-1)) == 0
   tags: [ingress, tls, gateway]
 
 - name: Set SSL cert annotation to new cert only (gateway read failed or first deploy)
@@ -336,7 +339,7 @@
   run_once: true
   when:
     - gke_enable_tls | default(true) | bool
-    - gateway_current_certs.rc != 0
+    - (gateway_current_certs.rc | default(-1)) != 0
   tags: [ingress, tls, gateway]
 
 - name: Display combined cert annotation
