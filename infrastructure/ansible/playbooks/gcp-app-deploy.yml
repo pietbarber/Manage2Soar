@@ -448,7 +448,7 @@
       when:
         - (gke_deploy_tenants | length) > 1
         - gke_wait_for_rollout | default(true) | bool
-      tags: [deploy, healthcheck]
+      tags: [deploy, healthcheck, ingress, tls, cert-cleanup]
 
   post_tasks:
     # Auto-run migrations for any tenant with unapplied migrations.
