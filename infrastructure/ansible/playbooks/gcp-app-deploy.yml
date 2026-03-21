@@ -380,6 +380,7 @@
       loop_control:
         loop_var: tenant
         label: "{{ tenant.prefix }}"
+      when: not ansible_check_mode
       tags: [deploy, ingress, tls, cert-cleanup, healthcheck]
 
     - name: Wait for all tenant rollouts in parallel
