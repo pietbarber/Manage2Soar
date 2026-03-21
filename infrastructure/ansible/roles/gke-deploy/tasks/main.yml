@@ -83,6 +83,7 @@
   delegate_to: localhost
   run_once: true
   changed_when: false
+  when: not ansible_check_mode
   tags: [gke-auth]
 
 - name: Verify kubectl context
@@ -92,6 +93,7 @@
   run_once: true
   register: kubectl_context
   changed_when: false
+  when: not ansible_check_mode
   tags: [gke-auth]
 
 - name: Validate kubectl context
@@ -105,6 +107,7 @@
       Expected context for cluster: {{ gke_cluster_name }} in project: {{ gcp_project }}
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [gke-auth]
 
 # ============================================================
@@ -236,6 +239,7 @@
 
 - name: Include verification tasks
   ansible.builtin.include_tasks: verify.yml
+  when: gke_run_verify | default(true) | bool
   tags: [verify]
 
 # ============================================================
