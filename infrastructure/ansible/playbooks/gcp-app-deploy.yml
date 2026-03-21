@@ -456,6 +456,7 @@
       when:
         - (gke_deploy_tenants | length) > 1
         - gke_wait_for_rollout | default(true) | bool
+        - not ansible_check_mode
       tags: [deploy, healthcheck, ingress, tls, cert-cleanup]
 
     - name: Verify each tenant after parallel rollout
