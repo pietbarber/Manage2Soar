@@ -371,10 +371,8 @@
         # centralized parallel rollout waiting is enabled below.
         gke_run_verify: >-
           {{
-            not (
-              (gke_deploy_tenants | length > 1)
-              and (gke_wait_for_rollout | default(true) | bool)
-            )
+            (gke_deploy_tenants | length == 1)
+            and (gke_wait_for_rollout | default(true) | bool)
           }}
         # Run backfill in post_tasks after migrations for multi-tenant safety.
         gke_run_backfill_document_sizes: false
