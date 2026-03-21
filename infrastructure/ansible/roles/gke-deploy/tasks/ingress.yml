@@ -359,6 +359,7 @@
   register: manifest_temp_dir
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, gateway]
 
 - name: Generate Gateway manifest
@@ -368,6 +369,7 @@
     mode: "0600"
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, gateway]
 
 - name: Apply Gateway configuration
@@ -377,12 +379,16 @@
   changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, gateway]
 
 - name: Display Gateway result
   ansible.builtin.debug:
     msg: "{{ gateway_result.stdout_lines }}"
-  when: gateway_result is defined
+  when:
+    - not ansible_check_mode
+    - gateway_result is defined
+    - gateway_result.stdout_lines is defined
   run_once: true
   tags: [ingress, gateway]
 
@@ -392,7 +398,7 @@
     state: absent
   delegate_to: localhost
   run_once: true
-  when: not (gke_keep_manifests | default(false))
+  when: not ansible_check_mode and not (gke_keep_manifests | default(false))
   tags: [ingress, gateway]
 
 # ============================================================
@@ -571,6 +577,7 @@
   changed_when: false
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, verify]
 
 - name: Get Gateway IP address
@@ -581,13 +588,16 @@
   failed_when: false
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, verify]
 
 - name: Update ingress IP from Gateway status
   ansible.builtin.set_fact:
     gke_ingress_ip: "{{ gateway_ip.stdout | trim }}"
   run_once: true
-  when: gateway_ip.stdout | trim | length > 0
+  when:
+    - not ansible_check_mode
+    - gateway_ip.stdout | trim | length > 0
   tags: [ingress, verify]
 
 - name: Get Gateway status
@@ -598,6 +608,7 @@
   failed_when: false
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, verify]
 
 - name: Get HTTPRoute status
@@ -608,6 +619,7 @@
   failed_when: false
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, verify]
 
 - name: Get SSL certificate status
@@ -622,7 +634,7 @@
   failed_when: false
   delegate_to: localhost
   run_once: true
-  when: gke_enable_tls | default(true) | bool
+  when: not ansible_check_mode and gke_enable_tls | default(true) | bool
   tags: [ingress, verify]
 
 - name: Display Gateway configuration summary
@@ -684,6 +696,7 @@
 
       ========================================
   run_once: true
+  when: not ansible_check_mode
   tags: [ingress, verify]
 
 # ============================================================

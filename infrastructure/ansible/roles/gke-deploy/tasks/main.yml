@@ -105,6 +105,7 @@
       Expected context for cluster: {{ gke_cluster_name }} in project: {{ gcp_project }}
   delegate_to: localhost
   run_once: true
+  when: not ansible_check_mode
   tags: [gke-auth]
 
 # ============================================================
