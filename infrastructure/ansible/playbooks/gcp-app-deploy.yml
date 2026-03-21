@@ -404,19 +404,20 @@
           echo "Rollout failed for tenant(s): ${failed[*]}" >&2
           echo "Attempting rollback for failed tenant(s)..." >&2
 
-          # Build a map from tenant name to index for direct namespace lookup.
-          declare -A tenant_index_map
-          for idx in "${!names[@]}"; do
-            tenant_index_map["${names[$idx]}"]=$idx
-          done
-
           for failed_tenant in "${failed[@]}"; do
-            if [[ -z "${tenant_index_map[$failed_tenant]+_}" ]]; then
+            tenant_idx=-1
+            for idx in "${!names[@]}"; do
+              if [[ "${names[$idx]}" == "$failed_tenant" ]]; then
+                tenant_idx=$idx
+                break
+              fi
+            done
+
+            if [[ "$tenant_idx" -lt 0 ]]; then
               echo "Unable to determine namespace for failed tenant $failed_tenant" >&2
               continue
             fi
 
-            tenant_idx=${tenant_index_map[$failed_tenant]}
             tenant_namespace="${namespaces[$tenant_idx]}"
             # Avoid aborting the whole script on history lookup failure.
             if ! history_output=$(kubectl rollout history "deployment/django-app-$failed_tenant" -n "$tenant_namespace" 2>/dev/null); then
