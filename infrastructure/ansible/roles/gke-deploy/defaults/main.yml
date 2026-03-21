@@ -224,6 +224,9 @@ gke_apply_config: true
 # Wait for rollout to complete
 gke_wait_for_rollout: true
 
+# Run verification tasks (status checks and env inspection)
+gke_run_verify: true
+
 # Rollout timeout (seconds)
 gke_rollout_timeout: 600  # 10 minutes - increased from 5 to handle slow startups and image pulls
 

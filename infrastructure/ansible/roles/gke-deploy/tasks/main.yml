@@ -236,6 +236,7 @@
 
 - name: Include verification tasks
   ansible.builtin.include_tasks: verify.yml
+  when: gke_run_verify | default(true) | bool
   tags: [verify]
 
 # ============================================================

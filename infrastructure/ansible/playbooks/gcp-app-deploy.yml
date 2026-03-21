@@ -367,6 +367,15 @@
             (gke_deploy_tenants | length == 1)
             and (gke_wait_for_rollout | default(true) | bool)
           }}
+        # Skip role-level verification during the multi-tenant apply phase when
+        # centralized parallel rollout waiting is enabled below.
+        gke_run_verify: >-
+          {{
+            not (
+              (gke_deploy_tenants | length > 1)
+              and (gke_wait_for_rollout | default(true) | bool)
+            )
+          }}
         # Run backfill in post_tasks after migrations for multi-tenant safety.
         gke_run_backfill_document_sizes: false
       loop: "{{ gke_deploy_tenants }}"
@@ -384,9 +393,9 @@
         declare -a failed=()
 
         {% for tenant in gke_deploy_tenants %}
-        kubectl rollout status deployment/django-app-{{ tenant.prefix }} \
-          -n {{ tenant.namespace | default('tenant-' + tenant.prefix) }} \
-          --timeout={{ gke_rollout_timeout }}s &
+        kubectl rollout status "deployment/django-app-{{ tenant.prefix }}" \
+          -n "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}" \
+          --timeout="{{ gke_rollout_timeout }}s" &
         pids+=("$!")
         names+=("{{ tenant.prefix }}")
         namespaces+=("{{ tenant.namespace | default('tenant-' + tenant.prefix) }}")
@@ -432,7 +441,7 @@
                 echo "Rollback command failed for tenant $failed_tenant" >&2
                 continue
               fi
-              if ! kubectl rollout status "deployment/django-app-$failed_tenant" -n "$tenant_namespace" --timeout={{ gke_rollout_timeout }}s; then
+              if ! kubectl rollout status "deployment/django-app-$failed_tenant" -n "$tenant_namespace" --timeout="{{ gke_rollout_timeout }}s"; then
                 echo "Rollback verification failed for tenant $failed_tenant" >&2
               fi
             else
