@@ -411,6 +411,7 @@
         declare -a names=()
         declare -a namespaces=()
         declare -a failed=()
+        declare -a failed_indices=()
 
         {% for tenant in gke_deploy_tenants %}
         kubectl rollout status "deployment/django-app-{{ tenant.prefix }}" \
@@ -425,6 +426,7 @@
         for pid in "${pids[@]}"; do
           if ! wait "$pid"; then
             failed+=("${names[$idx]}")
+            failed_indices+=("$idx")
           fi
           idx=$((idx + 1))
         done
@@ -433,20 +435,8 @@
           echo "Rollout failed for tenant(s): ${failed[*]}" >&2
           echo "Attempting rollback for failed tenant(s)..." >&2
 
-          for failed_tenant in "${failed[@]}"; do
-            tenant_idx=-1
-            for idx in "${!names[@]}"; do
-              if [[ "${names[$idx]}" == "$failed_tenant" ]]; then
-                tenant_idx=$idx
-                break
-              fi
-            done
-
-            if [[ "$tenant_idx" -lt 0 ]]; then
-              echo "Unable to determine namespace for failed tenant $failed_tenant" >&2
-              continue
-            fi
-
+          for tenant_idx in "${failed_indices[@]}"; do
+            failed_tenant="${names[$tenant_idx]}"
             tenant_namespace="${namespaces[$tenant_idx]}"
             # Avoid aborting the whole script on history lookup failure.
             if ! history_output=$(kubectl rollout history "deployment/django-app-$failed_tenant" -n "$tenant_namespace" 2>/dev/null); then
