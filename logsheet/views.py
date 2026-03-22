@@ -779,7 +779,9 @@ def land_flight_now(request, flight_id):
             )
 
         flight.landing_time = landing_time
-        flight.save(update_fields=["landing_time"])
+        # Persist duration alongside landing_time because Flight.save() computes
+        # duration and update_fields would otherwise drop that write.
+        flight.save(update_fields=["landing_time", "duration"])
         return JsonResponse({"success": True})
     except Exception as e:
         logger.exception("Error landing flight %s", flight_id)
@@ -828,7 +830,8 @@ def launch_flight_now(request, flight_id):
             )
 
         flight.launch_time = launch_time
-        flight.save(update_fields=["launch_time"])
+        # Persist duration reset/compute together with launch_time updates.
+        flight.save(update_fields=["launch_time", "duration"])
         return JsonResponse({"success": True})
     except Exception as e:
         logger.exception("Error launching flight %s", flight_id)

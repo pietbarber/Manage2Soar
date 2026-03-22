@@ -13,7 +13,7 @@ secret with the stable cookie value.
 
 import json
 import re
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from django.conf import settings
 from django.test import Client, TestCase
@@ -270,3 +270,34 @@ class KioskCsrfRegressionTest(TestCase):
             403,
             "CSRF 403 after kiosk session expiry on land endpoint — Issue #709 regression!",
         )
+
+    def test_land_flight_now_persists_duration(self):
+        """Landing via endpoint should persist computed duration, not only landing_time."""
+        landing_flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            glider=self.glider,
+            launch_time=time(10, 0),
+        )
+
+        client = self._csrf_client()
+        manage_url = reverse("logsheet:manage", kwargs={"pk": self.logsheet.pk})
+
+        response = client.get(manage_url)
+        self.assertEqual(response.status_code, 200)
+        csrf_token = self._extract_csrf_token(response.content.decode())
+        self.assertIsNotNone(csrf_token)
+        assert csrf_token is not None  # type narrowing for Pylance
+
+        land_url = reverse(
+            "logsheet:land_flight_now", kwargs={"flight_id": landing_flight.pk}
+        )
+        response = client.post(
+            land_url,
+            data=json.dumps({"landing_time": "11:00"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        landing_flight.refresh_from_db()
+        self.assertEqual(landing_flight.duration, timedelta(hours=1))
