@@ -477,6 +477,7 @@
         gke_secret_name: "manage2soar-env-{{ tenant.prefix }}"
         gke_wait_for_rollout: true
         gke_image_tag: "{{ gke_shared_image_tag | trim }}"
+        gke_computed_image_tag: "{{ gke_shared_image_tag | trim }}"
       loop: "{{ gke_deploy_tenants }}"
       loop_control:
         loop_var: tenant
