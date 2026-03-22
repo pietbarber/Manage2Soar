@@ -239,7 +239,7 @@ class Flight(models.Model):
                 - free_rental is True (explicitly marked as free)
                 - is_retrieve is True AND site config waive_rental_fee_on_retrieve is True
                 - glider has no rental rate
-            None: If glider or duration is not set.
+            None: If glider is not set or duration cannot be computed.
 
         Note:
             Instance-level caching of SiteConfiguration via _site_config_cache helps
@@ -256,11 +256,13 @@ class Flight(models.Model):
             if config and config.waive_rental_fee_on_retrieve:
                 return Decimal("0.00")
 
-        if not self.glider or not self.duration:
+        duration = self.computed_duration
+
+        if not self.glider or not duration:
             return None
         if not self.glider.rental_rate:
             return Decimal("0.00")
-        hours = Decimal(self.duration.total_seconds()) / Decimal(3600)
+        hours = Decimal(duration.total_seconds()) / Decimal(3600)
         return Decimal(str(self.glider.rental_rate)) * hours
 
     @property

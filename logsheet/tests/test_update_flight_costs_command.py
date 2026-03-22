@@ -212,3 +212,46 @@ def test_skips_non_finalized_logsheets_when_backfilling(airfield, active_member)
     assert draft_flight.tow_cost_actual == Decimal("0.00")
     assert draft_flight.rental_cost_actual == Decimal("0.00")
     assert final_flight.rental_cost_actual == Decimal("45.00")
+
+
+@pytest.mark.django_db
+def test_backfills_rental_when_duration_missing_but_times_exist(
+    airfield, active_member
+):
+    """Backfill should use computed_duration fallback when persisted duration is null."""
+    glider = Glider.objects.create(
+        make="Schleicher",
+        model="ASK-21",
+        n_number="NTEST006",
+        rental_rate=Decimal("30.00"),
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2026, 3, 10),
+        airfield=airfield,
+        created_by=active_member,
+        finalized=True,
+    )
+
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        flight_type="solo",
+        launch_time=time(10, 0),
+        landing_time=time(10, 30),
+        tow_cost_actual=Decimal("0.00"),
+        rental_cost_actual=Decimal("0.00"),
+    )
+
+    # Simulate legacy/corrupt row where duration was never persisted.
+    Flight.objects.filter(pk=flight.pk).update(duration=None)
+    flight.refresh_from_db()
+    assert flight.duration is None
+    assert flight.computed_duration is not None
+
+    call_command("update_flight_costs", after="2026-03-01")
+
+    flight.refresh_from_db()
+    assert flight.rental_cost_actual == Decimal("15.00")
