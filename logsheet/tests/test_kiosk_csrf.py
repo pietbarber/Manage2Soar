@@ -301,3 +301,35 @@ class KioskCsrfRegressionTest(TestCase):
 
         landing_flight.refresh_from_db()
         self.assertEqual(landing_flight.duration, timedelta(hours=1))
+
+    def test_launch_flight_now_recomputes_and_persists_duration(self):
+        """Launch endpoint should recompute/persist duration when landing already exists."""
+        launch_flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            glider=self.glider,
+            landing_time=time(11, 0),
+            duration=timedelta(hours=2),
+        )
+
+        client = self._csrf_client()
+        manage_url = reverse("logsheet:manage", kwargs={"pk": self.logsheet.pk})
+
+        response = client.get(manage_url)
+        self.assertEqual(response.status_code, 200)
+        csrf_token = self._extract_csrf_token(response.content.decode())
+        self.assertIsNotNone(csrf_token)
+        assert csrf_token is not None  # type narrowing for Pylance
+
+        launch_url = reverse(
+            "logsheet:launch_flight_now", kwargs={"flight_id": launch_flight.pk}
+        )
+        response = client.post(
+            launch_url,
+            data=json.dumps({"launch_time": "10:00"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        launch_flight.refresh_from_db()
+        self.assertEqual(launch_flight.duration, timedelta(hours=1))

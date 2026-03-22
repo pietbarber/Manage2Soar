@@ -239,7 +239,7 @@ class Flight(models.Model):
                 - free_rental is True (explicitly marked as free)
                 - is_retrieve is True AND site config waive_rental_fee_on_retrieve is True
                 - glider has no rental rate
-            None: If glider or duration is not set.
+            None: If glider is not set or duration cannot be computed.
 
         Note:
             Instance-level caching of SiteConfiguration via _site_config_cache helps
