@@ -233,6 +233,22 @@
         label: "{{ item.prefix }}"
       tags: [always]
 
+    - name: Validate tenant prefix is shell-safe DNS label
+      # Prefix is interpolated into kubectl rollout shell commands later; enforce
+      # Kubernetes/DNS-label compatible values to avoid shell metacharacter risks.
+      ansible.builtin.assert:
+        that:
+          - item.prefix is match('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+          - item.prefix | length <= 63
+        fail_msg: |
+          Invalid tenant prefix '{{ item.prefix }}'.
+          Tenant prefixes must be lowercase DNS labels (a-z, 0-9, hyphen),
+          cannot start/end with '-', and must be <= 63 characters.
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        label: "{{ item.prefix }}"
+      tags: [always]
+
     - name: Pre-create all tenant namespaces
       # Loops over ALL gke_tenants (not just gke_deploy_tenants) because the ingress
       # role iterates over the full tenant list when generating HTTPRoutes and
@@ -342,6 +358,11 @@
             - gke_image_tag is defined
       tags: [deploy]
 
+    - name: Compute global rollout wait flag
+      ansible.builtin.set_fact:
+        gke_wait_for_rollout_enabled: "{{ gke_wait_for_rollout | default(true) | bool }}"
+      tags: [always]
+
     # Deploy each tenant
     - name: Deploy each tenant
       ansible.builtin.include_role:
@@ -360,13 +381,119 @@
         # Disable the role's own migration step - post_tasks handles it via
         # migrate --check detection to avoid running migrations twice.
         gke_run_migrations: false
+        # For multi-tenant deploys with rollout waiting enabled, apply first and
+        # wait in parallel in the next task. Otherwise honor the global setting.
+        gke_wait_for_rollout: >-
+          {{
+            (gke_deploy_tenants | length == 1)
+            and (gke_wait_for_rollout_enabled | bool)
+          }}
+        # Skip role-level verification during the multi-tenant apply phase when
+        # centralized parallel rollout waiting is enabled below.
+        gke_run_verify: >-
+          {{
+            (gke_deploy_tenants | length == 1)
+            and (gke_wait_for_rollout_enabled | bool)
+          }}
         # Run backfill in post_tasks after migrations for multi-tenant safety.
         gke_run_backfill_document_sizes: false
       loop: "{{ gke_deploy_tenants }}"
       loop_control:
         loop_var: tenant
         label: "{{ tenant.prefix }}"
+      when: not ansible_check_mode
       tags: [deploy, ingress, tls, cert-cleanup, healthcheck]
+
+    - name: Wait for all tenant rollouts in parallel
+      ansible.builtin.shell: |
+        set -euo pipefail
+        declare -a pids=()
+        declare -a names=()
+        declare -a namespaces=()
+        declare -a failed=()
+        declare -a failed_indices=()
+
+        {% for tenant in gke_deploy_tenants %}
+        kubectl rollout status "deployment/django-app-{{ tenant.prefix }}" \
+          -n "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}" \
+          --timeout="{{ gke_rollout_timeout }}s" &
+        pids+=("$!")
+        names+=("{{ tenant.prefix }}")
+        namespaces+=("{{ tenant.namespace | default('tenant-' + tenant.prefix) }}")
+        {% endfor %}
+
+        idx=0
+        for pid in "${pids[@]}"; do
+          if ! wait "$pid"; then
+            failed+=("${names[$idx]}")
+            failed_indices+=("$idx")
+          fi
+          idx=$((idx + 1))
+        done
+
+        if [[ -n "${failed[*]:-}" ]]; then
+          echo "Rollout failed for tenant(s): ${failed[*]}" >&2
+          echo "Attempting rollback for failed tenant(s)..." >&2
+
+          for tenant_idx in "${failed_indices[@]}"; do
+            failed_tenant="${names[$tenant_idx]}"
+            tenant_namespace="${namespaces[$tenant_idx]}"
+            # Avoid aborting the whole script on history lookup failure.
+            if ! history_output=$(kubectl rollout history "deployment/django-app-$failed_tenant" -n "$tenant_namespace" 2>/dev/null); then
+              history_lines=0
+            else
+              history_lines=$(printf '%s\n' "$history_output" | wc -l | tr -d ' ')
+            fi
+
+            if [[ "$history_lines" -gt 2 ]]; then
+              # Keep processing other tenants even if rollback command fails.
+              if ! kubectl rollout undo "deployment/django-app-$failed_tenant" -n "$tenant_namespace"; then
+                echo "Rollback command failed for tenant $failed_tenant" >&2
+                continue
+              fi
+              if ! kubectl rollout status "deployment/django-app-$failed_tenant" -n "$tenant_namespace" --timeout="{{ gke_rollout_timeout }}s"; then
+                echo "Rollback verification failed for tenant $failed_tenant" >&2
+              fi
+            else
+              echo "Skipping rollback for tenant $failed_tenant (no rollout history)" >&2
+            fi
+          done
+
+          exit 1
+        fi
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      changed_when: false
+      when:
+        - (gke_deploy_tenants | length) > 1
+        - gke_wait_for_rollout_enabled | bool
+        - not ansible_check_mode
+      tags: [deploy, healthcheck, ingress, tls, cert-cleanup]
+
+    - name: Verify each tenant after parallel rollout
+      ansible.builtin.include_role:
+        name: gke-deploy
+        tasks_from: verify.yml
+      vars:
+        gke_club_prefix: "{{ tenant.prefix }}"
+        gke_namespace: "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}"
+        gke_deployment_name: "django-app-{{ tenant.prefix }}"
+        gke_service_name: "django-app-{{ tenant.prefix }}"
+        gke_secret_name: "manage2soar-env-{{ tenant.prefix }}"
+        gke_app_domain: "{{ tenant.domain | default(tenant.prefix + '.' + gke_base_domain | default('manage2soar.com')) }}"
+        gke_wait_for_rollout: true
+        gke_image_tag: "{{ gke_shared_image_tag | trim }}"
+        gke_computed_image_tag: "{{ gke_shared_image_tag | trim }}"
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        loop_var: tenant
+        label: "{{ tenant.prefix }}"
+      when:
+        - (gke_deploy_tenants | length) > 1
+        - gke_wait_for_rollout_enabled | bool
+        - not ansible_check_mode
+      tags: [verify]
 
   post_tasks:
     # Auto-run migrations for any tenant with unapplied migrations.
