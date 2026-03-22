@@ -481,6 +481,7 @@
         gke_deployment_name: "django-app-{{ tenant.prefix }}"
         gke_service_name: "django-app-{{ tenant.prefix }}"
         gke_secret_name: "manage2soar-env-{{ tenant.prefix }}"
+        gke_app_domain: "{{ tenant.domain | default(tenant.prefix + '.' + gke_base_domain | default('manage2soar.com')) }}"
         gke_wait_for_rollout: true
         gke_image_tag: "{{ gke_shared_image_tag | trim }}"
         gke_computed_image_tag: "{{ gke_shared_image_tag | trim }}"
