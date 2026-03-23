@@ -645,15 +645,23 @@ class DutySwapOffer(models.Model):
 class OpsIntent(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
     date = models.DateField(db_index=True)
-    # e.g. ["towpilot", "glider_pilot", "instruction"]
+    # e.g. ["club_single", "club_two", "guest"]
     # Centralize available activities so templates and admin can render
     # consistent labels. Keys here are stored in the JSONField.
     AVAILABLE_ACTIVITIES = [
-        ("club", "Club glider"),
-        ("private", "Private glider"),
-        ("towpilot", "Tow Pilot"),
-        ("glider_pilot", "Glider Pilot"),
+        ("club_single", "Fly Club Single-Seater"),
+        ("club_two", "Fly Club Two-Seater"),
+        ("guest", "Fly with Guest"),
+        ("private", "Fly Private Glider"),
     ]
+
+    # Backward-compatible labels for legacy stored activity keys.
+    LEGACY_ACTIVITY_LABELS = {
+        "club": "Club glider",
+        "towpilot": "Tow Pilot",
+        "glider_pilot": "Glider Pilot",
+        "instruction": "instruction",
+    }
 
     available_as = models.JSONField(default=list)
     glider = models.ForeignKey(
@@ -671,6 +679,7 @@ class OpsIntent(models.Model):
     def available_as_labels(self):
         """Return a list of human-friendly labels for the stored activity keys."""
         mapping = dict(self.AVAILABLE_ACTIVITIES)
+        mapping.update(self.LEGACY_ACTIVITY_LABELS)
         return [mapping.get(k, k) for k in (self.available_as or [])]
 
 

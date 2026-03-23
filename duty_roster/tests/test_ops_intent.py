@@ -12,13 +12,19 @@ def test_available_as_labels_returns_human_labels(db, django_user_model):
     # create an OpsIntent with two valid activities
     day = date(2025, 11, 8)
     intent = OpsIntent.objects.create(
-        member=user, date=day, available_as=["club", "towpilot"]
+        member=user, date=day, available_as=["club_single", "guest"]
     )
 
     labels = intent.available_as_labels()
     assert isinstance(labels, list)
-    assert "Club glider" in labels
-    assert "Tow Pilot" in labels
+    assert "Fly Club Single-Seater" in labels
+    assert "Fly with Guest" in labels
+
+
+@pytest.mark.django_db
+def test_available_activities_match_issue_803_choices():
+    keys = [key for key, _label in OpsIntent.AVAILABLE_ACTIVITIES]
+    assert keys == ["club_single", "club_two", "guest", "private"]
 
 
 @pytest.mark.django_db
@@ -44,3 +50,19 @@ def test_available_as_labels_falls_back_for_legacy_instruction_data(
     # Falls back to raw key for missing entry; "Club glider" is still mapped.
     assert "instruction" in labels
     assert "Club glider" in labels
+
+
+@pytest.mark.django_db
+def test_available_as_labels_supports_legacy_keys(db, django_user_model):
+    user = django_user_model.objects.create(
+        username="legacy_ops_user", email="legacy_ops@example.com"
+    )
+    intent = OpsIntent.objects.create(
+        member=user,
+        date=date(2025, 11, 9),
+        available_as=["towpilot", "glider_pilot"],
+    )
+
+    labels = intent.available_as_labels()
+    assert "Tow Pilot" in labels
+    assert "Glider Pilot" in labels

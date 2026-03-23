@@ -1,13 +1,17 @@
-👨‍🎓 Student Flight Intent - {{ ops_date }}
+🛩️ Member Flight Intent - {{ ops_date }}
 ================================================================================
 
 Hi {{ instructor_name }},
 
-Your student {{ student_name }} has indicated their intent to fly on {{ ops_date }}.
+{{ member_name }} has indicated a flying intent on {{ ops_date }}.
+
+Intent selected:
+{% for label in intent_labels %}
+- {{ label }}
+{% endfor %}
 
 This is a courtesy notification to help you plan your instructional availability.
-If you're available to instruct, please consider confirming your attendance to
-ensure {{ student_name }} can fly as planned.
+If instructional support is needed, please consider confirming your attendance.
 
 View Duty Roster: {{ roster_url }}
 

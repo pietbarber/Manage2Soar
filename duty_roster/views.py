@@ -441,6 +441,7 @@ def calendar_day_detail(request, year, month, day):
 
     # Show current user intent status
     intent_exists = False
+    intent_blocked_reason = ""
     can_submit_intent = request.user.is_authenticated and day_date >= date.today()
     if request.user.is_authenticated:
         intent_exists = OpsIntent.objects.filter(
@@ -466,8 +467,9 @@ def calendar_day_detail(request, year, month, day):
         if assignment
         else 0
     )
+    tow_intent_keys = {"club", "club_single", "club_two", "private"}
     tow_count = sum(
-        1 for i in intents if "club" in i.available_as or "private" in i.available_as
+        1 for i in intents if any(key in tow_intent_keys for key in i.available_as)
     )
 
     show_surge_alert = instruction_intent_count >= instruction_surge_threshold
@@ -507,6 +509,37 @@ def calendar_day_detail(request, year, month, day):
                 assignment=assignment, student=request.user
             )
 
+        if user_has_instruction_request and not intent_exists:
+            can_submit_intent = False
+            intent_blocked_reason = (
+                "You already requested instruction for this day. "
+                "Use only Request Instruction or cancel that request first."
+            )
+
+    reservation_config = SiteConfiguration.objects.first()
+    reservation_enabled = bool(
+        reservation_config and reservation_config.allow_glider_reservations
+    )
+    day_reservations = []
+    can_reserve_glider = False
+    reservations_remaining = None
+
+    if request.user.is_authenticated and reservation_enabled:
+        day_reservations = GliderReservation.get_reservations_for_date(day_date)
+        can_reserve_glider, _reserve_message = GliderReservation.can_member_reserve(
+            request.user,
+            year=day_date.year,
+            month=day_date.month,
+        )
+
+        max_per_year = reservation_config.max_reservations_per_year
+        if max_per_year > 0:
+            current_year_count = GliderReservation.get_member_yearly_count(
+                request.user,
+                year=day_date.year,
+            )
+            reservations_remaining = max(0, max_per_year - current_year_count)
+
     # Determine scheduled but empty roles (visible to all users as an "unfilled" indicator)
     # and the subset the current user is qualified to volunteer for (Issue #679).
     scheduled_holes = {}
@@ -545,6 +578,7 @@ def calendar_day_detail(request, year, month, day):
             "day": day_date,
             "assignment": assignment,
             "intent_exists": intent_exists,
+            "intent_blocked_reason": intent_blocked_reason,
             "can_submit_intent": can_submit_intent,
             "intents": intents,
             "show_surge_alert": show_surge_alert,
@@ -582,6 +616,10 @@ def calendar_day_detail(request, year, month, day):
                 and assignment.surge_tow_pilot_id is None
                 and request.user.id != assignment.tow_pilot_id
             ),
+            "reservation_enabled": reservation_enabled,
+            "day_reservations": day_reservations,
+            "can_reserve_glider": can_reserve_glider,
+            "reservations_remaining": reservations_remaining,
         },
     )
 
@@ -594,12 +632,36 @@ def ops_intent_toggle(request, year, month, day):
     from django.conf import settings
 
     day_date = date(year, month, day)
+    available_as = request.POST.getlist("available_as") or []
+
+    assignment = DutyAssignment.objects.filter(date=day_date).first()
+
+    if request.user.is_authenticated and assignment and available_as:
+        from .models import InstructionSlot
+
+        has_instruction_request = (
+            InstructionSlot.objects.filter(
+                assignment=assignment,
+                student=request.user,
+            )
+            .exclude(status="cancelled")
+            .exists()
+        )
+        if has_instruction_request:
+            response = format_html(
+                '<p class="text-warning">⚠️ You already requested instruction for this day. '
+                "Use one workflow at a time to avoid duplicate planning.</p>"
+                '<form hx-get="{}form/" '
+                'hx-target="#ops-intent-response" hx-swap="innerHTML">'
+                '<button type="submit" class="btn btn-sm btn-primary">'
+                "🛩️ I Plan to Fly This Day</button></form>",
+                request.path,
+            )
+            return HttpResponse(response)
 
     # remember prior intent so we only email on true cancellations
     old_intent = OpsIntent.objects.filter(member=request.user, date=day_date).first()
     old_available = old_intent.available_as if old_intent else []
-
-    available_as = request.POST.getlist("available_as") or []
 
     # enforce site-configured instruction request window (Issue #648)
     if "instruction" in available_as:
@@ -629,17 +691,12 @@ def ops_intent_toggle(request, year, month, day):
             member=request.user, date=day_date, defaults={"available_as": available_as}
         )
 
-        # who’s signed up now?
-        intents = OpsIntent.objects.filter(date=day_date)
-        students = [
-            i.member.full_display_name
-            for i in intents
-            if "instruction" in i.available_as
-        ]
-
         assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
         duty_inst = assignment.instructor
         surge_inst = assignment.surge_instructor
+
+        notify_keys = {"club_single", "club_two", "guest", "club"}
+        should_notify_instructors = any(k in notify_keys for k in available_as)
 
         # recipients: duty instructor plus (if exists) surge instructor
         recipients = []
@@ -648,16 +705,22 @@ def ops_intent_toggle(request, year, month, day):
         if surge_inst and surge_inst.email:
             recipients.append(surge_inst.email)
 
-        if recipients:
+        if recipients and should_notify_instructors:
+            intent_labels = OpsIntent(
+                member=request.user,
+                date=day_date,
+                available_as=available_as,
+            ).available_as_labels()
             # Prepare template context
             email_config = get_email_config()
 
             context = {
-                "student_name": request.user.full_display_name,
+                "member_name": request.user.full_display_name,
                 "instructor_name": (
                     duty_inst.full_display_name if duty_inst else "Instructor"
                 ),
                 "ops_date": day_date.strftime("%A, %B %d, %Y"),
+                "intent_labels": intent_labels,
                 "club_name": email_config["club_name"],
                 "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
                 "roster_url": email_config["roster_url"],
@@ -672,7 +735,7 @@ def ops_intent_toggle(request, year, month, day):
             )
 
             send_mail(
-                subject=f"[{email_config['club_name']}] Student Plans to Fly - {day_date:%b %d}",
+                subject=f"[{email_config['club_name']}] Member Flight Intent - {day_date:%b %d}",
                 message=text_message,
                 from_email=email_config["from_email"],
                 recipient_list=recipients,

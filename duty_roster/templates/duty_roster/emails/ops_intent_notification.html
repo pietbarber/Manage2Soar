@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Plans to Fly</title>
+    <title>Member Flight Intent</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
@@ -26,8 +26,8 @@
                             {% if club_logo_url %}
                             <img src="{{ club_logo_url }}" alt="{{ club_name }} Logo" style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 15px;">
                             {% endif %}
-                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">Student Flight Intent</h1>
-                            <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px;">A student is planning to fly on {{ ops_date }}</p>
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">Member Flight Intent</h1>
+                            <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px;">A member has added flying intent for {{ ops_date }}</p>
                             <!--[if mso]>
                             </td>
                             </tr>
@@ -49,21 +49,26 @@
                                 Hi {{ instructor_name }},
                             </p>
 
-                            <!-- Student Info Card -->
+                            <!-- Intent Details Card -->
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #e7f3ff; border-left: 4px solid #0066cc; border-radius: 4px; margin-bottom: 20px;">
                                 <tr>
                                     <td style="padding: 20px;">
-                                        <h2 style="margin: 0 0 15px 0; color: #0066cc; font-size: 18px;">👨‍🎓 {{ student_name }}</h2>
+                                        <h2 style="margin: 0 0 15px 0; color: #0066cc; font-size: 18px;">🛩️ {{ member_name }}</h2>
 
                                         <p style="margin: 0; color: #333333; font-size: 14px; line-height: 1.6;">
-                                            Your student has indicated their intent to fly on <strong>{{ ops_date }}</strong>.
+                                            This member has indicated the following intent for <strong>{{ ops_date }}</strong>:
                                         </p>
+                                        <ul style="margin: 10px 0 0 18px; padding: 0; color: #333333; font-size: 14px; line-height: 1.6;">
+                                            {% for label in intent_labels %}
+                                            <li>{{ label }}</li>
+                                            {% endfor %}
+                                        </ul>
                                     </td>
                                 </tr>
                             </table>
 
                             <p style="margin: 0 0 20px 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                                This is a courtesy notification to help you plan your instructional availability. If you're available to instruct, please consider confirming your attendance to ensure {{ student_name }} can fly as planned.
+                                This is a courtesy notification to help you plan instructional availability. If instructional support is needed, please consider confirming your attendance.
                             </p>
 
                             <!-- Call to Action -->

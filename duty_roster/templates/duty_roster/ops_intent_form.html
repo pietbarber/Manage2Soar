@@ -5,6 +5,9 @@
 >
   {% csrf_token %}
   <p class="mb-1">I plan to fly this day. My intent:</p>
+  <p class="text-muted small mb-2">
+    This is for general flying plans. Use <strong>Request Instruction</strong> for instructor scheduling.
+  </p>
   {% comment %} Render available activity checkboxes from the view-provided list. {% endcomment %}
   {% for key,label in available_activities %}
   <div class="form-check">

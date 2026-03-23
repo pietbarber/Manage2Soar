@@ -291,9 +291,9 @@
     </div>
     {% elif instruction_request_form %}
     {# Expandable instruction request form #}
-    <div class="card border-success mb-3">
-      <div class="card-header bg-success text-white py-2" id="instruction-request-header">
-        <button class="btn btn-link text-white text-decoration-none w-100 d-flex justify-content-between align-items-center p-0"
+    <div class="card border-primary mb-3">
+      <div class="card-header bg-primary py-2" id="instruction-request-header">
+        <button class="btn btn-primary w-100 d-flex justify-content-between align-items-center"
                 type="button"
                 data-bs-toggle="collapse"
                 data-bs-target="#instruction-request-form"
@@ -395,12 +395,57 @@
           <i class="bi bi-airplane-engines me-2" aria-hidden="true"></i>I Plan to Fly This Day
         </button>
       </form>
+      {% elif intent_blocked_reason %}
+      <div class="alert alert-warning mb-0" role="alert">
+        <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>{{ intent_blocked_reason }}
+      </div>
       {% else %}
       <div class="text-muted">
         <i class="bi bi-clock me-2" aria-hidden="true"></i>This date is in the past. You can no longer declare intent.
       </div>
       {% endif %}
     </div>
+
+    {% if reservation_enabled %}
+    <hr class="my-3">
+    <h6 class="fw-semibold text-secondary mb-2">
+      <i class="bi bi-calendar-check me-2" aria-hidden="true"></i>Glider Reservations
+    </h6>
+
+    {% if reservations_remaining is not None %}
+    <p class="text-muted small mb-2">
+      Guest reservations remaining this year: <strong>{{ reservations_remaining }}</strong>
+    </p>
+    {% endif %}
+
+    {% if day_reservations %}
+    <ul class="list-group mb-2">
+      {% for res in day_reservations %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <strong>{{ res.glider }}</strong>
+          <span class="text-muted ms-2">{{ res.member.full_display_name }}</span>
+          <div class="small text-muted">{{ res.get_reservation_type_display }}</div>
+        </div>
+        {% if res.is_trainer %}
+        <span class="badge bg-info" title="Two-seater">2S</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted small mb-2">
+      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>No glider reservations for this day.
+    </p>
+    {% endif %}
+
+    {% if can_reserve_glider %}
+    <a href="{% url 'duty_roster:reservation_create_for_day' day.year day.month day.day %}"
+       class="btn btn-outline-primary btn-sm w-100">
+      <i class="bi bi-stars me-2" aria-hidden="true"></i>Reserve a Glider for This Day
+    </a>
+    {% endif %}
+    {% endif %}
 
     {# Rescind buttons for ad-hoc day crew (issue #696: signup via shovel buttons in duty crew card above) #}
     {% if assignment and not assignment.is_scheduled %}
