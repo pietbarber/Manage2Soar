@@ -264,17 +264,27 @@ def homepage(request):
     page = None
     from members.utils import is_kiosk_session
 
-    # Show member content if: authenticated + (kiosk session OR active membership)
-    if user.is_authenticated and (
-        is_kiosk_session(request)
-        or user.is_superuser
-        or getattr(user, "membership_status", None) in allowed_statuses
-    ):
-        page = HomePageContent.objects.filter(
-            audience="member", slug="member-home"
-        ).first()
-    else:
+    kiosk_mode = is_kiosk_session(request)
+    public_override = request.GET.get("view") == "public"
+
+    # Allow authenticated, non-kiosk users to explicitly view the public homepage.
+    if user.is_authenticated and public_override and not kiosk_mode:
         page = HomePageContent.objects.filter(audience="public", slug="home").first()
+
+    if page is None:
+        # Show member content if: authenticated + (kiosk session OR active membership)
+        if user.is_authenticated and (
+            kiosk_mode
+            or user.is_superuser
+            or getattr(user, "membership_status", None) in allowed_statuses
+        ):
+            page = HomePageContent.objects.filter(
+                audience="member", slug="member-home"
+            ).first()
+        else:
+            page = HomePageContent.objects.filter(
+                audience="public", slug="home"
+            ).first()
 
     if page:
         # Homepage editing is webmaster-only
