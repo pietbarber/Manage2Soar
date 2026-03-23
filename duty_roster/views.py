@@ -621,6 +621,7 @@ def calendar_day_detail(request, year, month, day):
             "day_reservations": day_reservations,
             "can_reserve_glider": can_reserve_glider,
             "reservations_remaining": reservations_remaining,
+            "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
         },
     )
 
@@ -649,16 +650,19 @@ def ops_intent_toggle(request, year, month, day):
             .exists()
         )
         if has_instruction_request:
-            response = format_html(
-                '<p class="text-warning">⚠️ You already requested instruction for this day. '
+            warning_html = (
+                '<p class="text-warning mb-2">⚠️ You already requested instruction for this day. '
                 "Use one workflow at a time to avoid duplicate planning.</p>"
-                '<form hx-get="{}form/" '
-                'hx-target="#ops-intent-response" hx-swap="innerHTML">'
-                '<button type="submit" class="btn btn-sm btn-primary">'
-                "🛩️ I Plan to Fly This Day</button></form>",
-                request.path,
             )
-            return HttpResponse(response)
+            form_html = render_to_string(
+                "duty_roster/ops_intent_form.html",
+                {
+                    "day": day_date,
+                    "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
+                },
+                request=request,
+            )
+            return HttpResponse(f"{warning_html}{form_html}")
 
     # remember prior intent so we only email on true cancellations
     old_intent = OpsIntent.objects.filter(member=request.user, date=day_date).first()
@@ -673,18 +677,19 @@ def ops_intent_toggle(request, year, month, day):
                 if opens_on_intent
                 else "a future date"
             )
-            response = format_html(
-                '<p class="text-danger">⏰ Instruction requests for this date do not open until {}.</p>'
-                '<form hx-get="{}form/" '
-                'hx-post="{}" '
-                'hx-target="#ops-intent-response" hx-swap="innerHTML">'
-                '<button type="submit" class="btn btn-sm btn-primary">'
-                "🛩️ I Plan to Fly This Day</button></form>",
+            warning_html = format_html(
+                '<p class="text-danger mb-2">⏰ Instruction requests for this date do not open until {}.</p>',
                 opens_str,
-                request.path,
-                request.path,
             )
-            return HttpResponse(response)
+            form_html = render_to_string(
+                "duty_roster/ops_intent_form.html",
+                {
+                    "day": day_date,
+                    "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
+                },
+                request=request,
+            )
+            return HttpResponse(f"{warning_html}{form_html}")
 
     # SIGNUP FLOW
     if available_as:
@@ -792,14 +797,18 @@ def ops_intent_toggle(request, year, month, day):
                 )
 
         OpsIntent.objects.filter(member=request.user, date=day_date).delete()
-        response = format_html(
-            '<p class="text-gray-700">❌ You\'ve removed your intent to fly.</p>'
-            '<form hx-get="{}form/" '
-            'hx-target="#ops-intent-response" hx-swap="innerHTML">'
-            '<button type="submit" class="btn btn-sm btn-primary">'
-            "🛩️ I Plan to Fly This Day</button></form>",
-            request.path,
+        info_html = (
+            '<p class="text-gray-700 mb-2">❌ You\'ve removed your intent to fly.</p>'
         )
+        form_html = render_to_string(
+            "duty_roster/ops_intent_form.html",
+            {
+                "day": day_date,
+                "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
+            },
+            request=request,
+        )
+        response = f"{info_html}{form_html}"
 
     # still check for surges across the board
     maybe_notify_surge_instructor(day_date)
