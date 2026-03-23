@@ -440,6 +440,17 @@ th {
 }
 
 /* Duty Roster Calendar Enhancement - Professional Color-Coded Badges */
+.duty-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  line-height: normal;
+}
+
 .calendar-cell .duty-badge,
 .duty-assignments .duty-badge,
 table .duty-badge {
@@ -479,6 +490,31 @@ table .duty-badge {
 .duty-badge.badge-duty-officer {
   background-color: #fd7e14;
   border: 1px solid #e55a00;
+  color: white;
+}
+
+/* Context-independent legend helpers so role chips keep color outside table cells */
+.duty-badge.badge-instructor {
+  background-color: #28a745;
+  border: 1px solid #1e7e34;
+  color: white;
+}
+
+.duty-badge.badge-tow-pilot {
+  background-color: #dc3545;
+  border: 1px solid #c82333;
+  color: white;
+}
+
+.duty-badge.badge-assistant-duty-officer {
+  background-color: #6c757d;
+  border: 1px solid #545b62;
+  color: white;
+}
+
+.duty-badge.badge-surge {
+  background-color: #dc3545;
+  border: 1px solid #c82333;
   color: white;
 }
 
