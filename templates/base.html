@@ -316,6 +316,11 @@
               </a></li>
               <li><a class="dropdown-item" href="{% url 'knowledgetest:quiz-pending' %}">📝 My Pending Tests</a></li>
               <li><a class="dropdown-item" href="{% url 'knowledgetest:member-test-history' %}">📊 My Test History</a></li>
+              {% if not kiosk_mode %}
+              <li><a class="dropdown-item" href="{% url 'home' %}?view=public">
+                <i class="fas fa-globe me-1"></i> View Public Homepage
+              </a></li>
+              {% endif %}
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="{% url 'members:safety_report_submit' %}">💡 Suggestion Box</a></li>
               {% if user.glider_rating != "private" and user.glider_rating != "commercial" %}
@@ -329,7 +334,7 @@
               {% endif %}
               {% if user.is_staff or user.webmaster or user.rostermeister or user.member_manager or user.instructor %}
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="/admin/">Admin Interface</a></li>
+              <li><a class="dropdown-item" href="{% url 'admin:index' %}">Admin Interface</a></li>
               {% endif %}
               {% if not kiosk_mode %}
               <li>
@@ -342,8 +347,32 @@
             </ul>
           </li>
         </ul>
+
+        <div class="user-section d-lg-none">
+          {% if not kiosk_mode %}
+          <a class="nav-link" href="{% url 'home' %}?view=public">
+            <i class="fas fa-globe me-1"></i> View Public Homepage
+          </a>
+          {% endif %}
+
+          {% if user.is_staff or user.webmaster or user.rostermeister or user.member_manager or user.instructor %}
+          <a class="nav-link" href="{% url 'admin:index' %}">
+            <i class="fas fa-user-shield me-1"></i> Admin Interface
+          </a>
+          {% endif %}
+
+          {% if not kiosk_mode %}
+          <form action="{% url 'logout' %}" method="post" class="d-flex">
+            {% csrf_token %}
+            <button class="btn btn-outline-light btn-sm navbar-auth-btn w-100" type="submit">Logout</button>
+          </form>
+          {% endif %}
+        </div>
         {% else %}
-        <a class="btn btn-outline-light btn-sm navbar-auth-btn" href="{% url 'login' %}">Login</a>
+        <a class="btn btn-outline-light btn-sm navbar-auth-btn d-none d-lg-inline-flex" href="{% url 'login' %}">Login</a>
+        <div class="user-section d-lg-none">
+          <a class="btn btn-outline-light btn-sm navbar-auth-btn w-100" href="{% url 'login' %}">Login</a>
+        </div>
         {% endif %}
 
         </div><!-- /.offcanvas-body -->
