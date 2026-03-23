@@ -348,7 +348,7 @@
           </li>
         </ul>
 
-        <div class="user-section d-lg-none">
+        <div class="user-section d-flex d-lg-none">
           {% if not kiosk_mode %}
           <a class="nav-link" href="{% url 'home' %}?view=public">
             <i class="fas fa-globe me-1"></i> View Public Homepage
@@ -370,7 +370,7 @@
         </div>
         {% else %}
         <a class="btn btn-outline-light btn-sm navbar-auth-btn d-none d-lg-inline-flex" href="{% url 'login' %}">Login</a>
-        <div class="user-section d-lg-none">
+        <div class="user-section d-flex d-lg-none">
           <a class="btn btn-outline-light btn-sm navbar-auth-btn w-100" href="{% url 'login' %}">Login</a>
         </div>
         {% endif %}

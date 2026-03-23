@@ -73,6 +73,26 @@ def test_homepagecontent_public_override_for_logged_in_member(
 
 
 @pytest.mark.django_db
+def test_homepagecontent_public_override_falls_back_when_public_missing(
+    client, django_user_model
+):
+    django_user_model.objects.create_user(
+        username="member2", password="pass", membership_status="Full Member"
+    )
+    client.login(username="member2", password="pass")
+    HomePageContent.objects.create(
+        title="Member Home",
+        slug="member-home",
+        audience="member",
+        content="<p>Member Fallback</p>",
+    )
+
+    response = client.get("/?view=public")
+    assert response.status_code == 200
+    assert b"Member Fallback" in response.content
+
+
+@pytest.mark.django_db
 def test_homepage_template_does_not_render_hardcoded_h1(client):
     HomePageContent.objects.create(
         title="Skyline Soaring Club",
