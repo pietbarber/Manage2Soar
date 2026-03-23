@@ -50,6 +50,7 @@ from .models import (
     DutyPairing,
     DutyPreference,
     DutyRosterMessage,
+    GliderReservation,
     MemberBlackout,
     OpsIntent,
 )
