@@ -506,7 +506,7 @@
       <h6 class="fw-semibold text-secondary mb-2">Requirements</h6>
       <ul class="mb-3 text-muted small">
         <li>You must be an active member in good standing.</li>
-        <li>You must have guest reservations remaining for the year.</li>
+        <li>You must have reservations remaining for the year.</li>
         <li>Glider availability and existing reservations still apply.</li>
       </ul>
 
@@ -517,7 +517,7 @@
 
       {% if reservations_remaining is not None %}
       <p class="text-muted small mb-2">
-        Guest reservations remaining this year: <strong>{{ reservations_remaining }}</strong>
+        Reservations remaining this year: <strong>{{ reservations_remaining }}</strong>
       </p>
       {% endif %}
 
@@ -547,6 +547,14 @@
          class="btn btn-outline-primary btn-sm w-100">
         <i class="bi bi-stars me-2" aria-hidden="true"></i>Reserve a Glider for This Day
       </a>
+      {% elif reserve_message %}
+      <p class="text-muted small mb-0">
+        <i class="bi bi-info-circle me-2" aria-hidden="true"></i>{{ reserve_message }}
+      </p>
+      {% else %}
+      <p class="text-muted small mb-0">
+        <i class="bi bi-info-circle me-2" aria-hidden="true"></i>You don't currently meet the requirements to reserve a glider for this day.
+      </p>
       {% endif %}
       {% else %}
       <p class="text-muted mb-0">

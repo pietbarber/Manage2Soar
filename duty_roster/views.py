@@ -379,11 +379,12 @@ def duty_calendar_view(request, year=None, month=None):
     ):
         instruction_count[row["assignment__date"]] += row["_count"]
 
-    # Tow surge: still driven by OpsIntent club/private activity flags.
+    # Tow surge: driven by tow-relevant OpsIntent activity flags (Issue #803).
+    tow_intent_keys = {"club", "club_single", "club_two", "guest", "private"}
     intents = OpsIntent.objects.filter(date__in=visible_dates)
     for intent in intents:
         roles = intent.available_as or []
-        if "private" in roles or "club" in roles:
+        if any(key in tow_intent_keys for key in roles):
             tow_count[intent.date] += 1
 
     surge_needed_by_date = {}
@@ -523,11 +524,12 @@ def calendar_day_detail(request, year, month, day):
     )
     day_reservations = []
     can_reserve_glider = False
+    reserve_message = ""
     reservations_remaining = None
 
     if request.user.is_authenticated and reservation_enabled:
         day_reservations = GliderReservation.get_reservations_for_date(day_date)
-        can_reserve_glider, _reserve_message = GliderReservation.can_member_reserve(
+        can_reserve_glider, reserve_message = GliderReservation.can_member_reserve(
             request.user,
             year=day_date.year,
             month=day_date.month,
@@ -620,6 +622,7 @@ def calendar_day_detail(request, year, month, day):
             "reservation_enabled": reservation_enabled,
             "day_reservations": day_reservations,
             "can_reserve_glider": can_reserve_glider,
+            "reserve_message": reserve_message,
             "reservations_remaining": reservations_remaining,
             "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
         },
