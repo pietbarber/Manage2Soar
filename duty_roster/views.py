@@ -50,6 +50,7 @@ from .models import (
     DutyPairing,
     DutyPreference,
     DutyRosterMessage,
+    GliderReservation,
     MemberBlackout,
     OpsIntent,
 )
@@ -68,6 +69,9 @@ logger = logging.getLogger("duty_roster.views")
 # Allowed roles for roster slot editing/assignment endpoints
 ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
 MAX_PROPOSAL_RANGE_MONTHS = 12
+
+# OpsIntent activity keys that contribute to tow demand/surge calculations.
+TOW_INTENT_KEYS = {"club", "club_single", "club_two", "guest", "private"}
 
 
 def calendar_refresh_response(year, month):
@@ -378,11 +382,11 @@ def duty_calendar_view(request, year=None, month=None):
     ):
         instruction_count[row["assignment__date"]] += row["_count"]
 
-    # Tow surge: still driven by OpsIntent club/private activity flags.
+    # Tow surge: driven by tow-relevant OpsIntent activity flags (Issue #803).
     intents = OpsIntent.objects.filter(date__in=visible_dates)
     for intent in intents:
         roles = intent.available_as or []
-        if "private" in roles or "club" in roles:
+        if any(key in TOW_INTENT_KEYS for key in roles):
             tow_count[intent.date] += 1
 
     surge_needed_by_date = {}
@@ -441,6 +445,7 @@ def calendar_day_detail(request, year, month, day):
 
     # Show current user intent status
     intent_exists = False
+    intent_blocked_reason = ""
     can_submit_intent = request.user.is_authenticated and day_date >= date.today()
     if request.user.is_authenticated:
         intent_exists = OpsIntent.objects.filter(
@@ -467,7 +472,7 @@ def calendar_day_detail(request, year, month, day):
         else 0
     )
     tow_count = sum(
-        1 for i in intents if "club" in i.available_as or "private" in i.available_as
+        1 for i in intents if any(key in TOW_INTENT_KEYS for key in i.available_as)
     )
 
     show_surge_alert = instruction_intent_count >= instruction_surge_threshold
@@ -507,27 +512,71 @@ def calendar_day_detail(request, year, month, day):
                 assignment=assignment, student=request.user
             )
 
+        if user_has_instruction_request and not intent_exists:
+            can_submit_intent = False
+            intent_blocked_reason = (
+                "You already requested instruction for this day. "
+                "Use only Request Instruction or cancel that request first."
+            )
+
+    site_config = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
+    if site_config is _SITECONFIG_CACHE_SENTINEL:
+        site_config = SiteConfiguration.objects.first()
+        cache.set("siteconfig_instance", site_config, timeout=60)
+
+    active_statuses = set(get_active_membership_statuses())
+    can_access_reservations = bool(
+        request.user.is_authenticated
+        and request.user.is_active
+        and request.user.membership_status in active_statuses
+    )
+
+    reservation_config = site_config
+    reservation_feature_enabled = bool(
+        reservation_config and reservation_config.allow_glider_reservations
+    )
+    reservation_enabled = bool(reservation_feature_enabled and can_access_reservations)
+    day_reservations = []
+    can_reserve_glider = False
+    reserve_message = ""
+    reservations_remaining = None
+
+    if request.user.is_authenticated and reservation_enabled:
+        day_reservations = GliderReservation.get_reservations_for_date(day_date)
+        can_reserve_glider, reserve_message = GliderReservation.can_member_reserve(
+            request.user,
+            year=day_date.year,
+            month=day_date.month,
+            config=reservation_config,
+        )
+
+        # reservation_enabled implies reservation_config exists; keep explicit
+        # guard so static type-checkers can narrow away Optional.
+        if reservation_config is None:
+            max_per_year = 0
+        else:
+            max_per_year = reservation_config.max_reservations_per_year
+        if max_per_year > 0:
+            current_year_count = GliderReservation.get_member_yearly_count(
+                request.user,
+                year=day_date.year,
+            )
+            reservations_remaining = max(0, max_per_year - current_year_count)
+
     # Determine scheduled but empty roles (visible to all users as an "unfilled" indicator)
     # and the subset the current user is qualified to volunteer for (Issue #679).
     scheduled_holes = {}
     volunteerable_holes = {}
     if assignment and day_date >= date.today():
-        # Reuse the cached SiteConfiguration to avoid an extra DB query and keep
-        # configuration reads consistent within the same request (same 60s cache
-        # as get_surge_thresholds / _check_instruction_request_window).
-        _cfg = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
-        if _cfg is _SITECONFIG_CACHE_SENTINEL:
-            _cfg = SiteConfiguration.objects.first()
-            cache.set("siteconfig_instance", _cfg, timeout=60)
-        if _cfg:
-            if _cfg.schedule_instructors and not assignment.instructor:
+        if site_config:
+            if site_config.schedule_instructors and not assignment.instructor:
                 scheduled_holes["instructor"] = True
-            if _cfg.schedule_tow_pilots and not assignment.tow_pilot:
+            if site_config.schedule_tow_pilots and not assignment.tow_pilot:
                 scheduled_holes["tow_pilot"] = True
-            if _cfg.schedule_duty_officers and not assignment.duty_officer:
+            if site_config.schedule_duty_officers and not assignment.duty_officer:
                 scheduled_holes["duty_officer"] = True
             if (
-                _cfg.schedule_assistant_duty_officers
+                site_config.schedule_assistant_duty_officers
                 and not assignment.assistant_duty_officer
             ):
                 scheduled_holes["assistant_duty_officer"] = True
@@ -545,6 +594,7 @@ def calendar_day_detail(request, year, month, day):
             "day": day_date,
             "assignment": assignment,
             "intent_exists": intent_exists,
+            "intent_blocked_reason": intent_blocked_reason,
             "can_submit_intent": can_submit_intent,
             "intents": intents,
             "show_surge_alert": show_surge_alert,
@@ -582,6 +632,14 @@ def calendar_day_detail(request, year, month, day):
                 and assignment.surge_tow_pilot_id is None
                 and request.user.id != assignment.tow_pilot_id
             ),
+            "reservation_enabled": reservation_enabled,
+            "reservation_feature_enabled": reservation_feature_enabled,
+            "can_access_reservations": can_access_reservations,
+            "day_reservations": day_reservations,
+            "can_reserve_glider": can_reserve_glider,
+            "reserve_message": reserve_message,
+            "reservations_remaining": reservations_remaining,
+            "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
         },
     )
 
@@ -594,12 +652,39 @@ def ops_intent_toggle(request, year, month, day):
     from django.conf import settings
 
     day_date = date(year, month, day)
+    available_as = request.POST.getlist("available_as") or []
+
+    assignment = DutyAssignment.objects.filter(date=day_date).first()
+
+    if request.user.is_authenticated and assignment and available_as:
+        from .models import InstructionSlot
+
+        has_instruction_request = (
+            InstructionSlot.objects.filter(
+                assignment=assignment,
+                student=request.user,
+            )
+            .exclude(status="cancelled")
+            .exists()
+        )
+        if has_instruction_request:
+            warning_html = (
+                '<p class="text-warning mb-2">⚠️ You already requested instruction for this day. '
+                "Use one workflow at a time to avoid duplicate planning.</p>"
+            )
+            form_html = render_to_string(
+                "duty_roster/ops_intent_form.html",
+                {
+                    "day": day_date,
+                    "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
+                },
+                request=request,
+            )
+            return HttpResponse(f"{warning_html}{form_html}")
 
     # remember prior intent so we only email on true cancellations
     old_intent = OpsIntent.objects.filter(member=request.user, date=day_date).first()
     old_available = old_intent.available_as if old_intent else []
-
-    available_as = request.POST.getlist("available_as") or []
 
     # enforce site-configured instruction request window (Issue #648)
     if "instruction" in available_as:
@@ -610,18 +695,19 @@ def ops_intent_toggle(request, year, month, day):
                 if opens_on_intent
                 else "a future date"
             )
-            response = format_html(
-                '<p class="text-danger">⏰ Instruction requests for this date do not open until {}.</p>'
-                '<form hx-get="{}form/" '
-                'hx-post="{}" '
-                'hx-target="#ops-intent-response" hx-swap="innerHTML">'
-                '<button type="submit" class="btn btn-sm btn-primary">'
-                "🛩️ I Plan to Fly This Day</button></form>",
+            warning_html = format_html(
+                '<p class="text-danger mb-2">⏰ Instruction requests for this date do not open until {}.</p>',
                 opens_str,
-                request.path,
-                request.path,
             )
-            return HttpResponse(response)
+            form_html = render_to_string(
+                "duty_roster/ops_intent_form.html",
+                {
+                    "day": day_date,
+                    "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
+                },
+                request=request,
+            )
+            return HttpResponse(f"{warning_html}{form_html}")
 
     # SIGNUP FLOW
     if available_as:
@@ -629,17 +715,12 @@ def ops_intent_toggle(request, year, month, day):
             member=request.user, date=day_date, defaults={"available_as": available_as}
         )
 
-        # who’s signed up now?
-        intents = OpsIntent.objects.filter(date=day_date)
-        students = [
-            i.member.full_display_name
-            for i in intents
-            if "instruction" in i.available_as
-        ]
-
         assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
         duty_inst = assignment.instructor
         surge_inst = assignment.surge_instructor
+
+        notify_keys = {"club_single", "club_two", "guest", "club"}
+        should_notify_instructors = any(k in notify_keys for k in available_as)
 
         # recipients: duty instructor plus (if exists) surge instructor
         recipients = []
@@ -648,16 +729,22 @@ def ops_intent_toggle(request, year, month, day):
         if surge_inst and surge_inst.email:
             recipients.append(surge_inst.email)
 
-        if recipients:
+        if recipients and should_notify_instructors:
+            intent_labels = OpsIntent(
+                member=request.user,
+                date=day_date,
+                available_as=available_as,
+            ).available_as_labels()
             # Prepare template context
             email_config = get_email_config()
 
             context = {
-                "student_name": request.user.full_display_name,
+                "member_name": request.user.full_display_name,
                 "instructor_name": (
                     duty_inst.full_display_name if duty_inst else "Instructor"
                 ),
                 "ops_date": day_date.strftime("%A, %B %d, %Y"),
+                "intent_labels": intent_labels,
                 "club_name": email_config["club_name"],
                 "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
                 "roster_url": email_config["roster_url"],
@@ -672,7 +759,7 @@ def ops_intent_toggle(request, year, month, day):
             )
 
             send_mail(
-                subject=f"[{email_config['club_name']}] Student Plans to Fly - {day_date:%b %d}",
+                subject=f"[{email_config['club_name']}] Member Flight Intent - {day_date:%b %d}",
                 message=text_message,
                 from_email=email_config["from_email"],
                 recipient_list=recipients,
@@ -728,14 +815,18 @@ def ops_intent_toggle(request, year, month, day):
                 )
 
         OpsIntent.objects.filter(member=request.user, date=day_date).delete()
-        response = format_html(
-            '<p class="text-gray-700">❌ You\'ve removed your intent to fly.</p>'
-            '<form hx-get="{}form/" '
-            'hx-target="#ops-intent-response" hx-swap="innerHTML">'
-            '<button type="submit" class="btn btn-sm btn-primary">'
-            "🛩️ I Plan to Fly This Day</button></form>",
-            request.path,
+        info_html = (
+            '<p class="text-gray-700 mb-2">❌ You\'ve removed your intent to fly.</p>'
         )
+        form_html = render_to_string(
+            "duty_roster/ops_intent_form.html",
+            {
+                "day": day_date,
+                "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
+            },
+            request=request,
+        )
+        response = f"{info_html}{form_html}"
 
     # still check for surges across the board
     maybe_notify_surge_instructor(day_date)
@@ -822,7 +913,7 @@ def maybe_notify_surge_towpilot(day_date):
 
     intents = OpsIntent.objects.filter(date=day_date)
     tow_count = sum(
-        1 for i in intents if "club" in i.available_as or "private" in i.available_as
+        1 for i in intents if any(key in TOW_INTENT_KEYS for key in i.available_as)
     )
 
     if tow_count >= tow_surge_threshold:
