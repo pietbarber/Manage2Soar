@@ -535,7 +535,12 @@ def calendar_day_detail(request, year, month, day):
             month=day_date.month,
         )
 
-        max_per_year = reservation_config.max_reservations_per_year
+        # reservation_enabled implies reservation_config exists; keep explicit
+        # guard so static type-checkers can narrow away Optional.
+        if reservation_config is None:
+            max_per_year = 0
+        else:
+            max_per_year = reservation_config.max_reservations_per_year
         if max_per_year > 0:
             current_year_count = GliderReservation.get_member_yearly_count(
                 request.user,
