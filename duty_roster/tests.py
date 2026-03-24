@@ -3,6 +3,7 @@ from datetime import date, time, timedelta
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from duty_roster.models import DutyAssignment, DutyPreference, MemberBlackout
 from duty_roster.views import (
@@ -693,6 +694,7 @@ class InstructionRequestViewTests(TestCase):
             status="cancelled",
             instructor_response="rejected",
             instructor_note="Try next week",
+            instructor_response_at=timezone.now(),
         )
 
         self.client.login(username="student", password="testpass123")
