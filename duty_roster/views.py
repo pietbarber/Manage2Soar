@@ -70,6 +70,9 @@ logger = logging.getLogger("duty_roster.views")
 ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
 MAX_PROPOSAL_RANGE_MONTHS = 12
 
+# OpsIntent activity keys that contribute to tow demand/surge calculations.
+TOW_INTENT_KEYS = {"club", "club_single", "club_two", "guest", "private"}
+
 
 def calendar_refresh_response(year, month):
     """Helper function to create HTMX response that refreshes calendar with month context"""
@@ -380,11 +383,10 @@ def duty_calendar_view(request, year=None, month=None):
         instruction_count[row["assignment__date"]] += row["_count"]
 
     # Tow surge: driven by tow-relevant OpsIntent activity flags (Issue #803).
-    tow_intent_keys = {"club", "club_single", "club_two", "guest", "private"}
     intents = OpsIntent.objects.filter(date__in=visible_dates)
     for intent in intents:
         roles = intent.available_as or []
-        if any(key in tow_intent_keys for key in roles):
+        if any(key in TOW_INTENT_KEYS for key in roles):
             tow_count[intent.date] += 1
 
     surge_needed_by_date = {}
@@ -469,9 +471,8 @@ def calendar_day_detail(request, year, month, day):
         if assignment
         else 0
     )
-    tow_intent_keys = {"club", "club_single", "club_two", "private", "guest"}
     tow_count = sum(
-        1 for i in intents if any(key in tow_intent_keys for key in i.available_as)
+        1 for i in intents if any(key in TOW_INTENT_KEYS for key in i.available_as)
     )
 
     show_surge_alert = instruction_intent_count >= instruction_surge_threshold
@@ -523,9 +524,18 @@ def calendar_day_detail(request, year, month, day):
         site_config = SiteConfiguration.objects.first()
         cache.set("siteconfig_instance", site_config, timeout=60)
 
+    active_statuses = set(get_active_membership_statuses())
+    can_access_reservations = bool(
+        request.user.is_authenticated
+        and request.user.is_active
+        and request.user.membership_status in active_statuses
+    )
+
     reservation_config = site_config
     reservation_enabled = bool(
-        reservation_config and reservation_config.allow_glider_reservations
+        reservation_config
+        and reservation_config.allow_glider_reservations
+        and can_access_reservations
     )
     day_reservations = []
     can_reserve_glider = False
@@ -538,6 +548,7 @@ def calendar_day_detail(request, year, month, day):
             request.user,
             year=day_date.year,
             month=day_date.month,
+            config=reservation_config,
         )
 
         # reservation_enabled implies reservation_config exists; keep explicit
@@ -901,7 +912,7 @@ def maybe_notify_surge_towpilot(day_date):
 
     intents = OpsIntent.objects.filter(date=day_date)
     tow_count = sum(
-        1 for i in intents if "club" in i.available_as or "private" in i.available_as
+        1 for i in intents if any(key in TOW_INTENT_KEYS for key in i.available_as)
     )
 
     if tow_count >= tow_surge_threshold:

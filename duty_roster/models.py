@@ -883,12 +883,13 @@ class GliderReservation(models.Model):
         )
 
     @classmethod
-    def can_member_reserve(cls, member, year=None, month=None):
+    def can_member_reserve(cls, member, year=None, month=None, config=None):
         """
         Check if a member can make a new reservation based on yearly and monthly limits.
         Returns tuple: (can_reserve: bool, message: str)
         """
-        config = SiteConfiguration.objects.first()
+        if config is None:
+            config = SiteConfiguration.objects.first()
         if not config:
             return False, "Site configuration is not available."
 

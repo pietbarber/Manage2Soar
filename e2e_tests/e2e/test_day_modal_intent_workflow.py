@@ -7,7 +7,7 @@ Validates primary modal interactions introduced in the phase-1 UX refactor:
 - cancelling intent restores the inline form path
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 from duty_roster.models import DutyAssignment
 from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
