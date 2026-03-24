@@ -13,5 +13,8 @@
     "files.associations": {
         ".bandit": "yaml",
         "*.bandit": "yaml"
+    },
+    "chat.tools.terminal.autoApprove": {
+        "gh": true
     }
 }
