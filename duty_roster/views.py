@@ -532,11 +532,10 @@ def calendar_day_detail(request, year, month, day):
     )
 
     reservation_config = site_config
-    reservation_enabled = bool(
-        reservation_config
-        and reservation_config.allow_glider_reservations
-        and can_access_reservations
+    reservation_feature_enabled = bool(
+        reservation_config and reservation_config.allow_glider_reservations
     )
+    reservation_enabled = bool(reservation_feature_enabled and can_access_reservations)
     day_reservations = []
     can_reserve_glider = False
     reserve_message = ""
@@ -634,6 +633,8 @@ def calendar_day_detail(request, year, month, day):
                 and request.user.id != assignment.tow_pilot_id
             ),
             "reservation_enabled": reservation_enabled,
+            "reservation_feature_enabled": reservation_feature_enabled,
+            "can_access_reservations": can_access_reservations,
             "day_reservations": day_reservations,
             "can_reserve_glider": can_reserve_glider,
             "reserve_message": reserve_message,

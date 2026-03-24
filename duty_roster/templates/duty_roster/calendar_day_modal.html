@@ -558,7 +558,11 @@
       {% endif %}
       {% else %}
       <p class="text-muted mb-0">
+        {% if reservation_feature_enabled %}
+        <i class="bi bi-info-circle me-2" aria-hidden="true"></i>Glider reservations are currently unavailable for your account.
+        {% else %}
         <i class="bi bi-info-circle me-2" aria-hidden="true"></i>Glider reservations are not enabled.
+        {% endif %}
       </p>
       {% endif %}
     </div>
