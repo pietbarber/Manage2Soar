@@ -469,7 +469,7 @@ def calendar_day_detail(request, year, month, day):
         if assignment
         else 0
     )
-    tow_intent_keys = {"club", "club_single", "club_two", "private"}
+    tow_intent_keys = {"club", "club_single", "club_two", "private", "guest"}
     tow_count = sum(
         1 for i in intents if any(key in tow_intent_keys for key in i.available_as)
     )
@@ -518,7 +518,12 @@ def calendar_day_detail(request, year, month, day):
                 "Use only Request Instruction or cancel that request first."
             )
 
-    reservation_config = SiteConfiguration.objects.first()
+    site_config = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
+    if site_config is _SITECONFIG_CACHE_SENTINEL:
+        site_config = SiteConfiguration.objects.first()
+        cache.set("siteconfig_instance", site_config, timeout=60)
+
+    reservation_config = site_config
     reservation_enabled = bool(
         reservation_config and reservation_config.allow_glider_reservations
     )
@@ -553,22 +558,15 @@ def calendar_day_detail(request, year, month, day):
     scheduled_holes = {}
     volunteerable_holes = {}
     if assignment and day_date >= date.today():
-        # Reuse the cached SiteConfiguration to avoid an extra DB query and keep
-        # configuration reads consistent within the same request (same 60s cache
-        # as get_surge_thresholds / _check_instruction_request_window).
-        _cfg = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
-        if _cfg is _SITECONFIG_CACHE_SENTINEL:
-            _cfg = SiteConfiguration.objects.first()
-            cache.set("siteconfig_instance", _cfg, timeout=60)
-        if _cfg:
-            if _cfg.schedule_instructors and not assignment.instructor:
+        if site_config:
+            if site_config.schedule_instructors and not assignment.instructor:
                 scheduled_holes["instructor"] = True
-            if _cfg.schedule_tow_pilots and not assignment.tow_pilot:
+            if site_config.schedule_tow_pilots and not assignment.tow_pilot:
                 scheduled_holes["tow_pilot"] = True
-            if _cfg.schedule_duty_officers and not assignment.duty_officer:
+            if site_config.schedule_duty_officers and not assignment.duty_officer:
                 scheduled_holes["duty_officer"] = True
             if (
-                _cfg.schedule_assistant_duty_officers
+                site_config.schedule_assistant_duty_officers
                 and not assignment.assistant_duty_officer
             ):
                 scheduled_holes["assistant_duty_officer"] = True

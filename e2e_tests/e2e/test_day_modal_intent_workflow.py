@@ -38,7 +38,8 @@ class TestDayModalIntentWorkflow(DjangoPlaywrightTestCase):
         )
         self.login(username="modalmember")
 
-        ops_day = date.today() + timedelta(days=7)
+        # Keep the target date in the currently rendered month view.
+        ops_day = date.today()
         DutyAssignment.objects.create(date=ops_day)
 
         self.page.goto(f"{self.live_server_url}/duty_roster/calendar/")
