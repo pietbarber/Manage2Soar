@@ -319,7 +319,22 @@ class InstructionRequestForm(forms.ModelForm):
         instance.status = "pending"
         instance.instructor_response = "pending"
         if commit:
-            instance.save()
+            # Reuse an existing cancelled slot for this (assignment, student)
+            # instead of inserting a duplicate row that violates the unique
+            # database constraint.
+            instance, _ = InstructionSlot.objects.update_or_create(
+                assignment=self.assignment,
+                student=self.student,
+                defaults={
+                    "instructor": instance.instructor,
+                    "instruction_types": instance.instruction_types,
+                    "student_notes": instance.student_notes,
+                    "status": instance.status,
+                    "instructor_response": instance.instructor_response,
+                    "instructor_note": "",
+                    "instructor_response_at": None,
+                },
+            )
         return instance
 
 
