@@ -24,7 +24,13 @@ def test_available_as_labels_returns_human_labels(db, django_user_model):
 @pytest.mark.django_db
 def test_available_activities_match_issue_803_choices():
     keys = [key for key, _label in OpsIntent.AVAILABLE_ACTIVITIES]
-    assert keys == ["club_single", "club_two", "guest", "private"]
+    assert keys == [
+        "club_single",
+        "club_two",
+        "guest",
+        "private",
+        "faa_practical_test",
+    ]
 
 
 @pytest.mark.django_db

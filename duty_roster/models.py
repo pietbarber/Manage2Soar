@@ -653,6 +653,7 @@ class OpsIntent(models.Model):
         ("club_two", "Fly Club Two-Seater"),
         ("guest", "Fly with Guest"),
         ("private", "Fly Private Glider"),
+        ("faa_practical_test", "FAA Practical Test"),
     ]
 
     # Backward-compatible labels for legacy stored activity keys.
