@@ -75,8 +75,8 @@ gke_cpu_request: "100m"
 gke_cpu_limit: "250m"
 
 # Memory requests and limits
-gke_memory_request: "192Mi"
-gke_memory_limit: "384Mi"
+gke_memory_request: "512Mi"
+gke_memory_limit: "1Gi"
 
 # ============================================================
 # DATABASE CONNECTION
