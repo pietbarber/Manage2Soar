@@ -686,6 +686,8 @@ class InstructionRequestViewTests(TestCase):
 
     def test_cancelled_request_can_be_re_requested_without_duplicate_row(self):
         """Re-request should reuse cancelled slot and avoid unique-constraint errors."""
+        from django.core import mail
+
         from duty_roster.models import InstructionSlot
 
         slot = InstructionSlot.objects.create(
@@ -696,6 +698,7 @@ class InstructionRequestViewTests(TestCase):
             instructor_note="Try next week",
             instructor_response_at=timezone.now(),
         )
+        original_created_at = slot.created_at
 
         self.client.login(username="student", password="testpass123")
 
@@ -725,6 +728,9 @@ class InstructionRequestViewTests(TestCase):
         self.assertEqual(slot.instructor_response, "pending")
         self.assertEqual(slot.instructor_note, "")
         self.assertIsNone(slot.instructor_response_at)
+        self.assertGreater(slot.created_at, original_created_at)
+        # Re-request should notify instructor(s), matching a fresh signup.
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_my_instruction_requests_view(self):
         """Test the my instruction requests view."""

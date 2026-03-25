@@ -344,6 +344,12 @@ class InstructionRequestForm(forms.ModelForm):
                     created_at=requested_at
                 )
                 instance.created_at = requested_at
+                # update_or_create triggers post_save(created=False), which does
+                # not send the new-signup notification in the signal handler.
+                # Re-requests should notify instructors just like new requests.
+                from .signals import send_student_signup_notification
+
+                send_student_signup_notification(instance)
             self.instance = instance
         return instance
 
