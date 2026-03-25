@@ -29,7 +29,9 @@ class TestAgendaQuickActions(DjangoPlaywrightTestCase):
         DutyAssignment.objects.create(date=target_day, duty_officer=crew)
 
         self.login(username="agenda_do")
-        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/?view=agenda")
+        self.page.goto(
+            f"{self.live_server_url}/duty_roster/calendar/{target_day.year}/{target_day.month}/?view=agenda"
+        )
         self.page.wait_for_selector("#agenda-view-content", state="visible")
 
         swap_link = self.page.locator("a:has-text('Request Swap')").first
@@ -38,7 +40,7 @@ class TestAgendaQuickActions(DjangoPlaywrightTestCase):
             "#agenda-view-content .agenda-disabled-trigger[data-bs-content*='Glider reservations are currently disabled.']"
         ).first
         assert reserve_disabled.is_visible()
-        reserve_disabled.click()
+        reserve_disabled.click(force=True)
         self.page.wait_for_selector(
             ".popover .popover-body:has-text('Glider reservations are currently disabled.')"
         )
@@ -63,14 +65,16 @@ class TestAgendaQuickActions(DjangoPlaywrightTestCase):
         InstructionSlot.objects.create(assignment=assignment, student=student)
 
         self.login(username="agenda_student")
-        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/?view=agenda")
+        self.page.goto(
+            f"{self.live_server_url}/duty_roster/calendar/{target_day.year}/{target_day.month}/?view=agenda"
+        )
         self.page.wait_for_selector("#agenda-view-content", state="visible")
 
         disabled_trigger = self.page.locator(
             "#agenda-view-content .agenda-disabled-trigger[data-bs-content*='already requested instruction']"
         ).first
         assert disabled_trigger.is_visible()
-        disabled_trigger.click()
+        disabled_trigger.click(force=True)
         self.page.wait_for_selector(
             ".popover .popover-body:has-text('already requested instruction')"
         )
@@ -90,7 +94,9 @@ class TestAgendaQuickActions(DjangoPlaywrightTestCase):
         DutyAssignment.objects.create(date=target_day, instructor=instructor)
 
         self.login(username="agenda_panel_user")
-        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/?view=agenda")
+        self.page.goto(
+            f"{self.live_server_url}/duty_roster/calendar/{target_day.year}/{target_day.month}/?view=agenda"
+        )
         self.page.wait_for_selector("#agenda-view-content", state="visible")
 
         self.page.locator("button:has-text('Plan to Fly')").first.click()

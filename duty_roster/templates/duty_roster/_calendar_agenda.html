@@ -231,7 +231,8 @@
                                   data-bs-placement="top"
                                   data-bs-container="body"
                                   data-bs-content="{{ action.disabled_reason }}"
-                                  aria-haspopup="true"
+                                  aria-haspopup="dialog"
+                                  aria-disabled="true"
                                   aria-label="{{ action.label }} unavailable: {{ action.disabled_reason }}">
                             <i class="{{ action.icon }} me-1"></i>{{ action.label }}
                           </button>
