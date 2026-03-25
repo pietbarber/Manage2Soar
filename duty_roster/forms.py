@@ -2,6 +2,7 @@ import calendar
 
 from django import forms
 from django.db.models import Exists, OuterRef, Q
+from django.utils import timezone
 from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue
@@ -319,7 +320,37 @@ class InstructionRequestForm(forms.ModelForm):
         instance.status = "pending"
         instance.instructor_response = "pending"
         if commit:
-            instance.save()
+            requested_at = timezone.now()
+            # Reuse an existing cancelled slot for this (assignment, student)
+            # instead of inserting a duplicate row that violates the unique
+            # database constraint.
+            instance, created = InstructionSlot.objects.update_or_create(
+                assignment=self.assignment,
+                student=self.student,
+                defaults={
+                    "instructor": instance.instructor,
+                    "instruction_types": instance.instruction_types,
+                    "student_notes": instance.student_notes,
+                    "status": instance.status,
+                    "instructor_response": instance.instructor_response,
+                    "instructor_note": "",
+                    "instructor_response_at": None,
+                },
+            )
+            if not created:
+                # Preserve request ordering semantics by treating re-requests
+                # as new requests in instructor queues.
+                InstructionSlot.objects.filter(pk=instance.pk).update(
+                    created_at=requested_at
+                )
+                instance.created_at = requested_at
+                # update_or_create triggers post_save(created=False), which does
+                # not send the new-signup notification in the signal handler.
+                # Re-requests should notify instructors just like new requests.
+                from .signals import send_student_signup_notification
+
+                send_student_signup_notification(instance)
+            self.instance = instance
         return instance
 
 

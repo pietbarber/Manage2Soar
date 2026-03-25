@@ -3,6 +3,7 @@ from datetime import date, time, timedelta
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from duty_roster.models import DutyAssignment, DutyPreference, MemberBlackout
 from duty_roster.views import (
@@ -682,6 +683,54 @@ class InstructionRequestViewTests(TestCase):
             student=self.student,
         ).count()
         self.assertEqual(count, 1)
+
+    def test_cancelled_request_can_be_re_requested_without_duplicate_row(self):
+        """Re-request should reuse cancelled slot and avoid unique-constraint errors."""
+        from django.core import mail
+
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student,
+            status="cancelled",
+            instructor_response="rejected",
+            instructor_note="Try next week",
+            instructor_response_at=timezone.now(),
+        )
+        original_created_at = slot.created_at
+
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:request_instruction",
+            kwargs={
+                "year": self.future_date.year,
+                "month": self.future_date.month,
+                "day": self.future_date.day,
+            },
+        )
+
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+
+        # Still one row; existing slot was reactivated to pending.
+        self.assertEqual(
+            InstructionSlot.objects.filter(
+                assignment=self.assignment,
+                student=self.student,
+            ).count(),
+            1,
+        )
+
+        slot.refresh_from_db()
+        self.assertEqual(slot.status, "pending")
+        self.assertEqual(slot.instructor_response, "pending")
+        self.assertEqual(slot.instructor_note, "")
+        self.assertIsNone(slot.instructor_response_at)
+        self.assertGreater(slot.created_at, original_created_at)
+        # Re-request should notify instructor(s), matching a fresh signup.
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_my_instruction_requests_view(self):
         """Test the my instruction requests view."""
