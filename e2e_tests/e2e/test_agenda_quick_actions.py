@@ -10,14 +10,13 @@ from siteconfig.models import SiteConfiguration
 class TestAgendaQuickActions(DjangoPlaywrightTestCase):
     def setUp(self):
         super().setUp()
-        SiteConfiguration.objects.get_or_create(
-            defaults={
-                "club_name": "Test Soaring Club",
-                "club_abbreviation": "TSC",
-                "domain_name": "test.org",
-                "schedule_duty_officers": True,
-                "allow_glider_reservations": False,
-            }
+        SiteConfiguration.objects.all().delete()
+        SiteConfiguration.objects.create(
+            club_name="Test Soaring Club",
+            club_abbreviation="TSC",
+            domain_name="test.org",
+            schedule_duty_officers=True,
+            allow_glider_reservations=False,
         )
 
     def test_request_swap_visible_for_assigned_crew_and_navigates(self):

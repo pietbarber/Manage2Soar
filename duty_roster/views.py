@@ -391,15 +391,16 @@ def _build_agenda_quick_actions(
                 "label": "Cancel Plan to Fly",
                 "enabled": True,
                 "icon": "fas fa-ban",
-                "kind": "post",
+                "kind": "modal",
                 "url": reverse(
-                    "duty_roster:ops_intent_toggle",
+                    "duty_roster:calendar_day_detail",
                     kwargs={
                         "year": day_date.year,
                         "month": day_date.month,
                         "day": day_date.day,
                     },
-                ),
+                )
+                + "?open_panel=plan_to_fly",
             }
         )
     else:
