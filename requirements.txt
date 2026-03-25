@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 anyio==4.11.0
 asgiref==3.9.1
-Authlib==1.6.7
+Authlib==1.6.9
 bandit==1.8.6
 black==26.3.1
 bleach==6.3.0
@@ -80,7 +80,7 @@ proto-plus==1.26.1
 protobuf>=3.19.5,<7.0.0,!=3.20.0,!=3.20.1,!=4.21.0,!=4.21.1,!=4.21.2,!=4.21.3,!=4.21.4,!=4.21.5,!=5.29.0,!=6.33.0,!=6.33.1,!=6.33.2,!=6.33.3,!=6.33.4
 psycopg2-binary==2.9.10
 py-serializable==2.1.0
-pyasn1==0.6.2
+pyasn1==0.6.3
 pyasn1_modules==0.4.2
 pycodestyle==2.14.0
 pycparser==2.22
