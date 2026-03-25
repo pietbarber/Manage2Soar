@@ -111,3 +111,163 @@ def test_calendar_renders_compact_surge_alert_icon_markup(client):
     content = response.content.decode("utf-8")
     assert "calendar-alert-icon" in content
     assert "High demand alert" in content
+
+
+@pytest.mark.django_db
+def test_agenda_quick_actions_show_disabled_plan_to_fly_when_instruction_exists(client):
+    day = date.today() + timedelta(days=6)
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+    )
+
+    viewer = Member.objects.create_user(
+        username="agenda_viewer",
+        email="agenda_viewer@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    instructor = Member.objects.create_user(
+        username="agenda_inst",
+        email="agenda_inst@example.com",
+        password="password",
+        membership_status="Full Member",
+        instructor=True,
+    )
+
+    assignment = DutyAssignment.objects.create(date=day, instructor=instructor)
+    InstructionSlot.objects.create(assignment=assignment, student=viewer)
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": day.year, "month": day.month},
+        )
+        + "?view=agenda"
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Plan to Fly" in content
+    assert "You already requested instruction for this day." in content
+    assert "Review Student Requests" not in content
+
+
+@pytest.mark.django_db
+def test_agenda_quick_actions_show_reservation_disabled_reason_when_feature_off(client):
+    day = date.today() + timedelta(days=8)
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        allow_glider_reservations=False,
+    )
+
+    viewer = Member.objects.create_user(
+        username="reserve_viewer",
+        email="reserve_viewer@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+
+    DutyAssignment.objects.create(date=day)
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": day.year, "month": day.month},
+        )
+        + "?view=agenda"
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Reserve a Glider" in content
+    assert "Glider reservations are currently disabled." in content
+
+
+@pytest.mark.django_db
+def test_agenda_quick_actions_open_modal_panel_urls(client):
+    day = date.today() + timedelta(days=5)
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        allow_glider_reservations=False,
+    )
+
+    viewer = Member.objects.create_user(
+        username="agenda_modal_viewer",
+        email="agenda_modal_viewer@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    instructor = Member.objects.create_user(
+        username="agenda_modal_inst",
+        email="agenda_modal_inst@example.com",
+        password="password",
+        membership_status="Full Member",
+        instructor=True,
+    )
+
+    DutyAssignment.objects.create(date=day, instructor=instructor)
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": day.year, "month": day.month},
+        )
+        + "?view=agenda"
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "open_panel=plan_to_fly" in content
+    assert "open_panel=request_instruction" in content
+
+
+@pytest.mark.django_db
+def test_agenda_review_student_requests_disabled_for_inactive_instructor(client):
+    day = date.today() + timedelta(days=5)
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+    )
+
+    inactive_instructor = Member.objects.create_user(
+        username="inactive_instructor",
+        email="inactive_instructor@example.com",
+        password="password",
+        membership_status="Full Member",
+        instructor=True,
+    )
+    Member.objects.filter(pk=inactive_instructor.pk).update(
+        membership_status="Inactive",
+        is_active=True,
+    )
+    inactive_instructor.refresh_from_db()
+
+    DutyAssignment.objects.create(date=day)
+
+    client.force_login(inactive_instructor)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": day.year, "month": day.month},
+        )
+        + "?view=agenda"
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Review Student Requests" in content
+    assert "Active membership is required." in content

@@ -183,14 +183,64 @@
               </div>
 
               <!-- Quick Actions -->
-              <div class="mt-3">
-                <button class="btn btn-sm btn-outline-primary"
-                        hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
-                        hx-target="#modal-body"
-                        hx-swap="innerHTML"
-                        onclick="showModalWithLoading();">
-                  <i class="fas fa-info-circle me-1"></i>View Details
-                </button>
+              <div class="mt-3 agenda-quick-actions" aria-label="Quick actions for {{ day|date:'F j, Y' }}">
+                <div class="agenda-quick-actions-buttons">
+                  <button class="btn btn-sm btn-outline-primary"
+                          hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
+                          hx-target="#modal-body"
+                          hx-swap="innerHTML"
+                          onclick="showModalWithLoading();">
+                    <i class="fas fa-info-circle me-1"></i>View Details
+                  </button>
+
+                  {% with quick_actions=agenda_quick_actions_by_date|dict_get:day %}
+                    {% for action in quick_actions %}
+                      {% if action.enabled %}
+                        {% if action.kind == "modal" %}
+                          <button class="btn btn-sm btn-outline-secondary"
+                                  hx-get="{{ action.url }}"
+                                  hx-target="#modal-body"
+                                  hx-swap="innerHTML"
+                                  onclick="showModalWithLoading();">
+                            <i class="{{ action.icon }} me-1"></i>{{ action.label }}
+                          </button>
+                        {% elif action.kind == "post" %}
+                          <form method="post" action="{{ action.url }}" class="d-inline">
+                            {% csrf_token %}
+                            {% if action.post_data %}
+                              {% for key, value in action.post_data.items %}
+                                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                              {% endfor %}
+                            {% endif %}
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                              <i class="{{ action.icon }} me-1"></i>{{ action.label }}
+                            </button>
+                          </form>
+                        {% else %}
+                          <a href="{{ action.url }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="{{ action.icon }} me-1"></i>{{ action.label }}
+                          </a>
+                        {% endif %}
+                      {% else %}
+                        <span class="agenda-disabled-action d-inline-block">
+                          <button type="button"
+                                  class="btn btn-sm btn-outline-secondary agenda-disabled-btn agenda-disabled-trigger"
+                                  data-agenda-disabled-popover="true"
+                                  data-bs-toggle="popover"
+                                  data-bs-trigger="focus click"
+                                  data-bs-placement="top"
+                                  data-bs-container="body"
+                                  data-bs-content="{{ action.disabled_reason }}"
+                                  aria-haspopup="dialog"
+                                  aria-disabled="true"
+                                  aria-label="{{ action.label }} unavailable: {{ action.disabled_reason }}">
+                            <i class="{{ action.icon }} me-1"></i>{{ action.label }}
+                          </button>
+                        </span>
+                      {% endif %}
+                    {% endfor %}
+                  {% endwith %}
+                </div>
               </div>
             </div>
           </div>

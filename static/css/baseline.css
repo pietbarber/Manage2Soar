@@ -791,6 +791,52 @@ table .duty-badge.badge-warning {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
+.agenda-quick-actions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.agenda-disabled-action {
+  max-width: 16rem;
+}
+
+.agenda-disabled-btn,
+.agenda-disabled-btn:disabled {
+  background: repeating-linear-gradient(-45deg,
+      #e8ebef,
+      #e8ebef 8px,
+      #dde2e8 8px,
+      #dde2e8 16px) !important;
+  border-color: #a0a8b3 !important;
+  border-style: dashed !important;
+  color: #6c7480 !important;
+  cursor: help !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+
+.agenda-disabled-action:hover .agenda-disabled-btn {
+  transform: none !important;
+}
+
+@media (max-width: 576px) {
+  .agenda-quick-actions-buttons {
+    gap: 0.4rem;
+  }
+
+  .agenda-quick-actions-buttons .btn {
+    width: 100%;
+  }
+
+  .agenda-disabled-action {
+    display: block;
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
 /* View toggle styling */
 .btn-check:checked+.btn-outline-secondary {
   background-color: #6c757d;
