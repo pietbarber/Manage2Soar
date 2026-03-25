@@ -74,3 +74,32 @@ class TestAgendaQuickActions(DjangoPlaywrightTestCase):
         self.page.wait_for_selector(
             ".popover .popover-body:has-text('already requested instruction')"
         )
+
+    def test_agenda_quick_actions_auto_expand_modal_panels(self):
+        member = self.create_test_member(
+            username="agenda_panel_user",
+            membership_status="Full Member",
+        )
+        instructor = self.create_test_member(
+            username="agenda_panel_instructor",
+            instructor=True,
+            membership_status="Full Member",
+        )
+
+        target_day = date.today() + timedelta(days=6)
+        DutyAssignment.objects.create(date=target_day, instructor=instructor)
+
+        self.login(username="agenda_panel_user")
+        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/?view=agenda")
+        self.page.wait_for_selector("#agenda-view-content", state="visible")
+
+        self.page.locator("button:has-text('Plan to Fly')").first.click()
+        self.page.wait_for_selector("#calendarModal.show", state="visible")
+        self.page.wait_for_selector("#modal-body #plan-to-fly-panel.show")
+
+        self.page.locator("#calendarModal .btn-close").click()
+        self.page.wait_for_selector("#calendarModal.show", state="hidden")
+
+        self.page.locator("button:has-text('Request Instruction')").first.click()
+        self.page.wait_for_selector("#calendarModal.show", state="visible")
+        self.page.wait_for_selector("#modal-body #instruction-request-form.show")

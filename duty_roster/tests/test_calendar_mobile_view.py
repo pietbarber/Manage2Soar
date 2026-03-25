@@ -231,3 +231,43 @@ def test_agenda_quick_actions_open_modal_panel_urls(client):
     content = response.content.decode("utf-8")
     assert "open_panel=plan_to_fly" in content
     assert "open_panel=request_instruction" in content
+
+
+@pytest.mark.django_db
+def test_agenda_review_student_requests_disabled_for_inactive_instructor(client):
+    day = date.today() + timedelta(days=5)
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+    )
+
+    inactive_instructor = Member.objects.create_user(
+        username="inactive_instructor",
+        email="inactive_instructor@example.com",
+        password="password",
+        membership_status="Full Member",
+        instructor=True,
+    )
+    Member.objects.filter(pk=inactive_instructor.pk).update(
+        membership_status="Inactive",
+        is_active=True,
+    )
+    inactive_instructor.refresh_from_db()
+
+    DutyAssignment.objects.create(date=day)
+
+    client.force_login(inactive_instructor)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": day.year, "month": day.month},
+        )
+        + "?view=agenda"
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Review Student Requests" in content
+    assert "Active membership is required." in content

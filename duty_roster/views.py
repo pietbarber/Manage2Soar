@@ -483,12 +483,19 @@ def _build_agenda_quick_actions(
     elif not reservation_feature_enabled:
         reserve_reason = "Glider reservations are currently disabled."
     else:
-        can_reserve_glider, reserve_reason = GliderReservation.can_member_reserve(
-            request.user,
-            year=day_date.year,
-            month=day_date.month,
-            config=site_config,
-        )
+        cache_attr = "_glider_reservation_eligibility_cache"
+        if not hasattr(request, cache_attr):
+            setattr(request, cache_attr, {})
+        eligibility_cache = getattr(request, cache_attr)
+        cache_key = (day_date.year, day_date.month)
+        if cache_key not in eligibility_cache:
+            eligibility_cache[cache_key] = GliderReservation.can_member_reserve(
+                request.user,
+                year=day_date.year,
+                month=day_date.month,
+                config=site_config,
+            )
+        can_reserve_glider, reserve_reason = eligibility_cache[cache_key]
 
     actions.append(
         {
@@ -565,11 +572,16 @@ def _build_agenda_quick_actions(
 
     # Review Student Requests (instructor roles)
     if is_authenticated and getattr(request.user, "instructor", False):
+        review_reason = ""
+        if not is_active_member:
+            review_reason = "Active membership is required."
+
         actions.append(
             {
                 "key": "review_student_requests",
                 "label": "Review Student Requests",
-                "enabled": True,
+                "enabled": review_reason == "",
+                "disabled_reason": review_reason,
                 "icon": "fas fa-user-check",
                 "kind": "link",
                 "url": reverse("duty_roster:instructor_requests"),
