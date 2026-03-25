@@ -608,3 +608,29 @@
   </div>
 </div>
 {% endif %}
+
+<script>
+  (function() {
+    const openPanel = "{{ open_panel|default:'' }}";
+    if (!openPanel || typeof bootstrap === "undefined") {
+      return;
+    }
+
+    const panelMap = {
+      plan_to_fly: "plan-to-fly-panel",
+      request_instruction: "instruction-request-form",
+    };
+
+    const targetId = panelMap[openPanel];
+    const panelEl = targetId ? document.getElementById(targetId) : null;
+    if (!panelEl) {
+      return;
+    }
+
+    const collapse = bootstrap.Collapse.getOrCreateInstance(panelEl, { toggle: false });
+    collapse.show();
+    setTimeout(() => {
+      panelEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  })();
+</script>

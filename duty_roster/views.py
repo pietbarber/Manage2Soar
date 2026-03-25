@@ -50,6 +50,7 @@ from .models import (
     DutyPairing,
     DutyPreference,
     DutyRosterMessage,
+    DutySwapRequest,
     GliderReservation,
     MemberBlackout,
     OpsIntent,
@@ -342,6 +343,241 @@ def _check_instruction_request_window(day_date):
     return False, None
 
 
+def _build_agenda_quick_actions(
+    request,
+    day_date,
+    assignment,
+    site_config,
+    active_statuses,
+    intent_dates,
+    instruction_dates,
+    open_swap_keys,
+):
+    """Build quick actions for an agenda day card based on user/day state."""
+    actions = []
+    is_authenticated = request.user.is_authenticated
+    is_active_member = bool(
+        is_authenticated
+        and request.user.is_active
+        and request.user.membership_status in active_statuses
+    )
+    is_past = day_date < date.today()
+    has_intent = day_date in intent_dates
+    has_instruction_request = day_date in instruction_dates
+
+    # Plan to Fly
+    if has_intent:
+        actions.append(
+            {
+                "key": "plan_to_fly_edit",
+                "label": "Edit Plan to Fly",
+                "enabled": True,
+                "icon": "fas fa-pen",
+                "kind": "modal",
+                "url": reverse(
+                    "duty_roster:calendar_day_detail",
+                    kwargs={
+                        "year": day_date.year,
+                        "month": day_date.month,
+                        "day": day_date.day,
+                    },
+                )
+                + "?open_panel=plan_to_fly",
+            }
+        )
+        actions.append(
+            {
+                "key": "plan_to_fly_cancel",
+                "label": "Cancel Plan to Fly",
+                "enabled": True,
+                "icon": "fas fa-ban",
+                "kind": "post",
+                "url": reverse(
+                    "duty_roster:ops_intent_toggle",
+                    kwargs={
+                        "year": day_date.year,
+                        "month": day_date.month,
+                        "day": day_date.day,
+                    },
+                ),
+            }
+        )
+    else:
+        plan_reason = ""
+        if is_past:
+            plan_reason = "Unavailable for past dates."
+        elif not is_active_member:
+            plan_reason = "Active membership is required."
+        elif has_instruction_request:
+            plan_reason = "You already requested instruction for this day."
+
+        actions.append(
+            {
+                "key": "plan_to_fly",
+                "label": "Plan to Fly",
+                "enabled": plan_reason == "",
+                "disabled_reason": plan_reason,
+                "icon": "fas fa-plane-departure",
+                "kind": "modal",
+                "url": reverse(
+                    "duty_roster:calendar_day_detail",
+                    kwargs={
+                        "year": day_date.year,
+                        "month": day_date.month,
+                        "day": day_date.day,
+                    },
+                )
+                + "?open_panel=plan_to_fly",
+            }
+        )
+
+    # Request Instruction
+    instruction_reason = ""
+    has_instructor_assigned = bool(
+        assignment and (assignment.instructor_id or assignment.surge_instructor_id)
+    )
+    too_early, opens_on = _check_instruction_request_window(day_date)
+    if is_past:
+        instruction_reason = "Unavailable for past dates."
+    elif not is_active_member:
+        instruction_reason = "Active membership is required."
+    elif has_instruction_request:
+        instruction_reason = "You already have an instruction request for this day."
+    elif not has_instructor_assigned:
+        instruction_reason = "No instructor is currently assigned for this day."
+    elif too_early:
+        opens_str = opens_on.strftime("%b %d, %Y") if opens_on else "a later date"
+        instruction_reason = f"Instruction requests open on {opens_str}."
+
+    actions.append(
+        {
+            "key": "request_instruction",
+            "label": "Request Instruction",
+            "enabled": instruction_reason == "",
+            "disabled_reason": instruction_reason,
+            "icon": "fas fa-graduation-cap",
+            "kind": "modal",
+            "url": reverse(
+                "duty_roster:calendar_day_detail",
+                kwargs={
+                    "year": day_date.year,
+                    "month": day_date.month,
+                    "day": day_date.day,
+                },
+            )
+            + "?open_panel=request_instruction",
+        }
+    )
+
+    # Reserve a Glider
+    reserve_reason = ""
+    reservation_feature_enabled = bool(
+        site_config and site_config.allow_glider_reservations
+    )
+    can_reserve_glider = False
+    if is_past:
+        reserve_reason = "Unavailable for past dates."
+    elif not is_active_member:
+        reserve_reason = "Active membership is required."
+    elif not reservation_feature_enabled:
+        reserve_reason = "Glider reservations are currently disabled."
+    else:
+        can_reserve_glider, reserve_reason = GliderReservation.can_member_reserve(
+            request.user,
+            year=day_date.year,
+            month=day_date.month,
+            config=site_config,
+        )
+
+    actions.append(
+        {
+            "key": "reserve_glider",
+            "label": "Reserve a Glider",
+            "enabled": can_reserve_glider,
+            "disabled_reason": reserve_reason,
+            "icon": "fas fa-calendar-check",
+            "kind": "link",
+            "url": reverse(
+                "duty_roster:reservation_create_for_day",
+                kwargs={
+                    "year": day_date.year,
+                    "month": day_date.month,
+                    "day": day_date.day,
+                },
+            ),
+        }
+    )
+
+    # Request Swap (only if this user is assigned to one or more scheduled roles)
+    assigned_roles = []
+    if assignment and is_authenticated:
+        if assignment.instructor_id == request.user.id:
+            assigned_roles.append(("INSTRUCTOR", get_role_title("instructor")))
+        if assignment.tow_pilot_id == request.user.id:
+            assigned_roles.append(("TOW", get_role_title("towpilot")))
+        if assignment.duty_officer_id == request.user.id:
+            assigned_roles.append(("DO", get_role_title("duty_officer")))
+        if assignment.assistant_duty_officer_id == request.user.id:
+            assigned_roles.append(("ADO", get_role_title("assistant_duty_officer")))
+
+    scheduled_map = {
+        "INSTRUCTOR": bool(site_config and site_config.schedule_instructors),
+        "TOW": bool(site_config and site_config.schedule_tow_pilots),
+        "DO": bool(site_config and site_config.schedule_duty_officers),
+        "ADO": bool(site_config and site_config.schedule_assistant_duty_officers),
+    }
+
+    for role_code, role_title in assigned_roles:
+        swap_reason = ""
+        if is_past:
+            swap_reason = "Unavailable for past dates."
+        elif not is_active_member:
+            swap_reason = "Active membership is required."
+        elif not scheduled_map.get(role_code, False):
+            swap_reason = f"{role_title} is not currently a scheduled role."
+        elif (day_date, role_code) in open_swap_keys:
+            swap_reason = "You already have an open swap request for this role."
+
+        label = "Request Swap"
+        if len(assigned_roles) > 1:
+            label = f"Request Swap ({role_title})"
+
+        actions.append(
+            {
+                "key": f"request_swap_{role_code.lower()}",
+                "label": label,
+                "enabled": swap_reason == "",
+                "disabled_reason": swap_reason,
+                "icon": "fas fa-exchange-alt",
+                "kind": "link",
+                "url": reverse(
+                    "duty_roster:create_swap_request",
+                    kwargs={
+                        "year": day_date.year,
+                        "month": day_date.month,
+                        "day": day_date.day,
+                        "role": role_code,
+                    },
+                ),
+            }
+        )
+
+    # Review Student Requests (instructor roles)
+    if is_authenticated and getattr(request.user, "instructor", False):
+        actions.append(
+            {
+                "key": "review_student_requests",
+                "label": "Review Student Requests",
+                "enabled": True,
+                "icon": "fas fa-user-check",
+                "kind": "link",
+                "url": reverse("duty_roster:instructor_requests"),
+            }
+        )
+
+    return actions
+
+
 def duty_calendar_view(request, year=None, month=None):
     today = date.today()
     year = int(year) if year else today.year
@@ -350,6 +586,11 @@ def duty_calendar_view(request, year=None, month=None):
     # Get site config for surge thresholds
     tow_surge_threshold, instruction_surge_threshold = get_surge_thresholds()
 
+    site_config = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
+    if site_config is _SITECONFIG_CACHE_SENTINEL:
+        site_config = SiteConfiguration.objects.first()
+        cache.set("siteconfig_instance", site_config, timeout=60)
+
     cal = calendar.Calendar(firstweekday=6)
     weeks = cal.monthdatescalendar(year, month)
     first_visible_day = weeks[0][0]
@@ -357,13 +598,58 @@ def duty_calendar_view(request, year=None, month=None):
     assignments = DutyAssignment.objects.filter(
         date__range=(first_visible_day, last_visible_day)
     ).order_by("date")
+    visible_dates = [day for week in weeks for day in week]
 
     assignments_by_date = {a.date: a for a in assignments}
 
-    prev_year, prev_month, next_year, next_month = get_adjacent_months(year, month)
+    active_statuses = set(get_active_membership_statuses())
 
-    # After building `weeks` for the calendar
-    visible_dates = [day for week in weeks for day in week]
+    intent_dates = set()
+    instruction_dates = set()
+    open_swap_keys = set()
+    if request.user.is_authenticated:
+        intent_dates = set(
+            OpsIntent.objects.filter(member=request.user, date__in=visible_dates)
+            .values_list("date", flat=True)
+            .iterator()
+        )
+
+        from .models import InstructionSlot
+
+        instruction_dates = set(
+            InstructionSlot.objects.filter(
+                assignment__date__in=visible_dates,
+                student=request.user,
+            )
+            .exclude(status="cancelled")
+            .values_list("assignment__date", flat=True)
+            .iterator()
+        )
+
+        open_swap_keys = set(
+            DutySwapRequest.objects.filter(
+                requester=request.user,
+                original_date__in=visible_dates,
+                status="open",
+            )
+            .values_list("original_date", "role")
+            .iterator()
+        )
+
+    agenda_quick_actions_by_date = {}
+    for day, assignment in assignments_by_date.items():
+        agenda_quick_actions_by_date[day] = _build_agenda_quick_actions(
+            request=request,
+            day_date=day,
+            assignment=assignment,
+            site_config=site_config,
+            active_statuses=active_statuses,
+            intent_dates=intent_dates,
+            instruction_dates=instruction_dates,
+            open_swap_keys=open_swap_keys,
+        )
+
+    prev_year, prev_month, next_year, next_month = get_adjacent_months(year, month)
 
     # Then safely run these:
     instruction_count = defaultdict(int)
@@ -426,6 +712,7 @@ def duty_calendar_view(request, year=None, month=None):
         "next_year": next_year,
         "next_month": next_month,
         "today": today,
+        "agenda_quick_actions_by_date": agenda_quick_actions_by_date,
         "surge_needed_by_date": surge_needed_by_date,
         "tow_surge_threshold": tow_surge_threshold,
         "instruction_surge_threshold": instruction_surge_threshold,
@@ -439,6 +726,9 @@ def duty_calendar_view(request, year=None, month=None):
 def calendar_day_detail(request, year, month, day):
     day_date = date(year, month, day)
     assignment = DutyAssignment.objects.filter(date=day_date).first()
+    open_panel = request.GET.get("open_panel", "")
+    if open_panel not in {"plan_to_fly", "request_instruction"}:
+        open_panel = ""
 
     # Get site config for surge thresholds
     tow_surge_threshold, instruction_surge_threshold = get_surge_thresholds()
@@ -640,6 +930,7 @@ def calendar_day_detail(request, year, month, day):
             "reserve_message": reserve_message,
             "reservations_remaining": reservations_remaining,
             "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
+            "open_panel": open_panel,
         },
     )
 

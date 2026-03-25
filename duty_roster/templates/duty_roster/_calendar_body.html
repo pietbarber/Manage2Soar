@@ -93,11 +93,27 @@
         }
       }
 
+      function initAgendaDisabledPopovers() {
+        if (typeof bootstrap === 'undefined' || !bootstrap.Popover) {
+          return;
+        }
+
+        document.querySelectorAll('[data-agenda-disabled-popover="true"]').forEach((el) => {
+          if (!bootstrap.Popover.getInstance(el)) {
+            new bootstrap.Popover(el);
+          }
+        });
+      }
+
       // Restore state when page loads or HTMX updates content
-      document.addEventListener('DOMContentLoaded', restoreViewState);
+      document.addEventListener('DOMContentLoaded', function() {
+        restoreViewState();
+        initAgendaDisabledPopovers();
+      });
       document.addEventListener('htmx:afterSettle', function(event) {
         if (event.detail.target.id === 'calendar-body') {
           restoreViewState();
+          initAgendaDisabledPopovers();
         }
       });
     </script>
