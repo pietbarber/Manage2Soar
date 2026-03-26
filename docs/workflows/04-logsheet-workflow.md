@@ -63,7 +63,7 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-    participant DO as Duty Officer  
+    participant DO as Duty Crew
     participant System as Manage2Soar
     participant Member as Club Member
     participant Instructor as Instructor
