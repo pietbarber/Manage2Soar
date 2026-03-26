@@ -11,7 +11,7 @@ The Duty Roster app manages operational crew assignments, member availability, d
 
 ```mermaid
 erDiagram
-    Member ||--o{ DutyRosterMessage : "last editor"
+    Member o|--o{ DutyRosterMessage : "last editor"
     Member ||--o{ MemberBlackout : "has blackout dates"
     Member ||--o| DutyPreference : "has preference profile"
     Member ||--o{ DutyPairing : "paired with"
@@ -38,7 +38,7 @@ erDiagram
         text content
         bool is_active
         datetime updated_at
-        int updated_by FK
+        int updated_by FK "nullable"
     }
 
     MemberBlackout {
@@ -49,6 +49,7 @@ erDiagram
     }
 
     DutyPreference {
+        int id PK
         int member FK
         string preferred_day
         text comment

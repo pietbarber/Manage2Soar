@@ -62,7 +62,7 @@ flowchart TD
 ### **Models Involved**
 - **`duty_roster.DutyAssignment`**: Individual duty assignments for a specific date
 - **`duty_roster.MemberBlackout`**: Member unavailable dates
-- **`duty_roster.DutyPreference`**: Member role preferences
+- **`duty_roster.DutyPreference`**: Member scheduling preferences (preferred days, temporary suspension, role allocation percentages, and monthly assignment limits)
 - **`duty_roster.DutySwapRequest`**: Swap requests between members
 - **`duty_roster.DutySwapOffer`**: Available coverage offers
 - **`duty_roster.OpsIntent`**: Planned operations intent for specific dates
