@@ -486,7 +486,7 @@ The instruction report email provides a professional, comprehensive summary of t
   - 🟣 ① Introduced (purple)
   - 🔵 ② Practiced (blue)
   - 🟢 ③ Solo Standard (green)
-    - 🟢 ④ Practical Test Standard (dark green)
+  - 🟢 ④ Practical Test Standard (dark green)
   - 🔴 ⚠ Needs Attention (red)
 - Update banner for modified reports (yellow highlight)
 - Celebration section for new qualifications (green highlight)

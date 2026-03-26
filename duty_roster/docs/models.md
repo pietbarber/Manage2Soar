@@ -491,6 +491,8 @@ Members declare their operational intent for upcoming flying days. Helps Duty Of
 - `time_preference` (CharField): Broad time-of-day preference
 - `status` (CharField): Current reservation state
 - `purpose` (TextField): Optional details
+- `cancellation_reason` (TextField, optional): Explanation when a reservation is cancelled
+- `cancelled_at` (DateTimeField, optional): Timestamp when reservation was cancelled
 - `created_at`, `updated_at`: Audit timestamps
 
 ---

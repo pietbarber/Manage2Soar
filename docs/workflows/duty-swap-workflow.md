@@ -1,6 +1,6 @@
 # Duty Swap Workflow - Issue #1
 
-> Note (Issue #421): Duty swap is now treated as part of the main duty roster workflow.
+> Note (Issue #1): Duty swap is now treated as part of the main duty roster workflow.
 > This document remains as detailed historical/reference material.
 > Primary workflow: [05-duty-roster-workflow.md](05-duty-roster-workflow.md).
 

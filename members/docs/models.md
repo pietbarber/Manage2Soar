@@ -137,6 +137,7 @@ erDiagram
         bool is_active
         datetime created_at
         datetime last_used_at
+        string last_used_ip
         string landing_page
         text notes
     }
@@ -147,6 +148,8 @@ erDiagram
         string token_value
         datetime timestamp
         string ip_address
+        text user_agent
+        string device_fingerprint
         string status
         text details
     }
@@ -158,8 +161,8 @@ erDiagram
     Member ||--o{ Member : last_updated_by
     Member ||--o| MembershipApplication : created_from_application
     Member ||--o{ MembershipApplication : reviewed_applications
-    Member ||--o{ KioskToken : kiosk_auth_tokens
-    KioskToken ||--o{ KioskAccessLog : access_attempts
+    Member ||--o{ KioskToken : kiosk_tokens
+    KioskToken ||--o{ KioskAccessLog : access_logs
     Member ||--o{ SafetyReport : submitted_reports
     Member ||--o{ SafetyReport : reviewed_by
 

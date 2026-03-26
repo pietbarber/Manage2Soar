@@ -73,7 +73,7 @@ flowchart TD
 - **Models**: `duty_roster/models.py` - Duty scheduling data structures
 - **Views**: `duty_roster/views.py` - Roster management interface
 - **Generator**: `duty_roster/roster_generator.py` - Automated assignment logic
-- **Optimized Scheduler**: `duty_roster/ortools_scheduler.py` - Constraint-based optimized duty selection (introduced late February 2026)
+- **Optimized Scheduler**: `duty_roster/ortools_scheduler.py` - Constraint-based optimized duty selection
 - **Utils**: `duty_roster/utils.py` - Scheduling algorithms and validation
 - **Management**: `duty_roster/management/commands/` - Automated roster generation
 
@@ -308,7 +308,7 @@ flowchart LR
 
 - Duty swap management is now integrated in this workflow (Issue #1)
 - Glider reservation planning is now integrated in duty roster operations (Issue #410)
-- Optimized duty selection was added in late February 2026 via the OR-Tools scheduler path, with feature-flag routing/fallback in `roster_generator.py` (Issue #642)
+- Optimized duty selection is available via the OR-Tools scheduler path, with feature-flag routing and legacy fallback in `roster_generator.py`
 
 ### **Monthly Roster Generation**
 
