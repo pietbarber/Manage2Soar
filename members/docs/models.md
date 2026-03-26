@@ -133,11 +133,11 @@ erDiagram
         int user_id FK
         string token UK
         string name
-        string device_fingerprint
+        string device_fingerprint "nullable"
         bool is_active
         datetime created_at
-        datetime last_used_at
-        string last_used_ip
+        datetime last_used_at "nullable"
+        string last_used_ip "nullable"
         string landing_page
         text notes
     }

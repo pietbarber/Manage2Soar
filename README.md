@@ -39,10 +39,27 @@ Major apps:
 
 ### Option A: Automated Setup
 
+Before running the script, create and configure a local `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+At minimum, set values for:
+
+- `DJANGO_SECRET_KEY`
+- `DB_PASSWORD`
+
 ```bash
 git clone https://github.com/pietbarber/Manage2Soar.git
 cd Manage2Soar
 ./infrastructure/scripts/setup-dev.sh
+```
+
+After setup, start local development on port 8001:
+
+```bash
+python manage.py runserver 127.0.0.1:8001
 ```
 
 ### Option B: Manual Setup

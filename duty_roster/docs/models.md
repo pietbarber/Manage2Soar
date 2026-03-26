@@ -11,9 +11,9 @@ The Duty Roster app manages operational crew assignments, member availability, d
 
 ```mermaid
 erDiagram
-    Member ||--o{ DutyRosterMessage : "updates message"
+    Member ||--o{ DutyRosterMessage : "last editor"
     Member ||--o{ MemberBlackout : "has blackout dates"
-    Member ||--o{ DutyPreference : "has preferences"
+    Member ||--o| DutyPreference : "has preference profile"
     Member ||--o{ DutyPairing : "paired with"
     Member ||--o{ DutyPairing : "paired as"
     Member ||--o{ DutyAvoidance : "avoids member"
@@ -45,18 +45,23 @@ erDiagram
         int id PK
         int member FK
         date date
-        string reason
-        datetime created_at
-        datetime updated_at
+        string note
     }
 
     DutyPreference {
-        int id PK
         int member FK
-        string role
-        int preference_level
-        datetime created_at
-        datetime updated_at
+        string preferred_day
+        text comment
+        bool dont_schedule
+        bool scheduling_suspended
+        string suspended_reason
+        date last_duty_date
+        int instructor_percent
+        int duty_officer_percent
+        int ado_percent
+        int towpilot_percent
+        decimal max_assignments_per_month
+        bool allow_weekend_double
     }
 
     DutyPairing {
@@ -192,8 +197,7 @@ erDiagram
 **Fields:**
 - `member` (FK to Member): The member who is unavailable
 - `date` (Date): The specific date of unavailability
-- `reason` (CharField): Optional reason for the blackout
-- `created_at`, `updated_at`: Audit timestamps
+- `note` (CharField): Optional note for context
 
 **Usage:**
 Members declare blackout dates through the duty roster UI. The roster generator respects these constraints when making assignments.
@@ -202,24 +206,27 @@ Members declare blackout dates through the duty roster UI. The roster generator 
 
 ### DutyPreference
 
-**Purpose:** Stores member preferences for specific duty roles.
+**Purpose:** Stores one profile of scheduling preferences and assignment-rate controls per member.
 
 **Key Features:**
-- Preference levels (0-10 scale) for each role type
-- Influences roster generator's assignment decisions
-- Helps balance member satisfaction with operational needs
+- Preferred operational day selection
+- Suspension and exclusion flags for scheduling
+- Role allocation percentages and max monthly assignment rate
+- Weekend double-assignment opt-in
 
 **Fields:**
-- `member` (FK to Member): The member expressing preference
-- `role` (CharField): Role key (DO, ADO, INSTRUCTOR, TOW)
-- `preference_level` (IntegerField): 0-10 scale (0=avoid, 10=prefer)
-- `created_at`, `updated_at`: Audit timestamps
-
-**Choices:**
-- Roles: Duty Officer (DO), Assistant Duty Officer (ADO), Instructor (INSTRUCTOR), Tow Pilot (TOW)
+- `member` (OneToOne to Member): The member preference profile owner
+- `preferred_day` (CharField): Preferred day (`sat` or `sun`)
+- `comment` (TextField): Freeform scheduling notes
+- `dont_schedule` / `scheduling_suspended` (BooleanField): Scheduling controls
+- `suspended_reason` (CharField): Explanation when scheduling is suspended
+- `last_duty_date` (DateField): Last assigned duty date
+- `instructor_percent`, `duty_officer_percent`, `ado_percent`, `towpilot_percent` (PositiveIntegerField): Role allocation profile
+- `max_assignments_per_month` (DecimalField): Assignment-rate cap
+- `allow_weekend_double` (BooleanField): Allows both Saturday and Sunday assignments
 
 **Usage:**
-Members set preferences through their profile. Roster generator uses these as soft constraints to optimize assignments.
+Members configure availability and assignment preferences through their profile. Roster generation uses these settings to balance coverage and member constraints.
 
 ---
 
