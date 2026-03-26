@@ -128,6 +128,29 @@ erDiagram
         text notes
     }
 
+    KioskToken {
+        int id PK
+        int user_id FK
+        string token UK
+        string name
+        string device_fingerprint
+        bool is_active
+        datetime created_at
+        datetime last_used_at
+        string landing_page
+        text notes
+    }
+
+    KioskAccessLog {
+        int id PK
+        int kiosk_token_id FK
+        string token_value
+        datetime timestamp
+        string ip_address
+        string status
+        text details
+    }
+
     Badge ||--o{ Badge : parent_badge
     Member ||--o| Biography : has_biography
     Member ||--o{ MemberBadge : earned_badges
@@ -135,6 +158,8 @@ erDiagram
     Member ||--o{ Member : last_updated_by
     Member ||--o| MembershipApplication : created_from_application
     Member ||--o{ MembershipApplication : reviewed_applications
+    Member ||--o{ KioskToken : kiosk_auth_tokens
+    KioskToken ||--o{ KioskAccessLog : access_attempts
     Member ||--o{ SafetyReport : submitted_reports
     Member ||--o{ SafetyReport : reviewed_by
 
@@ -191,6 +216,15 @@ See also: [Redaction of Personal Contact Information](redaction.md)
 ### `MemberBadge`
 - Through model linking `Member` and `Badge`.
 - Tracks which badges a member has earned and when.
+
+### `KioskToken`
+- Passwordless authentication token for dedicated kiosk devices (Issue #364).
+- Bound to a role account and optionally device-fingerprinted for security.
+- Tracks activation, last use metadata, and post-login landing page.
+
+### `KioskAccessLog`
+- Audit log of kiosk authentication attempts.
+- Captures success/failure status, token used, IP/device context, and details.
 
 ### `SafetyReport`
 - Stores safety observations, suggestions, and near-miss reports from members.

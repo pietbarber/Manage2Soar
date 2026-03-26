@@ -183,10 +183,21 @@ erDiagram
         datetime timestamp
     }
 
+    FinalizationEmailOutbox {
+        int id PK
+        int logsheet_id FK
+        string status
+        int attempt_count
+        text last_error
+        datetime queued_at
+        datetime processed_at
+    }
+
     Logsheet ||--o{ Flight : contains
     Logsheet ||--o{ LogsheetPayment : payments
     Logsheet ||--o{ LogsheetCloseout : closeout
     Logsheet ||--o{ TowplaneCloseout : towplane_closeouts
+    Logsheet ||--|| FinalizationEmailOutbox : summary_email_delivery
     Airfield ||--o{ Logsheet : location
     Glider ||--o{ Flight : aircraft
     Towplane ||--o{ Flight : tow_aircraft
@@ -243,6 +254,10 @@ This document describes all models in `logsheet/models.py`.
 
 ## RevisionLog
 - Tracks changes to logsheet entries for audit/history.
+
+## FinalizationEmailOutbox
+- Durable queue record for post-finalization summary email delivery.
+- One-to-one with `Logsheet`, with delivery status, retry count, and error tracking.
 
 ## Towplane
 - Represents a towplane, including status and maintenance.

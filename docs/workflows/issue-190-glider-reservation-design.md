@@ -1,5 +1,9 @@
 # Issue #190: Enhanced Glider Reservation System Design
 
+> Note (Issue #421): Glider reservation behavior is now integrated into the main duty roster workflow.
+> Use [05-duty-roster-workflow.md](05-duty-roster-workflow.md) for current operational flow context.
+> This document remains as detailed design/reference history.
+
 ## Overview
 This document outlines the comprehensive glider reservation system that will transform the duty roster workflow into a full-featured club operations management system comparable to ClickNGlide functionality.
 

@@ -11,6 +11,7 @@ The Duty Roster app manages operational crew assignments, member availability, d
 
 ```mermaid
 erDiagram
+    Member ||--o{ DutyRosterMessage : "updates message"
     Member ||--o{ MemberBlackout : "has blackout dates"
     Member ||--o{ DutyPreference : "has preferences"
     Member ||--o{ DutyPairing : "paired with"
@@ -24,11 +25,21 @@ erDiagram
     Member ||--o{ DutySwapRequest : "receives direct request"
     Member ||--o{ DutySwapOffer : "makes offer"
     Member ||--o{ OpsIntent : "declares availability"
+    Member ||--o{ GliderReservation : "reserves glider"
     Airfield ||--o{ DutyAssignment : "duty at"
     DutyAssignment ||--o{ InstructionSlot : "instruction during"
     DutySwapRequest ||--o{ DutySwapOffer : "receives offers"
     DutySwapRequest ||--|| DutySwapOffer : "accepts one offer"
     Glider ||--o{ OpsIntent : "flying glider"
+    Glider ||--o{ GliderReservation : "reserved as"
+
+    DutyRosterMessage {
+        int id PK
+        text content
+        bool is_active
+        datetime updated_at
+        int updated_by FK
+    }
 
     MemberBlackout {
         int id PK
@@ -131,9 +142,41 @@ erDiagram
         text notes
         datetime created_at
     }
+
+    GliderReservation {
+        int id PK
+        int member FK
+        int glider FK
+        date date
+        time start_time
+        time end_time
+        string reservation_type
+        string time_preference
+        string status
+        text purpose
+        datetime created_at
+        datetime updated_at
+    }
 ```
 
 ## Models
+
+### DutyRosterMessage
+
+**Purpose:** Stores the singleton, rich-text rostermeister announcement shown on calendar pages.
+
+**Key Features:**
+- Singleton enforcement (one record only)
+- Rich HTML content with sanitization
+- Activate/deactivate toggle without deleting content
+
+**Fields:**
+- `content` (HTMLField): Message body shown in duty roster views
+- `is_active` (BooleanField): Enables/disables display
+- `updated_by` (FK to Member): Last editor
+- `updated_at`: Last update timestamp
+
+---
 
 ### MemberBlackout
 
@@ -426,6 +469,29 @@ Members respond to swap requests by making offers. Cover offers are simpler (jus
 
 **Usage:**
 Members declare their operational intent for upcoming flying days. Helps Duty Officers and Operations team plan resources, coordinate instruction, and ensure adequate tow pilot coverage. Provides visibility into expected operational tempo.
+
+---
+
+### GliderReservation
+
+**Purpose:** Supports member reservations of club gliders for upcoming operation dates.
+
+**Key Features:**
+- Date-based reservations tied to specific gliders and members
+- Time preference and optional time window support
+- Reservation status lifecycle (`confirmed`, `cancelled`, `completed`, `no_show`)
+- Used by planning and notification workflows
+
+**Fields:**
+- `member` (FK to Member): Member making the reservation
+- `glider` (FK to Glider): Reserved aircraft
+- `date` (Date): Reservation date
+- `start_time`, `end_time` (TimeField, optional): Specific time window
+- `reservation_type` (CharField): Flight intent classification
+- `time_preference` (CharField): Broad time-of-day preference
+- `status` (CharField): Current reservation state
+- `purpose` (TextField): Optional details
+- `created_at`, `updated_at`: Audit timestamps
 
 ---
 

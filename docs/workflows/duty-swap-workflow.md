@@ -1,5 +1,9 @@
 # Duty Swap Workflow - Issue #1
 
+> Note (Issue #421): Duty swap is now treated as part of the main duty roster workflow.
+> This document remains as detailed historical/reference material.
+> Primary workflow: [05-duty-roster-workflow.md](05-duty-roster-workflow.md).
+
 ## Overview
 This workflow handles the process where duty crew members (instructors, tow pilots, duty officers, assistant duty officers) need to find replacements for their scheduled duties when conflicts arise.
 
