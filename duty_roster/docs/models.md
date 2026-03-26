@@ -51,12 +51,12 @@ erDiagram
     DutyPreference {
         int id PK
         int member FK
-        string preferred_day
-        text comment
+        string preferred_day "optional"
+        text comment "optional"
         bool dont_schedule
         bool scheduling_suspended
-        string suspended_reason
-        date last_duty_date
+        string suspended_reason "optional"
+        date last_duty_date "optional"
         int instructor_percent
         int duty_officer_percent
         int ado_percent

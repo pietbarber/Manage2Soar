@@ -50,6 +50,9 @@ At minimum, set values for:
 - `DJANGO_SECRET_KEY`
 - `DB_PASSWORD`
 
+Ensure the local PostgreSQL database and user already exist before running the script.
+If not, complete the database creation step in Option B first.
+
 ```bash
 git clone https://github.com/pietbarber/Manage2Soar.git
 cd Manage2Soar
@@ -61,6 +64,8 @@ After setup, start local development on port 8001:
 ```bash
 python manage.py runserver 127.0.0.1:8001
 ```
+
+Note: `infrastructure/scripts/setup-dev.sh` installs dependencies and runs migrations, but does not create the PostgreSQL database/user.
 
 ### Option B: Manual Setup
 
