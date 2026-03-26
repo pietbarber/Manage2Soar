@@ -148,12 +148,14 @@ erDiagram
         int member FK
         int glider FK
         date date
-        time start_time
-        time end_time
+        time start_time "optional"
+        time end_time "optional"
         string reservation_type
         string time_preference
         string status
         text purpose
+        datetime cancelled_at
+        text cancellation_reason
         datetime created_at
         datetime updated_at
     }

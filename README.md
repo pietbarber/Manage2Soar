@@ -121,7 +121,10 @@ use the Ansible playbooks rather than manual cloud setup.
 ```bash
 cd infrastructure/ansible
 cp inventory/gcp_app.yml.example inventory/gcp_app.yml
-ansible-playbook -i inventory/gcp_app.yml playbooks/gcp-app-deploy.yml
+cp group_vars/gcp_app.vars.yml.example group_vars/gcp_app/vars.yml
+cp group_vars/gcp_app.vault.yml.example group_vars/gcp_app/vault.yml
+ansible-vault encrypt group_vars/gcp_app/vault.yml
+ansible-playbook -i inventory/gcp_app.yml --vault-password-file ~/.ansible_vault_pass playbooks/gcp-app-deploy.yml
 ```
 
 Primary instructions:

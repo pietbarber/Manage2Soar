@@ -144,7 +144,7 @@ erDiagram
 
     KioskAccessLog {
         int id PK
-        int kiosk_token_id FK
+        int kiosk_token_id FK "nullable for failed token lookups"
         string token_value
         datetime timestamp
         string ip_address

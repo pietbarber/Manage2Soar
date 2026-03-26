@@ -197,7 +197,7 @@ erDiagram
     Logsheet ||--o{ LogsheetPayment : payments
     Logsheet ||--o{ LogsheetCloseout : closeout
     Logsheet ||--o{ TowplaneCloseout : towplane_closeouts
-    Logsheet ||--|| FinalizationEmailOutbox : summary_email_delivery
+    Logsheet ||--|| FinalizationEmailOutbox : finalization_email_outbox
     Airfield ||--o{ Logsheet : location
     Glider ||--o{ Flight : aircraft
     Towplane ||--o{ Flight : tow_aircraft
