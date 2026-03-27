@@ -640,13 +640,21 @@ def make_offer(request, request_id):
         if form.is_valid():
             offer = form.save()
 
-            # Notify requester
-            send_offer_made_notification(offer)
-
-            messages.success(
-                request,
-                f"Your offer has been sent to {swap_request.requester.first_name}!",
-            )
+            # A pure cover offer does not require requester acknowledgement.
+            if offer.offer_type == "cover" and not offer.proposed_swap_date:
+                _accept_offer_and_finalize(swap_request, offer)
+                messages.success(
+                    request,
+                    "Your cover offer was accepted automatically. "
+                    "The duty assignment has been updated.",
+                )
+            else:
+                # Notify requester for offers that still need a decision.
+                send_offer_made_notification(offer)
+                messages.success(
+                    request,
+                    f"Your offer has been sent to {swap_request.requester.first_name}!",
+                )
             return redirect("duty_roster:swap_request_detail", request_id=request_id)
     else:
         form = DutySwapOfferForm(swap_request=swap_request, offered_by=member)
@@ -656,6 +664,40 @@ def make_offer(request, request_id):
         "swap_request": swap_request,
     }
     return render(request, "duty_roster/swap/make_offer.html", context)
+
+
+def _accept_offer_and_finalize(swap_request, offer):
+    """Accept an offer, fulfill the request, and send notifications."""
+    with transaction.atomic():
+        now = timezone.now()
+
+        # Accept this offer
+        offer.status = "accepted"
+        offer.responded_at = now
+        offer.save()
+
+        # Mark request as fulfilled
+        swap_request.status = "fulfilled"
+        swap_request.accepted_offer = offer
+        swap_request.fulfilled_at = now
+        swap_request.save()
+
+        # Auto-decline other pending offers
+        other_offers = list(
+            swap_request.offers.filter(status="pending").exclude(pk=offer.pk)
+        )
+        for other in other_offers:
+            other.status = "auto_declined"
+            other.responded_at = now
+            other.save()
+
+        # Update duty assignments
+        update_duty_assignments(swap_request, offer)
+
+        # Send notifications
+        send_offer_accepted_notifications(offer)
+        for other in other_offers:
+            send_offer_declined_notification(other, auto=True)
 
 
 @active_member_required
@@ -676,33 +718,7 @@ def accept_offer(request, offer_id):
         messages.error(request, "This offer is no longer available.")
         return redirect("duty_roster:swap_request_detail", request_id=swap_request.pk)
 
-    with transaction.atomic():
-        # Accept this offer
-        offer.status = "accepted"
-        offer.responded_at = timezone.now()
-        offer.save()
-
-        # Mark request as fulfilled
-        swap_request.status = "fulfilled"
-        swap_request.accepted_offer = offer
-        swap_request.fulfilled_at = timezone.now()
-        swap_request.save()
-
-        # Auto-decline other pending offers
-        other_offers = swap_request.offers.filter(status="pending").exclude(pk=offer.pk)
-        for other in other_offers:
-            other.status = "auto_declined"
-            other.responded_at = timezone.now()
-            other.save()
-
-        # Update duty assignments
-        update_duty_assignments(swap_request, offer)
-
-        # Send notifications
-        send_offer_accepted_notifications(offer)
-
-        for other in other_offers:
-            send_offer_declined_notification(other, auto=True)
+    _accept_offer_and_finalize(swap_request, offer)
 
     messages.success(
         request,
