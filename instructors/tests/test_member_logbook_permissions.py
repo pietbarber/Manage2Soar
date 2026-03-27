@@ -46,6 +46,154 @@ def test_member_can_view_own_logbook(client):
 
 
 @pytest.mark.django_db
+def test_rated_pilot_logs_dual_and_pic_for_instructor_flight(client):
+    _ensure_full_member_status()
+    pilot = _make_member("logbook_rated_dual", glider_rating="rated")
+    pilot.private_glider_checkride_date = date(2024, 1, 1)
+    pilot.save(update_fields=["private_glider_checkride_date"])
+
+    instructor = _make_member(
+        "logbook_rated_dual_instructor", instructor=True, glider_rating="rated"
+    )
+
+    airfield = Airfield.objects.create(name="Front Royal", identifier="KFRR")
+    glider = Glider.objects.create(
+        n_number="N762A",
+        make="Schleicher",
+        model="ASK-21",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 6, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 25),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook") + "?show_all_years=1")
+
+    assert response.status_code == 200
+    row = response.context["pages"][0]["rows"][0]
+    assert row["dual_received_m"] == 25
+    assert row["pic_m"] == 25
+
+
+@pytest.mark.django_db
+def test_pre_rating_instructor_flight_logs_dual_not_pic(client):
+    _ensure_full_member_status()
+    pilot = _make_member("logbook_prerating_dual", glider_rating="student")
+    pilot.private_glider_checkride_date = date(2024, 7, 1)
+    pilot.save(update_fields=["private_glider_checkride_date"])
+
+    instructor = _make_member(
+        "logbook_prerating_instructor", instructor=True, glider_rating="rated"
+    )
+
+    airfield = Airfield.objects.create(name="Winchester", identifier="KWGO")
+    glider = Glider.objects.create(
+        n_number="N762B",
+        make="Schweizer",
+        model="2-33",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 6, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(11, 0),
+        landing_time=time(11, 30),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook") + "?show_all_years=1")
+
+    assert response.status_code == 200
+    row = response.context["pages"][0]["rows"][0]
+    assert row["dual_received_m"] == 30
+    assert row["pic_m"] == 0
+
+
+@pytest.mark.django_db
+def test_logbook_glider_summary_is_all_time_even_on_default_view(client):
+    _ensure_full_member_status()
+    pilot = _make_member("logbook_all_time_summary")
+    instructor = _make_member(
+        "logbook_all_time_summary_instructor", instructor=True, glider_rating="rated"
+    )
+
+    airfield = Airfield.objects.create(name="Summit Point", identifier="KSUM")
+    glider = Glider.objects.create(
+        n_number="N762C",
+        make="Schleicher",
+        model="ASK-21",
+        club_owned=True,
+        is_active=True,
+    )
+
+    old_logsheet = Logsheet.objects.create(
+        log_date=date.today() - timedelta(days=365 * 5),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=old_logsheet,
+        pilot=pilot,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(9, 0),
+        landing_time=time(9, 30),
+    )
+
+    recent_logsheet = Logsheet.objects.create(
+        log_date=date.today() - timedelta(days=10),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=recent_logsheet,
+        pilot=pilot,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 45),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook"))
+
+    assert response.status_code == 200
+
+    pages = response.context["pages"]
+    total_rows = sum(len(page["rows"]) for page in pages)
+    assert total_rows == 1
+
+    summary_rows = response.context["glider_time_summary"]
+    row = next(r for r in summary_rows if r["make_model"] == "Schleicher ASK-21")
+    assert row["total"] == "1:15"
+    assert row["dual_received"] == "1:15"
+
+
+@pytest.mark.django_db
 def test_instructor_can_view_student_logbook(client):
     _ensure_full_member_status()
     instructor = _make_member("logbook_instructor", instructor=True)

@@ -1,0 +1,133 @@
+"""Focused E2E tests for logbook time breakout behavior (Issue #762)."""
+
+from datetime import date, time, timedelta
+
+from django.urls import reverse
+
+from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
+from logsheet.models import Airfield, Flight, Glider, Logsheet
+
+
+class TestLogbookTimeBreakouts(DjangoPlaywrightTestCase):
+    def _create_common_members(self, pilot_username):
+        pilot = self.create_test_member(
+            username=pilot_username,
+            glider_rating="rated",
+        )
+        pilot.private_glider_checkride_date = date(2020, 1, 1)
+        pilot.save(update_fields=["private_glider_checkride_date"])
+
+        instructor = self.create_test_member(
+            username=f"{pilot_username}_instructor",
+            instructor=True,
+            glider_rating="rated",
+        )
+        return pilot, instructor
+
+    def test_rated_pilot_dual_row_shows_dual_and_pic(self):
+        """Rated pilot with instructor logs both Dual Received and PIC on logbook row."""
+        pilot, instructor = self._create_common_members("e2e_logbook_rated")
+
+        airfield = Airfield.objects.create(name="Front Royal", identifier="KFRR")
+        glider = Glider.objects.create(
+            n_number="N762E2E1",
+            make="Schleicher",
+            model="ASK-21",
+            club_owned=True,
+            is_active=True,
+        )
+        logsheet = Logsheet.objects.create(
+            log_date=date(2024, 6, 1),
+            airfield=airfield,
+            created_by=pilot,
+        )
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            instructor=instructor,
+            glider=glider,
+            launch_method="tow",
+            launch_time=time(10, 0),
+            landing_time=time(10, 25),
+        )
+
+        self.login(username=pilot.username)
+        self.page.goto(
+            f"{self.live_server_url}{reverse('instructors:member_logbook')}?show_all_years=1"
+        )
+        self.page.wait_for_selector("text=Logbook for")
+
+        row = self.page.locator("table.table tbody tr", has_text="2024-06-01").first
+        dual = row.locator("td").nth(11).inner_text().strip()
+        pic = row.locator("td").nth(13).inner_text().strip()
+        total = row.locator("td").nth(15).inner_text().strip()
+
+        assert dual == "0:25"
+        assert pic == "0:25"
+        assert total == "0:25"
+
+    def test_default_view_hides_old_rows_but_summary_is_all_time(self):
+        """Default logbook view still shows all-time totals in the glider summary table."""
+        pilot, instructor = self._create_common_members("e2e_logbook_alltime")
+
+        airfield = Airfield.objects.create(name="Summit Point", identifier="KSUM")
+        glider = Glider.objects.create(
+            n_number="N762E2E2",
+            make="Schleicher",
+            model="ASK-21",
+            club_owned=True,
+            is_active=True,
+        )
+
+        old_date = date.today() - timedelta(days=365 * 5)
+        recent_date = date.today() - timedelta(days=7)
+
+        old_logsheet = Logsheet.objects.create(
+            log_date=old_date,
+            airfield=airfield,
+            created_by=pilot,
+        )
+        Flight.objects.create(
+            logsheet=old_logsheet,
+            pilot=pilot,
+            instructor=instructor,
+            glider=glider,
+            launch_method="tow",
+            launch_time=time(9, 0),
+            landing_time=time(9, 30),
+        )
+
+        recent_logsheet = Logsheet.objects.create(
+            log_date=recent_date,
+            airfield=airfield,
+            created_by=pilot,
+        )
+        Flight.objects.create(
+            logsheet=recent_logsheet,
+            pilot=pilot,
+            instructor=instructor,
+            glider=glider,
+            launch_method="tow",
+            launch_time=time(10, 0),
+            landing_time=time(10, 45),
+        )
+
+        self.login(username=pilot.username)
+        self.page.goto(f"{self.live_server_url}{reverse('instructors:member_logbook')}")
+        self.page.wait_for_selector("text=Logbook for")
+
+        assert self.page.locator(f"text={old_date.isoformat()}").count() == 0
+        assert self.page.locator(f"text={recent_date.isoformat()}").count() > 0
+
+        self.page.wait_for_selector("text=All-Time Glider Time Summary")
+        summary_row = self.page.locator(
+            "table tbody tr", has_text="Schleicher ASK-21"
+        ).first
+
+        dual = summary_row.locator("td").nth(1).inner_text().strip()
+        pic_summary = summary_row.locator("td").nth(4).inner_text().strip()
+        total = summary_row.locator("td").nth(5).inner_text().strip()
+
+        assert dual == "1:15"
+        assert pic_summary == "1:15"
+        assert total == "1:15"

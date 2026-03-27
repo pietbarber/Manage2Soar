@@ -53,6 +53,7 @@ from instructors.models import (
 )
 from instructors.utils import (
     get_flight_summary_for_member,
+    get_logbook_glider_time_summary,
     send_instruction_report_email,
 )
 from knowledgetest.forms import TestBuilderForm
@@ -1693,6 +1694,7 @@ def member_logbook(request, member_id=None):
 
     # 3) Use actual private_glider_checkride_date if available
     rating_date = getattr(member, "private_glider_checkride_date", None)
+    glider_time_summary = get_logbook_glider_time_summary(member)
 
     # 4) Flatten flights & grounds into a single timeline of events, capturing time
     events = []
@@ -1752,10 +1754,9 @@ def member_logbook(request, member_id=None):
             if is_pilot:
                 if f.instructor:
                     # Received dual / PIC
+                    dual_m += dur_m
                     if rating_date and date >= rating_date:
                         pic_m += dur_m
-                    else:
-                        dual_m += dur_m
 
                     # Look up the instruction report from pre-fetched dict (O(1) lookup)
                     report_data = report_lookup.get((f.instructor_id, date))
@@ -2023,6 +2024,7 @@ def member_logbook(request, member_id=None):
             "years": years,
             "year_page_map": year_page_map,
             "all_years": all_years,
+            "glider_time_summary": glider_time_summary,
         },
     )
 

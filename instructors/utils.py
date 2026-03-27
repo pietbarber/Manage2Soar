@@ -1,10 +1,11 @@
 # instructors/utils.py
 
 import logging
+from collections import defaultdict
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Count, F, Max, Sum, Value
+from django.db.models import Count, F, Max, Q, Sum, Value
 from django.db.models.fields import DurationField
 from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
@@ -135,6 +136,120 @@ def get_flight_summary_for_member(member):
                 row[f"{prefix}_time"] = ""
 
     return flights_summary
+
+
+def get_logbook_glider_time_summary(member):
+    """Build an all-time, per-make/model glider time summary for logbook display."""
+
+    def format_minutes(minutes):
+        hours, mins = divmod(int(minutes), 60)
+        return f"{hours}:{mins:02d}"
+
+    rating_date = getattr(member, "private_glider_checkride_date", None)
+
+    flights = Flight.objects.filter(
+        (Q(pilot=member) | Q(instructor=member)),
+        glider__isnull=False,
+    ).select_related("glider", "logsheet")
+
+    summary_by_glider = defaultdict(
+        lambda: {
+            "dual_received_m": 0,
+            "solo_m": 0,
+            "instruction_given_m": 0,
+            "rated_dual_for_pic_m": 0,
+            "total_m": 0,
+        }
+    )
+
+    for flight in flights:
+        flight_date = flight.logsheet.log_date if flight.logsheet else None
+        duration_m = (
+            int(flight.duration.total_seconds() // 60) if flight.duration else 0
+        )
+
+        make = (flight.glider.make or "").strip()
+        model = (flight.glider.model or "").strip()
+        make_model = " ".join(part for part in (make, model) if part).strip()
+        if not make_model:
+            make_model = flight.glider.n_number or "Unknown Glider"
+
+        bucket = summary_by_glider[make_model]
+
+        is_pilot = flight.pilot_id == member.id
+        is_instructor = flight.instructor_id == member.id
+
+        if is_pilot and flight.instructor_id:
+            bucket["dual_received_m"] += duration_m
+            if rating_date and flight_date and flight_date >= rating_date:
+                bucket["rated_dual_for_pic_m"] += duration_m
+
+        if (
+            is_pilot
+            and not flight.instructor_id
+            and not flight.passenger_id
+            and not flight.passenger_name
+        ):
+            bucket["solo_m"] += duration_m
+
+        if is_instructor:
+            bucket["instruction_given_m"] += duration_m
+
+        if is_pilot or is_instructor:
+            bucket["total_m"] += duration_m
+
+    rows = []
+    totals = {
+        "make_model": "Totals",
+        "dual_received_m": 0,
+        "solo_m": 0,
+        "instruction_given_m": 0,
+        "pic_summary_m": 0,
+        "total_m": 0,
+    }
+
+    for make_model in sorted(summary_by_glider):
+        bucket = summary_by_glider[make_model]
+        pic_summary_m = (
+            bucket["solo_m"]
+            + bucket["instruction_given_m"]
+            + bucket["rated_dual_for_pic_m"]
+        )
+
+        row = {
+            "make_model": make_model,
+            "dual_received_m": bucket["dual_received_m"],
+            "solo_m": bucket["solo_m"],
+            "instruction_given_m": bucket["instruction_given_m"],
+            "pic_summary_m": pic_summary_m,
+            "total_m": bucket["total_m"],
+            "dual_received": format_minutes(bucket["dual_received_m"]),
+            "solo": format_minutes(bucket["solo_m"]),
+            "instruction_given": format_minutes(bucket["instruction_given_m"]),
+            "pic_summary": format_minutes(pic_summary_m),
+            "total": format_minutes(bucket["total_m"]),
+        }
+        rows.append(row)
+
+        totals["dual_received_m"] += row["dual_received_m"]
+        totals["solo_m"] += row["solo_m"]
+        totals["instruction_given_m"] += row["instruction_given_m"]
+        totals["pic_summary_m"] += row["pic_summary_m"]
+        totals["total_m"] += row["total_m"]
+
+    if rows:
+        totals.update(
+            {
+                "dual_received": format_minutes(totals["dual_received_m"]),
+                "solo": format_minutes(totals["solo_m"]),
+                "instruction_given": format_minutes(totals["instruction_given_m"]),
+                "pic_summary": format_minutes(totals["pic_summary_m"]),
+                "total": format_minutes(totals["total_m"]),
+            }
+        )
+        rows.append(totals)
+
+    return rows
 
 
 ####################################################

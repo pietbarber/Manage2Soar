@@ -168,6 +168,37 @@
 {% endif %}
 {% endfor %}
 
+{% if glider_time_summary %}
+<h3 class="mt-4">All-Time Glider Time Summary</h3>
+<p class="text-muted">Comprehensive breakout across all logged years by glider make and model.</p>
+<div class="table-responsive">
+  <table class="table table-sm table-bordered mb-4">
+    <thead class="table-dark">
+      <tr>
+        <th>Make / Model</th>
+        <th class="text-end">Dual Received</th>
+        <th class="text-end">Solo</th>
+        <th class="text-end">Instruction Given</th>
+        <th class="text-end">PIC Summary</th>
+        <th class="text-end">Total Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for summary in glider_time_summary %}
+      <tr class="{% if summary.make_model == 'Totals' %}table-secondary fw-bold{% endif %}">
+        <td>{{ summary.make_model }}</td>
+        <td class="text-end">{{ summary.dual_received }}</td>
+        <td class="text-end">{{ summary.solo }}</td>
+        <td class="text-end">{{ summary.instruction_given }}</td>
+        <td class="text-end">{{ summary.pic_summary }}</td>
+        <td class="text-end">{{ summary.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 <!-- Back to Top Button -->
 
 <!-- Back to Top Button -->
