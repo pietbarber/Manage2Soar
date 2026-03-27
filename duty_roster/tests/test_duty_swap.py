@@ -510,6 +510,9 @@ class TestSwapOfferWorkflow:
         assert swap_request.status == "fulfilled"
         assert swap_request.accepted_offer == offer
 
+        updated_assignment = DutyAssignment.objects.get(date=swap_request.original_date)
+        assert updated_assignment.tow_pilot == bob
+
     def test_make_swap_offer(
         self, client, bob, swap_request, bob_duty_assignment, site_config
     ):
