@@ -99,7 +99,11 @@ def _csv_customer_name(member):
 
 
 def _csv_glider_product_name(glider):
-    """Return stable glider Product/Service label for treasurer CSV exports."""
+    """Return stable glider Product/Service label for treasurer CSV exports.
+
+    Product naming is competition-number first (for example `321K`), with
+    model fallback (for example `Discus`) when no competition number is set.
+    """
     if not glider:
         return "Glider"
 
@@ -111,11 +115,10 @@ def _csv_glider_product_name(glider):
 def _csv_towplane_product_name(towplane):
     """Return stable towplane Product/Service label for treasurer CSV exports."""
     if not towplane:
-        return "Tow"
+        return "Towplane"
 
-    model = (towplane.model or "").strip()
     name = (towplane.name or "").strip()
-    return _sanitize_csv_cell(model or name or "Tow")
+    return _sanitize_csv_cell(name or "Towplane")
 
 
 def _member_flight_charge_breakdown(flight, member):
@@ -557,15 +560,17 @@ def export_logsheet_finances_csv(request, pk):
             "Invoice Date",
             "Service Date",
             "Product/Service",
-            "Product/Service",
-            "Description",
-            "Product/Service",
             "Quantity",
-            "Product/Service",
             "Rate",
             "Amount",
         ]
     )
+
+    # Treasurer compatibility: allocate invoice numbers from a high 5-digit
+    # namespace and offset by logsheet PK to avoid collisions across exports.
+    base_invoice_num = 90000 + (int(logsheet.pk or 0) * 1000)
+    next_invoice_num = base_invoice_num
+    member_invoice_numbers = {}
 
     for flight in flights:
         tow_base = (
@@ -592,18 +597,11 @@ def export_logsheet_finances_csv(request, pk):
             for member, split_values in allocations.items()
             if member
         ]
-        has_split_allocations = len(member_allocations) > 1
-
-        for allocation_index, (member, split_values) in enumerate(
-            member_allocations, start=1
-        ):
-            # Treasurer requirement: use flight PK as base invoice identifier.
-            # For split charges, suffix with .1/.2 by allocation order.
-            invoice_num = (
-                f"{flight.pk}.{allocation_index}"
-                if has_split_allocations
-                else str(flight.pk)
-            )
+        for member, split_values in member_allocations:
+            if member.pk not in member_invoice_numbers:
+                member_invoice_numbers[member.pk] = str(next_invoice_num)
+                next_invoice_num += 1
+            invoice_num = member_invoice_numbers[member.pk]
 
             customer_name = _sanitize_csv_cell(_csv_customer_name(member))
             invoice_date = logsheet.log_date.isoformat()
@@ -636,11 +634,7 @@ def export_logsheet_finances_csv(request, pk):
                         invoice_date,
                         service_date,
                         f"{glider_name} Rental",
-                        "",
-                        "",
-                        "",
                         _format_charge_csv_number(quantity),
-                        "",
                         _format_charge_csv_number(rate),
                         _format_charge_csv_number(rental_amount),
                     ]
@@ -649,10 +643,14 @@ def export_logsheet_finances_csv(request, pk):
             tow_amount = quantize_currency(split_values.get("tow"))
             if tow_amount > Decimal("0.00"):
                 towplane_name = _csv_towplane_product_name(flight.towplane)
-                tow_label = (
+                towplane_token = "".join(str(towplane_name).split())
+                tow_height_token = (
                     str(flight.release_altitude)
                     if flight.release_altitude is not None
-                    else "Tow"
+                    else ""
+                )
+                tow_product_service = _sanitize_csv_cell(
+                    f"{tow_height_token}{towplane_token}Tow"
                 )
 
                 writer.writerow(
@@ -661,12 +659,8 @@ def export_logsheet_finances_csv(request, pk):
                         customer_name,
                         invoice_date,
                         service_date,
-                        tow_label,
-                        f"{towplane_name} Tow",
-                        "",
-                        "",
+                        tow_product_service,
                         "1",
-                        "",
                         _format_charge_csv_number(tow_amount),
                         _format_charge_csv_number(tow_amount),
                     ]

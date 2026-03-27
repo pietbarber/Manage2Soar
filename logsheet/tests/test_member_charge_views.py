@@ -873,6 +873,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             is_active=True,
         )
         towplane = Towplane.objects.create(
+            name="Pawnee",
             n_number="N200BB",
             make="Piper",
             model="Pawnee",
@@ -909,18 +910,20 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         )
 
         content = response.content.decode("utf-8")
-        self.assertIn("Inv Num,Customer,Invoice Date,Service Date", content)
+        self.assertIn(
+            "Inv Num,Customer,Invoice Date,Service Date,Product/Service,Quantity,Rate,Amount",
+            content,
+        )
         self.assertIn("Pilot, Test", content)
-        self.assertIn(",47,,0.4,18.8", content)
-        self.assertIn(",3000", content)
-        self.assertIn(",1,,45,45", content)
+        self.assertIn(",47,0.4,18.8", content)
+        self.assertIn(",3000PawneeTow,1,45,45", content)
 
         rows = list(csv.reader(StringIO(content)))
         data_rows = rows[1:]
         invoice_numbers = [r[0] for r in data_rows]
 
         rental_rows = [row for row in data_rows if row[4].endswith(" Rental")]
-        tow_rows = [row for row in data_rows if row[5].endswith(" Tow")]
+        tow_rows = [row for row in data_rows if row[4].endswith("Tow")]
 
         self.assertEqual(len(rental_rows), 1)
         self.assertEqual(rental_rows[0][4], "PW-5 Rental")
@@ -928,14 +931,15 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.assertNotIn("N100AA", rental_rows[0][4])
 
         self.assertEqual(len(tow_rows), 1)
-        self.assertEqual(tow_rows[0][5], "Pawnee Tow")
-        self.assertNotIn("(", tow_rows[0][5])
-        self.assertNotIn("N200BB", tow_rows[0][5])
+        self.assertEqual(tow_rows[0][4], "3000PawneeTow")
+        self.assertNotIn("(", tow_rows[0][4])
+        self.assertNotIn("N200BB", tow_rows[0][4])
 
-        # Treasurer requirement: invoice number comes directly from Flight.pk.
+        # Treasurer requirement fallback: use non-conflicting 90000+ invoice IDs.
         self.assertGreater(len(invoice_numbers), 0)
         self.assertEqual(len(set(invoice_numbers)), 1)
-        self.assertEqual(invoice_numbers[0], str(flight.pk))
+        self.assertTrue(invoice_numbers[0].isdigit())
+        self.assertGreaterEqual(int(invoice_numbers[0]), 90000)
 
     def test_treasurer_csv_export_prefers_glider_competition_number_for_product(self):
         """Glider Product/Service should use competition number when present."""
@@ -949,6 +953,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             is_active=True,
         )
         towplane = Towplane.objects.create(
+            name="Pawnee",
             n_number="N204BB",
             make="Piper",
             model="Pawnee",
@@ -985,8 +990,8 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.assertEqual(len(rental_rows), 1)
         self.assertEqual(rental_rows[0][4], "321K Rental")
 
-    def test_treasurer_csv_export_uses_split_suffix_invoice_numbers(self):
-        """Split allocations should use Flight.pk.1 / Flight.pk.2 invoice IDs."""
+    def test_treasurer_csv_export_uses_unique_member_invoice_numbers(self):
+        """Split allocations should use separate 90000+ invoice IDs per member."""
         glider = Glider.objects.create(
             n_number="N101AA",
             make="PW",
@@ -996,6 +1001,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             is_active=True,
         )
         towplane = Towplane.objects.create(
+            name="Pawnee",
             n_number="N201BB",
             make="Piper",
             model="Pawnee",
@@ -1030,10 +1036,164 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         rows = list(csv.reader(StringIO(response.content.decode("utf-8"))))
         data_rows = rows[1:]
 
-        split_invoice_numbers = {
-            row[0] for row in data_rows if row[0].startswith(f"{flight.pk}.")
-        }
-        self.assertEqual(split_invoice_numbers, {f"{flight.pk}.1", f"{flight.pk}.2"})
+        split_invoice_numbers = {row[0] for row in data_rows}
+        self.assertEqual(len(split_invoice_numbers), 2)
+        for invoice_num in split_invoice_numbers:
+            self.assertTrue(invoice_num.isdigit())
+            self.assertGreaterEqual(int(invoice_num), 90000)
+
+    def test_treasurer_csv_export_invoice_numbers_differ_across_logsheets(self):
+        """Separate logsheet exports should not reuse the same invoice numbers."""
+        glider = Glider.objects.create(
+            n_number="N107AA",
+            make="PW",
+            model="PW-5",
+            rental_rate=Decimal("24.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            name="Pawnee",
+            n_number="N207BB",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+
+        first_logsheet = self.logsheet
+        second_logsheet = Logsheet.objects.create(
+            log_date=self.logsheet.log_date.replace(
+                day=min(self.logsheet.log_date.day + 1, 28)
+            ),
+            airfield=self.airfield,
+            created_by=self.duty_officer,
+        )
+
+        Flight.objects.create(
+            logsheet=first_logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(9, 0),
+            landing_time=time(9, 20),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("25.00"),
+            rental_cost_actual=Decimal("10.00"),
+        )
+        Flight.objects.create(
+            logsheet=second_logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(10, 0),
+            landing_time=time(10, 20),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("25.00"),
+            rental_cost_actual=Decimal("10.00"),
+        )
+
+        first_logsheet.finalized = True
+        first_logsheet.save(update_fields=["finalized"])
+        second_logsheet.finalized = True
+        second_logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+
+        first_response = self.client.get(
+            reverse(
+                "logsheet:export_logsheet_finances_csv",
+                kwargs={"pk": first_logsheet.pk},
+            )
+        )
+        second_response = self.client.get(
+            reverse(
+                "logsheet:export_logsheet_finances_csv",
+                kwargs={"pk": second_logsheet.pk},
+            )
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+
+        first_rows = list(csv.reader(StringIO(first_response.content.decode("utf-8"))))
+        second_rows = list(
+            csv.reader(StringIO(second_response.content.decode("utf-8")))
+        )
+        first_invoice_num = first_rows[1][0]
+        second_invoice_num = second_rows[1][0]
+
+        self.assertNotEqual(first_logsheet.pk, second_logsheet.pk)
+        self.assertNotEqual(first_invoice_num, second_invoice_num)
+
+    def test_treasurer_csv_export_groups_multiple_flights_under_one_member_invoice(
+        self,
+    ):
+        """One pilot's line items should share one invoice number across flights."""
+        glider = Glider.objects.create(
+            n_number="N106AA",
+            make="PW",
+            model="PW-5",
+            rental_rate=Decimal("24.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            name="Pawnee",
+            n_number="N206BB",
+            make="Piper",
+            model="PA-25-260",
+            club_owned=True,
+            is_active=True,
+        )
+
+        Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(9, 0),
+            landing_time=time(9, 20),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("30.00"),
+            rental_cost_actual=Decimal("8.00"),
+        )
+        Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(10, 0),
+            landing_time=time(10, 25),
+            release_altitude=2500,
+            tow_cost_actual=Decimal("28.00"),
+            rental_cost_actual=Decimal("10.00"),
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        self.assertEqual(response.status_code, 200)
+        rows = list(csv.reader(StringIO(response.content.decode("utf-8"))))
+        data_rows = rows[1:]
+        pilot_rows = [row for row in data_rows if row[1] == "Pilot, Test"]
+        self.assertGreater(len(pilot_rows), 2)
+
+        invoice_numbers = {row[0] for row in pilot_rows}
+        self.assertEqual(len(invoice_numbers), 1)
+        invoice_num = next(iter(invoice_numbers))
+        self.assertTrue(invoice_num.isdigit())
+        self.assertGreaterEqual(int(invoice_num), 90000)
 
     def test_treasurer_csv_export_handles_zero_release_altitude(self):
         """A 0-ft tow altitude should export as '0', not fallback 'Tow'."""
@@ -1046,6 +1206,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             is_active=True,
         )
         towplane = Towplane.objects.create(
+            name="Pawnee",
             n_number="N202BB",
             make="Piper",
             model="Pawnee",
@@ -1075,7 +1236,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         response = self.client.get(export_url)
 
         content = response.content.decode("utf-8")
-        self.assertIn(",0,", content)
+        self.assertIn(",0PawneeTow,1,12,12", content)
 
     def test_treasurer_csv_export_uses_computed_duration_when_duration_missing(self):
         """Export should use computed_duration fallback, not default quantity=1."""
@@ -1088,6 +1249,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             is_active=True,
         )
         towplane = Towplane.objects.create(
+            name="Pawnee",
             n_number="N203BB",
             make="Piper",
             model="Pawnee",
@@ -1118,7 +1280,52 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         response = self.client.get(export_url)
 
         content = response.content.decode("utf-8")
-        self.assertIn(",30,,0.5,15", content)
+        self.assertIn(",30,0.5,15", content)
+
+    def test_treasurer_csv_export_prefers_generic_towplane_name_for_tow_token(self):
+        """Tow Product/Service should use generic towplane name, not make/model text."""
+        glider = Glider.objects.create(
+            n_number="N105AA",
+            make="PW",
+            model="PW-5",
+            rental_rate=Decimal("20.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            name="Pawnee",
+            n_number="N205BB",
+            make="Piper",
+            model="PA-25-260",
+            club_owned=True,
+            is_active=True,
+        )
+        Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(13, 0),
+            landing_time=time(13, 20),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("25.00"),
+            rental_cost_actual=Decimal("10.00"),
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("3000PawneeTow", content)
+        self.assertNotIn("3000PA-25-260Tow", content)
 
     def test_format_charge_csv_number_uses_half_up_rounding(self):
         """CSV number formatting should align with billing half-up semantics."""
