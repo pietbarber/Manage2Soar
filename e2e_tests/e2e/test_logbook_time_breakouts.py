@@ -9,6 +9,13 @@ from logsheet.models import Airfield, Flight, Glider, Logsheet
 
 
 class TestLogbookTimeBreakouts(DjangoPlaywrightTestCase):
+    def _header_index_map(self, table):
+        headers = [
+            table.locator("thead tr").last.locator("th").nth(i).inner_text().strip()
+            for i in range(table.locator("thead tr").last.locator("th").count())
+        ]
+        return {name: idx for idx, name in enumerate(headers)}
+
     def _create_common_members(self, pilot_username):
         pilot = self.create_test_member(
             username=pilot_username,
@@ -57,10 +64,13 @@ class TestLogbookTimeBreakouts(DjangoPlaywrightTestCase):
         )
         self.page.wait_for_selector("text=Logbook for")
 
-        row = self.page.locator("table.table tbody tr", has_text="2024-06-01").first
-        dual = row.locator("td").nth(11).inner_text().strip()
-        pic = row.locator("td").nth(13).inner_text().strip()
-        total = row.locator("td").nth(15).inner_text().strip()
+        logbook_table = self.page.locator("table.table").first
+        col = self._header_index_map(logbook_table)
+
+        row = logbook_table.locator("tbody tr", has_text="2024-06-01").first
+        dual = row.locator("td").nth(col["Dual"]).inner_text().strip()
+        pic = row.locator("td").nth(col["PIC"]).inner_text().strip()
+        total = row.locator("td").nth(col["Total"]).inner_text().strip()
 
         assert dual == "0:25"
         assert pic == "0:25"
@@ -120,8 +130,11 @@ class TestLogbookTimeBreakouts(DjangoPlaywrightTestCase):
         assert self.page.locator(f"text={recent_date.isoformat()}").count() > 0
 
         self.page.wait_for_selector("text=All-Time Glider Time Summary")
-        summary_row = self.page.locator(
-            "table tbody tr", has_text="Schleicher ASK-21"
+        summary_table = self.page.locator(
+            "h3:has-text('All-Time Glider Time Summary') + p + div table"
+        ).first
+        summary_row = summary_table.locator(
+            "tbody tr", has_text="Schleicher ASK-21"
         ).first
 
         dual = summary_row.locator("td").nth(1).inner_text().strip()
