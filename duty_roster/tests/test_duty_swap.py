@@ -21,6 +21,7 @@ from duty_roster.models import (
     DutySwapRequest,
     MemberBlackout,
 )
+from duty_roster.views_swap import _accept_offer_and_finalize
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
@@ -613,6 +614,30 @@ class TestOfferAcceptDecline:
 
         swap_offer.refresh_from_db()
         assert swap_offer.status == "withdrawn"
+
+    def test_accept_helper_returns_false_when_request_already_fulfilled(
+        self, swap_request, swap_offer, charlie
+    ):
+        """Concurrent/stale accept attempts do not overwrite fulfilled requests."""
+        swap_request.status = "fulfilled"
+        swap_request.accepted_offer = swap_offer
+        swap_request.save(update_fields=["status", "accepted_offer"])
+
+        stale_offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=charlie,
+            offer_type="cover",
+            status="pending",
+        )
+
+        accepted = _accept_offer_and_finalize(swap_request, stale_offer)
+        stale_offer.refresh_from_db()
+        swap_request.refresh_from_db()
+
+        assert accepted is False
+        assert stale_offer.status == "auto_declined"
+        assert swap_request.status == "fulfilled"
+        assert swap_request.accepted_offer == swap_offer
 
 
 # =============================================================================

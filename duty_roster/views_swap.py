@@ -642,12 +642,19 @@ def make_offer(request, request_id):
 
             # A pure cover offer does not require requester acknowledgement.
             if offer.offer_type == "cover" and not offer.proposed_swap_date:
-                _accept_offer_and_finalize(swap_request, offer)
-                messages.success(
-                    request,
-                    "Your cover offer was accepted automatically. "
-                    "The duty assignment has been updated.",
-                )
+                accepted = _accept_offer_and_finalize(swap_request, offer)
+                if accepted:
+                    messages.success(
+                        request,
+                        "Your cover offer was accepted automatically. "
+                        "The duty assignment has been updated.",
+                    )
+                else:
+                    messages.info(
+                        request,
+                        "This request was just fulfilled by another offer. "
+                        "Your offer was not applied.",
+                    )
             else:
                 # Notify requester for offers that still need a decision.
                 send_offer_made_notification(offer)
@@ -667,37 +674,74 @@ def make_offer(request, request_id):
 
 
 def _accept_offer_and_finalize(swap_request, offer):
-    """Accept an offer, fulfill the request, and send notifications."""
+    """Accept an offer, fulfill the request, and queue notifications post-commit."""
     with transaction.atomic():
+        locked_request = DutySwapRequest.objects.select_for_update().get(
+            pk=swap_request.pk
+        )
+        locked_offer = DutySwapOffer.objects.select_for_update().get(pk=offer.pk)
         now = timezone.now()
 
+        # Abort if another transaction already fulfilled this request.
+        if (
+            locked_request.status != "open"
+            or locked_request.accepted_offer_id is not None
+            or locked_offer.status != "pending"
+        ):
+            if locked_offer.status == "pending":
+                locked_offer.status = "auto_declined"
+                locked_offer.responded_at = now
+                locked_offer.save(update_fields=["status", "responded_at"])
+            return False
+
         # Accept this offer
-        offer.status = "accepted"
-        offer.responded_at = now
-        offer.save()
+        locked_offer.status = "accepted"
+        locked_offer.responded_at = now
+        locked_offer.save(update_fields=["status", "responded_at"])
 
         # Mark request as fulfilled
-        swap_request.status = "fulfilled"
-        swap_request.accepted_offer = offer
-        swap_request.fulfilled_at = now
-        swap_request.save()
+        locked_request.status = "fulfilled"
+        locked_request.accepted_offer = locked_offer
+        locked_request.fulfilled_at = now
+        locked_request.save(update_fields=["status", "accepted_offer", "fulfilled_at"])
 
         # Auto-decline other pending offers
         other_offers = list(
-            swap_request.offers.filter(status="pending").exclude(pk=offer.pk)
+            locked_request.offers.filter(status="pending").exclude(pk=locked_offer.pk)
         )
         for other in other_offers:
             other.status = "auto_declined"
             other.responded_at = now
-            other.save()
+            other.save(update_fields=["status", "responded_at"])
 
         # Update duty assignments
-        update_duty_assignments(swap_request, offer)
+        update_duty_assignments(locked_request, locked_offer)
 
-        # Send notifications
-        send_offer_accepted_notifications(offer)
-        for other in other_offers:
-            send_offer_declined_notification(other, auto=True)
+        accepted_offer_id = locked_offer.pk
+        declined_offer_ids = [other.pk for other in other_offers]
+
+        def _send_notifications_after_commit():
+            accepted_offer = DutySwapOffer.objects.select_related(
+                "swap_request", "offered_by", "swap_request__requester"
+            ).get(pk=accepted_offer_id)
+            send_offer_accepted_notifications(accepted_offer)
+
+            for declined_offer_id in declined_offer_ids:
+                declined_offer = DutySwapOffer.objects.select_related(
+                    "swap_request", "offered_by", "swap_request__requester"
+                ).get(pk=declined_offer_id)
+                send_offer_declined_notification(declined_offer, auto=True)
+
+        transaction.on_commit(_send_notifications_after_commit)
+
+        # Keep caller instances up to date for downstream messages.
+        offer.status = locked_offer.status
+        offer.responded_at = locked_offer.responded_at
+        swap_request.status = locked_request.status
+        swap_request.accepted_offer = locked_request.accepted_offer
+        swap_request.fulfilled_at = locked_request.fulfilled_at
+
+        return True
 
 
 @active_member_required
@@ -718,7 +762,10 @@ def accept_offer(request, offer_id):
         messages.error(request, "This offer is no longer available.")
         return redirect("duty_roster:swap_request_detail", request_id=swap_request.pk)
 
-    _accept_offer_and_finalize(swap_request, offer)
+    accepted = _accept_offer_and_finalize(swap_request, offer)
+    if not accepted:
+        messages.error(request, "This offer is no longer available.")
+        return redirect("duty_roster:swap_request_detail", request_id=swap_request.pk)
 
     messages.success(
         request,
