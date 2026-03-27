@@ -110,7 +110,7 @@
             <ul class="dropdown-menu" aria-labelledby="membersDropdown">
               <li><a class="dropdown-item" href="{% url 'members:member_list' %}"><i class="fas fa-address-book me-1"></i> Member List</a></li>
               {% if user.is_authenticated %}
-                {% if user.member_manager or user.webmaster or user.is_superuser %}
+                {% if user.director or user.member_manager or user.webmaster or user.is_superuser %}
               <li><a class="dropdown-item" href="{% url 'members:membership_applications_list' %}"><i class="fas fa-user-plus"></i> Membership Applications</a></li>
                 {% endif %}
               {% endif %}

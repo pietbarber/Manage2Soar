@@ -21,6 +21,18 @@ from .models_applications import MembershipApplication
 logger = logging.getLogger(__name__)
 
 
+def _can_view_membership_applications(user):
+    """Return True when the user may view membership applications/waitlist."""
+    return bool(
+        user.director or user.member_manager or user.webmaster or user.is_superuser
+    )
+
+
+def _can_modify_membership_applications(user):
+    """Return True when the user may modify membership applications/waitlist."""
+    return bool(user.member_manager or user.webmaster or user.is_superuser)
+
+
 @ensure_csrf_cookie
 @require_http_methods(["GET", "POST"])
 def membership_application(request):
@@ -135,16 +147,12 @@ def membership_application(request):
 @active_member_required
 def membership_applications_list(request):
     """
-    List of all membership applications for membership managers.
-    Only accessible to members with member_manager role.
+    List of membership applications for authorized club roles.
+    Directors have read-only visibility.
     """
 
-    # Check if user has permission to manage memberships
-    if not (
-        request.user.member_manager
-        or request.user.webmaster
-        or request.user.is_superuser
-    ):
+    # Check if user has permission to view memberships
+    if not _can_view_membership_applications(request.user):
         raise PermissionDenied(
             "You do not have permission to view membership applications."
         )
@@ -204,6 +212,7 @@ def membership_applications_list(request):
             "search_query": search_query,
             "status_counts": status_counts_dict,
             "status_choices": MembershipApplication.STATUS_CHOICES,
+            "can_modify": _can_modify_membership_applications(request.user),
         },
     )
 
@@ -211,19 +220,17 @@ def membership_applications_list(request):
 @active_member_required
 def membership_application_detail(request, application_id):
     """
-    Detailed view of a membership application with review capabilities.
-    Only accessible to membership managers.
+    Detailed view of a membership application.
+    Directors have read-only visibility.
     """
 
-    # Check permissions
-    if not (
-        request.user.member_manager
-        or request.user.webmaster
-        or request.user.is_superuser
-    ):
+    # Check read permissions
+    if not _can_view_membership_applications(request.user):
         raise PermissionDenied(
             "You do not have permission to view membership applications."
         )
+
+    can_modify = _can_modify_membership_applications(request.user)
 
     # Get the application
     application = get_object_or_404(
@@ -231,6 +238,11 @@ def membership_application_detail(request, application_id):
     )
 
     if request.method == "POST":
+        if not can_modify:
+            raise PermissionDenied(
+                "Directors have read-only access to membership applications."
+            )
+
         review_form = MembershipApplicationReviewForm(
             request.POST, instance=application
         )
@@ -375,6 +387,7 @@ def membership_application_detail(request, application_id):
         {
             "application": application,
             "review_form": review_form,
+            "can_modify": can_modify,
         },
     )
 
@@ -382,21 +395,24 @@ def membership_application_detail(request, application_id):
 @active_member_required
 def membership_waitlist(request):
     """
-    Manage the membership waiting list - allows reordering of applications.
-    Only accessible to membership managers.
+    View/manage the membership waiting list.
+    Directors have read-only visibility.
     """
 
-    # Check permissions
-    if not (
-        request.user.member_manager
-        or request.user.webmaster
-        or request.user.is_superuser
-    ):
+    # Check read permissions
+    if not _can_view_membership_applications(request.user):
         raise PermissionDenied(
-            "You do not have permission to manage the membership waiting list."
+            "You do not have permission to view the membership waiting list."
         )
 
+    can_modify = _can_modify_membership_applications(request.user)
+
     if request.method == "POST":
+        if not can_modify:
+            raise PermissionDenied(
+                "Directors have read-only access to membership waitlist status."
+            )
+
         # Handle waitlist reordering
         action = request.POST.get("action")
         application_id = request.POST.get("application_id")
@@ -534,6 +550,7 @@ def membership_waitlist(request):
         "members/membership_waitlist.html",
         {
             "applications": waitlisted_applications,
+            "can_modify": can_modify,
         },
     )
 

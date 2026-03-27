@@ -282,7 +282,7 @@
         </div>
 
         <!-- Review Form -->
-        {% if application.status != 'approved' and application.status != 'rejected' %}
+        {% if application.status != 'approved' and application.status != 'rejected' and can_modify %}
         <div class="review-section">
             <h4><i class="fas fa-gavel"></i> Review Application</h4>
             <form method="post">
@@ -328,6 +328,11 @@
                     </button>
                 </div>
             </form>
+        </div>
+        {% elif application.status != 'approved' and application.status != 'rejected' %}
+        <div class="alert alert-info">
+            <h5><i class="fas fa-eye"></i> Read-Only Director View</h5>
+            <p class="mb-0">You can review the application and waitlist status, but only membership managers/webmasters can make changes.</p>
         </div>
         {% elif application.status == 'approved' %}
         <div class="alert alert-success">
