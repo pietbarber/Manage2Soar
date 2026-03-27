@@ -230,11 +230,44 @@ def test_guest_instructor_flight_counts_as_dual_and_rated_pic(client):
     row = response.context["pages"][0]["rows"][0]
     assert row["dual_received_m"] == 20
     assert row["pic_m"] == 20
+    assert "instruction received" in row["comments"]
+    assert "Guest CFI" in row["comments"]
 
     summary_rows = response.context["glider_time_summary"]
     summary_row = next(r for r in summary_rows if r["make_model"] == "DG DG-1000")
     assert summary_row["dual_received"] == "0:20"
     assert summary_row["pic_summary"] == "0:20"
+
+
+@pytest.mark.django_db
+def test_private_flights_are_included_in_all_time_summary(client):
+    _ensure_full_member_status()
+    pilot = _make_member("logbook_private_summary", glider_rating="rated")
+    pilot.private_glider_checkride_date = date(2020, 1, 1)
+    pilot.save(update_fields=["private_glider_checkride_date"])
+
+    airfield = Airfield.objects.create(name="Private Field", identifier="KPRV")
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 8, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        launch_method="tow",
+        launch_time=time(8, 0),
+        landing_time=time(8, 25),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook") + "?show_all_years=1")
+
+    assert response.status_code == 200
+    summary_rows = response.context["glider_time_summary"]
+    private_row = next(r for r in summary_rows if r["make_model"] == "Private")
+    assert private_row["solo"] == "0:25"
+    assert private_row["total"] == "0:25"
 
 
 @pytest.mark.django_db

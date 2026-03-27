@@ -142,7 +142,7 @@ def is_logbook_rated_dual_flight(flight_date, rating_date):
     return bool(rating_date and flight_date and flight_date >= rating_date)
 
 
-def _has_instructor_context(flight):
+def has_logbook_instructor_context(flight):
     """Return True when a flight includes any instructor source (FK or imported name)."""
     return bool(
         flight.instructor_id
@@ -166,7 +166,7 @@ def classify_logbook_flight_minutes(flight, member_id, rating_date):
     inst_m = 0
 
     if is_pilot:
-        if _has_instructor_context(flight):
+        if has_logbook_instructor_context(flight):
             dual_m += duration_m
             if is_logbook_rated_dual_flight(flight_date, rating_date):
                 pic_m += duration_m
@@ -219,7 +219,7 @@ def get_logbook_glider_time_summary(member):
         rated_dual_filter = dual_filter & Q(logsheet__log_date__gte=rating_date)
 
     grouped = (
-        Flight.objects.filter(total_filter, glider__isnull=False)
+        Flight.objects.filter(total_filter)
         .values("glider__make", "glider__model")
         .annotate(
             dual_received_duration=Coalesce(
@@ -266,7 +266,7 @@ def get_logbook_glider_time_summary(member):
         model = (grouped_row.get("glider__model") or "").strip()
         make_model = " ".join(part for part in (make, model) if part).strip()
         if not make_model:
-            make_model = "Unknown Glider"
+            make_model = "Private"
 
         dual_received_m = int(
             grouped_row["dual_received_duration"].total_seconds() // 60

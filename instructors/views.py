@@ -55,6 +55,7 @@ from instructors.utils import (
     classify_logbook_flight_minutes,
     get_flight_summary_for_member,
     get_logbook_glider_time_summary,
+    has_logbook_instructor_context,
     send_instruction_report_email,
 )
 from knowledgetest.forms import TestBuilderForm
@@ -1761,9 +1762,11 @@ def member_logbook(request, member_id=None):
 
             # 5b) Pilot logic: instruction received vs lesson codes
             if is_pilot:
-                if f.instructor:
+                if has_logbook_instructor_context(f):
                     # Look up the instruction report from pre-fetched dict (O(1) lookup)
-                    report_data = report_lookup.get((f.instructor_id, date))
+                    report_data = None
+                    if f.instructor_id:
+                        report_data = report_lookup.get((f.instructor_id, date))
 
                     if report_data:
                         rpt = report_data["report"]
@@ -1773,7 +1776,15 @@ def member_logbook(request, member_id=None):
                         )
                         report_id = rpt.id
                     else:
-                        comments = "instruction received"
+                        fallback_instructor_name = (
+                            f.guest_instructor_name or f.legacy_instructor_name or ""
+                        )
+                        if fallback_instructor_name:
+                            comments = (
+                                f"instruction received /s/ {fallback_instructor_name}"
+                            )
+                        else:
+                            comments = "instruction received"
                         report_id = None
                 else:
                     if f.passenger:
