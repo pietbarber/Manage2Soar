@@ -11,8 +11,9 @@ The Duty Roster app manages operational crew assignments, member availability, d
 
 ```mermaid
 erDiagram
+    Member o|--o{ DutyRosterMessage : "last editor"
     Member ||--o{ MemberBlackout : "has blackout dates"
-    Member ||--o{ DutyPreference : "has preferences"
+    Member ||--o| DutyPreference : "has preference profile"
     Member ||--o{ DutyPairing : "paired with"
     Member ||--o{ DutyPairing : "paired as"
     Member ||--o{ DutyAvoidance : "avoids member"
@@ -24,28 +25,44 @@ erDiagram
     Member ||--o{ DutySwapRequest : "receives direct request"
     Member ||--o{ DutySwapOffer : "makes offer"
     Member ||--o{ OpsIntent : "declares availability"
+    Member ||--o{ GliderReservation : "reserves glider"
     Airfield ||--o{ DutyAssignment : "duty at"
     DutyAssignment ||--o{ InstructionSlot : "instruction during"
     DutySwapRequest ||--o{ DutySwapOffer : "receives offers"
     DutySwapRequest ||--|| DutySwapOffer : "accepts one offer"
     Glider ||--o{ OpsIntent : "flying glider"
+    Glider ||--o{ GliderReservation : "reserved as"
+
+    DutyRosterMessage {
+        int id PK
+        text content
+        bool is_active
+        datetime updated_at
+        int updated_by FK "nullable"
+    }
 
     MemberBlackout {
         int id PK
         int member FK
         date date
-        string reason
-        datetime created_at
-        datetime updated_at
+        string note
     }
 
     DutyPreference {
         int id PK
         int member FK
-        string role
-        int preference_level
-        datetime created_at
-        datetime updated_at
+        string preferred_day "optional"
+        text comment "optional"
+        bool dont_schedule
+        bool scheduling_suspended
+        string suspended_reason "optional"
+        date last_duty_date "optional"
+        int instructor_percent
+        int duty_officer_percent
+        int ado_percent
+        int towpilot_percent
+        decimal max_assignments_per_month
+        bool allow_weekend_double
     }
 
     DutyPairing {
@@ -131,9 +148,43 @@ erDiagram
         text notes
         datetime created_at
     }
+
+    GliderReservation {
+        int id PK
+        int member FK
+        int glider FK
+        date date
+        time start_time "optional"
+        time end_time "optional"
+        string reservation_type
+        string time_preference
+        string status
+        text purpose
+        datetime cancelled_at "optional"
+        text cancellation_reason
+        datetime created_at
+        datetime updated_at
+    }
 ```
 
 ## Models
+
+### DutyRosterMessage
+
+**Purpose:** Stores the singleton, rich-text rostermeister announcement shown on calendar pages.
+
+**Key Features:**
+- Singleton enforcement (one record only)
+- Rich HTML content with sanitization
+- Activate/deactivate toggle without deleting content
+
+**Fields:**
+- `content` (HTMLField): Message body shown in duty roster views
+- `is_active` (BooleanField): Enables/disables display
+- `updated_by` (FK to Member): Last editor
+- `updated_at`: Last update timestamp
+
+---
 
 ### MemberBlackout
 
@@ -147,8 +198,7 @@ erDiagram
 **Fields:**
 - `member` (FK to Member): The member who is unavailable
 - `date` (Date): The specific date of unavailability
-- `reason` (CharField): Optional reason for the blackout
-- `created_at`, `updated_at`: Audit timestamps
+- `note` (CharField): Optional note for context
 
 **Usage:**
 Members declare blackout dates through the duty roster UI. The roster generator respects these constraints when making assignments.
@@ -157,24 +207,27 @@ Members declare blackout dates through the duty roster UI. The roster generator 
 
 ### DutyPreference
 
-**Purpose:** Stores member preferences for specific duty roles.
+**Purpose:** Stores one profile of scheduling preferences and assignment-rate controls per member.
 
 **Key Features:**
-- Preference levels (0-10 scale) for each role type
-- Influences roster generator's assignment decisions
-- Helps balance member satisfaction with operational needs
+- Preferred operational day selection
+- Suspension and exclusion flags for scheduling
+- Role allocation percentages and max monthly assignment rate
+- Weekend double-assignment opt-in
 
 **Fields:**
-- `member` (FK to Member): The member expressing preference
-- `role` (CharField): Role key (DO, ADO, INSTRUCTOR, TOW)
-- `preference_level` (IntegerField): 0-10 scale (0=avoid, 10=prefer)
-- `created_at`, `updated_at`: Audit timestamps
-
-**Choices:**
-- Roles: Duty Officer (DO), Assistant Duty Officer (ADO), Instructor (INSTRUCTOR), Tow Pilot (TOW)
+- `member` (OneToOne to Member): The member preference profile owner
+- `preferred_day` (CharField): Preferred day (`sat` or `sun`)
+- `comment` (TextField): Freeform scheduling notes
+- `dont_schedule` / `scheduling_suspended` (BooleanField): Scheduling controls
+- `suspended_reason` (CharField): Explanation when scheduling is suspended
+- `last_duty_date` (DateField): Last assigned duty date
+- `instructor_percent`, `duty_officer_percent`, `ado_percent`, `towpilot_percent` (PositiveIntegerField): Role allocation profile
+- `max_assignments_per_month` (DecimalField): Assignment-rate cap
+- `allow_weekend_double` (BooleanField): Allows both Saturday and Sunday assignments
 
 **Usage:**
-Members set preferences through their profile. Roster generator uses these as soft constraints to optimize assignments.
+Members configure availability and assignment preferences through their profile. Roster generation uses these settings to balance coverage and member constraints.
 
 ---
 
@@ -426,6 +479,31 @@ Members respond to swap requests by making offers. Cover offers are simpler (jus
 
 **Usage:**
 Members declare their operational intent for upcoming flying days. Helps Duty Officers and Operations team plan resources, coordinate instruction, and ensure adequate tow pilot coverage. Provides visibility into expected operational tempo.
+
+---
+
+### GliderReservation
+
+**Purpose:** Supports member reservations of club gliders for upcoming operation dates.
+
+**Key Features:**
+- Date-based reservations tied to specific gliders and members
+- Time preference and optional time window support
+- Reservation status lifecycle (`confirmed`, `cancelled`, `completed`, `no_show`)
+- Used by planning and notification workflows
+
+**Fields:**
+- `member` (FK to Member): Member making the reservation
+- `glider` (FK to Glider): Reserved aircraft
+- `date` (Date): Reservation date
+- `start_time`, `end_time` (TimeField, optional): Specific time window
+- `reservation_type` (CharField): Flight intent classification
+- `time_preference` (CharField): Broad time-of-day preference
+- `status` (CharField): Current reservation state
+- `purpose` (TextField): Optional details
+- `cancellation_reason` (TextField, optional): Explanation when a reservation is cancelled
+- `cancelled_at` (DateTimeField, optional): Timestamp when reservation was cancelled
+- `created_at`, `updated_at`: Audit timestamps
 
 ---
 

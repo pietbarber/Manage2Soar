@@ -132,20 +132,20 @@ stateDiagram-v2
         LandingPractice --> [*]
     }
 
-    PreSolo --> SoloPrep: Phase 1 Complete
+    PreSolo --> SoloPrep: Core Skills Complete
     SoloPrep --> FirstSolo: Instructor Sign-off
     FirstSolo --> PostSolo: Solo Achievement
 
     state PostSolo {
-        [*] --> CrossCountry
-        CrossCountry --> AdvancedManeuvers
-        AdvancedManeuvers --> WeatherDecision
-        WeatherDecision --> [*]
+        [*] --> SkillRefinement
+        SkillRefinement --> AdvancedManeuvers
+        AdvancedManeuvers --> PracticalTestPrep
+        PracticalTestPrep --> [*]
     }
 
-    PostSolo --> CheckRide: Phase 2 Complete
-    CheckRide --> Certified: Examiner Approval
-    CheckRide --> Remedial: Additional Training Needed
+    PostSolo --> PracticalTest: Practical Test Readiness Review
+    PracticalTest --> Certified: Examiner Approval
+    PracticalTest --> Remedial: Additional Training Needed
     Remedial --> PostSolo: Weakness Addressed
 
     Certified --> [*]: License Issued
@@ -287,7 +287,7 @@ flowchart TD
     C --> D[Training Assessment Meeting]
     D --> E[Training Plan Development]
 
-    E --> F[Phase 1: Basic Controls]
+    E --> F[Basic Controls Training]
     F --> G[Dual Instruction Flights]
     G --> H[Progress Evaluation]
 
@@ -301,8 +301,8 @@ flowchart TD
     M --> N[First Solo Flight]
 
     N --> O[Post-Solo Training]
-    O --> P[Cross-Country Preparation]
-    P --> Q[License Check Ride]
+    O --> P[Practical Test Preparation]
+    P --> Q[Practical Test]
     Q --> R[Certification Complete]
 
     style A fill:#e1f5fe
@@ -359,7 +359,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     A[New Student Needs Instructor] --> B[Check Instructor Availability]
-    B --> C[Match Experience Level]
+    B --> C[Review Student Goals and Availability]
     C --> D[Consider Student Preferences]
     D --> E[Assign Primary Instructor]
 
@@ -398,16 +398,13 @@ flowchart TD
 - ✅ **In-app notifications for students** (InstructionReport, GroundInstruction, Qualifications, Badges)
 
 ### **Identified Gaps**
-- 🟡 **Calendar Integration**: No centralized scheduling system for lessons
 - 🟡 **Student Portal**: Limited self-service options for students
-- 🟡 **Mobile Access**: Instructors need mobile-friendly lesson entry
 - 🟡 **Automated Scheduling**: Manual coordination between instructors and students
-- 🟡 **Video/Photo Integration**: No multimedia support for training documentation
 
 ### **Improvement Opportunities**
-- 🔄 **Smart Scheduling**: AI-assisted lesson scheduling based on weather, availability, and progress
+- 🔄 **Smart Scheduling**: Better lesson scheduling support based on member availability and progress
 - 🔄 **Progress Visualization**: Better charts and graphs for student progress tracking
-- 🔄 **Standardized Checkrides**: Formal check ride scheduling and documentation
+- 🔄 **Practical Test Readiness**: Standardize practical test readiness tracking and documentation
 - 🔄 **Training Analytics**: Advanced metrics on training effectiveness and completion rates
 - 🔄 **External Integration**: Connect with FAA databases and external training records
 
@@ -489,7 +486,7 @@ The instruction report email provides a professional, comprehensive summary of t
   - 🟣 ① Introduced (purple)
   - 🔵 ② Practiced (blue)
   - 🟢 ③ Solo Standard (green)
-  - 🟢 ④ Checkride Standard (dark green)
+  - 🟢 ④ Practical Test Standard (dark green)
   - 🔴 ⚠ Needs Attention (red)
 - Update banner for modified reports (yellow highlight)
 - Celebration section for new qualifications (green highlight)

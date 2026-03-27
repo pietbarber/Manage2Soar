@@ -62,16 +62,18 @@ flowchart TD
 ### **Models Involved**
 - **`duty_roster.DutyAssignment`**: Individual duty assignments for a specific date
 - **`duty_roster.MemberBlackout`**: Member unavailable dates
-- **`duty_roster.DutyPreference`**: Member role preferences
+- **`duty_roster.DutyPreference`**: Member scheduling preferences (preferred days, temporary suspension, role allocation percentages, and monthly assignment limits)
 - **`duty_roster.DutySwapRequest`**: Swap requests between members
 - **`duty_roster.DutySwapOffer`**: Available coverage offers
-- **`duty_roster.OpsIntent`**: Planned operations and weather decisions
+- **`duty_roster.OpsIntent`**: Planned operations intent for specific dates
+- **`duty_roster.GliderReservation`**: Member glider reservations integrated with duty planning
 - **`members.Member`**: Club members with qualifications
 
 ### **Key Files**
 - **Models**: `duty_roster/models.py` - Duty scheduling data structures
 - **Views**: `duty_roster/views.py` - Roster management interface
 - **Generator**: `duty_roster/roster_generator.py` - Automated assignment logic
+- **Optimized Scheduler**: `duty_roster/ortools_scheduler.py` - Constraint-based optimized duty selection
 - **Utils**: `duty_roster/utils.py` - Scheduling algorithms and validation
 - **Management**: `duty_roster/management/commands/` - Automated roster generation
 
@@ -170,6 +172,7 @@ flowchart LR
     A --> G
     B --> F
     B --> G
+    E --> G
     C --> H
     C --> I
     D --> J
@@ -290,7 +293,7 @@ Automated notifications keep members informed:
 ```mermaid
 flowchart LR
     A[Roster Published] --> B[Duty Assignment Notifications]
-    B --> C[Calendar Integration]
+    B --> C[Calendar Invitations (.ics)]
     C --> D[Reminder Notifications]
     D --> E[Day-Before Reminders]
 
@@ -300,6 +303,12 @@ flowchart LR
 ```
 
 ## Common Workflows
+
+### **Integrated Features Snapshot**
+
+- Duty swap management is now integrated in this workflow (Issue #1)
+- Glider reservation planning is now integrated in duty roster operations (Issue #410)
+- Optimized duty selection is available via the OR-Tools scheduler path, with feature-flag routing and legacy fallback in `roster_generator.py`
 
 ### **Monthly Roster Generation**
 
@@ -401,15 +410,12 @@ flowchart LR
 - ✅ Comprehensive notification system
 
 ### **Identified Gaps**
-- 🟡 **Predictive Scheduling**: No weather-based scheduling adjustments
-- 🟡 **Mobile Accessibility**: Limited mobile interface for duty management
-- 🟡 **Calendar Integration**: No two-way sync with external calendar systems
+- 🟡 **Predictive Scheduling**: Assignment balancing can be improved with better forecasting
 - 🟡 **Workload Analytics**: Limited analysis of member duty distribution
 - 🟡 **Automated Reminders**: Basic reminder system could be enhanced
 
 ### **Improvement Opportunities**
 - 🔄 **AI-Assisted Scheduling**: Machine learning for optimal assignment patterns
-- 🔄 **Weather Integration**: Automatic adjustment based on weather forecasts
 - 🔄 **Skill Development Tracking**: Integrate with training progress for role advancement
 - 🔄 **Performance Metrics**: Track duty performance and reliability
 - 🔄 **External Integration**: Connect with other club scheduling systems

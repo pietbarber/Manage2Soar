@@ -5,7 +5,7 @@
 The member lifecycle describes how individuals join the club, get their profiles set up, receive appropriate permissions, and progress through different membership levels. This is the foundation workflow that enables all other club activities.
 
 **Key Stages:**
-1. **Registration** - New user creates account via Google OAuth2
+1. **Registration and Access** - New members apply first; sign-in supports Google OAuth2 or username/password
 2. **Profile Setup** - Basic information and club-specific details
 3. **Membership Activation** - Admin approval and status assignment
 4. **Role Assignment** - Permissions based on qualifications and club roles
@@ -17,13 +17,17 @@ The member lifecycle describes how individuals join the club, get their profiles
 flowchart TD
     %% Entry Points
     A1[New User Visits Site] --> B{User Type}
-    B -->|Existing Member/Login| C[OAuth2 Login Flow]
+    B -->|Existing Member/Login| C[Sign-In Flow]
     B -->|New Member Interest| D[Membership Application Form]
 
-    %% OAuth2 Path (Existing Members)
-    C --> E[Google OAuth2 Flow]
+    %% Sign-in Paths (Existing Members)
+    C --> C1{Authentication Method}
+    C1 -->|Google| E[Google OAuth2 Flow]
+    C1 -->|Username/Password| E2[Django Login Form]
     E --> F[Django Social Auth Pipeline]
+    E2 --> F2[Django Authentication]
     F --> G[Access Member Account]
+    F2 --> G
 
     %% New Application Path (Issue #245)
     D --> H[Complete Application Form]
@@ -94,6 +98,8 @@ flowchart TD
 
 ### **Authentication Flow Details**
 
+Google OAuth2 path is shown below. Username/password login follows Django's standard authentication flow and then enters the same member account lifecycle.
+
 ```mermaid
 sequenceDiagram
     participant User as New User
@@ -128,20 +134,15 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Guest: OAuth2 Registration
-    Guest --> Applicant: Profile Completed
-    Applicant --> Full_Member: Admin Approval
+    [*] --> Applicant: Membership Application Submitted
+    Applicant --> Probationary_Member: Admin Approval + Probationary Status
     Applicant --> Inactive: Application Rejected
 
-    Full_Member --> Student_Member: Learning to Fly
-    Student_Member --> Full_Member: Solo/License
-    Full_Member --> Family_Member: Family Plan
-    Full_Member --> Service_Member: Military Status
+    Probationary_Member --> Full_Member: Onboarding Complete
     Full_Member --> Honorary_Member: Special Recognition
     Full_Member --> Emeritus_Member: Retirement
 
     Full_Member --> Inactive: Non-payment/Violation
-    Student_Member --> Inactive: Non-payment/Violation
     Inactive --> Full_Member: Reinstatement
 
     note right of Full_Member
@@ -246,9 +247,9 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A[OAuth2 Registration] --> B[Profile Photo Upload]
-    B --> C[Bio Completion]
-    C --> D[Contact Information]
+    A[Membership Application Submitted] --> B[Application Data Captured]
+    B --> C[Optional Bio/Photo Enhancements]
+    C --> D[Contact Information Confirmed]
     D --> E[Emergency Contact]
     E --> F[Admin Review]
 
@@ -257,7 +258,7 @@ flowchart TD
     G -->|Rejected| I[Rejection Notice]
     G -->|Needs Info| J[Request Details]
 
-    H --> K[Membership Card Generated]
+    H --> K[Optional First Login via OAuth2 or Username/Password]
     K --> L[Role Assignment]
     L --> M[Training Assessment]
     M --> N[Duty Roster Eligible]
@@ -270,35 +271,10 @@ flowchart TD
     style O fill:#ffebee
 ```
 
-### **Member Status Changes**
-
-```mermaid
-flowchart LR
-    A[Status Change Request] --> B{Change Type}
-    B -->|Promotion| C[Admin Approval Required]
-    B -->|Demotion| D[Admin Action Only]
-    B -->|Role Addition| E[Qualification Check]
-    B -->|Role Removal| F[Admin Confirmation]
-
-    C --> G[Update Database]
-    D --> G
-    E --> H{Meets Requirements?}
-    F --> G
-
-    H -->|Yes| G
-    H -->|No| I[Deny Request]
-
-    G --> J[Send Notification]
-    G --> K[Update Permissions]
-    G --> L[Log Change]
-
-    I --> M[Explain Requirements]
-```
-
 ## Known Gaps & Improvements
 
 ### **Current Strengths**
-- ✅ Seamless Google OAuth2 integration
+- ✅ Flexible authentication (Google OAuth2 or username/password)
 - ✅ Comprehensive profile management
 - ✅ Flexible role-based permissions
 - ✅ Automated welcome process

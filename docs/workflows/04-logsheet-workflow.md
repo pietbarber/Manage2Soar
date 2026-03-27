@@ -15,7 +15,7 @@ The logsheet workflow is the operational heart of the soaring club, managing dai
 
 ```mermaid
 flowchart TD
-    A[Duty Officer Arrives] --> B[Check Weather/Conditions]
+    A[Day-Before Pre-op Duty Crew Email] --> B[Duty Officer Arrives]
     B --> C[Create/Open Daily Logsheet]
     C --> D[Aircraft Pre-flight Inspections]
     D --> E[Operations Begin]
@@ -28,33 +28,74 @@ flowchart TD
     I --> J[Flight in Progress]
     J --> K[Flight Lands]
     K --> L[Log Flight End]
-    L --> M[Calculate Costs]
+    L --> M{Instructor Onboard?}
+    M -->|Yes| N[Link to Training Record]
+    M -->|No| O[Standard Flight Processing]
 
-    M --> N{Training Flight?}
-    N -->|Yes| O[Link to Training Record]
-    N -->|No| P[Standard Flight Processing]
+    N --> P[Update Training Progress]
+    O --> Q[Continue Operations]
+    P --> Q
 
-    O --> Q[Update Training Progress]
-    P --> R[Member Cost Notification]
-    Q --> R
+    Q --> R{More Flights?}
+    R -->|Yes| F
+    R -->|No| S[End of Operations]
 
-    R --> S{More Flights?}
-    S -->|Yes| F
-    S -->|No| T[End of Operations]
+    S --> T[Aircraft Post-flight Checks]
+    T --> U{Maintenance Issues?}
+    U -->|Yes| V[Log Maintenance Item]
+    U -->|No| W[Complete Closeout]
 
-    T --> U[Aircraft Post-flight Checks]
-    U --> V{Maintenance Issues?}
-    V -->|Yes| W[Log Maintenance Item]
-    V -->|No| X[Close Logsheet]
+    V --> X[Notify Maintenance Team]
+    X --> W
 
-    W --> Y[Notify Maintenance Team]
-    Y --> X
-    X --> Z[Generate Daily Reports]
-    Z --> AA[Archive Logsheet]
+    W --> Y[Write Ops Report and Towplane Closeouts]
+    Y --> Z[Review Costs in Edit Finances]
+    Z --> AA[Finalize Logsheet]
+    AA --> AB[Generate Daily Reports]
+    AB --> AC[Archive Logsheet]
 
-    style A fill:#e1f5fe
-    style AA fill:#e8f5e8
-    style W fill:#fff3e0
+    style B fill:#e1f5fe
+    style AC fill:#e8f5e8
+    style V fill:#fff3e0
+```
+
+### **Daily Operations Sequence**
+
+```mermaid
+sequenceDiagram
+    participant DO as Duty Crew
+    participant System as Manage2Soar
+    participant Member as Club Member
+    participant Instructor as Instructor
+    participant Maintenance as Maintenance Team
+    participant Analytics as Analytics
+
+    System->>DO: Send Day-Before Pre-op Duty Crew Email
+    DO->>System: Create Daily Logsheet
+    System->>System: Initialize Aircraft Status
+
+    Member->>DO: Request Flight
+    DO->>System: Check Aircraft Availability
+    System->>DO: Show Available Aircraft
+    DO->>System: Assign Aircraft
+    DO->>System: Log Flight Start
+
+    alt Instructor Onboard
+        System->>Instructor: Link Flight to Training Workflow
+    end
+
+    DO->>System: Log Flight Landing
+
+    alt Maintenance Issue Found
+        DO->>System: Log Maintenance Issue
+        System->>Maintenance: Send Issue Notification
+    end
+
+    DO->>System: Complete Closeout (ops report + towplane closeouts)
+    DO->>System: Review Edit Finances
+    DO->>System: Finalize Logsheet
+    System->>Analytics: Update Flight Statistics
+    System->>System: Generate Daily Reports
 ```
 
 ## Technical Implementation
@@ -77,68 +118,56 @@ flowchart TD
 - **Utils**: `logsheet/utils.py` - Cost calculations and business logic
 - **Signals**: `logsheet/signals.py` - Automated notifications and analytics updates
 
-### **Daily Operations Sequence**
-
-```mermaid
-sequenceDiagram
-    participant DO as Duty Officer  
-    participant System as Manage2Soar
-    participant Member as Club Member
-    participant Instructor as Instructor
-    participant Maintenance as Maintenance Team
-    participant Analytics as Analytics
-
-    DO->>System: Create Daily Logsheet
-    System->>System: Initialize Aircraft Status
-    DO->>System: Record Weather Conditions
-
-    Member->>DO: Request Flight
-    DO->>System: Check Aircraft Availability
-    System->>DO: Show Available Aircraft
-    DO->>System: Assign Aircraft & Log Flight Start
-
-    alt Training Flight
-        System->>Instructor: Notify of Training Flight
-        Instructor->>System: Acknowledge Assignment
-    end
-
-    DO->>System: Log Flight Landing
-    System->>System: Calculate Flight Costs
-    System->>Member: Send Cost Notification
-
-    alt Maintenance Issue Found
-        DO->>System: Log Maintenance Issue
-        System->>Maintenance: Send Issue Notification
-    end
-
-    DO->>System: Close Daily Operations
-    System->>Analytics: Update Flight Statistics
-    System->>System: Generate Daily Reports
-```
-
 ### **Flight Cost Calculation Engine**
 
+Current behavior is implemented in `logsheet/models.py`, `logsheet/utils/flight_charges.py`,
+and the finalize flow in `logsheet/views.py`.
+
+- Tow cost uses the towplane's active `TowplaneChargeScheme`/tiers.
+- Rental cost uses glider rate x duration, with optional max-rental cap.
+- Retrieve and free-flight flags can waive tow and/or rental fees.
+- Split handling supports `even`, `tow`, `rental`, and `full` partner allocation.
+- On logsheet finalization, calculated values are locked into `tow_cost_actual` and `rental_cost_actual`.
+
 ```mermaid
-flowchart LR
-    A[Flight Data] --> B[Calculate Tow Cost]
-    A --> C[Calculate Rental Cost]
-    A --> D[Check Split Arrangements]
+flowchart TD
+    A[Flight Lands] --> B[Compute Tow Cost]
+    A --> C[Compute Rental Cost]
 
-    B --> E[Release Altitude × Rate]
-    C --> F[Flight Time × Hourly Rate]
-    D --> G[Apply Cost Splitting]
+    B --> B1{Tow Waived?}
+    B1 -->|Yes| B2[Tow = 0]
+    B1 -->|No| B3[Use Towplane Charge Scheme + Tiers]
 
-    E --> H[Base Tow Cost]
-    F --> I[Base Rental Cost]
-    G --> J[Member Portions]
+    C --> C1{Rental Waived?}
+    C1 -->|Yes| C2[Rental = 0]
+    C1 -->|No| C3[Duration x Glider Rate]
+    C3 --> C4{Max Rental Cap Set?}
+    C4 -->|Yes| C5[Apply Cap]
+    C4 -->|No| C6[Use Calculated Rental]
 
-    H --> K[Apply Member Discounts]
-    I --> K
-    J --> K
+    B2 --> D[Base Flight Cost]
+    B3 --> D
+    C2 --> D
+    C5 --> D
+    C6 --> D
 
-    K --> L[Final Member Costs]
-    L --> M[Generate Billing Records]
-    M --> N[Send Payment Notifications]
+    D --> E{Split With Partner?}
+    E -->|No| F[Charge Pilot]
+    E -->|Yes| G{Split Type}
+    G -->|even| H[50/50 Tow + Rental]
+    G -->|tow| I[Partner Pays Tow, Pilot Pays Rental]
+    G -->|rental| J[Pilot Pays Tow, Partner Pays Rental]
+    G -->|full| K[Partner Pays All]
+
+    F --> L[Member Charge Allocation]
+    H --> L
+    I --> L
+    J --> L
+    K --> L
+
+    L --> M{Logsheet Finalized?}
+    M -->|No| N[Use Calculated Values in Finances View]
+    M -->|Yes| O[Lock into tow_cost_actual / rental_cost_actual]
 ```
 
 ### **Aircraft Status Tracking**
@@ -403,15 +432,13 @@ flowchart LR
 - ✅ Comprehensive flight logging and tracking
 - ✅ Integrated cost calculation and billing
 - ✅ Real-time aircraft status management
+- ✅ Aircraft reservation support (via integrated glider reservation workflows)
 - ✅ Maintenance issue tracking and notifications
 - ✅ Training flight integration
 - ✅ Detailed reporting and analytics integration
 
 ### **Identified Gaps**
-- 🟡 **Real-time Updates**: Limited real-time collaboration between duty officers
-- 🟡 **Weather Integration**: No automated weather data integration
-- 🟡 **Aircraft Scheduling**: No advance booking system for aircraft
-- 🟡 **Digital Signatures**: Paper-based sign-offs for maintenance and inspections
+- 🟡 **Maintenance Analytics Depth**: Opportunity for richer trend analysis and predictive maintenance insights
 
 ### **Recently Completed**
 - ✅ **Offline Mode (PWA)**: Duty officers can now add, edit, launch, land, copy, and delete flights while offline. Changes sync automatically when connectivity returns. See [Offline Operations](#offline-operations) below.
@@ -419,7 +446,6 @@ flowchart LR
 ### **Improvement Opportunities**
 - 🔄 **Predictive Analytics**: Use historical data to predict busy periods and maintenance needs
 - 🔄 **Automated Notifications**: Enhanced notification system for operations status
-- 🔄 **Integration APIs**: Connect with external flight tracking and weather systems
 - 🔄 **Workflow Automation**: Reduce manual data entry and repetitive tasks
 - 🔄 **Advanced Reporting**: More sophisticated analytics and operational metrics
 
