@@ -21,6 +21,7 @@ from duty_roster.models import (
     DutySwapRequest,
     MemberBlackout,
 )
+from duty_roster.views_swap import _accept_offer_and_finalize
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
@@ -487,7 +488,7 @@ class TestSwapOfferWorkflow:
     def test_make_cover_offer(
         self, client, bob, swap_request, bob_duty_assignment, site_config
     ):
-        """Member can make a cover offer."""
+        """Cover offer is accepted immediately and fulfills the request."""
         client.force_login(bob)
         url = reverse("duty_roster:make_swap_offer", args=[swap_request.id])
         resp = client.post(
@@ -497,17 +498,25 @@ class TestSwapOfferWorkflow:
                 "notes": "I can cover for you",
             },
         )
-        assert resp.status_code in [200, 302]
-        assert DutySwapOffer.objects.filter(
+        assert resp.status_code == 302
+        offer = DutySwapOffer.objects.get(
             swap_request=swap_request,
             offered_by=bob,
             offer_type="cover",
-        ).exists()
+        )
+
+        swap_request.refresh_from_db()
+        assert offer.status == "accepted"
+        assert swap_request.status == "fulfilled"
+        assert swap_request.accepted_offer == offer
+
+        updated_assignment = DutyAssignment.objects.get(date=swap_request.original_date)
+        assert updated_assignment.tow_pilot == bob
 
     def test_make_swap_offer(
         self, client, bob, swap_request, bob_duty_assignment, site_config
     ):
-        """Member can make a swap offer with proposed date."""
+        """Swap offer remains pending until requester explicitly accepts."""
         client.force_login(bob)
         url = reverse("duty_roster:make_swap_offer", args=[swap_request.id])
         resp = client.post(
@@ -518,13 +527,53 @@ class TestSwapOfferWorkflow:
                 "notes": "Let's trade dates",
             },
         )
-        assert resp.status_code in [200, 302]
-        assert DutySwapOffer.objects.filter(
+        assert resp.status_code == 302
+        offer = DutySwapOffer.objects.get(
             swap_request=swap_request,
             offered_by=bob,
             offer_type="swap",
             proposed_swap_date=bob_duty_assignment.date,
-        ).exists()
+        )
+
+        swap_request.refresh_from_db()
+        assert offer.status == "pending"
+        assert swap_request.status == "open"
+        assert swap_request.accepted_offer is None
+
+    def test_cover_auto_accept_declines_existing_pending_offers(
+        self, client, bob, charlie, swap_request, site_config
+    ):
+        """Auto-accepting a cover offer auto-declines other pending offers."""
+        other_offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=charlie,
+            offer_type="cover",
+            status="pending",
+        )
+
+        client.force_login(bob)
+        url = reverse("duty_roster:make_swap_offer", args=[swap_request.id])
+        resp = client.post(
+            url,
+            {
+                "offer_type": "cover",
+                "notes": "I can take this duty",
+            },
+        )
+        assert resp.status_code == 302
+
+        accepted_offer = DutySwapOffer.objects.get(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+        )
+        other_offer.refresh_from_db()
+        swap_request.refresh_from_db()
+
+        assert accepted_offer.status == "accepted"
+        assert other_offer.status == "auto_declined"
+        assert swap_request.status == "fulfilled"
+        assert swap_request.accepted_offer == accepted_offer
 
 
 @pytest.mark.django_db
@@ -568,6 +617,30 @@ class TestOfferAcceptDecline:
 
         swap_offer.refresh_from_db()
         assert swap_offer.status == "withdrawn"
+
+    def test_accept_helper_returns_false_when_request_already_fulfilled(
+        self, swap_request, swap_offer, charlie
+    ):
+        """Concurrent/stale accept attempts do not overwrite fulfilled requests."""
+        swap_request.status = "fulfilled"
+        swap_request.accepted_offer = swap_offer
+        swap_request.save(update_fields=["status", "accepted_offer"])
+
+        stale_offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=charlie,
+            offer_type="cover",
+            status="pending",
+        )
+
+        accepted = _accept_offer_and_finalize(swap_request, stale_offer)
+        stale_offer.refresh_from_db()
+        swap_request.refresh_from_db()
+
+        assert accepted is False
+        assert stale_offer.status == "auto_declined"
+        assert swap_request.status == "fulfilled"
+        assert swap_request.accepted_offer == swap_offer
 
 
 # =============================================================================
@@ -786,14 +859,12 @@ class TestSwapIntegration:
         assert swap_offer.offer_type == "cover"
         assert swap_offer.proposed_swap_date is None
 
-        # Step 3: Alice accepts Bob's offer
-        client.force_login(alice)
-        accept_url = reverse("duty_roster:accept_swap_offer", args=[swap_offer.id])
-        client.post(accept_url)
-
-        # Verify final state
+        # Verify final state (auto-accepted for cover offers)
+        swap_offer.refresh_from_db()
         swap_request.refresh_from_db()
+        assert swap_offer.status == "accepted"
         assert swap_request.status == "fulfilled"
+        assert swap_request.accepted_offer == swap_offer
 
 
 # ---------------------------------------------------------------------------

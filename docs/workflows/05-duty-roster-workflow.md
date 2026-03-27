@@ -354,27 +354,36 @@ flowchart TD
     D --> F[Member Makes Offer or Declines Direct Request]
     E --> G[Member Makes Offer]
 
-    F --> H[Offer Saved as Pending]
+    F --> H{Offer Type}
     G --> H
 
-    H --> I[Notify Requester of New Offer]
-    I --> J[Requester Reviews Pending Offers]
-    J --> K{Requester Decision}
+    H -->|Cover| I[Auto-accept Offer and Fulfill Request]
+    H -->|Swap| J[Offer Saved as Pending]
 
-    K -->|Accept Offer| L[Mark Offer Accepted and Request Fulfilled]
-    K -->|Decline Offer| M[Mark Offer Declined]
+    I --> K[Auto-decline Other Pending Offers]
+    K --> L[Update Duty Assignments]
+    L --> M[Notify Requester and Offerer]
+    M --> N[Update Calendar Systems]
 
-    L --> N[Auto-decline Other Pending Offers]
-    N --> O[Update Duty Assignments]
-    O --> P[Notify Requester and Offerer]
-    P --> Q[Update Calendar Systems]
+    J --> O[Notify Requester of New Offer]
+    O --> P[Requester Reviews Pending Offers]
+    P --> Q{Requester Decision}
 
-    M --> R{More Pending Offers?}
-    R -->|Yes| J
-    R -->|No| S[Request Remains Open for New Offers]
+    Q -->|Accept Offer| R[Mark Offer Accepted and Request Fulfilled]
+    Q -->|Decline Offer| S[Mark Offer Declined]
 
-    style L fill:#e8f5e8
-    style S fill:#fff3e0
+    R --> T[Auto-decline Other Pending Offers]
+    T --> U[Update Duty Assignments]
+    U --> V[Notify Requester and Offerer]
+    V --> N
+
+    S --> W{More Pending Offers?}
+    W -->|Yes| P
+    W -->|No| X[Request Remains Open for New Offers]
+
+    style I fill:#e8f5e8
+    style R fill:#e8f5e8
+    style X fill:#fff3e0
 ```
 
 ### **Emergency Coverage Process**
