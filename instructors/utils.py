@@ -222,26 +222,31 @@ def get_logbook_glider_time_summary(member):
         Flight.objects.filter(total_filter)
         .values("glider__make", "glider__model")
         .annotate(
+            dual_received_count=Count("id", filter=dual_filter),
             dual_received_duration=Coalesce(
                 Sum("duration", filter=dual_filter),
                 empty_duration,
                 output_field=DurationField(),
             ),
+            solo_count=Count("id", filter=solo_filter),
             solo_duration=Coalesce(
                 Sum("duration", filter=solo_filter),
                 empty_duration,
                 output_field=DurationField(),
             ),
+            instruction_given_count=Count("id", filter=instruction_given_filter),
             instruction_given_duration=Coalesce(
                 Sum("duration", filter=instruction_given_filter),
                 empty_duration,
                 output_field=DurationField(),
             ),
+            rated_dual_pic_count=Count("id", filter=rated_dual_filter),
             rated_dual_pic_duration=Coalesce(
                 Sum("duration", filter=rated_dual_filter),
                 empty_duration,
                 output_field=DurationField(),
             ),
+            total_count=Count("id", filter=total_filter),
             total_duration=Coalesce(
                 Sum("duration", filter=total_filter),
                 empty_duration,
@@ -254,10 +259,15 @@ def get_logbook_glider_time_summary(member):
     rows = []
     totals = {
         "make_model": "Totals",
+        "dual_received_count": 0,
         "dual_received_m": 0,
+        "solo_count": 0,
         "solo_m": 0,
+        "instruction_given_count": 0,
         "instruction_given_m": 0,
+        "pic_summary_count": 0,
         "pic_summary_m": 0,
+        "total_count": 0,
         "total_m": 0,
     }
 
@@ -268,26 +278,39 @@ def get_logbook_glider_time_summary(member):
         if not make_model:
             make_model = "Private"
 
+        dual_received_count = grouped_row["dual_received_count"]
         dual_received_m = int(
             grouped_row["dual_received_duration"].total_seconds() // 60
         )
+        solo_count = grouped_row["solo_count"]
         solo_m = int(grouped_row["solo_duration"].total_seconds() // 60)
+        instruction_given_count = grouped_row["instruction_given_count"]
         instruction_given_m = int(
             grouped_row["instruction_given_duration"].total_seconds() // 60
         )
+        rated_dual_for_pic_count = grouped_row["rated_dual_pic_count"]
         rated_dual_for_pic_m = int(
             grouped_row["rated_dual_pic_duration"].total_seconds() // 60
         )
+        total_count = grouped_row["total_count"]
         total_m = int(grouped_row["total_duration"].total_seconds() // 60)
 
+        pic_summary_count = (
+            solo_count + instruction_given_count + rated_dual_for_pic_count
+        )
         pic_summary_m = solo_m + instruction_given_m + rated_dual_for_pic_m
 
         row = {
             "make_model": make_model,
+            "dual_received_count": dual_received_count,
             "dual_received_m": dual_received_m,
+            "solo_count": solo_count,
             "solo_m": solo_m,
+            "instruction_given_count": instruction_given_count,
             "instruction_given_m": instruction_given_m,
+            "pic_summary_count": pic_summary_count,
             "pic_summary_m": pic_summary_m,
+            "total_count": total_count,
             "total_m": total_m,
             "dual_received": format_minutes(dual_received_m),
             "solo": format_minutes(solo_m),
@@ -297,10 +320,15 @@ def get_logbook_glider_time_summary(member):
         }
         rows.append(row)
 
+        totals["dual_received_count"] += row["dual_received_count"]
         totals["dual_received_m"] += row["dual_received_m"]
+        totals["solo_count"] += row["solo_count"]
         totals["solo_m"] += row["solo_m"]
+        totals["instruction_given_count"] += row["instruction_given_count"]
         totals["instruction_given_m"] += row["instruction_given_m"]
+        totals["pic_summary_count"] += row["pic_summary_count"]
         totals["pic_summary_m"] += row["pic_summary_m"]
+        totals["total_count"] += row["total_count"]
         totals["total_m"] += row["total_m"]
 
     if rows:

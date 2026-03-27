@@ -64,7 +64,9 @@ class TestLogbookTimeBreakouts(DjangoPlaywrightTestCase):
         )
         self.page.wait_for_selector("text=Logbook for")
 
-        logbook_table = self.page.locator("table.table").first
+        logbook_table = self.page.locator(
+            "table.table", has=self.page.locator("thead th:text-is('Date')")
+        ).first
         col = self._header_index_map(logbook_table)
 
         row = logbook_table.locator("tbody tr", has_text="2024-06-01").first
@@ -137,10 +139,20 @@ class TestLogbookTimeBreakouts(DjangoPlaywrightTestCase):
             "tbody tr", has_text="Schleicher ASK-21"
         ).first
 
-        dual = summary_row.locator("td").nth(1).inner_text().strip()
-        pic_summary = summary_row.locator("td").nth(4).inner_text().strip()
-        total = summary_row.locator("td").nth(5).inner_text().strip()
+        dual_count = summary_row.locator("td").nth(1).inner_text().strip()
+        dual = summary_row.locator("td").nth(2).inner_text().strip()
+        instruction_count = summary_row.locator("td").nth(5).inner_text().strip()
+        instruction_time = summary_row.locator("td").nth(6).inner_text().strip()
+        pic_summary_count = summary_row.locator("td").nth(7).inner_text().strip()
+        pic_summary = summary_row.locator("td").nth(8).inner_text().strip()
+        total_count = summary_row.locator("td").nth(9).inner_text().strip()
+        total = summary_row.locator("td").nth(10).inner_text().strip()
 
+        assert dual_count == "2"
         assert dual == "1:15"
+        assert instruction_count == "0"
+        assert instruction_time == "0:00"
+        assert pic_summary_count == "2"
         assert pic_summary == "1:15"
+        assert total_count == "2"
         assert total == "1:15"
