@@ -721,16 +721,19 @@ def _accept_offer_and_finalize(swap_request, offer):
         declined_offer_ids = [other.pk for other in other_offers]
 
         def _send_notifications_after_commit():
-            accepted_offer = DutySwapOffer.objects.select_related(
+            offers = DutySwapOffer.objects.select_related(
                 "swap_request", "offered_by", "swap_request__requester"
-            ).get(pk=accepted_offer_id)
-            send_offer_accepted_notifications(accepted_offer)
+            ).filter(pk__in=[accepted_offer_id, *declined_offer_ids])
+            offers_by_id = {loaded_offer.pk: loaded_offer for loaded_offer in offers}
+
+            accepted_offer = offers_by_id.get(accepted_offer_id)
+            if accepted_offer is not None:
+                send_offer_accepted_notifications(accepted_offer)
 
             for declined_offer_id in declined_offer_ids:
-                declined_offer = DutySwapOffer.objects.select_related(
-                    "swap_request", "offered_by", "swap_request__requester"
-                ).get(pk=declined_offer_id)
-                send_offer_declined_notification(declined_offer, auto=True)
+                declined_offer = offers_by_id.get(declined_offer_id)
+                if declined_offer is not None:
+                    send_offer_declined_notification(declined_offer, auto=True)
 
         transaction.on_commit(_send_notifications_after_commit)
 

@@ -498,7 +498,7 @@ class TestSwapOfferWorkflow:
                 "notes": "I can cover for you",
             },
         )
-        assert resp.status_code in [200, 302]
+        assert resp.status_code == 302
         offer = DutySwapOffer.objects.get(
             swap_request=swap_request,
             offered_by=bob,
@@ -524,7 +524,7 @@ class TestSwapOfferWorkflow:
                 "notes": "Let's trade dates",
             },
         )
-        assert resp.status_code in [200, 302]
+        assert resp.status_code == 302
         offer = DutySwapOffer.objects.get(
             swap_request=swap_request,
             offered_by=bob,
@@ -557,7 +557,7 @@ class TestSwapOfferWorkflow:
                 "notes": "I can take this duty",
             },
         )
-        assert resp.status_code in [200, 302]
+        assert resp.status_code == 302
 
         accepted_offer = DutySwapOffer.objects.get(
             swap_request=swap_request,
