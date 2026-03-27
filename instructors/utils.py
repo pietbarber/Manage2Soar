@@ -1,7 +1,6 @@
 # instructors/utils.py
 
 import logging
-from collections import defaultdict
 from datetime import timedelta
 
 from django.conf import settings
@@ -138,6 +137,50 @@ def get_flight_summary_for_member(member):
     return flights_summary
 
 
+def is_logbook_rated_dual_flight(flight_date, rating_date):
+    """Return True when an instructor flight should also count toward PIC as rated dual."""
+    return bool(rating_date and flight_date and flight_date >= rating_date)
+
+
+def classify_logbook_flight_minutes(flight, member_id, rating_date):
+    """Classify one flight's minutes into logbook buckets for a member."""
+    flight_date = flight.logsheet.log_date if flight.logsheet else None
+    duration_m = int(flight.duration.total_seconds() // 60) if flight.duration else 0
+
+    is_pilot = flight.pilot_id == member_id
+    is_instructor = flight.instructor_id == member_id
+    is_passenger = flight.passenger_id == member_id
+
+    dual_m = 0
+    solo_m = 0
+    pic_m = 0
+    inst_m = 0
+
+    if is_pilot:
+        if flight.instructor_id:
+            dual_m += duration_m
+            if is_logbook_rated_dual_flight(flight_date, rating_date):
+                pic_m += duration_m
+        else:
+            if not flight.passenger_id and not flight.passenger_name:
+                solo_m += duration_m
+            pic_m += duration_m
+    elif is_instructor:
+        inst_m += duration_m
+        pic_m += duration_m
+
+    return {
+        "is_pilot": is_pilot,
+        "is_instructor": is_instructor,
+        "is_passenger": is_passenger,
+        "duration_m": duration_m,
+        "dual_m": dual_m,
+        "solo_m": solo_m,
+        "pic_m": pic_m,
+        "inst_m": inst_m,
+    }
+
+
 def get_logbook_glider_time_summary(member):
     """Build an all-time, per-make/model glider time summary for logbook display."""
 
@@ -147,56 +190,48 @@ def get_logbook_glider_time_summary(member):
 
     rating_date = getattr(member, "private_glider_checkride_date", None)
 
-    flights = Flight.objects.filter(
-        (Q(pilot=member) | Q(instructor=member)),
-        glider__isnull=False,
-    ).select_related("glider", "logsheet")
-
-    summary_by_glider = defaultdict(
-        lambda: {
-            "dual_received_m": 0,
-            "solo_m": 0,
-            "instruction_given_m": 0,
-            "rated_dual_for_pic_m": 0,
-            "total_m": 0,
-        }
+    empty_duration = Value(timedelta(0), output_field=DurationField())
+    dual_filter = Q(pilot=member, instructor__isnull=False)
+    solo_filter = Q(pilot=member, instructor__isnull=True, passenger__isnull=True) & (
+        Q(passenger_name__isnull=True) | Q(passenger_name="")
     )
+    instruction_given_filter = Q(instructor=member)
+    total_filter = Q(pilot=member) | Q(instructor=member)
+    rated_dual_filter = Q(pk__in=[])
+    if rating_date:
+        rated_dual_filter = dual_filter & Q(logsheet__log_date__gte=rating_date)
 
-    for flight in flights:
-        flight_date = flight.logsheet.log_date if flight.logsheet else None
-        duration_m = (
-            int(flight.duration.total_seconds() // 60) if flight.duration else 0
+    grouped = (
+        Flight.objects.filter(total_filter, glider__isnull=False)
+        .values("glider__make", "glider__model", "glider__n_number")
+        .annotate(
+            dual_received_duration=Coalesce(
+                Sum("duration", filter=dual_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+            solo_duration=Coalesce(
+                Sum("duration", filter=solo_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+            instruction_given_duration=Coalesce(
+                Sum("duration", filter=instruction_given_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+            rated_dual_pic_duration=Coalesce(
+                Sum("duration", filter=rated_dual_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+            total_duration=Coalesce(
+                Sum("duration", filter=total_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
         )
-
-        make = (flight.glider.make or "").strip()
-        model = (flight.glider.model or "").strip()
-        make_model = " ".join(part for part in (make, model) if part).strip()
-        if not make_model:
-            make_model = flight.glider.n_number or "Unknown Glider"
-
-        bucket = summary_by_glider[make_model]
-
-        is_pilot = flight.pilot_id == member.id
-        is_instructor = flight.instructor_id == member.id
-
-        if is_pilot and flight.instructor_id:
-            bucket["dual_received_m"] += duration_m
-            if rating_date and flight_date and flight_date >= rating_date:
-                bucket["rated_dual_for_pic_m"] += duration_m
-
-        if (
-            is_pilot
-            and not flight.instructor_id
-            and not flight.passenger_id
-            and not flight.passenger_name
-        ):
-            bucket["solo_m"] += duration_m
-
-        if is_instructor:
-            bucket["instruction_given_m"] += duration_m
-
-        if is_pilot or is_instructor:
-            bucket["total_m"] += duration_m
+    )
 
     rows = []
     totals = {
@@ -208,26 +243,39 @@ def get_logbook_glider_time_summary(member):
         "total_m": 0,
     }
 
-    for make_model in sorted(summary_by_glider):
-        bucket = summary_by_glider[make_model]
-        pic_summary_m = (
-            bucket["solo_m"]
-            + bucket["instruction_given_m"]
-            + bucket["rated_dual_for_pic_m"]
+    for grouped_row in grouped:
+        make = (grouped_row.get("glider__make") or "").strip()
+        model = (grouped_row.get("glider__model") or "").strip()
+        make_model = " ".join(part for part in (make, model) if part).strip()
+        if not make_model:
+            make_model = grouped_row.get("glider__n_number") or "Unknown Glider"
+
+        dual_received_m = int(
+            grouped_row["dual_received_duration"].total_seconds() // 60
         )
+        solo_m = int(grouped_row["solo_duration"].total_seconds() // 60)
+        instruction_given_m = int(
+            grouped_row["instruction_given_duration"].total_seconds() // 60
+        )
+        rated_dual_for_pic_m = int(
+            grouped_row["rated_dual_pic_duration"].total_seconds() // 60
+        )
+        total_m = int(grouped_row["total_duration"].total_seconds() // 60)
+
+        pic_summary_m = solo_m + instruction_given_m + rated_dual_for_pic_m
 
         row = {
             "make_model": make_model,
-            "dual_received_m": bucket["dual_received_m"],
-            "solo_m": bucket["solo_m"],
-            "instruction_given_m": bucket["instruction_given_m"],
+            "dual_received_m": dual_received_m,
+            "solo_m": solo_m,
+            "instruction_given_m": instruction_given_m,
             "pic_summary_m": pic_summary_m,
-            "total_m": bucket["total_m"],
-            "dual_received": format_minutes(bucket["dual_received_m"]),
-            "solo": format_minutes(bucket["solo_m"]),
-            "instruction_given": format_minutes(bucket["instruction_given_m"]),
+            "total_m": total_m,
+            "dual_received": format_minutes(dual_received_m),
+            "solo": format_minutes(solo_m),
+            "instruction_given": format_minutes(instruction_given_m),
             "pic_summary": format_minutes(pic_summary_m),
-            "total": format_minutes(bucket["total_m"]),
+            "total": format_minutes(total_m),
         }
         rows.append(row)
 

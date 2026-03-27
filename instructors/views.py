@@ -52,6 +52,7 @@ from instructors.models import (
     TrainingPhase,
 )
 from instructors.utils import (
+    classify_logbook_flight_minutes,
     get_flight_summary_for_member,
     get_logbook_glider_time_summary,
     send_instruction_report_email,
@@ -1730,10 +1731,15 @@ def member_logbook(request, member_id=None):
             flight_id = f.id
             date = ev["date"]
 
-            # Roles
-            is_pilot = f.pilot_id == member.id
-            is_instructor = f.instructor_id == member.id
-            is_passenger = f.passenger_id == member.id
+            classification = classify_logbook_flight_minutes(
+                f,
+                member.id,
+                rating_date,
+            )
+
+            is_pilot = classification["is_pilot"]
+            is_instructor = classification["is_instructor"]
+            is_passenger = classification["is_passenger"]
 
             # Always initialize report_id
             report_id = None
@@ -1746,18 +1752,16 @@ def member_logbook(request, member_id=None):
                 display_flight_no = ""
 
             # Raw minutes
-            dur_m = int(f.duration.total_seconds() // 60) if f.duration else 0
-            dual_m = solo_m = pic_m = inst_m = 0
+            dur_m = classification["duration_m"]
+            dual_m = classification["dual_m"]
+            solo_m = classification["solo_m"]
+            pic_m = classification["pic_m"]
+            inst_m = classification["inst_m"]
             comments = ""
 
             # 5b) Pilot logic: instruction received vs lesson codes
             if is_pilot:
                 if f.instructor:
-                    # Received dual / PIC
-                    dual_m += dur_m
-                    if rating_date and date >= rating_date:
-                        pic_m += dur_m
-
                     # Look up the instruction report from pre-fetched dict (O(1) lookup)
                     report_data = report_lookup.get((f.instructor_id, date))
 
@@ -1772,10 +1776,6 @@ def member_logbook(request, member_id=None):
                         comments = "instruction received"
                         report_id = None
                 else:
-                    # Solo flight (only if no passenger)
-                    if not f.passenger and not f.passenger_name:
-                        solo_m += dur_m
-                    pic_m += dur_m
                     if f.passenger:
                         comments = f"{f.passenger.full_display_name}"
                     elif f.passenger_name:
@@ -1787,10 +1787,8 @@ def member_logbook(request, member_id=None):
                     f"{f.pilot.full_display_name} (<i>{member.full_display_name}</i>)"
                 )
 
-            # 7) Instructor logic: inst_given + PIC
+            # 7) Instructor logic: classification already includes inst_given + PIC
             elif is_instructor:
-                inst_m += dur_m
-                pic_m += dur_m
                 student = f.pilot or f.passenger
                 if student:
                     comments = student.full_display_name
