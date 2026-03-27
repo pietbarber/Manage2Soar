@@ -337,6 +337,18 @@ class MembershipApplicationViewTests(TestCase):
         self.client.force_login(manager)
         return manager
 
+    def _create_director(self, username="director", email="director@example.com"):
+        """Create and return a director user (read-only for applications)."""
+        director = Member.objects.create_user(
+            username=username,
+            email=email,
+            password="testpass",
+            director=True,
+            membership_status="Full Member",
+        )
+        self.client.force_login(director)
+        return director
+
     def _create_waitlisted_app(self, first_name, email):
         """Create and return a waitlisted application."""
         application = MembershipApplication.objects.create(
@@ -559,6 +571,89 @@ class MembershipApplicationViewTests(TestCase):
         self.assertContains(response, "Person0 Test")
         self.assertContains(response, "Person1 Test")
         self.assertContains(response, "Person2 Test")
+
+    def test_director_can_view_applications_list(self):
+        """Directors can view membership applications list in read-only mode."""
+        self._create_director()
+        response = self.client.get(
+            reverse("members:membership_applications_list"), follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Membership Applications")
+
+    def test_director_can_view_application_detail(self):
+        """Directors can view membership application details in read-only mode."""
+        self._create_director()
+        application = self._create_waitlisted_app(
+            "DirectorView", "directorview@example.com"
+        )
+        response = self.client.get(
+            reverse(
+                "members:membership_application_detail",
+                args=[application.application_id],
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Application Review")
+        self.assertContains(response, "Read-Only Director View")
+
+    def test_director_can_view_waitlist(self):
+        """Directors can view waitlist status in read-only mode."""
+        self._create_director()
+        self._create_waitlisted_app("WaitlistRead", "waitlistread@example.com")
+        response = self.client.get(reverse("members:membership_waitlist"), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Membership Waitlist")
+        self.assertContains(response, "read-only access")
+
+    def test_director_cannot_modify_application_review(self):
+        """Directors cannot submit review actions on applications."""
+        self._create_director()
+        application = self._create_waitlisted_app("NoModify", "nomodify@example.com")
+        response = self.client.post(
+            reverse(
+                "members:membership_application_detail",
+                args=[application.application_id],
+            ),
+            {
+                "review_action": "reject",
+                "admin_notes": "Should be blocked",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+
+        application.refresh_from_db()
+        self.assertEqual(application.status, "waitlisted")
+
+    def test_director_cannot_reorder_waitlist(self):
+        """Directors cannot submit waitlist reorder actions."""
+        self._create_director()
+        app1 = self._create_waitlisted_app("First", "firstro@example.com")
+        app2 = self._create_waitlisted_app("Second", "secondro@example.com")
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_top", "application_id": app2.application_id},
+        )
+        self.assertEqual(response.status_code, 403)
+
+        app1.refresh_from_db()
+        app2.refresh_from_db()
+        self.assertEqual(app1.waitlist_position, 1)
+        self.assertEqual(app2.waitlist_position, 2)
+
+    def test_regular_member_cannot_view_membership_applications(self):
+        """Active members without elevated roles cannot view membership applications."""
+        regular_member = Member.objects.create_user(
+            username="regular",
+            email="regular@example.com",
+            password="testpass",
+            membership_status="Full Member",
+        )
+        self.client.force_login(regular_member)
+
+        response = self.client.get(reverse("members:membership_applications_list"))
+        self.assertEqual(response.status_code, 403)
 
     def test_waitlist_move_to_top(self):
         """Test moving an applicant to the top of the waitlist."""

@@ -154,7 +154,7 @@
                                                    class="btn btn-sm btn-outline-primary" title="View Details">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
-                                                {% if app.status == 'pending' or app.status == 'under_review' %}
+                                                {% if can_modify and app.status == 'pending' or can_modify and app.status == 'under_review' %}
                                                     <a href="{% url 'members:membership_application_detail' app.application_id %}"
                                                        class="btn btn-sm btn-outline-success" title="Review">
                                                         <i class="fas fa-check"></i>
