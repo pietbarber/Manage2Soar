@@ -146,7 +146,7 @@ cp inventory/gcp_app.yml.example inventory/gcp_app.yml
 mkdir -p group_vars/gcp_app
 cp group_vars/gcp_app.vars.yml.example group_vars/gcp_app/vars.yml
 cp group_vars/gcp_app.vault.yml.example group_vars/gcp_app/vault.yml
-ansible-vault encrypt group_vars/gcp_app/vault.yml
+ansible-vault encrypt --vault-password-file ~/.ansible_vault_pass group_vars/gcp_app/vault.yml
 ansible-playbook -i inventory/gcp_app.yml --vault-password-file ~/.ansible_vault_pass playbooks/gcp-app-deploy.yml
 ```
 
