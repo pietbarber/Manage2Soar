@@ -703,22 +703,22 @@ def _accept_offer_and_finalize(swap_request, offer):
         locked_request.status = "fulfilled"
         locked_request.accepted_offer = locked_offer
         locked_request.fulfilled_at = now
-        locked_request.save(update_fields=["status", "accepted_offer", "fulfilled_at"])
+        locked_request.save(
+            update_fields=["status", "accepted_offer", "fulfilled_at", "updated_at"]
+        )
 
         # Auto-decline other pending offers
-        other_offers = list(
-            locked_request.offers.filter(status="pending").exclude(pk=locked_offer.pk)
+        pending_other_offers = locked_request.offers.filter(status="pending").exclude(
+            pk=locked_offer.pk
         )
-        for other in other_offers:
-            other.status = "auto_declined"
-            other.responded_at = now
-            other.save(update_fields=["status", "responded_at"])
+        declined_offer_ids = list(pending_other_offers.values_list("pk", flat=True))
+        if declined_offer_ids:
+            pending_other_offers.update(status="auto_declined", responded_at=now)
 
         # Update duty assignments
         update_duty_assignments(locked_request, locked_offer)
 
         accepted_offer_id = locked_offer.pk
-        declined_offer_ids = [other.pk for other in other_offers]
 
         def _send_notifications_after_commit():
             offers = DutySwapOffer.objects.select_related(
