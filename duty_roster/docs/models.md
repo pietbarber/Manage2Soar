@@ -160,7 +160,7 @@ erDiagram
         string time_preference
         string status
         text purpose
-        datetime cancelled_at
+        datetime cancelled_at "optional"
         text cancellation_reason
         datetime created_at
         datetime updated_at
