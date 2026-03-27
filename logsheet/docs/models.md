@@ -175,12 +175,10 @@ erDiagram
 
     RevisionLog {
         int id PK
-        string model_name
-        int object_id
-        string action
-        text changes
-        int user_id FK
-        datetime timestamp
+        int logsheet_id FK
+        int revised_by_id FK "nullable"
+        datetime revised_at
+        text note
     }
 
     FinalizationEmailOutbox {
