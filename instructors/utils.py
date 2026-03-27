@@ -142,6 +142,15 @@ def is_logbook_rated_dual_flight(flight_date, rating_date):
     return bool(rating_date and flight_date and flight_date >= rating_date)
 
 
+def _has_instructor_context(flight):
+    """Return True when a flight includes any instructor source (FK or imported name)."""
+    return bool(
+        flight.instructor_id
+        or (flight.guest_instructor_name and flight.guest_instructor_name.strip())
+        or (flight.legacy_instructor_name and flight.legacy_instructor_name.strip())
+    )
+
+
 def classify_logbook_flight_minutes(flight, member_id, rating_date):
     """Classify one flight's minutes into logbook buckets for a member."""
     flight_date = flight.logsheet.log_date if flight.logsheet else None
@@ -157,7 +166,7 @@ def classify_logbook_flight_minutes(flight, member_id, rating_date):
     inst_m = 0
 
     if is_pilot:
-        if flight.instructor_id:
+        if _has_instructor_context(flight):
             dual_m += duration_m
             if is_logbook_rated_dual_flight(flight_date, rating_date):
                 pic_m += duration_m
@@ -191,9 +200,17 @@ def get_logbook_glider_time_summary(member):
     rating_date = getattr(member, "private_glider_checkride_date", None)
 
     empty_duration = Value(timedelta(0), output_field=DurationField())
-    dual_filter = Q(pilot=member, instructor__isnull=False)
-    solo_filter = Q(pilot=member, instructor__isnull=True, passenger__isnull=True) & (
-        Q(passenger_name__isnull=True) | Q(passenger_name="")
+    instructor_present_filter = (
+        Q(instructor__isnull=False)
+        | (Q(guest_instructor_name__isnull=False) & ~Q(guest_instructor_name=""))
+        | (Q(legacy_instructor_name__isnull=False) & ~Q(legacy_instructor_name=""))
+    )
+    dual_filter = Q(pilot=member) & instructor_present_filter
+    solo_filter = (
+        Q(pilot=member)
+        & ~instructor_present_filter
+        & Q(passenger__isnull=True)
+        & (Q(passenger_name__isnull=True) | Q(passenger_name=""))
     )
     instruction_given_filter = Q(instructor=member)
     total_filter = Q(pilot=member) | Q(instructor=member)
@@ -203,7 +220,7 @@ def get_logbook_glider_time_summary(member):
 
     grouped = (
         Flight.objects.filter(total_filter, glider__isnull=False)
-        .values("glider__make", "glider__model", "glider__n_number")
+        .values("glider__make", "glider__model")
         .annotate(
             dual_received_duration=Coalesce(
                 Sum("duration", filter=dual_filter),
@@ -231,6 +248,7 @@ def get_logbook_glider_time_summary(member):
                 output_field=DurationField(),
             ),
         )
+        .order_by("glider__make", "glider__model")
     )
 
     rows = []
@@ -248,7 +266,7 @@ def get_logbook_glider_time_summary(member):
         model = (grouped_row.get("glider__model") or "").strip()
         make_model = " ".join(part for part in (make, model) if part).strip()
         if not make_model:
-            make_model = grouped_row.get("glider__n_number") or "Unknown Glider"
+            make_model = "Unknown Glider"
 
         dual_received_m = int(
             grouped_row["dual_received_duration"].total_seconds() // 60

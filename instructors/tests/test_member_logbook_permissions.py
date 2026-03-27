@@ -194,6 +194,50 @@ def test_logbook_glider_summary_is_all_time_even_on_default_view(client):
 
 
 @pytest.mark.django_db
+def test_guest_instructor_flight_counts_as_dual_and_rated_pic(client):
+    _ensure_full_member_status()
+    pilot = _make_member("logbook_guest_instructor", glider_rating="rated")
+    pilot.private_glider_checkride_date = date(2020, 1, 1)
+    pilot.save(update_fields=["private_glider_checkride_date"])
+
+    airfield = Airfield.objects.create(name="Guest Field", identifier="KGST")
+    glider = Glider.objects.create(
+        n_number="N762G",
+        make="DG",
+        model="DG-1000",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 5, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(9, 0),
+        landing_time=time(9, 20),
+        guest_instructor_name="Guest CFI",
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook") + "?show_all_years=1")
+
+    assert response.status_code == 200
+    row = response.context["pages"][0]["rows"][0]
+    assert row["dual_received_m"] == 20
+    assert row["pic_m"] == 20
+
+    summary_rows = response.context["glider_time_summary"]
+    summary_row = next(r for r in summary_rows if r["make_model"] == "DG DG-1000")
+    assert summary_row["dual_received"] == "0:20"
+    assert summary_row["pic_summary"] == "0:20"
+
+
+@pytest.mark.django_db
 def test_instructor_can_view_student_logbook(client):
     _ensure_full_member_status()
     instructor = _make_member("logbook_instructor", instructor=True)
