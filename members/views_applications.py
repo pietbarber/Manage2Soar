@@ -402,7 +402,7 @@ def membership_waitlist(request):
     # Check read permissions
     if not _can_view_membership_applications(request.user):
         raise PermissionDenied(
-            "You do not have permission to manage the membership waiting list."
+            "You do not have permission to view the membership waiting list."
         )
 
     can_modify = _can_modify_membership_applications(request.user)

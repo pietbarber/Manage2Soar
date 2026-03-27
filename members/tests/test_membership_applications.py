@@ -575,11 +575,29 @@ class MembershipApplicationViewTests(TestCase):
     def test_director_can_view_applications_list(self):
         """Directors can view membership applications list in read-only mode."""
         self._create_director()
+        MembershipApplication.objects.create(
+            first_name="ListView",
+            last_name="Test",
+            email="listview@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact Person",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
         response = self.client.get(
             reverse("members:membership_applications_list"), follow=True
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Membership Applications")
+        self.assertNotContains(response, 'title="Review"')
 
     def test_director_can_view_application_detail(self):
         """Directors can view membership application details in read-only mode."""
