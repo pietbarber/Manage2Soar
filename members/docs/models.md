@@ -147,7 +147,7 @@ erDiagram
         int kiosk_token_id FK "nullable for failed token lookups"
         string token_value
         datetime timestamp
-        string ip_address
+        string ip_address "nullable"
         text user_agent
         string device_fingerprint
         string status
@@ -162,7 +162,7 @@ erDiagram
     Member ||--o| MembershipApplication : created_from_application
     Member ||--o{ MembershipApplication : reviewed_applications
     Member ||--o{ KioskToken : kiosk_tokens
-    KioskToken ||--o{ KioskAccessLog : access_logs
+    KioskToken o|--o{ KioskAccessLog : access_logs
     Member ||--o{ SafetyReport : submitted_reports
     Member ||--o{ SafetyReport : reviewed_by
 

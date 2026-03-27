@@ -135,7 +135,7 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> Applicant: Membership Application Submitted
-    Applicant --> Probationary_Member: Admin Approval + Account Activation
+    Applicant --> Probationary_Member: Admin Approval + Probationary Status
     Applicant --> Inactive: Application Rejected
 
     Probationary_Member --> Full_Member: Onboarding Complete

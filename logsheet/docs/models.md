@@ -190,7 +190,7 @@ erDiagram
         int attempt_count
         text last_error
         datetime queued_at
-        datetime processed_at
+        datetime processed_at "nullable"
     }
 
     Logsheet ||--o{ Flight : contains
