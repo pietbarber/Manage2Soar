@@ -34,7 +34,7 @@ Major apps:
 ### Prerequisites
 
 - Python 3.12+
-- PostgreSQL 12+
+- PostgreSQL 17+ (recommended baseline)
 - Git
 
 ### Option A: Automated Setup

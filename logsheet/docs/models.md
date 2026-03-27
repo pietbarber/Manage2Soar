@@ -251,7 +251,7 @@ This document describes all models in `logsheet/models.py`.
 - Represents a single flight log entry, including pilots, aircraft, launch method, times, and costs.
 
 ## RevisionLog
-- Tracks changes to logsheet entries for audit/history.
+- Tracks audit entries when a finalized logsheet is reactivated/unlocked for edits.
 
 ## FinalizationEmailOutbox
 - Durable queue record for post-finalization summary email delivery.

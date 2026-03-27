@@ -15,7 +15,7 @@ The logsheet workflow is the operational heart of the soaring club, managing dai
 
 ```mermaid
 flowchart TD
-    A[Night-Before Duty Crew Reminder Email] --> B[Duty Officer Arrives]
+    A[Day-Before Pre-op Duty Crew Email] --> B[Duty Officer Arrives]
     B --> C[Create/Open Daily Logsheet]
     C --> D[Aircraft Pre-flight Inspections]
     D --> E[Operations Begin]
@@ -70,7 +70,7 @@ sequenceDiagram
     participant Maintenance as Maintenance Team
     participant Analytics as Analytics
 
-    System->>DO: Send Duty Reminder (night before)
+    System->>DO: Send Day-Before Pre-op Duty Crew Email
     DO->>System: Create Daily Logsheet
     System->>System: Initialize Aircraft Status
 
