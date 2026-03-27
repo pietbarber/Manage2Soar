@@ -566,9 +566,10 @@ def export_logsheet_finances_csv(request, pk):
         ]
     )
 
-    # Treasurer compatibility: avoid QuickBooks conflicts by allocating
-    # invoice numbers from a high 5-digit namespace.
-    next_invoice_num = 90000
+    # Treasurer compatibility: allocate invoice numbers from a high 5-digit
+    # namespace and offset by logsheet PK to avoid collisions across exports.
+    base_invoice_num = 90000 + (int(logsheet.pk or 0) * 1000)
+    next_invoice_num = base_invoice_num
     member_invoice_numbers = {}
 
     for flight in flights:

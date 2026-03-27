@@ -1042,6 +1042,92 @@ class FinancesViewChargeDisplayTestCase(TestCase):
             self.assertTrue(invoice_num.isdigit())
             self.assertGreaterEqual(int(invoice_num), 90000)
 
+    def test_treasurer_csv_export_invoice_numbers_differ_across_logsheets(self):
+        """Separate logsheet exports should not reuse the same invoice numbers."""
+        glider = Glider.objects.create(
+            n_number="N107AA",
+            make="PW",
+            model="PW-5",
+            rental_rate=Decimal("24.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            name="Pawnee",
+            n_number="N207BB",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+
+        first_logsheet = self.logsheet
+        second_logsheet = Logsheet.objects.create(
+            log_date=self.logsheet.log_date.replace(
+                day=min(self.logsheet.log_date.day + 1, 28)
+            ),
+            airfield=self.airfield,
+            created_by=self.duty_officer,
+        )
+
+        Flight.objects.create(
+            logsheet=first_logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(9, 0),
+            landing_time=time(9, 20),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("25.00"),
+            rental_cost_actual=Decimal("10.00"),
+        )
+        Flight.objects.create(
+            logsheet=second_logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(10, 0),
+            landing_time=time(10, 20),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("25.00"),
+            rental_cost_actual=Decimal("10.00"),
+        )
+
+        first_logsheet.finalized = True
+        first_logsheet.save(update_fields=["finalized"])
+        second_logsheet.finalized = True
+        second_logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+
+        first_response = self.client.get(
+            reverse(
+                "logsheet:export_logsheet_finances_csv",
+                kwargs={"pk": first_logsheet.pk},
+            )
+        )
+        second_response = self.client.get(
+            reverse(
+                "logsheet:export_logsheet_finances_csv",
+                kwargs={"pk": second_logsheet.pk},
+            )
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+
+        first_rows = list(csv.reader(StringIO(first_response.content.decode("utf-8"))))
+        second_rows = list(
+            csv.reader(StringIO(second_response.content.decode("utf-8")))
+        )
+        first_invoice_num = first_rows[1][0]
+        second_invoice_num = second_rows[1][0]
+
+        self.assertNotEqual(first_logsheet.pk, second_logsheet.pk)
+        self.assertNotEqual(first_invoice_num, second_invoice_num)
+
     def test_treasurer_csv_export_groups_multiple_flights_under_one_member_invoice(
         self,
     ):
