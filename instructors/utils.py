@@ -210,7 +210,7 @@ def get_logbook_glider_time_summary(member):
         Q(pilot=member)
         & ~instructor_present_filter
         & Q(passenger__isnull=True)
-        & (Q(passenger_name__isnull=True) | Q(passenger_name=""))
+        & Q(passenger_name="")
     )
     instruction_given_filter = Q(instructor=member)
     total_filter = Q(pilot=member) | Q(instructor=member)
