@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Count, F, Max, Sum, Value
+from django.db.models import Count, F, Max, Q, Sum, Value
 from django.db.models.fields import DurationField
 from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
@@ -135,6 +135,215 @@ def get_flight_summary_for_member(member):
                 row[f"{prefix}_time"] = ""
 
     return flights_summary
+
+
+def is_logbook_rated_dual_flight(flight_date, rating_date):
+    """Return True when an instructor flight should also count toward PIC as rated dual."""
+    return bool(rating_date and flight_date and flight_date >= rating_date)
+
+
+def has_logbook_instructor_context(flight):
+    """Return True when a flight includes any instructor source (FK or imported name)."""
+    return bool(
+        flight.instructor_id
+        or (flight.guest_instructor_name and flight.guest_instructor_name.strip())
+        or (flight.legacy_instructor_name and flight.legacy_instructor_name.strip())
+    )
+
+
+def classify_logbook_flight_minutes(flight, member_id, rating_date):
+    """Classify one flight's minutes into logbook buckets for a member."""
+    flight_date = flight.logsheet.log_date if flight.logsheet else None
+    duration_m = int(flight.duration.total_seconds() // 60) if flight.duration else 0
+
+    is_pilot = flight.pilot_id == member_id
+    is_instructor = flight.instructor_id == member_id
+    is_passenger = flight.passenger_id == member_id
+
+    dual_m = 0
+    solo_m = 0
+    pic_m = 0
+    inst_m = 0
+
+    if is_pilot:
+        if has_logbook_instructor_context(flight):
+            dual_m += duration_m
+            if is_logbook_rated_dual_flight(flight_date, rating_date):
+                pic_m += duration_m
+        else:
+            if not flight.passenger_id and not flight.passenger_name:
+                solo_m += duration_m
+            pic_m += duration_m
+    elif is_instructor:
+        inst_m += duration_m
+        pic_m += duration_m
+
+    return {
+        "is_pilot": is_pilot,
+        "is_instructor": is_instructor,
+        "is_passenger": is_passenger,
+        "duration_m": duration_m,
+        "dual_m": dual_m,
+        "solo_m": solo_m,
+        "pic_m": pic_m,
+        "inst_m": inst_m,
+    }
+
+
+def get_logbook_glider_time_summary(member):
+    """Build an all-time, per-make/model glider time summary for logbook display."""
+
+    def format_minutes(minutes):
+        hours, mins = divmod(int(minutes), 60)
+        return f"{hours}:{mins:02d}"
+
+    rating_date = getattr(member, "private_glider_checkride_date", None)
+
+    empty_duration = Value(timedelta(0), output_field=DurationField())
+    instructor_present_filter = (
+        Q(instructor__isnull=False)
+        | (Q(guest_instructor_name__isnull=False) & ~Q(guest_instructor_name=""))
+        | (Q(legacy_instructor_name__isnull=False) & ~Q(legacy_instructor_name=""))
+    )
+    dual_filter = Q(pilot=member) & instructor_present_filter
+    solo_filter = (
+        Q(pilot=member)
+        & ~instructor_present_filter
+        & Q(passenger__isnull=True)
+        & Q(passenger_name="")
+    )
+    instruction_given_filter = Q(instructor=member)
+    total_filter = Q(pilot=member) | Q(instructor=member)
+    rated_dual_filter = Q(pk__in=[])
+    if rating_date:
+        rated_dual_filter = dual_filter & Q(logsheet__log_date__gte=rating_date)
+
+    grouped = (
+        Flight.objects.filter(total_filter)
+        .values("glider__make", "glider__model")
+        .annotate(
+            dual_received_count=Count("id", filter=dual_filter),
+            dual_received_duration=Coalesce(
+                Sum("duration", filter=dual_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+            solo_count=Count("id", filter=solo_filter),
+            solo_duration=Coalesce(
+                Sum("duration", filter=solo_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+            instruction_given_count=Count("id", filter=instruction_given_filter),
+            instruction_given_duration=Coalesce(
+                Sum("duration", filter=instruction_given_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+            rated_dual_pic_count=Count("id", filter=rated_dual_filter),
+            rated_dual_pic_duration=Coalesce(
+                Sum("duration", filter=rated_dual_filter),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+            total_count=Count("id"),
+            total_duration=Coalesce(
+                Sum("duration"),
+                empty_duration,
+                output_field=DurationField(),
+            ),
+        )
+        .order_by("glider__make", "glider__model")
+    )
+
+    rows = []
+    totals = {
+        "make_model": "Totals",
+        "dual_received_count": 0,
+        "dual_received_m": 0,
+        "solo_count": 0,
+        "solo_m": 0,
+        "instruction_given_count": 0,
+        "instruction_given_m": 0,
+        "pic_summary_count": 0,
+        "pic_summary_m": 0,
+        "total_count": 0,
+        "total_m": 0,
+    }
+
+    for grouped_row in grouped:
+        make = (grouped_row.get("glider__make") or "").strip()
+        model = (grouped_row.get("glider__model") or "").strip()
+        make_model = " ".join(part for part in (make, model) if part).strip()
+        if not make_model:
+            make_model = "Private"
+
+        dual_received_count = grouped_row["dual_received_count"]
+        dual_received_m = int(
+            grouped_row["dual_received_duration"].total_seconds() // 60
+        )
+        solo_count = grouped_row["solo_count"]
+        solo_m = int(grouped_row["solo_duration"].total_seconds() // 60)
+        instruction_given_count = grouped_row["instruction_given_count"]
+        instruction_given_m = int(
+            grouped_row["instruction_given_duration"].total_seconds() // 60
+        )
+        rated_dual_for_pic_count = grouped_row["rated_dual_pic_count"]
+        rated_dual_for_pic_m = int(
+            grouped_row["rated_dual_pic_duration"].total_seconds() // 60
+        )
+        total_count = grouped_row["total_count"]
+        total_m = int(grouped_row["total_duration"].total_seconds() // 60)
+
+        pic_summary_count = (
+            solo_count + instruction_given_count + rated_dual_for_pic_count
+        )
+        pic_summary_m = solo_m + instruction_given_m + rated_dual_for_pic_m
+
+        row = {
+            "make_model": make_model,
+            "dual_received_count": dual_received_count,
+            "dual_received_m": dual_received_m,
+            "solo_count": solo_count,
+            "solo_m": solo_m,
+            "instruction_given_count": instruction_given_count,
+            "instruction_given_m": instruction_given_m,
+            "pic_summary_count": pic_summary_count,
+            "pic_summary_m": pic_summary_m,
+            "total_count": total_count,
+            "total_m": total_m,
+            "dual_received": format_minutes(dual_received_m),
+            "solo": format_minutes(solo_m),
+            "instruction_given": format_minutes(instruction_given_m),
+            "pic_summary": format_minutes(pic_summary_m),
+            "total": format_minutes(total_m),
+        }
+        rows.append(row)
+
+        totals["dual_received_count"] += row["dual_received_count"]
+        totals["dual_received_m"] += row["dual_received_m"]
+        totals["solo_count"] += row["solo_count"]
+        totals["solo_m"] += row["solo_m"]
+        totals["instruction_given_count"] += row["instruction_given_count"]
+        totals["instruction_given_m"] += row["instruction_given_m"]
+        totals["pic_summary_count"] += row["pic_summary_count"]
+        totals["pic_summary_m"] += row["pic_summary_m"]
+        totals["total_count"] += row["total_count"]
+        totals["total_m"] += row["total_m"]
+
+    if rows:
+        totals.update(
+            {
+                "dual_received": format_minutes(totals["dual_received_m"]),
+                "solo": format_minutes(totals["solo_m"]),
+                "instruction_given": format_minutes(totals["instruction_given_m"]),
+                "pic_summary": format_minutes(totals["pic_summary_m"]),
+                "total": format_minutes(totals["total_m"]),
+            }
+        )
+        rows.append(totals)
+
+    return rows
 
 
 ####################################################

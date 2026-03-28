@@ -44,6 +44,54 @@
 </div>
 {% endif %}
 
+{% if glider_time_summary %}
+<h3 class="mt-4">All-Time Glider Time Summary</h3>
+<p class="text-muted">Comprehensive breakout across all logged years by glider make and model.</p>
+<div class="table-responsive">
+  <table class="table table-sm table-bordered mb-4">
+    <thead class="table-dark">
+      <tr>
+        <th rowspan="2">Make / Model</th>
+        <th colspan="2" class="text-center">Dual Received</th>
+        <th colspan="2" class="text-center">Solo</th>
+        <th colspan="2" class="text-center">Instruction Given</th>
+        <th colspan="2" class="text-center">PIC Summary</th>
+        <th colspan="2" class="text-center">Total Time</th>
+      </tr>
+      <tr>
+        <th class="text-end">#</th>
+        <th class="text-end">Time</th>
+        <th class="text-end">#</th>
+        <th class="text-end">Time</th>
+        <th class="text-end">#</th>
+        <th class="text-end">Time</th>
+        <th class="text-end">#</th>
+        <th class="text-end">Time</th>
+        <th class="text-end">#</th>
+        <th class="text-end">Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for summary in glider_time_summary %}
+      <tr class="{% if summary.make_model == 'Totals' %}table-secondary fw-bold{% endif %}">
+        <td>{{ summary.make_model }}</td>
+        <td class="text-end">{{ summary.dual_received_count }}</td>
+        <td class="text-end">{{ summary.dual_received }}</td>
+        <td class="text-end">{{ summary.solo_count }}</td>
+        <td class="text-end">{{ summary.solo }}</td>
+        <td class="text-end">{{ summary.instruction_given_count }}</td>
+        <td class="text-end">{{ summary.instruction_given }}</td>
+        <td class="text-end">{{ summary.pic_summary_count }}</td>
+        <td class="text-end">{{ summary.pic_summary }}</td>
+        <td class="text-end">{{ summary.total_count }}</td>
+        <td class="text-end">{{ summary.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 
 {% for page in pages %}
 

@@ -38,6 +38,7 @@ The `DjangoPlaywrightTestCase` base class sets the `DJANGO_ALLOW_ASYNC_UNSAFE` e
 - `test_tinymce.py`: TinyMCE editor tests (initialization, YouTube embedding, media dialog)
 - `test_duty_percentage_validation.py`: Duty roster percentage validation tests
 - `test_duty_swap_auto_accept.py`: Duty swap offer flow tests (cover auto-accept and swap pending workflow)
+- `test_logbook_time_breakouts.py`: Logbook dual/PIC and all-time summary breakout tests
 - `test_kiosk_authentication.py`: Kiosk authentication mode tests
 - `test_logsheet_altitude_buttons.py`: Logsheet altitude button interaction tests
 - `test_maintenance_deadline_update.py`: Maintenance deadline update tests
@@ -83,3 +84,4 @@ pytest e2e_tests/e2e/ --cov=. --cov-report=term-missing -v
 - Issue #547: Site Style Enhancements (navbar, banners)
 - Issue #558: E2E tests for navbar active highlighting and banner brightness detection
 - Issue #810: Duty swap cover auto-accept and pending swap workflow
+- Issue #762: Logbook all-time glider time breakouts and rated dual/PIC behavior

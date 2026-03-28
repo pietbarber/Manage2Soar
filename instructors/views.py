@@ -52,7 +52,10 @@ from instructors.models import (
     TrainingPhase,
 )
 from instructors.utils import (
+    classify_logbook_flight_minutes,
     get_flight_summary_for_member,
+    get_logbook_glider_time_summary,
+    has_logbook_instructor_context,
     send_instruction_report_email,
 )
 from knowledgetest.forms import TestBuilderForm
@@ -1693,6 +1696,7 @@ def member_logbook(request, member_id=None):
 
     # 3) Use actual private_glider_checkride_date if available
     rating_date = getattr(member, "private_glider_checkride_date", None)
+    glider_time_summary = get_logbook_glider_time_summary(member)
 
     # 4) Flatten flights & grounds into a single timeline of events, capturing time
     events = []
@@ -1728,10 +1732,15 @@ def member_logbook(request, member_id=None):
             flight_id = f.id
             date = ev["date"]
 
-            # Roles
-            is_pilot = f.pilot_id == member.id
-            is_instructor = f.instructor_id == member.id
-            is_passenger = f.passenger_id == member.id
+            classification = classify_logbook_flight_minutes(
+                f,
+                member.id,
+                rating_date,
+            )
+
+            is_pilot = classification["is_pilot"]
+            is_instructor = classification["is_instructor"]
+            is_passenger = classification["is_passenger"]
 
             # Always initialize report_id
             report_id = None
@@ -1744,21 +1753,20 @@ def member_logbook(request, member_id=None):
                 display_flight_no = ""
 
             # Raw minutes
-            dur_m = int(f.duration.total_seconds() // 60) if f.duration else 0
-            dual_m = solo_m = pic_m = inst_m = 0
+            dur_m = classification["duration_m"]
+            dual_m = classification["dual_m"]
+            solo_m = classification["solo_m"]
+            pic_m = classification["pic_m"]
+            inst_m = classification["inst_m"]
             comments = ""
 
             # 5b) Pilot logic: instruction received vs lesson codes
             if is_pilot:
-                if f.instructor:
-                    # Received dual / PIC
-                    if rating_date and date >= rating_date:
-                        pic_m += dur_m
-                    else:
-                        dual_m += dur_m
-
+                if has_logbook_instructor_context(f):
                     # Look up the instruction report from pre-fetched dict (O(1) lookup)
-                    report_data = report_lookup.get((f.instructor_id, date))
+                    report_data = None
+                    if f.instructor_id:
+                        report_data = report_lookup.get((f.instructor_id, date))
 
                     if report_data:
                         rpt = report_data["report"]
@@ -1768,13 +1776,21 @@ def member_logbook(request, member_id=None):
                         )
                         report_id = rpt.id
                     else:
-                        comments = "instruction received"
+                        guest_instructor_name = (f.guest_instructor_name or "").strip()
+                        legacy_instructor_name = (
+                            f.legacy_instructor_name or ""
+                        ).strip()
+                        fallback_instructor_name = (
+                            guest_instructor_name or legacy_instructor_name
+                        )
+                        if fallback_instructor_name:
+                            comments = (
+                                f"instruction received /s/ {fallback_instructor_name}"
+                            )
+                        else:
+                            comments = "instruction received"
                         report_id = None
                 else:
-                    # Solo flight (only if no passenger)
-                    if not f.passenger and not f.passenger_name:
-                        solo_m += dur_m
-                    pic_m += dur_m
                     if f.passenger:
                         comments = f"{f.passenger.full_display_name}"
                     elif f.passenger_name:
@@ -1786,10 +1802,8 @@ def member_logbook(request, member_id=None):
                     f"{f.pilot.full_display_name} (<i>{member.full_display_name}</i>)"
                 )
 
-            # 7) Instructor logic: inst_given + PIC
+            # 7) Instructor logic: classification already includes inst_given + PIC
             elif is_instructor:
-                inst_m += dur_m
-                pic_m += dur_m
                 student = f.pilot or f.passenger
                 if student:
                     comments = student.full_display_name
@@ -2023,6 +2037,7 @@ def member_logbook(request, member_id=None):
             "years": years,
             "year_page_map": year_page_map,
             "all_years": all_years,
+            "glider_time_summary": glider_time_summary,
         },
     )
 
@@ -2483,6 +2498,17 @@ def export_member_logbook_csv(request, member_id=None):
     )
 
     rating_date = getattr(member, "private_glider_checkride_date", None)
+    instruction_reports = (
+        InstructionReport.objects.filter(student=member)
+        .select_related("instructor")
+        .prefetch_related("lesson_scores__lesson")
+    )
+    report_lookup = {}
+    for rpt in instruction_reports:
+        report_lookup[(rpt.instructor_id, rpt.report_date)] = [
+            ls.lesson.code for ls in rpt.lesson_scores.all()
+        ]
+
     events = []
     for f in flights:
         events.append(
@@ -2503,23 +2529,38 @@ def export_member_logbook_csv(request, member_id=None):
         if ev["type"] == "flight":
             f = ev["obj"]
             date = ev["date"]
-            is_pilot = f.pilot_id == member.id
-            is_instructor = f.instructor_id == member.id
-            is_passenger = f.passenger_id == member.id
+            classification = classify_logbook_flight_minutes(
+                f,
+                member.id,
+                rating_date,
+            )
+            is_pilot = classification["is_pilot"]
+            is_instructor = classification["is_instructor"]
+            is_passenger = classification["is_passenger"]
             if is_pilot or is_instructor:
                 flight_no += 1
-            dur_m = int(f.duration.total_seconds() // 60) if f.duration else 0
-            dual_m = solo_m = pic_m = inst_m = 0
+            dur_m = classification["duration_m"]
+            dual_m = classification["dual_m"]
+            solo_m = classification["solo_m"]
+            pic_m = classification["pic_m"]
+            inst_m = classification["inst_m"]
             comments = ""
             # Construct comments as in logbook.html: lesson codes for instruction, otherwise blank
-            if is_pilot and f.instructor:
-                rpt = InstructionReport.objects.filter(
-                    student=member, instructor=f.instructor, report_date=date
-                ).first()
-                if rpt:
-                    codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
-                    if codes:
-                        comments = ", ".join(codes)
+            if is_pilot and has_logbook_instructor_context(f):
+                codes = []
+                if f.instructor_id:
+                    codes = report_lookup.get((f.instructor_id, date), [])
+                if codes:
+                    comments = ", ".join(codes)
+                else:
+                    fallback_instructor_name = (
+                        f.guest_instructor_name or ""
+                    ).strip() or (f.legacy_instructor_name or "").strip()
+                    comments = "instruction received"
+                    if fallback_instructor_name:
+                        comments = (
+                            f"instruction received /s/ {fallback_instructor_name}"
+                        )
             row = {
                 "Date": date,
                 "Flight #": flight_no if (is_pilot or is_instructor) else "",
