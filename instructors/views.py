@@ -1776,8 +1776,12 @@ def member_logbook(request, member_id=None):
                         )
                         report_id = rpt.id
                     else:
+                        guest_instructor_name = (f.guest_instructor_name or "").strip()
+                        legacy_instructor_name = (
+                            f.legacy_instructor_name or ""
+                        ).strip()
                         fallback_instructor_name = (
-                            f.guest_instructor_name or f.legacy_instructor_name or ""
+                            guest_instructor_name or legacy_instructor_name
                         )
                         if fallback_instructor_name:
                             comments = (

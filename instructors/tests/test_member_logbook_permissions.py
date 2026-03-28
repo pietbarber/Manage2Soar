@@ -240,6 +240,47 @@ def test_guest_instructor_flight_counts_as_dual_and_rated_pic(client):
 
 
 @pytest.mark.django_db
+def test_whitespace_guest_name_falls_back_to_legacy_instructor_name(client):
+    _ensure_full_member_status()
+    pilot = _make_member("logbook_legacy_instructor_fallback", glider_rating="rated")
+    pilot.private_glider_checkride_date = date(2020, 1, 1)
+    pilot.save(update_fields=["private_glider_checkride_date"])
+
+    airfield = Airfield.objects.create(name="Legacy Field", identifier="KLGY")
+    glider = Glider.objects.create(
+        n_number="N762L",
+        make="ASK",
+        model="21",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 5, 2),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(9, 0),
+        landing_time=time(9, 20),
+        guest_instructor_name="   ",
+        legacy_instructor_name="Legacy CFI",
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook") + "?show_all_years=1")
+
+    assert response.status_code == 200
+    row = response.context["pages"][0]["rows"][0]
+    assert row["dual_received_m"] == 20
+    assert "instruction received" in row["comments"]
+    assert "Legacy CFI" in row["comments"]
+
+
+@pytest.mark.django_db
 def test_private_flights_are_included_in_all_time_summary(client):
     _ensure_full_member_status()
     pilot = _make_member("logbook_private_summary", glider_rating="rated")
