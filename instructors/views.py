@@ -2498,6 +2498,17 @@ def export_member_logbook_csv(request, member_id=None):
     )
 
     rating_date = getattr(member, "private_glider_checkride_date", None)
+    instruction_reports = (
+        InstructionReport.objects.filter(student=member)
+        .select_related("instructor")
+        .prefetch_related("lesson_scores__lesson")
+    )
+    report_lookup = {}
+    for rpt in instruction_reports:
+        report_lookup[(rpt.instructor_id, rpt.report_date)] = [
+            ls.lesson.code for ls in rpt.lesson_scores.all()
+        ]
+
     events = []
     for f in flights:
         events.append(
@@ -2536,21 +2547,11 @@ def export_member_logbook_csv(request, member_id=None):
             comments = ""
             # Construct comments as in logbook.html: lesson codes for instruction, otherwise blank
             if is_pilot and has_logbook_instructor_context(f):
-                rpt = None
+                codes = []
                 if f.instructor_id:
-                    rpt = (
-                        InstructionReport.objects.filter(
-                            student=member,
-                            instructor=f.instructor,
-                            report_date=date,
-                        )
-                        .prefetch_related("lesson_scores__lesson")
-                        .first()
-                    )
-                if rpt:
-                    codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
-                    if codes:
-                        comments = ", ".join(codes)
+                    codes = report_lookup.get((f.instructor_id, date), [])
+                if codes:
+                    comments = ", ".join(codes)
                 else:
                     fallback_instructor_name = (
                         f.guest_instructor_name or ""
