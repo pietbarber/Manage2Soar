@@ -246,9 +246,9 @@ def get_logbook_glider_time_summary(member):
                 empty_duration,
                 output_field=DurationField(),
             ),
-            total_count=Count("id", filter=total_filter),
+            total_count=Count("id"),
             total_duration=Coalesce(
-                Sum("duration", filter=total_filter),
+                Sum("duration"),
                 empty_duration,
                 output_field=DurationField(),
             ),
