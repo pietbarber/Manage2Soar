@@ -2518,23 +2518,48 @@ def export_member_logbook_csv(request, member_id=None):
         if ev["type"] == "flight":
             f = ev["obj"]
             date = ev["date"]
-            is_pilot = f.pilot_id == member.id
-            is_instructor = f.instructor_id == member.id
-            is_passenger = f.passenger_id == member.id
+            classification = classify_logbook_flight_minutes(
+                f,
+                member.id,
+                rating_date,
+            )
+            is_pilot = classification["is_pilot"]
+            is_instructor = classification["is_instructor"]
+            is_passenger = classification["is_passenger"]
             if is_pilot or is_instructor:
                 flight_no += 1
-            dur_m = int(f.duration.total_seconds() // 60) if f.duration else 0
-            dual_m = solo_m = pic_m = inst_m = 0
+            dur_m = classification["duration_m"]
+            dual_m = classification["dual_m"]
+            solo_m = classification["solo_m"]
+            pic_m = classification["pic_m"]
+            inst_m = classification["inst_m"]
             comments = ""
             # Construct comments as in logbook.html: lesson codes for instruction, otherwise blank
-            if is_pilot and f.instructor:
-                rpt = InstructionReport.objects.filter(
-                    student=member, instructor=f.instructor, report_date=date
-                ).first()
+            if is_pilot and has_logbook_instructor_context(f):
+                rpt = None
+                if f.instructor_id:
+                    rpt = (
+                        InstructionReport.objects.filter(
+                            student=member,
+                            instructor=f.instructor,
+                            report_date=date,
+                        )
+                        .prefetch_related("lesson_scores__lesson")
+                        .first()
+                    )
                 if rpt:
                     codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
                     if codes:
                         comments = ", ".join(codes)
+                else:
+                    fallback_instructor_name = (
+                        f.guest_instructor_name or ""
+                    ).strip() or (f.legacy_instructor_name or "").strip()
+                    comments = "instruction received"
+                    if fallback_instructor_name:
+                        comments = (
+                            f"instruction received /s/ {fallback_instructor_name}"
+                        )
             row = {
                 "Date": date,
                 "Flight #": flight_no if (is_pilot or is_instructor) else "",

@@ -1,3 +1,5 @@
+import csv
+import io
 import re
 from datetime import date, time, timedelta
 
@@ -390,6 +392,52 @@ def test_non_instructor_cannot_export_another_members_logbook_csv(client):
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_csv_export_uses_shared_dual_and_pic_classification(client):
+    _ensure_full_member_status()
+    pilot = _make_member("logbook_csv_rated_dual", glider_rating="rated")
+    pilot.private_glider_checkride_date = date(2020, 1, 1)
+    pilot.save(update_fields=["private_glider_checkride_date"])
+
+    instructor = _make_member(
+        "logbook_csv_rated_dual_instructor", instructor=True, glider_rating="rated"
+    )
+    airfield = Airfield.objects.create(name="CSV Field", identifier="KCSV")
+    glider = Glider.objects.create(
+        n_number="N762CSV",
+        make="Schleicher",
+        model="ASK-21",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 6, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 25),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook_export_csv"))
+
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/csv")
+
+    rows = list(csv.DictReader(io.StringIO(response.content.decode())))
+    assert len(rows) == 1
+    assert rows[0]["Dual"] == "0:25"
+    assert rows[0]["PIC"] == "0:25"
+    assert rows[0]["Total"] == "0:25"
 
 
 @pytest.mark.django_db
