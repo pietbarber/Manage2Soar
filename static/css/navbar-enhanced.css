@@ -328,6 +328,8 @@
     }
 
     .navbar-offcanvas .dropdown-menu.show {
-        max-height: 500px;
+        /* Avoid clipping long menus (e.g., Resources) on small screens. */
+        max-height: 80vh;
+        overflow-y: auto;
     }
 }

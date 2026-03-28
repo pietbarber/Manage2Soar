@@ -1,7 +1,10 @@
 """E2E coverage for Issue #746 navbar information architecture updates."""
 
+from django.core.cache import cache
+
 from cms.models import HomePageContent
 from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
+from siteconfig.models import SiteConfiguration
 
 
 class TestNavbarResourcesDrawer(DjangoPlaywrightTestCase):
@@ -77,3 +80,33 @@ class TestNavbarResourcesDrawer(DjangoPlaywrightTestCase):
             offcanvas.locator("a.nav-link", has_text="Membership Application").count()
             == 0
         )
+
+    def test_mobile_resources_drawer_includes_clickable_webcam_entry(self):
+        """Active members should see and be able to open Webcam from mobile Resources."""
+        siteconfig = SiteConfiguration.objects.first()
+        if siteconfig:
+            siteconfig.webcam_snapshot_url = "https://example.com/webcam.jpg"
+            siteconfig.save(update_fields=["webcam_snapshot_url"])
+        else:
+            SiteConfiguration.objects.create(
+                club_name="E2E Test Club",
+                domain_name="e2e.test",
+                club_abbreviation="E2E",
+                webcam_snapshot_url="https://example.com/webcam.jpg",
+            )
+        cache.delete("siteconfig_webcam_enabled")
+
+        self.create_test_member(username="nav_webcam_member")
+        self.login(username="nav_webcam_member")
+        self._open_mobile_menu()
+
+        self.page.click("#resourcesDropdown")
+        self.page.wait_for_selector("#resourcesDropdown + .dropdown-menu.show")
+        resources_menu = self.page.locator("#resourcesDropdown + .dropdown-menu")
+        webcam_link = resources_menu.locator("a.dropdown-item", has_text="Webcam")
+        assert webcam_link.count() == 1
+
+        webcam_link.first.scroll_into_view_if_needed()
+        webcam_link.first.click()
+
+        self.page.wait_for_url(f"{self.live_server_url}/webcam/")
