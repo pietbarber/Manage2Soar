@@ -5,6 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 from tinymce.models import HTMLField
 
 from members.models import Member
@@ -682,6 +683,21 @@ class Glider(models.Model):
         return MaintenanceIssue.objects.filter(
             glider=self, grounded=True, resolved=False
         ).exists()
+
+    @property
+    def has_expired_maintenance_deadlines(self):
+        """Return True if this glider has any maintenance deadlines already past due."""
+        return MaintenanceDeadline.objects.filter(
+            glider=self,
+            due_date__lt=timezone.localdate(),
+        ).exists()
+
+    def get_expired_maintenance_deadlines(self):
+        """Return expired maintenance deadlines ordered oldest-first."""
+        return MaintenanceDeadline.objects.filter(
+            glider=self,
+            due_date__lt=timezone.localdate(),
+        ).order_by("due_date")
 
     def get_active_issues(self):
         return MaintenanceIssue.objects.filter(glider=self, resolved=False)

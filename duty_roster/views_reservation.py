@@ -112,6 +112,23 @@ def reservation_create(request, year=None, month=None, day=None):
             reservation = form.save()
             # Check if save was actually successful (form.save() may add errors without raising)
             if reservation.pk:
+                expired_deadlines = []
+                if reservation.glider:
+                    expired_deadlines = list(
+                        reservation.glider.get_expired_maintenance_deadlines()
+                    )
+
+                if expired_deadlines:
+                    overdue_items = ", ".join(
+                        f"{d.description_label} (due {d.due_date:%b %d, %Y})"
+                        for d in expired_deadlines
+                    )
+                    messages.warning(
+                        request,
+                        "Warning: this aircraft has expired maintenance deadlines: "
+                        f"{overdue_items}. Please confirm with operations staff before flying.",
+                    )
+
                 # Defensive programming: ensure glider exists before displaying
                 glider_display = (
                     str(reservation.glider) if reservation.glider else "Unknown glider"
@@ -141,8 +158,8 @@ def reservation_create(request, year=None, month=None, day=None):
     # Get available gliders for display (use the same queryset as the form to ensure consistency)
     available_gliders = form.fields["glider"].queryset
 
-    # Prefetch grounded status to avoid N+1 queries in template
-    from logsheet.models import MaintenanceIssue
+    # Prefetch grounded/expired status to avoid N+1 queries in template
+    from logsheet.models import MaintenanceDeadline, MaintenanceIssue
 
     grounded_glider_ids = set(
         MaintenanceIssue.objects.filter(
@@ -152,10 +169,40 @@ def reservation_create(request, year=None, month=None, day=None):
         ).values_list("glider_id", flat=True)
     )
 
+    expired_deadline_glider_ids = set(
+        MaintenanceDeadline.objects.filter(
+            glider__in=available_gliders,
+            due_date__lt=timezone.now().date(),
+        )
+        .values_list("glider_id", flat=True)
+        .distinct()
+    )
+
+    selected_glider = None
+    selected_glider_expired_deadlines = []
+    selected_glider_id = (
+        request.POST.get("glider") if request.method == "POST" else None
+    )
+    if selected_glider_id:
+        try:
+            selected_glider = available_gliders.filter(
+                pk=int(selected_glider_id)
+            ).first()
+        except (TypeError, ValueError):
+            selected_glider = None
+
+    if selected_glider:
+        selected_glider_expired_deadlines = list(
+            selected_glider.get_expired_maintenance_deadlines()
+        )
+
     context = {
         "form": form,
         "available_gliders": available_gliders,
         "grounded_glider_ids": grounded_glider_ids,
+        "expired_deadline_glider_ids": expired_deadline_glider_ids,
+        "selected_glider": selected_glider,
+        "selected_glider_expired_deadlines": selected_glider_expired_deadlines,
         "max_per_year": config.max_reservations_per_year,
     }
 

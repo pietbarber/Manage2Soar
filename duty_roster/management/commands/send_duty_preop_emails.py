@@ -266,6 +266,15 @@ class Command(BaseCommand):
             towplane__isnull=False, grounded=True, resolved=False
         ).select_related("towplane")
 
+        # Get expired maintenance deadlines (already past due on target date)
+        expired_deadlines = (
+            MaintenanceDeadline.objects.filter(
+                due_date__lt=target_date,
+            )
+            .select_related("glider", "towplane")
+            .order_by("due_date")
+        )
+
         # Get upcoming maintenance deadlines (next 30 days from target date)
         upcoming_deadlines = (
             MaintenanceDeadline.objects.filter(
@@ -327,6 +336,7 @@ class Command(BaseCommand):
             # Maintenance
             "grounded_gliders": grounded_gliders,
             "grounded_towplanes": grounded_towplanes,
+            "expired_deadlines": expired_deadlines,
             "upcoming_deadlines": upcoming_deadlines,
         }
 

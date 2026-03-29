@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from duty_roster.forms import GliderReservationForm
 from duty_roster.models import GliderReservation
-from logsheet.models import Glider, MaintenanceIssue
+from logsheet.models import Glider, MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
 
 
@@ -484,6 +484,27 @@ class TestGliderReservationValidation:
             reservation.clean()
         assert "reserved for the full day" in str(exc_info.value).lower()
 
+    def test_allows_reservation_with_expired_maintenance_deadline_warning_only(
+        self, site_config, member, glider, future_date
+    ):
+        """Expired deadlines should not hard-block reservations."""
+        MaintenanceDeadline.objects.create(
+            glider=glider,
+            description="annual",
+            due_date=timezone.now().date() - timedelta(days=1),
+        )
+
+        reservation = GliderReservation(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        # Should not raise; policy is warning-only.
+        reservation.clean()
+
 
 class TestGliderReservationForm:
     """Tests for the reservation form."""
@@ -646,6 +667,34 @@ class TestGliderReservationViews:
         response = client.get(url)
         # Should redirect with message
         assert response.status_code == 302
+
+    def test_reservation_create_shows_warning_for_expired_deadline(
+        self, client, site_config, member, glider, future_date
+    ):
+        """Reservation succeeds but shows warning when glider has expired deadlines."""
+        MaintenanceDeadline.objects.create(
+            glider=glider,
+            description="annual",
+            due_date=timezone.now().date() - timedelta(days=3),
+        )
+
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_create")
+        response = client.post(
+            url,
+            {
+                "glider": glider.pk,
+                "date": future_date.isoformat(),
+                "reservation_type": "solo",
+                "time_preference": "morning",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        assert GliderReservation.objects.filter(member=member, glider=glider).exists()
+        content = response.content.decode("utf-8")
+        assert "expired maintenance deadlines" in content.lower()
 
     def test_reservation_form_blocks_monthly_limit(
         self, site_config, member, glider, future_date
