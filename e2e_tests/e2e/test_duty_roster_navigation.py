@@ -250,3 +250,43 @@ class TestDutyRosterNavigation(DjangoPlaywrightTestCase):
         assert (
             not agenda_content.is_visible()
         ), "Agenda view should remain hidden when guest navbar Calendar is selected"
+
+    def test_month_navigation_preserves_selected_view_mode(self):
+        """Next/previous month navigation should keep the currently selected view mode."""
+        self.create_test_member(
+            username="navpreserve",
+            email="navpreserve@example.com",
+            membership_status="Full Member",
+        )
+        self.login(username="navpreserve")
+
+        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/")
+        self.page.wait_for_selector("#calendar-body")
+
+        # Switch to agenda and navigate forward one month.
+        self.page.locator('label[for="agenda-view"]').click()
+        self.page.wait_for_selector("#agenda-view-content", state="visible")
+        self.page.locator('button[title^="Go to"]').last.click()
+        self.page.wait_for_selector("#calendar-body")
+
+        agenda_content = self.page.locator("#agenda-view-content")
+        calendar_content = self.page.locator("#calendar-view-content")
+        assert (
+            agenda_content.is_visible()
+        ), "Agenda view should remain visible after month navigation"
+        assert (
+            not calendar_content.is_visible()
+        ), "Calendar view should remain hidden when agenda mode was selected"
+
+        # Switch back to calendar and navigate again; calendar must remain visible.
+        self.page.locator('label[for="calendar-view"]').click()
+        self.page.wait_for_selector("#calendar-view-content", state="visible")
+        self.page.locator('button[title^="Go to"]').last.click()
+        self.page.wait_for_selector("#calendar-body")
+
+        assert (
+            calendar_content.is_visible()
+        ), "Calendar view should remain visible after month navigation"
+        assert (
+            not agenda_content.is_visible()
+        ), "Agenda view should remain hidden when calendar mode was selected"
