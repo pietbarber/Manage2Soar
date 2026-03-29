@@ -56,6 +56,21 @@ class MemberBlackoutForm(forms.ModelForm):
 
 
 class DutyPreferenceForm(forms.ModelForm):
+    pair_with = forms.ModelMultipleChoiceField(
+        queryset=Member.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(
+            attrs={"class": "form-select multi-select-responsive"}
+        ),
+    )
+    avoid_with = forms.ModelMultipleChoiceField(
+        queryset=Member.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(
+            attrs={"class": "form-select multi-select-responsive"}
+        ),
+    )
+
     max_assignments_per_month = forms.DecimalField(
         min_value=0,
         max_value=12,
@@ -108,6 +123,15 @@ class DutyPreferenceForm(forms.ModelForm):
     def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.member = member
+
+        if member:
+            selectable_members = (
+                Member.objects.filter(is_active=True)
+                .exclude(id=member.id)
+                .order_by("last_name", "first_name")
+            )
+            self.fields["pair_with"].queryset = selectable_members
+            self.fields["avoid_with"].queryset = selectable_members
 
         # Make percentage fields not required if user doesn't have those roles
         # and set appropriate defaults
