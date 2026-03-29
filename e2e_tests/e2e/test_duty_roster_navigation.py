@@ -180,3 +180,38 @@ class TestDutyRosterNavigation(DjangoPlaywrightTestCase):
         assert (
             not agenda_content.is_visible()
         ), "Agenda view should be hidden when ?view=calendar is in URL"
+
+    def test_navbar_calendar_link_forces_calendar_view(self):
+        """Duty Roster -> Calendar navbar entry should always open calendar view."""
+        self.create_test_member(
+            username="testmember",
+            email="test@example.com",
+            membership_status="Full Member",
+        )
+        self.login(username="testmember")
+
+        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/")
+        self.page.wait_for_selector("#calendar-body")
+
+        # Simulate a previously saved preference for agenda view.
+        self.page.evaluate("localStorage.setItem('duty-roster-view', 'agenda')")
+
+        # Use the navbar link path the customer reported.
+        self.page.click("#dutyrosterDropdown")
+        duty_dropdown = self.page.locator("#dutyrosterDropdown + .dropdown-menu")
+        duty_dropdown.locator("a.dropdown-item", has_text="Calendar").click()
+
+        self.page.wait_for_url(
+            f"{self.live_server_url}/duty_roster/calendar/?view=calendar"
+        )
+        self.page.wait_for_selector("#calendar-view-content", state="visible")
+
+        agenda_content = self.page.locator("#agenda-view-content")
+        calendar_content = self.page.locator("#calendar-view-content")
+
+        assert (
+            calendar_content.is_visible()
+        ), "Calendar view should remain visible when opened from navbar Calendar link"
+        assert (
+            not agenda_content.is_visible()
+        ), "Agenda view should remain hidden when navbar Calendar is selected"
