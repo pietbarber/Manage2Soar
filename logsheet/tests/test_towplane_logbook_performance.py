@@ -692,6 +692,42 @@ class TowplaneLogbookMinimalTestCase(TestCase):
         self.assertEqual(day_data["day"], date.today())
         self.assertEqual(day_data["day_hours"], 1.5)
 
+    def test_year_navigation_links_have_anchor_targets(self):
+        """Year jump links should render matching in-table anchor targets."""
+        first_day = date(2025, 1, 10)
+        second_day = date(2026, 2, 15)
+
+        for d, start_tach, end_tach in (
+            (first_day, 100.0, 101.0),
+            (second_day, 101.0, 102.0),
+        ):
+            logsheet = Logsheet.objects.create(
+                log_date=d,
+                airfield=self.airfield,
+                duty_officer=self.member,
+                created_by=self.member,
+            )
+            TowplaneCloseout.objects.create(
+                logsheet=logsheet,
+                towplane=self.towplane,
+                start_tach=start_tach,
+                end_tach=end_tach,
+                tach_time=1.0,
+            )
+
+        client = Client()
+        client.force_login(self.member)
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'href="#y2025"')
+        self.assertContains(response, 'href="#y2026"')
+        self.assertContains(response, 'id="y2025"')
+        self.assertContains(response, 'id="y2026"')
+        self.assertContains(response, 'class="year-anchor-target"', count=2)
+
 
 class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
     """

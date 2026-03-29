@@ -52,8 +52,13 @@
             <tbody>
                 {% for row in daily %}
                 {% with d=row.day %}
-                <tr id="{% if row.year_anchor %}{{ row.year_anchor }}{% endif %}">
-                    <td style="white-space:nowrap;" data-sort="{{ d|date:'Y-m-d' }}">{{ d|date:'M. j, Y' }}</td>
+                <tr>
+                    <td style="white-space:nowrap;" data-sort="{{ d|date:'Y-m-d' }}">
+                        {% if row.year_anchor %}
+                        <span id="{{ row.year_anchor }}" class="year-anchor-target" aria-hidden="true"></span>
+                        {% endif %}
+                        {{ d|date:'M. j, Y' }}
+                    </td>
                     <td class="text-end">{{ row.glider_tows }}</td>
 
                     {# Decimal hours #}
@@ -131,6 +136,31 @@
                 </table>
                 </div>
                 <script>
+                    function updateLogbookYearAnchorOffset() {
+                        var root = document.documentElement;
+                        var fixedNavbar = document.querySelector('.navbar.fixed-top, .navbar.sticky-top');
+                        var yearNav = document.querySelector('.year-navigation');
+                        var offset = 16;
+
+                        if (fixedNavbar) {
+                            offset += fixedNavbar.getBoundingClientRect().height;
+                        }
+
+                        if (yearNav) {
+                            var yearNavStyle = window.getComputedStyle(yearNav);
+                            if (yearNavStyle.position === 'sticky' || yearNavStyle.position === 'fixed') {
+                                offset += yearNav.getBoundingClientRect().height;
+                            }
+                        }
+
+                        root.style.setProperty('--logbook-year-anchor-offset', Math.ceil(offset) + 'px');
+                    }
+
+                    updateLogbookYearAnchorOffset();
+                    window.addEventListener('resize', updateLogbookYearAnchorOffset);
+                    document.addEventListener('DOMContentLoaded', updateLogbookYearAnchorOffset);
+                    window.addEventListener('hashchange', updateLogbookYearAnchorOffset);
+
                     // After shared tablesort initializer runs, force initial descending sort on Date column
                     document.addEventListener('tablesort:ready', function () {
                         var table = document.getElementById('equipmentLogbookTable');
