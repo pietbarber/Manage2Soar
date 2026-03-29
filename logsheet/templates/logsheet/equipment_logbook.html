@@ -156,8 +156,10 @@
                         root.style.setProperty('--logbook-year-anchor-offset', Math.ceil(offset) + 'px');
                     }
 
+                    updateLogbookYearAnchorOffset();
                     window.addEventListener('resize', updateLogbookYearAnchorOffset);
                     document.addEventListener('DOMContentLoaded', updateLogbookYearAnchorOffset);
+                    window.addEventListener('hashchange', updateLogbookYearAnchorOffset);
 
                     // After shared tablesort initializer runs, force initial descending sort on Date column
                     document.addEventListener('tablesort:ready', function () {

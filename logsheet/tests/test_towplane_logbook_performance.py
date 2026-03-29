@@ -724,8 +724,9 @@ class TowplaneLogbookMinimalTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'href="#y2025"')
         self.assertContains(response, 'href="#y2026"')
-        self.assertContains(response, 'id="y2025" class="year-anchor-target"')
-        self.assertContains(response, 'id="y2026" class="year-anchor-target"')
+        self.assertContains(response, 'id="y2025"')
+        self.assertContains(response, 'id="y2026"')
+        self.assertContains(response, 'class="year-anchor-target"', count=2)
 
 
 class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
