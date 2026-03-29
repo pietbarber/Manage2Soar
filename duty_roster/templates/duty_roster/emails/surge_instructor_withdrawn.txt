@@ -1,0 +1,13 @@
+⚠️ Surge Instructor Withdrawn - {{ ops_date }}
+================================================================================
+
+Hi {{ primary_instructor.first_name|default:primary_instructor.username }},
+
+{{ withdrawn_instructor.get_full_name|default:withdrawn_instructor.username }}
+has withdrawn their surge instructor offer for {{ ops_date }}.
+
+You can view the current duty roster here:
+  {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

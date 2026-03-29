@@ -123,6 +123,12 @@
               <small class="text-muted d-block">{{ config.surge_instructor_title|default:'Surge Instructor' }}</small>
               {% if assignment.surge_instructor %}
                 <span class="fw-medium">{{ assignment.surge_instructor.full_display_name }}</span>
+                {% if user == assignment.surge_instructor and day >= today %}
+                <a href="{% url 'duty_roster:retract_surge_instructor' assignment_id=assignment.id %}"
+                   class="btn btn-outline-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
+                  ↩ Retract surge offer
+                </a>
+                {% endif %}
               {% elif can_volunteer_surge_instructor %}
                 <a href="{% url 'duty_roster:volunteer_surge_instructor' assignment_id=assignment.id %}"
                    class="btn btn-success btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
@@ -142,6 +148,12 @@
               <small class="text-muted d-block">{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}</small>
               {% if assignment.surge_tow_pilot %}
                 <span class="fw-medium">{{ assignment.surge_tow_pilot.full_display_name }}</span>
+                {% if user == assignment.surge_tow_pilot and day >= today %}
+                <a href="{% url 'duty_roster:retract_surge_tow_pilot' assignment_id=assignment.id %}"
+                   class="btn btn-outline-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
+                  ↩ Retract surge offer
+                </a>
+                {% endif %}
               {% elif can_volunteer_surge_tow_pilot %}
                 <a href="{% url 'duty_roster:volunteer_surge_tow_pilot' assignment_id=assignment.id %}"
                    class="btn btn-danger btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
