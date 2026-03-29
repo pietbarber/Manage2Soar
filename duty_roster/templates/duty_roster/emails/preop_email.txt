@@ -41,6 +41,11 @@ GROUNDED AIRCRAFT
 {% endfor %}{% endif %}{% else %}
 No grounded aircraft. All systems go!
 {% endif %}
+{% if expired_deadlines %}
+EXPIRED MAINTENANCE DEADLINES
+-----------------------------
+{% for deadline in expired_deadlines %}- {% firstof deadline.glider deadline.towplane "Unknown" %}: {{ deadline.description_label }} (OVERDUE since {{ deadline.due_date|date:"M j, Y" }})
+{% endfor %}{% endif %}
 {% if upcoming_deadlines %}
 MAINTENANCE DEADLINES (NEXT 30 DAYS)
 ------------------------------------

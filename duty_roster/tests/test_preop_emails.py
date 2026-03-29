@@ -277,7 +277,7 @@ class TestSendDutyPreopEmails:
 
         assert "Members Planning to Fly" in html_content
         assert "Pete Private" in html_content
-        assert "Private glider" in html_content
+        assert "Fly Private Glider" in html_content
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -345,6 +345,39 @@ class TestSendDutyPreopEmails:
 
         assert "Maintenance Deadlines" in html_content
         assert "Annual inspection" in html_content
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_includes_expired_maintenance_deadline_warning(
+        self, site_config, duty_assignment, glider, tomorrow
+    ):
+        """Expired maintenance deadlines should be highlighted separately."""
+        MaintenanceDeadline.objects.create(
+            glider=glider,
+            description="annual",
+            due_date=tomorrow - timedelta(days=40),
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        email = mail.outbox[0]
+        html_content = email.alternatives[0][0]
+        text_content = email.body
+
+        assert "EXPIRED MAINTENANCE DEADLINES" in html_content
+        assert "OVERDUE since" in html_content
+        assert "Annual Inspection" in html_content
+        assert "EXPIRED MAINTENANCE DEADLINES" in text_content
+        assert "OVERDUE since" in text_content
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",

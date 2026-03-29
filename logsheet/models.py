@@ -683,6 +683,21 @@ class Glider(models.Model):
             glider=self, grounded=True, resolved=False
         ).exists()
 
+    @property
+    def has_expired_maintenance_deadlines(self):
+        """Return True if this glider has any maintenance deadlines already past due."""
+        return MaintenanceDeadline.objects.filter(
+            glider=self,
+            due_date__lt=date.today(),
+        ).exists()
+
+    def get_expired_maintenance_deadlines(self):
+        """Return expired maintenance deadlines ordered oldest-first."""
+        return MaintenanceDeadline.objects.filter(
+            glider=self,
+            due_date__lt=date.today(),
+        ).order_by("due_date")
+
     def get_active_issues(self):
         return MaintenanceIssue.objects.filter(glider=self, resolved=False)
 

@@ -33,6 +33,20 @@
               </div>
             {% endif %}
 
+            {% if selected_glider_expired_deadlines %}
+              <div class="alert alert-warning" role="alert">
+                <strong>Maintenance warning:</strong>
+                <span>
+                  {{ selected_glider }} has expired maintenance deadlines.
+                </span>
+                <ul class="mb-0 mt-2">
+                  {% for deadline in selected_glider_expired_deadlines %}
+                    <li>{{ deadline.description_label }} (overdue since {{ deadline.due_date|date:"M j, Y" }})</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+
             <div class="mb-3">
               <label for="id_date" class="form-label">Date <span class="text-danger">*</span></label>
               {{ form.date }}
@@ -143,6 +157,9 @@
                   {% if glider.id in grounded_glider_ids %}
                     <span class="badge bg-danger">Grounded</span>
                   {% endif %}
+                  {% if glider.id in expired_deadline_glider_ids %}
+                    <span class="badge bg-warning text-dark">Deadline Overdue</span>
+                  {% endif %}
                 </li>
               {% endfor %}
             </ul>
@@ -162,6 +179,7 @@
             <li>Reservations are for fun flying only (solo, badge flights, guest flying).</li>
             <li>Maximum of <strong>{{ max_per_year }}</strong> reservations per year{% if max_per_year == 0 %} (unlimited){% endif %}.</li>
             <li>Grounded aircraft cannot be reserved.</li>
+            <li>Expired maintenance deadlines may still allow reservation but require operations review.</li>
             <li>Please cancel promptly if your plans change.</li>
             <li>The duty officer may contact you on the day of your reservation.</li>
           </ul>
