@@ -52,8 +52,13 @@
             <tbody>
                 {% for row in daily %}
                 {% with d=row.day %}
-                <tr id="{% if row.year_anchor %}{{ row.year_anchor }}{% endif %}">
-                    <td style="white-space:nowrap;" data-sort="{{ d|date:'Y-m-d' }}">{{ d|date:'M. j, Y' }}</td>
+                <tr>
+                    <td style="white-space:nowrap;" data-sort="{{ d|date:'Y-m-d' }}">
+                        {% if row.year_anchor %}
+                        <span id="{{ row.year_anchor }}" class="year-anchor-target" aria-hidden="true"></span>
+                        {% endif %}
+                        {{ d|date:'M. j, Y' }}
+                    </td>
                     <td class="text-end">{{ row.glider_tows }}</td>
 
                     {# Decimal hours #}
