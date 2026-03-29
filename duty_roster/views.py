@@ -157,7 +157,7 @@ def blackout_manage(request):
 
     # Active members (excluding current user)
     active_members = (
-        Member.objects.filter(membership_status__in=active_statuses)
+        Member.objects.filter(membership_status__in=active_statuses, is_active=True)
         .exclude(id=member.id)
         .order_by("last_name", "first_name")
     )
