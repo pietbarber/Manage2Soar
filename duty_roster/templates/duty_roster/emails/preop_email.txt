@@ -39,7 +39,7 @@ GROUNDED AIRCRAFT
 {% endfor %}{% endif %}{% if grounded_towplanes %}Towplanes:
 {% for issue in grounded_towplanes %}- {{ issue.towplane }}: {{ issue.description }}
 {% endfor %}{% endif %}{% else %}
-No grounded aircraft. All systems go!
+{% if not expired_deadlines and not upcoming_deadlines %}No grounded aircraft. All systems go!{% else %}No grounded aircraft.{% endif %}
 {% endif %}
 {% if expired_deadlines %}
 EXPIRED MAINTENANCE DEADLINES

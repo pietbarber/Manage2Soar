@@ -173,7 +173,9 @@ def reservation_create(request, year=None, month=None, day=None):
         MaintenanceDeadline.objects.filter(
             glider__in=available_gliders,
             due_date__lt=timezone.now().date(),
-        ).values_list("glider_id", flat=True)
+        )
+        .values_list("glider_id", flat=True)
+        .distinct()
     )
 
     selected_glider = None

@@ -10,15 +10,22 @@ from siteconfig.models import SiteConfiguration
 class TestGliderReservationDeadlineWarning(DjangoPlaywrightTestCase):
     def setUp(self):
         super().setUp()
-        SiteConfiguration.objects.get_or_create(
+        config, _ = SiteConfiguration.objects.get_or_create(
             defaults={
                 "club_name": "Test Soaring Club",
                 "club_abbreviation": "TSC",
                 "domain_name": "test.org",
-                "allow_glider_reservations": True,
-                "allow_two_seater_reservations": True,
-                "max_reservations_per_year": 3,
             }
+        )
+        config.allow_glider_reservations = True
+        config.allow_two_seater_reservations = True
+        config.max_reservations_per_year = 3
+        config.save(
+            update_fields=[
+                "allow_glider_reservations",
+                "allow_two_seater_reservations",
+                "max_reservations_per_year",
+            ]
         )
 
     def test_reservation_succeeds_with_expired_deadline_warning(self):
