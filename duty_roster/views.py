@@ -139,15 +139,25 @@ def blackout_manage(request):
     if member.towpilot:
         role_choices.append(("towpilot", "Tow Pilot"))
 
-    pair_with = Member.objects.filter(pairing_target__member=member)
-    avoid_with = Member.objects.filter(avoid_target__member=member)
+    pair_with = list(
+        Member.objects.filter(pairing_target__member=member).order_by(
+            "last_name", "first_name"
+        )
+    )
+    avoid_with = list(
+        Member.objects.filter(avoid_target__member=member).order_by(
+            "last_name", "first_name"
+        )
+    )
+    pair_with_ids = {m.id for m in pair_with}
+    avoid_with_ids = {m.id for m in avoid_with}
 
     # Create optgroups for member pairing fields (similar to logsheet forms)
     active_statuses = get_active_membership_statuses()
 
     # Active members (excluding current user)
     active_members = (
-        Member.objects.filter(membership_status__in=active_statuses)
+        Member.objects.filter(membership_status__in=active_statuses, is_active=True)
         .exclude(id=member.id)
         .order_by("last_name", "first_name")
     )
@@ -244,8 +254,8 @@ def blackout_manage(request):
             "max_assignments_per_month": preference.max_assignments_per_month,
             "allow_weekend_double": preference.allow_weekend_double,
             "comment": preference.comment,
-            "pair_with": pair_with,
-            "avoid_with": avoid_with,
+            "pair_with": list(pair_with_ids),
+            "avoid_with": list(avoid_with_ids),
         }
         form = DutyPreferenceForm(initial=initial, member=member)
 
@@ -261,6 +271,8 @@ def blackout_manage(request):
             "preference": preference,
             "pair_with": pair_with,
             "avoid_with": avoid_with,
+            "pair_with_ids": pair_with_ids,
+            "avoid_with_ids": avoid_with_ids,
             "all_other_members": all_other,
             "member_optgroups": member_optgroups,
             "form": form,

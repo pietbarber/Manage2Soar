@@ -409,14 +409,14 @@
                         {% for group_name, members in member_optgroups %}
                           <optgroup label="{{ group_name }}">
                             {% for m in members %}
-                              <option value="{{ m.id }}" {% if m in pair_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+                              <option value="{{ m.id }}" {% if m.id in pair_with_ids %}selected{% endif %}>{{ m.full_display_name }}</option>
                             {% endfor %}
                           </optgroup>
                         {% endfor %}
                       </select>
                       <div class="form-text">
                         <i class="fas fa-info-circle me-1"></i>
-                        Hold <kbd aria-label="Control">Ctrl</kbd> (Windows) or <kbd aria-label="Command">⌘</kbd> (Mac) to select multiple members
+                        Hold <kbd aria-label="Control">Ctrl</kbd> (Windows) or <kbd aria-label="Command">⌘</kbd> (Mac) to select multiple members. Saved selections stay highlighted.
                       </div>
                     </div>
                   </div>
@@ -443,7 +443,7 @@
                         {% for group_name, members in member_optgroups %}
                           <optgroup label="{{ group_name }}">
                             {% for m in members %}
-                              <option value="{{ m.id }}" {% if m in avoid_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+                              <option value="{{ m.id }}" {% if m.id in avoid_with_ids %}selected{% endif %}>{{ m.full_display_name }}</option>
                             {% endfor %}
                           </optgroup>
                         {% endfor %}

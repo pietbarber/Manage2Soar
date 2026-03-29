@@ -1540,3 +1540,53 @@ class PairingPreferencesDisplayTests(TestCase):
         # Should have both badge styles
         self.assertContains(response, "bg-success-subtle")
         self.assertContains(response, "bg-warning-subtle")
+
+    def test_post_saves_pairing_preferences_and_rehydrates_selected_options(self):
+        """Saving pairing preferences should persist badges and selected options."""
+        from duty_roster.models import DutyAvoidance, DutyPairing
+
+        self.client.login(username="testmember", password="testpass123")
+        url = reverse("duty_roster:blackout_manage")
+
+        form_data = {
+            "preferred_day": "",
+            "dont_schedule": "",
+            "scheduling_suspended": "",
+            "suspended_reason": "",
+            "comment": "",
+            "instructor_percent": "0",
+            "duty_officer_percent": "0",
+            "ado_percent": "0",
+            "towpilot_percent": "0",
+            "max_assignments_per_month": "2.00",
+            "allow_weekend_double": "",
+            "pair_with": [str(self.pair_member1.id), str(self.pair_member2.id)],
+            "avoid_with": [str(self.avoid_member.id)],
+        }
+
+        response = self.client.post(url, data=form_data, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+
+        pair_ids = set(
+            DutyPairing.objects.filter(member=self.member).values_list(
+                "pair_with_id", flat=True
+            )
+        )
+        avoid_ids = set(
+            DutyAvoidance.objects.filter(member=self.member).values_list(
+                "avoid_with_id", flat=True
+            )
+        )
+
+        self.assertEqual(pair_ids, {self.pair_member1.id, self.pair_member2.id})
+        self.assertEqual(avoid_ids, {self.avoid_member.id})
+
+        self.assertContains(response, "Duty preferences saved successfully")
+        self.assertContains(response, "Alice Partner")
+        self.assertContains(response, "Bob Buddy")
+        self.assertContains(response, "Charlie Conflict")
+
+        self.assertContains(response, f'value="{self.pair_member1.id}" selected')
+        self.assertContains(response, f'value="{self.pair_member2.id}" selected')
+        self.assertContains(response, f'value="{self.avoid_member.id}" selected')
