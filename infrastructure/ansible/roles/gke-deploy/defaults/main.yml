@@ -238,6 +238,12 @@ gke_run_migrations: false
 # The cost and time overhead is minimal (~10s); the risk of skipping is a broken site.
 gke_collect_static: true
 
+# Retry policy for kubectl exec management commands (migrate/collectstatic).
+# This helps absorb transient failures such as rc=137 when a selected pod is
+# terminated during rollout completion or rescheduling.
+gke_management_command_retries: 3
+gke_management_command_retry_delay: 10
+
 # Keep generated manifest files for debugging (default: clean up after deployment)
 gke_keep_manifests: false
 
