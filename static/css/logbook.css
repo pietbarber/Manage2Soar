@@ -108,11 +108,15 @@ td.logbook-comments {
     display: inline-block;
 }
 
+:root {
+    --logbook-year-anchor-offset: 150px;
+}
+
 /* Anchor target for year links; keep first row content visible below fixed/sticky bars. */
 .year-anchor-target {
     display: block;
     height: 0;
-    scroll-margin-top: 150px;
+    scroll-margin-top: var(--logbook-year-anchor-offset);
 }
 
 /* Smooth scrolling */
