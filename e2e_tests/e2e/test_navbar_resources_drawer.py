@@ -10,6 +10,8 @@ from siteconfig.models import SiteConfiguration
 class TestNavbarResourcesDrawer(DjangoPlaywrightTestCase):
     """Verify guest/member navbar structures and Resources drawer behavior."""
 
+    _TEST_WEBCAM_URL = "file:///nonexistent/webcam.jpg"
+
     def setUp(self):
         super().setUp()
         HomePageContent.objects.get_or_create(
@@ -85,14 +87,14 @@ class TestNavbarResourcesDrawer(DjangoPlaywrightTestCase):
         """Active members should see and be able to open Webcam from mobile Resources."""
         siteconfig = SiteConfiguration.objects.first()
         if siteconfig:
-            siteconfig.webcam_snapshot_url = "https://example.com/webcam.jpg"
+            siteconfig.webcam_snapshot_url = self._TEST_WEBCAM_URL
             siteconfig.save(update_fields=["webcam_snapshot_url"])
         else:
             SiteConfiguration.objects.create(
                 club_name="E2E Test Club",
                 domain_name="e2e.test",
                 club_abbreviation="E2E",
-                webcam_snapshot_url="https://example.com/webcam.jpg",
+                webcam_snapshot_url=self._TEST_WEBCAM_URL,
             )
         cache.delete("siteconfig_webcam_enabled")
 
