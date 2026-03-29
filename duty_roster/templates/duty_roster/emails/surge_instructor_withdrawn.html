@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surge Instructor Withdrawn</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <tr>
+                        <td align="center" style="background-color: #fd7e14; background: linear-gradient(135deg, #fd7e14 0%, #ffc107 100%); padding: 30px 20px;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }} Logo" style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">⚠️ Surge Instructor Withdrawn</h1>
+                            <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px;">{{ ops_date }}</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 30px 20px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 4px; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="padding: 15px; color: #856404;">
+                                        <strong>A surge instructor offer has been withdrawn.</strong>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Hi {{ primary_instructor.first_name|default:primary_instructor.username }},
+                            </p>
+
+                            <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                <strong>{{ withdrawn_instructor.get_full_name|default:withdrawn_instructor.username }}</strong>
+                                has withdrawn their surge instructor offer for
+                                <strong>{{ ops_date }}</strong>.
+                            </p>
+
+                            <p style="margin: 0 0 20px 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                You can review the duty roster for current coverage and make adjustments if needed.
+                            </p>
+
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding: 10px 0;">
+                                        <a href="{{ roster_url }}" style="display: inline-block; background-color: #fd7e14; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; font-size: 16px;">View Duty Roster</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
+                            <p style="margin: 0 0 10px 0; color: #6c757d; font-size: 12px;">
+                                This is an automated notification from Manage2Soar
+                            </p>
+                            <p style="margin: 0; color: #6c757d; font-size: 12px;">
+                                {{ club_name }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

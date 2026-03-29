@@ -3670,6 +3670,162 @@ def volunteer_as_surge_tow_pilot(request, assignment_id):
 
 
 @active_member_required
+@never_cache
+def retract_surge_instructor(request, assignment_id):
+    """Allow the assigned surge instructor to retract their own offer (Issue #801)."""
+    assignment = get_object_or_404(DutyAssignment, id=assignment_id)
+    member = request.user
+
+    if not member.instructor:
+        messages.error(
+            request,
+            "Only qualified instructors can retract a surge instructor offer.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    if assignment.date < date.today():
+        messages.error(
+            request,
+            "Cannot retract a surge instructor offer for a past duty day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    if not assignment.surge_instructor_id:
+        messages.info(
+            request,
+            "There is no surge instructor assignment to retract for this day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    if assignment.surge_instructor_id != member.id:
+        return HttpResponseForbidden(
+            "Only the assigned surge instructor can retract this offer."
+        )
+
+    if request.method == "POST":
+        with transaction.atomic():
+            locked = DutyAssignment.objects.select_for_update().get(id=assignment_id)
+
+            if not locked.surge_instructor_id:
+                messages.info(
+                    request,
+                    "This surge instructor offer was already retracted.",
+                )
+                return redirect("duty_roster:duty_calendar")
+
+            if locked.surge_instructor_id != member.id:
+                return HttpResponseForbidden(
+                    "Only the assigned surge instructor can retract this offer."
+                )
+
+            withdrawn_instructor = locked.surge_instructor
+            locked.surge_instructor = None
+            locked.save(update_fields=["surge_instructor"])
+
+        notified = _notify_primary_instructor_surge_withdrawn(
+            locked, withdrawn_instructor
+        )
+        base_msg = (
+            f"You have retracted your surge instructor offer for "
+            f"{assignment.date.strftime('%B %d, %Y')}."
+        )
+        messages.success(
+            request,
+            (
+                base_msg + " The primary instructor has been notified."
+                if notified
+                else base_msg
+                + " The primary instructor could not be notified automatically."
+            ),
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    return render(
+        request,
+        "duty_roster/surge_retract_confirm.html",
+        {"assignment": assignment},
+    )
+
+
+@active_member_required
+@never_cache
+def retract_surge_tow_pilot(request, assignment_id):
+    """Allow the assigned surge tow pilot to retract their own offer (Issue #801)."""
+    assignment = get_object_or_404(DutyAssignment, id=assignment_id)
+    member = request.user
+
+    if not getattr(member, "towpilot", False):
+        messages.error(
+            request,
+            "Only qualified tow pilots can retract a surge tow pilot offer.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    if assignment.date < date.today():
+        messages.error(
+            request,
+            "Cannot retract a surge tow pilot offer for a past duty day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    if not assignment.surge_tow_pilot_id:
+        messages.info(
+            request,
+            "There is no surge tow pilot assignment to retract for this day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    if assignment.surge_tow_pilot_id != member.id:
+        return HttpResponseForbidden(
+            "Only the assigned surge tow pilot can retract this offer."
+        )
+
+    if request.method == "POST":
+        with transaction.atomic():
+            locked = DutyAssignment.objects.select_for_update().get(id=assignment_id)
+
+            if not locked.surge_tow_pilot_id:
+                messages.info(
+                    request,
+                    "This surge tow pilot offer was already retracted.",
+                )
+                return redirect("duty_roster:duty_calendar")
+
+            if locked.surge_tow_pilot_id != member.id:
+                return HttpResponseForbidden(
+                    "Only the assigned surge tow pilot can retract this offer."
+                )
+
+            withdrawn_tow_pilot = locked.surge_tow_pilot
+            locked.surge_tow_pilot = None
+            locked.save(update_fields=["surge_tow_pilot"])
+
+        notified = _notify_primary_tow_pilot_surge_withdrawn(
+            locked, withdrawn_tow_pilot
+        )
+        base_msg = (
+            f"You have retracted your surge tow pilot offer for "
+            f"{assignment.date.strftime('%B %d, %Y')}."
+        )
+        messages.success(
+            request,
+            (
+                base_msg + " The primary tow pilot has been notified."
+                if notified
+                else base_msg
+                + " The primary tow pilot could not be notified automatically."
+            ),
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    return render(
+        request,
+        "duty_roster/surge_tow_retract_confirm.html",
+        {"assignment": assignment},
+    )
+
+
+@active_member_required
 @require_POST
 def assign_student_to_instructor(request, slot_id):
     """
@@ -4015,6 +4171,114 @@ def _notify_primary_tow_pilot_surge_filled(assignment):
     except Exception:
         logger.exception(
             "Failed to send surge-filled notification to primary tow pilot"
+        )
+        return False
+
+
+def _notify_primary_instructor_surge_withdrawn(assignment, withdrawn_instructor):
+    """Notify the primary instructor that the surge instructor has withdrawn."""
+    try:
+        primary = assignment.instructor
+        if not primary or not primary.email:
+            logger.warning(
+                "Primary instructor for assignment %s has no email; "
+                "surge-withdrawn notification suppressed",
+                assignment.id,
+            )
+            return False
+
+        if not withdrawn_instructor:
+            return False
+
+        email_config = get_email_config()
+        config = email_config["config"]
+
+        ops_date = assignment.date.strftime("%A, %B %d, %Y")
+        subject = (
+            f"Surge Instructor Withdrawn - {assignment.date.strftime('%B %d, %Y')}"
+        )
+
+        context = {
+            "ops_date": ops_date,
+            "primary_instructor": primary,
+            "withdrawn_instructor": withdrawn_instructor,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/surge_instructor_withdrawn.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_instructor_withdrawn.txt", context
+        )
+
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            [primary.email],
+            fail_silently=False,
+            html_message=html_message,
+        )
+        return sent_count > 0
+    except Exception:
+        logger.exception(
+            "Failed to send surge-withdrawn notification to primary instructor"
+        )
+        return False
+
+
+def _notify_primary_tow_pilot_surge_withdrawn(assignment, withdrawn_tow_pilot):
+    """Notify the primary tow pilot that the surge tow pilot has withdrawn."""
+    try:
+        primary = assignment.tow_pilot
+        if not primary or not primary.email:
+            logger.warning(
+                "Primary tow pilot for assignment %s has no email; "
+                "surge-withdrawn notification suppressed",
+                assignment.id,
+            )
+            return False
+
+        if not withdrawn_tow_pilot:
+            return False
+
+        email_config = get_email_config()
+        config = email_config["config"]
+
+        ops_date = assignment.date.strftime("%A, %B %d, %Y")
+        subject = f"Surge Tow Pilot Withdrawn - {assignment.date.strftime('%B %d, %Y')}"
+
+        context = {
+            "ops_date": ops_date,
+            "primary_tow_pilot": primary,
+            "withdrawn_tow_pilot": withdrawn_tow_pilot,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/surge_tow_pilot_withdrawn.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_tow_pilot_withdrawn.txt", context
+        )
+
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            [primary.email],
+            fail_silently=False,
+            html_message=html_message,
+        )
+        return sent_count > 0
+    except Exception:
+        logger.exception(
+            "Failed to send surge-withdrawn notification to primary tow pilot"
         )
         return False
 

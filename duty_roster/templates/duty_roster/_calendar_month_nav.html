@@ -3,6 +3,7 @@
 <div class="d-flex justify-content-between align-items-center {{ margin_class|default:'mb-4' }}">
   <button
     hx-get="{% url 'duty_roster:duty_calendar_month' year=prev_year month=prev_month %}"
+    hx-vals='js:{"view": localStorage.getItem("duty-roster-view") || "calendar"}'
     hx-target="#calendar-body"
     hx-swap="innerHTML"
     class="btn btn-sm btn-outline-primary"
@@ -48,6 +49,7 @@
 
   <button
     hx-get="{% url 'duty_roster:duty_calendar_month' year=next_year month=next_month %}"
+    hx-vals='js:{"view": localStorage.getItem("duty-roster-view") || "calendar"}'
     hx-target="#calendar-body"
     hx-swap="innerHTML"
     class="btn btn-sm btn-outline-primary"

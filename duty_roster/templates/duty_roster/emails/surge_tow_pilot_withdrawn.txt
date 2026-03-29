@@ -1,0 +1,13 @@
+⚠️ Surge Tow Pilot Withdrawn - {{ ops_date }}
+================================================================================
+
+Hi {{ primary_tow_pilot.first_name|default:primary_tow_pilot.username }},
+
+{{ withdrawn_tow_pilot.get_full_name|default:withdrawn_tow_pilot.username }}
+has withdrawn their surge tow pilot offer for {{ ops_date }}.
+
+You can view the current duty roster here:
+  {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

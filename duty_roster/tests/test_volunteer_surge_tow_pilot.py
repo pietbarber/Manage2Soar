@@ -20,7 +20,10 @@ import pytest
 from django.urls import reverse
 
 from duty_roster.models import DutyAssignment
-from duty_roster.views import _notify_primary_tow_pilot_surge_filled
+from duty_roster.views import (
+    _notify_primary_tow_pilot_surge_filled,
+    _notify_primary_tow_pilot_surge_withdrawn,
+)
 from siteconfig.models import SiteConfiguration
 
 # ---------------------------------------------------------------------------
@@ -353,6 +356,105 @@ def test_post_race_condition_guard(client, django_user_model):
 
 
 # ---------------------------------------------------------------------------
+# Retraction flow (Issue #801)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_retract_get_shows_confirmation_page(client, django_user_model):
+    """Assigned surge tow pilot GETs retraction confirmation page."""
+    primary = _make_member(django_user_model, "tp_ret_get_primary", towpilot=True)
+    surge = _make_member(django_user_model, "tp_ret_get_surge", towpilot=True)
+    assignment = _make_assignment(primary, date_offset=40)
+    assignment.surge_tow_pilot = surge
+    assignment.save(update_fields=["surge_tow_pilot"])
+
+    client.force_login(surge)
+    url = reverse(
+        "duty_roster:retract_surge_tow_pilot",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert "Retract" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_retract_post_clears_surge_tow_pilot(client, django_user_model):
+    """Assigned surge tow pilot can retract their own offer."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model,
+        "tp_ret_post_primary",
+        towpilot=True,
+        email="tp_ret_primary@sky.org",
+    )
+    surge = _make_member(django_user_model, "tp_ret_post_surge", towpilot=True)
+    assignment = _make_assignment(primary, date_offset=41)
+    assignment.surge_tow_pilot = surge
+    assignment.save(update_fields=["surge_tow_pilot"])
+
+    client.force_login(surge)
+    url = reverse(
+        "duty_roster:retract_surge_tow_pilot",
+        kwargs={"assignment_id": assignment.id},
+    )
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
+        response = client.post(url)
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.surge_tow_pilot is None
+
+
+@pytest.mark.django_db
+def test_retract_post_forbidden_for_non_owner(client, django_user_model):
+    """Only the assigned surge tow pilot can retract the offer."""
+    primary = _make_member(django_user_model, "tp_ret_forbid_primary", towpilot=True)
+    surge = _make_member(django_user_model, "tp_ret_forbid_surge", towpilot=True)
+    other = _make_member(django_user_model, "tp_ret_forbid_other", towpilot=True)
+    assignment = _make_assignment(primary, date_offset=42)
+    assignment.surge_tow_pilot = surge
+    assignment.save(update_fields=["surge_tow_pilot"])
+
+    client.force_login(other)
+    url = reverse(
+        "duty_roster:retract_surge_tow_pilot",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.post(url)
+
+    assert response.status_code == 403
+    assignment.refresh_from_db()
+    assert assignment.surge_tow_pilot == surge
+
+
+@pytest.mark.django_db
+def test_retract_post_rejected_for_past_day(client, django_user_model):
+    """Cannot retract a surge tow pilot offer for a past day."""
+    primary = _make_member(django_user_model, "tp_ret_past_primary", towpilot=True)
+    surge = _make_member(django_user_model, "tp_ret_past_surge", towpilot=True)
+    assignment = DutyAssignment.objects.create(
+        date=date.today() - timedelta(days=1),
+        tow_pilot=primary,
+        surge_tow_pilot=surge,
+    )
+
+    client.force_login(surge)
+    url = reverse(
+        "duty_roster:retract_surge_tow_pilot",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.post(url)
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.surge_tow_pilot == surge
+
+
+# ---------------------------------------------------------------------------
 # Authentication / 404
 # ---------------------------------------------------------------------------
 
@@ -463,3 +565,24 @@ def test_notify_helper_returns_false_when_surge_not_set(django_user_model):
 
     assert result is False
     mock_send.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_notify_withdrawn_helper_returns_true_on_success(django_user_model):
+    """Withdrawn-helper sends email to primary tow pilot and returns True."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model,
+        "tp_nw_primary",
+        towpilot=True,
+        email="tp_nw_primary@sky.org",
+    )
+    withdrawn = _make_member(django_user_model, "tp_nw_withdrawn", towpilot=True)
+    assignment = _make_assignment(primary, date_offset=75)
+
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
+        result = _notify_primary_tow_pilot_surge_withdrawn(assignment, withdrawn)
+
+    assert result is True
+    mock_send.assert_called_once()

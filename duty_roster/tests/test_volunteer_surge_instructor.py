@@ -21,6 +21,7 @@ from django.urls import reverse
 from duty_roster.models import DutyAssignment, InstructionSlot
 from duty_roster.views import (
     _notify_primary_instructor_surge_filled,
+    _notify_primary_instructor_surge_withdrawn,
     _notify_surge_instructor_needed,
 )
 from siteconfig.models import SiteConfiguration
@@ -389,6 +390,102 @@ def test_post_already_assigned_does_not_overwrite(client, django_user_model):
 
 
 # ---------------------------------------------------------------------------
+# Retraction flow (Issue #801)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_retract_get_shows_confirmation_page(client, django_user_model):
+    """Assigned surge instructor GETs retraction confirmation page."""
+    primary = _make_member(django_user_model, "ret_get_primary", instructor=True)
+    surge = _make_member(django_user_model, "ret_get_surge", instructor=True)
+    assignment = _make_assignment(primary, date_offset=40)
+    assignment.surge_instructor = surge
+    assignment.save(update_fields=["surge_instructor"])
+
+    client.force_login(surge)
+    url = reverse(
+        "duty_roster:retract_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert "Retract" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_retract_post_clears_surge_instructor(client, django_user_model):
+    """Assigned surge instructor can retract their own offer."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model, "ret_post_primary", instructor=True, email="rp@sky.org"
+    )
+    surge = _make_member(django_user_model, "ret_post_surge", instructor=True)
+    assignment = _make_assignment(primary, date_offset=41)
+    assignment.surge_instructor = surge
+    assignment.save(update_fields=["surge_instructor"])
+
+    client.force_login(surge)
+    url = reverse(
+        "duty_roster:retract_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
+        response = client.post(url)
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.surge_instructor is None
+
+
+@pytest.mark.django_db
+def test_retract_post_forbidden_for_non_owner(client, django_user_model):
+    """Only the current surge instructor can retract the offer."""
+    primary = _make_member(django_user_model, "ret_forbid_primary", instructor=True)
+    surge = _make_member(django_user_model, "ret_forbid_surge", instructor=True)
+    other = _make_member(django_user_model, "ret_forbid_other", instructor=True)
+    assignment = _make_assignment(primary, date_offset=42)
+    assignment.surge_instructor = surge
+    assignment.save(update_fields=["surge_instructor"])
+
+    client.force_login(other)
+    url = reverse(
+        "duty_roster:retract_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.post(url)
+
+    assert response.status_code == 403
+    assignment.refresh_from_db()
+    assert assignment.surge_instructor == surge
+
+
+@pytest.mark.django_db
+def test_retract_post_rejected_for_past_day(client, django_user_model):
+    """Cannot retract a surge offer for a past day."""
+    primary = _make_member(django_user_model, "ret_past_primary", instructor=True)
+    surge = _make_member(django_user_model, "ret_past_surge", instructor=True)
+    assignment = DutyAssignment.objects.create(
+        date=date.today() - timedelta(days=1),
+        instructor=primary,
+        surge_instructor=surge,
+    )
+
+    client.force_login(surge)
+    url = reverse(
+        "duty_roster:retract_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.post(url)
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.surge_instructor == surge
+
+
+# ---------------------------------------------------------------------------
 # Auth guards
 # ---------------------------------------------------------------------------
 
@@ -568,3 +665,24 @@ def test_alert_email_context_includes_volunteer_url(django_user_model):
     # The HTML body should also contain the volunteer URL path
     html_body = mock_send.call_args.kwargs.get("html_message", "")
     assert "volunteer-surge" in html_body
+
+
+@pytest.mark.django_db
+def test_notify_primary_withdrawn_returns_true_on_success(django_user_model):
+    """Withdrawn-helper sends email to primary instructor and returns True."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model,
+        "nfw_primary",
+        instructor=True,
+        email="nfw_primary@sky.org",
+    )
+    withdrawn = _make_member(django_user_model, "nfw_withdrawn", instructor=True)
+    assignment = _make_assignment(primary, date_offset=95)
+
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
+        result = _notify_primary_instructor_surge_withdrawn(assignment, withdrawn)
+
+    assert result is True
+    mock_send.assert_called_once()
