@@ -2,7 +2,20 @@ import logging
 import warnings
 from typing import Iterable, List, Optional
 
+from django.conf import settings
+from django.core.cache import cache
+
 logger = logging.getLogger(__name__)
+
+ACTIVE_MEMBERSHIP_STATUSES_CACHE_KEY = "members:active_membership_statuses"
+ACTIVE_MEMBERSHIP_STATUSES_CACHE_TIMEOUT = getattr(
+    settings, "ACTIVE_MEMBERSHIP_STATUSES_CACHE_TIMEOUT", 300
+)
+
+
+def clear_active_membership_statuses_cache() -> None:
+    """Clear cached active membership statuses."""
+    cache.delete(ACTIVE_MEMBERSHIP_STATUSES_CACHE_KEY)
 
 
 def get_active_membership_statuses() -> List[str]:
@@ -21,10 +34,20 @@ def get_active_membership_statuses() -> List[str]:
         siteconfig table doesn't exist. A deprecation warning is logged
         when fallback is used.
     """
+    cached_statuses = cache.get(ACTIVE_MEMBERSHIP_STATUSES_CACHE_KEY)
+    if cached_statuses is not None:
+        return list(cached_statuses)
+
     try:
         from siteconfig.models import MembershipStatus
 
-        return list(MembershipStatus.get_active_statuses())
+        statuses = list(MembershipStatus.get_active_statuses())
+        cache.set(
+            ACTIVE_MEMBERSHIP_STATUSES_CACHE_KEY,
+            statuses,
+            ACTIVE_MEMBERSHIP_STATUSES_CACHE_TIMEOUT,
+        )
+        return statuses
     except Exception as e:
         # Fallback to hardcoded list during migrations or if table/app doesn't exist
         from ..constants.membership import DEFAULT_ACTIVE_STATUSES
@@ -39,7 +62,13 @@ def get_active_membership_statuses() -> List[str]:
             DeprecationWarning,
             stacklevel=2,
         )
-        return list(DEFAULT_ACTIVE_STATUSES)
+        fallback_statuses = list(DEFAULT_ACTIVE_STATUSES)
+        cache.set(
+            ACTIVE_MEMBERSHIP_STATUSES_CACHE_KEY,
+            fallback_statuses,
+            ACTIVE_MEMBERSHIP_STATUSES_CACHE_TIMEOUT,
+        )
+        return fallback_statuses
 
 
 def get_all_membership_statuses() -> List[str]:

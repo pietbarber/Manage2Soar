@@ -1,12 +1,25 @@
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 
 from members.utils import is_active_member
-from members.utils.membership import get_active_membership_statuses
+from members.utils.membership import (
+    clear_active_membership_statuses_cache,
+    get_active_membership_statuses,
+)
 from siteconfig.models import MembershipStatus
 
 User = get_user_model()
+
+
+@pytest.fixture(autouse=True)
+def clear_membership_status_cache_between_tests():
+    clear_active_membership_statuses_cache()
+    yield
+    cache.clear()
 
 
 @pytest.mark.django_db
@@ -124,3 +137,17 @@ def test_membership_status_deletion_integration():
     # Now deletion should succeed (no members using it)
     status.delete()
     assert not MembershipStatus.objects.filter(name="Protected Status").exists()
+
+
+@pytest.mark.django_db
+def test_get_active_membership_statuses_uses_cache():
+    MembershipStatus.objects.create(name="Cached Active", is_active=True)
+    with patch(
+        "siteconfig.models.MembershipStatus.get_active_statuses",
+        wraps=MembershipStatus.get_active_statuses,
+    ) as wrapped:
+        first = get_active_membership_statuses()
+        second = get_active_membership_statuses()
+
+    assert first == second
+    assert wrapped.call_count == 1

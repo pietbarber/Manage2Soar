@@ -809,6 +809,14 @@ class MembershipStatus(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        """Override save to clear membership status cache."""
+        result = super().save(*args, **kwargs)
+        from members.utils.membership import clear_active_membership_statuses_cache
+
+        clear_active_membership_statuses_cache()
+        return result
+
     def delete(self, *args, **kwargs):
         """Override delete to prevent deletion if members are using this status."""
         # Import here to avoid circular imports
@@ -829,6 +837,9 @@ class MembershipStatus(models.Model):
             pass
 
         super().delete(*args, **kwargs)
+        from members.utils.membership import clear_active_membership_statuses_cache
+
+        clear_active_membership_statuses_cache()
 
     @classmethod
     def get_active_statuses(cls):
