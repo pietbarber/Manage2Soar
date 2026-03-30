@@ -141,6 +141,9 @@
   run_once: true
   when: gke_run_migrations | bool
   register: migrate_result
+  retries: "{{ gke_management_command_retries | int }}"
+  delay: "{{ gke_management_command_retry_delay | int }}"
+  until: migrate_result.rc == 0
 
 - name: Display migration result
   ansible.builtin.debug:
@@ -164,6 +167,9 @@
   run_once: true
   when: gke_collect_static | bool
   register: collectstatic_result
+  retries: "{{ gke_management_command_retries | int }}"
+  delay: "{{ gke_management_command_retry_delay | int }}"
+  until: collectstatic_result.rc == 0
 
 - name: Display collectstatic result
   ansible.builtin.debug:
