@@ -319,7 +319,7 @@ def send_instructor_acceptance_confirmation_email(slot):
         return
 
     config = SiteConfiguration.objects.first()
-    site_url = get_canonical_url()
+    site_url = get_canonical_url(config=config)
 
     recipients = []
     for instructor in [slot.assignment.instructor, slot.assignment.surge_instructor]:
