@@ -5,7 +5,7 @@ from io import BytesIO
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from django.utils.crypto import get_random_string
 from tinymce.models import HTMLField
@@ -814,7 +814,7 @@ class MembershipStatus(models.Model):
         result = super().save(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
-        clear_active_membership_statuses_cache()
+        transaction.on_commit(clear_active_membership_statuses_cache)
         return result
 
     def delete(self, *args, **kwargs):
@@ -839,7 +839,7 @@ class MembershipStatus(models.Model):
         super().delete(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
-        clear_active_membership_statuses_cache()
+        transaction.on_commit(clear_active_membership_statuses_cache)
 
     @classmethod
     def get_active_statuses(cls):
