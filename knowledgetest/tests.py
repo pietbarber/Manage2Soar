@@ -1,8 +1,11 @@
 import json
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from instructors.models import InstructionReport
 from knowledgetest.models import (
@@ -609,6 +612,7 @@ class TestPresetViewIntegrationTests(TestCase):
             username="integration-student",
             password="pass",
             membership_status="Full Member",
+            email="integration-student@example.com",
         )
 
     def test_get_presets_function(self):
@@ -675,6 +679,7 @@ class TestPresetViewIntegrationTests(TestCase):
 
     def test_create_self_practice_skips_assignment_and_notification(self):
         self.client.login(username="testuser", password="pass")
+        mail.outbox = []
         if Notification is not None:
             Notification.objects.all().delete()
 
@@ -700,9 +705,11 @@ class TestPresetViewIntegrationTests(TestCase):
         )
         if Notification is not None:
             self.assertFalse(Notification.objects.filter(user=self.user).exists())
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_create_assigned_member_creates_assignment_and_notification(self):
         self.client.login(username="testuser", password="pass")
+        mail.outbox = []
         if Notification is not None:
             Notification.objects.all().delete()
 
@@ -735,3 +742,138 @@ class TestPresetViewIntegrationTests(TestCase):
                     message__icontains="assigned a new written test",
                 ).exists()
             )
+
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        # EMAIL_DEV_MODE can redirect recipients in staging-like test configs.
+        self.assertTrue(
+            self.other_member.email in sent.to
+            or self.other_member.email in sent.subject
+        )
+        self.assertIn("New Written Test Assigned", sent.subject)
+        self.assertIn("Open Pending Tests", sent.alternatives[0][0])
+
+
+class InstructorRecentTestsViewTests(TestCase):
+    def setUp(self):
+        self.instructor = User.objects.create_user(
+            username="recent-instructor",
+            password="pass",
+            membership_status="Full Member",
+        )
+        self.student = User.objects.create_user(
+            username="recent-student",
+            password="pass",
+            membership_status="Student Member",
+        )
+        self.other_student = User.objects.create_user(
+            username="recent-student-2",
+            password="pass",
+            membership_status="Full Member",
+        )
+
+        # Instructor access gate relies on at least one instruction report.
+        InstructionReport.objects.create(
+            student=self.student,
+            instructor=self.instructor,
+            report_date=timezone.localdate(),
+            report_text="Gate access report",
+        )
+
+        category = QuestionCategory.objects.create(code="RVT", description="Recent")
+        question = Question.objects.create(
+            qnum=9101,
+            category=category,
+            question_text="Recent test question?",
+            option_a="A",
+            option_b="B",
+            option_c="C",
+            option_d="D",
+            correct_answer="A",
+        )
+
+        self.template = WrittenTestTemplate.objects.create(
+            name="Recent Template",
+            pass_percentage=70,
+            created_by=self.instructor,
+        )
+        self.template.questions.add(question, through_defaults={"order": 1})
+
+        # One passed and one failed attempt (used by existing summary cards)
+        WrittenTestAttempt.objects.create(
+            template=self.template,
+            student=self.student,
+            instructor=self.instructor,
+            score_percentage=90,
+            passed=True,
+        )
+        WrittenTestAttempt.objects.create(
+            template=self.template,
+            student=self.other_student,
+            instructor=self.instructor,
+            score_percentage=40,
+            passed=False,
+        )
+
+        # In-window pending assignment
+        self.pending_assignment = WrittenTestAssignment.objects.create(
+            template=self.template,
+            student=self.student,
+            instructor=self.instructor,
+            completed=False,
+        )
+
+        # Completed assignment should not appear in pending table
+        WrittenTestAssignment.objects.create(
+            template=WrittenTestTemplate.objects.create(
+                name="Completed Assignment Template",
+                pass_percentage=70,
+                created_by=self.instructor,
+            ),
+            student=self.other_student,
+            instructor=self.instructor,
+            completed=True,
+        )
+
+        # Old pending assignment should be excluded by 30-day window
+        old_assignment = WrittenTestAssignment.objects.create(
+            template=WrittenTestTemplate.objects.create(
+                name="Old Assignment Template",
+                pass_percentage=70,
+                created_by=self.instructor,
+            ),
+            student=self.other_student,
+            instructor=self.instructor,
+            completed=False,
+        )
+        WrittenTestAssignment.objects.filter(pk=old_assignment.pk).update(
+            assigned_at=timezone.now() - timedelta(days=45)
+        )
+
+        self.client.login(username="recent-instructor", password="pass")
+
+    def test_instructor_recent_context_includes_pending_assignment_metrics(self):
+        response = self.client.get(reverse("knowledgetest:instructor-recent-tests"))
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(response.context["total_recent"], 2)
+        self.assertEqual(response.context["recent_passed"], 1)
+        self.assertEqual(response.context["recent_failed"], 1)
+        self.assertEqual(response.context["assigned_pending_recent"], 1)
+
+        pending = list(response.context["assigned_pending_tests"])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0].pk, self.pending_assignment.pk)
+        self.assertGreaterEqual(pending[0].days_pending, 0)
+
+    def test_pending_table_renders_above_recent_completions(self):
+        response = self.client.get(reverse("knowledgetest:instructor-recent-tests"))
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode("utf-8")
+        self.assertIn("Assigned Tests Not Yet Taken", content)
+        self.assertIn("Recent Test Completions", content)
+        self.assertTrue(
+            content.index("Assigned Tests Not Yet Taken")
+            < content.index("Recent Test Completions")
+        )

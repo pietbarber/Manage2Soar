@@ -15,7 +15,7 @@
 
   <!-- Summary Stats -->
   <div class="row mb-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="card bg-info text-white">
         <div class="card-body text-center">
           <h3 class="mb-0">{{ total_recent }}</h3>
@@ -23,7 +23,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="card bg-success text-white">
         <div class="card-body text-center">
           <h3 class="mb-0">{{ recent_passed }}</h3>
@@ -31,7 +31,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="card bg-danger text-white">
         <div class="card-body text-center">
           <h3 class="mb-0">{{ recent_failed }}</h3>
@@ -39,6 +39,96 @@
         </div>
       </div>
     </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-dark">
+        <div class="card-body text-center">
+          <h3 class="mb-0">{{ assigned_pending_recent }}</h3>
+          <small>Assigned, Not Yet Taken</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assigned But Not Yet Taken -->
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">Assigned Tests Not Yet Taken</h5>
+      <small class="text-muted">Follow-up queue ({{ period_days }} days)</small>
+    </div>
+    <div class="card-body py-2 border-bottom bg-light">
+      <small class="text-muted d-flex flex-wrap gap-3">
+        <span><span class="badge bg-warning text-dark">⏳ 8-14 days</span> Follow up soon</span>
+        <span><span class="badge bg-danger">⚠ 15+ days</span> Needs attention now</span>
+      </small>
+    </div>
+    {% if assigned_pending_tests %}
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Assigned Date</th>
+                <th>Student</th>
+                <th>Membership Status</th>
+                <th>Test Name</th>
+                <th>Assigned By</th>
+                <th>Days Pending</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for assignment in assigned_pending_tests %}
+                <tr class="{% if assignment.days_pending > 14 %}pending-row-urgent{% elif assignment.days_pending > 7 %}pending-row-soon{% endif %}">
+                  <td>
+                    <div class="fw-bold">{{ assignment.assigned_at|date:"M j" }}</div>
+                    <small class="text-muted">{{ assignment.assigned_at|date:"g:i A" }}</small>
+                  </td>
+                  <td>
+                    <div class="fw-bold">{{ assignment.student.full_display_name }}</div>
+                  </td>
+                  <td>
+                    <small class="text-muted">{{ assignment.student.membership_status|default:"Member" }}</small>
+                  </td>
+                  <td>
+                    <div class="fw-bold">{{ assignment.template.name }}</div>
+                    {% if assignment.template.description %}
+                      <small class="text-muted d-block">{{ assignment.template.description|truncatechars:40 }}</small>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if assignment.instructor %}
+                      {{ assignment.instructor.full_display_name }}
+                    {% else %}
+                      <em class="text-muted">Unknown</em>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if assignment.days_pending > 14 %}
+                      <span class="badge bg-danger">⚠ {{ assignment.days_pending }} days</span>
+                    {% elif assignment.days_pending > 7 %}
+                      <span class="badge bg-warning text-dark">⏳ {{ assignment.days_pending }} days</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ assignment.days_pending }} days</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <a href="{% url 'instructors:member_instruction_record' assignment.student.pk %}"
+                       class="btn btn-outline-secondary btn-sm"
+                       title="View student's instruction record">
+                      📘 Record
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% else %}
+      <div class="card-body">
+        <p class="mb-0 text-muted">No assigned written tests are currently pending in the last {{ period_days }} days.</p>
+      </div>
+    {% endif %}
   </div>
 
   {% if attempts %}
@@ -178,6 +268,16 @@
 .table-warning {
     --bs-table-bg: #fff3cd;
     --bs-table-striped-bg: #ffecb5;
+}
+
+.pending-row-soon {
+  --bs-table-bg: #fff7e6;
+  --bs-table-striped-bg: #ffefcf;
+}
+
+.pending-row-urgent {
+  --bs-table-bg: #fdecec;
+  --bs-table-striped-bg: #fbdede;
 }
 </style>
 {% endblock %}
