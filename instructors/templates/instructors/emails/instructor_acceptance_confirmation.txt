@@ -1,0 +1,13 @@
+Instruction Request Accepted - {{ instruction_date }}
+
+A student instruction request has been accepted.
+
+Student: {{ student.full_display_name }}
+Date: {{ instruction_date }}
+Accepted by: {{ accepted_by.full_display_name|default:accepted_by.username }}
+
+View instructor requests:
+{{ instructor_requests_url }}
+
+This is an automated message from {{ club_name }}.
+{{ site_url }}

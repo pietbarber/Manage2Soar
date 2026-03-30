@@ -1,0 +1,13 @@
+Surge Instructor Filled - {{ ops_date }}
+
+A surge instructor has accepted coverage.
+
+Date: {{ ops_date }}
+Surge instructor: {{ surge_instructor.full_display_name|default:surge_instructor.username }}
+{% if primary_instructor %}Primary instructor: {{ primary_instructor.full_display_name|default:primary_instructor.username }}
+{% endif %}
+View duty roster:
+{{ roster_url }}
+
+This is an automated message from {{ club_name }}.
+{{ site_url }}

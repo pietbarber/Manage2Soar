@@ -20,11 +20,13 @@ from django.urls import reverse
 
 from duty_roster.models import DutyAssignment, InstructionSlot
 from duty_roster.views import (
+    _notify_instructors_surge_filled,
     _notify_primary_instructor_surge_filled,
     _notify_primary_instructor_surge_withdrawn,
     _notify_surge_instructor_needed,
 )
 from siteconfig.models import SiteConfiguration
+from utils.url_helpers import get_canonical_url
 
 # ---------------------------------------------------------------------------
 # Helpers (mirror test_request_surge_instructor.py for consistency)
@@ -304,7 +306,7 @@ def test_post_redirects_to_duty_calendar(client, django_user_model):
 
 @pytest.mark.django_db
 def test_post_notifies_primary_instructor_by_email(client, django_user_model):
-    """After a successful POST, the primary instructor receives an HTML email."""
+    """After a successful POST, primary and instructors-list emails are sent."""
     _make_site_config()
     primary = _make_member(
         django_user_model,
@@ -324,18 +326,23 @@ def test_post_notifies_primary_instructor_by_email(client, django_user_model):
         mock_send.return_value = 1
         client.post(url)
 
-    mock_send.assert_called_once()
-    call_kwargs = mock_send.call_args
-    # The notification must be sent to the primary instructor's email
-    recipients = (
-        call_kwargs.args[3]
-        if len(call_kwargs.args) > 3
-        else call_kwargs.kwargs.get("recipient_list", [])
-    )
-    assert "primary3@sky.org" in recipients
-    # HTML message must be present
-    html_content = call_kwargs.kwargs.get("html_message", "")
-    assert "<html" in html_content.lower()
+    assert mock_send.call_count == 2
+
+    recipients_per_call = []
+    for call in mock_send.call_args_list:
+        recipients = (
+            call.args[3]
+            if len(call.args) > 3
+            else call.kwargs.get("recipient_list", [])
+        )
+        recipients_per_call.append(set(recipients))
+
+    assert {"primary3@sky.org"} in recipients_per_call
+    assert {"instructors@sky.org"} in recipients_per_call
+
+    for call in mock_send.call_args_list:
+        html_content = call.kwargs.get("html_message", "")
+        assert "<html" in html_content.lower()
 
 
 @pytest.mark.django_db
@@ -636,6 +643,32 @@ def test_notify_primary_returns_false_when_no_surge_instructor(django_user_model
         mock_send.assert_not_called()
 
     assert result is False
+
+
+@pytest.mark.django_db
+def test_notify_instructors_broadcast_includes_site_url(django_user_model):
+    """Broadcast email includes canonical site_url in rendered text body."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model, "nb_primary", instructor=True, email="nb_primary@sky.org"
+    )
+    surge = _make_member(
+        django_user_model, "nb_surge", instructor=True, email="nb_surge@sky.org"
+    )
+    assignment = _make_assignment(primary, date_offset=84)
+    assignment.surge_instructor = surge
+    assignment.save(update_fields=["surge_instructor"])
+
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
+        result = _notify_instructors_surge_filled(assignment)
+
+    assert result is True
+    text_body = mock_send.call_args.args[1]
+    non_empty_lines = [line.strip() for line in text_body.splitlines() if line.strip()]
+    assert non_empty_lines[-1] == get_canonical_url(
+        config=SiteConfiguration.objects.first()
+    )
 
 
 # ---------------------------------------------------------------------------

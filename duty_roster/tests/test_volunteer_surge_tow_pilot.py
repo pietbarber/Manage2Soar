@@ -23,8 +23,10 @@ from duty_roster.models import DutyAssignment
 from duty_roster.views import (
     _notify_primary_tow_pilot_surge_filled,
     _notify_primary_tow_pilot_surge_withdrawn,
+    _notify_tow_pilots_surge_filled,
 )
 from siteconfig.models import SiteConfiguration
+from utils.url_helpers import get_canonical_url
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -277,7 +279,7 @@ def test_post_redirects_to_duty_calendar(client, django_user_model):
 
 @pytest.mark.django_db
 def test_post_notifies_primary_tow_pilot_by_email(client, django_user_model):
-    """After a successful POST, the primary tow pilot receives an HTML email."""
+    """After a successful POST, primary and tow-pilots-list emails are sent."""
     _make_site_config()
     primary = _make_member(
         django_user_model,
@@ -297,9 +299,23 @@ def test_post_notifies_primary_tow_pilot_by_email(client, django_user_model):
         mock_send.return_value = 1
         client.post(url)
 
-    mock_send.assert_called_once()
-    call_kwargs = mock_send.call_args
-    assert primary.email in call_kwargs[0][3]  # recipient list
+    assert mock_send.call_count == 2
+
+    recipients_per_call = []
+    for call in mock_send.call_args_list:
+        recipients = (
+            call.args[3]
+            if len(call.args) > 3
+            else call.kwargs.get("recipient_list", [])
+        )
+        recipients_per_call.append(set(recipients))
+
+    assert {primary.email} in recipients_per_call
+    assert {"towpilots@sky.org"} in recipients_per_call
+
+    for call in mock_send.call_args_list:
+        html_content = call.kwargs.get("html_message", "")
+        assert "<html" in html_content.lower()
 
 
 @pytest.mark.django_db
@@ -565,6 +581,32 @@ def test_notify_helper_returns_false_when_surge_not_set(django_user_model):
 
     assert result is False
     mock_send.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_notify_tow_broadcast_includes_site_url(django_user_model):
+    """Tow-pilot broadcast email includes canonical site_url in text body."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model, "tb_primary", towpilot=True, email="tb_primary@sky.org"
+    )
+    surge = _make_member(
+        django_user_model, "tb_surge", towpilot=True, email="tb_surge@sky.org"
+    )
+    assignment = _make_assignment(primary, date_offset=75)
+    assignment.surge_tow_pilot = surge
+    assignment.save(update_fields=["surge_tow_pilot"])
+
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
+        result = _notify_tow_pilots_surge_filled(assignment)
+
+    assert result is True
+    text_body = mock_send.call_args.args[1]
+    non_empty_lines = [line.strip() for line in text_body.splitlines() if line.strip()]
+    assert non_empty_lines[-1] == get_canonical_url(
+        config=SiteConfiguration.objects.first()
+    )
 
 
 @pytest.mark.django_db
