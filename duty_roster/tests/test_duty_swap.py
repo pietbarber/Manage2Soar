@@ -643,8 +643,8 @@ class TestSwapOfferWorkflow:
             offered_by=bob,
             offer_type="cover",
         )
-        other_offer.refresh_from_db()
-        swap_request.refresh_from_db()
+        other_offer = DutySwapOffer.objects.get(pk=other_offer.pk)
+        swap_request = DutySwapRequest.objects.get(pk=swap_request.pk)
 
         assert accepted_offer.status == "accepted"
         assert other_offer.status == "auto_declined"
@@ -778,8 +778,8 @@ class TestOfferAcceptDecline:
         )
 
         accepted = _accept_offer_and_finalize(swap_request, stale_offer)
-        stale_offer.refresh_from_db()
-        swap_request.refresh_from_db()
+        stale_offer = DutySwapOffer.objects.get(pk=stale_offer.pk)
+        swap_request = DutySwapRequest.objects.get(pk=swap_request.pk)
 
         assert accepted is False
         assert stale_offer.status == "auto_declined"
@@ -825,7 +825,7 @@ class TestCancelAndConvert:
         resp = client.post(url)
         assert resp.status_code in [200, 302]
 
-        direct_request.refresh_from_db()
+        direct_request = DutySwapRequest.objects.get(pk=direct_request.pk)
         assert direct_request.request_type == "general"
         assert direct_request.direct_request_to is None
 
@@ -945,8 +945,8 @@ class TestSwapIntegration:
         client.post(accept_url)
 
         # Verify final state
-        swap_request.refresh_from_db()
-        swap_offer.refresh_from_db()
+        swap_request = DutySwapRequest.objects.get(pk=swap_request.pk)
+        swap_offer = DutySwapOffer.objects.get(pk=swap_offer.pk)
 
         assert swap_request.status == "fulfilled"
         assert swap_offer.status == "accepted"
@@ -1004,8 +1004,8 @@ class TestSwapIntegration:
         assert swap_offer.proposed_swap_date is None
 
         # Verify final state (auto-accepted for cover offers)
-        swap_offer.refresh_from_db()
-        swap_request.refresh_from_db()
+        swap_offer = DutySwapOffer.objects.get(pk=swap_offer.pk)
+        swap_request = DutySwapRequest.objects.get(pk=swap_request.pk)
         assert swap_offer.status == "accepted"
         assert swap_request.status == "fulfilled"
         assert swap_request.accepted_offer == swap_offer
