@@ -117,7 +117,7 @@ def ado_non_qualified(db):
         first_name="Not",
         last_name="Qualified",
         email="ado_non_qualified@example.com",
-        membership_status="Probationary Member",
+        membership_status="Full Member",
         assistant_duty_officer=False,
     )
 
@@ -656,7 +656,6 @@ class TestSwapOfferWorkflow:
         client,
         ado_helper_probationary,
         ado_swap_request,
-        ado_duty_assignment,
         site_config,
     ):
         """Active ADO members in Probationary status can make swap offers."""
