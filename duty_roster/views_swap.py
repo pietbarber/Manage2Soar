@@ -21,6 +21,7 @@ from django.views.decorators.http import require_POST
 
 from members.decorators import active_member_required
 from members.models import Member
+from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 from utils.email import get_dev_mode_info, send_mail
@@ -76,8 +77,9 @@ def get_eligible_members_for_role(role, exclude_member=None):
     if not role_attr:
         return Member.objects.none()
 
+    active_statuses = get_active_membership_statuses()
     queryset = Member.objects.filter(
-        **{role_attr: True}, membership_status__in=["Full Member", "Family Member"]
+        **{role_attr: True}, membership_status__in=active_statuses
     )
 
     if exclude_member:
