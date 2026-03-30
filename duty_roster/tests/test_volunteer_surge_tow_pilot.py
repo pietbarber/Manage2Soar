@@ -26,6 +26,7 @@ from duty_roster.views import (
     _notify_tow_pilots_surge_filled,
 )
 from siteconfig.models import SiteConfiguration
+from utils.url_helpers import get_canonical_url
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -602,7 +603,10 @@ def test_notify_tow_broadcast_includes_site_url(django_user_model):
 
     assert result is True
     text_body = mock_send.call_args.args[1]
-    assert "https://sky.org" in text_body.splitlines()
+    non_empty_lines = [line.strip() for line in text_body.splitlines() if line.strip()]
+    assert non_empty_lines[-1] == get_canonical_url(
+        config=SiteConfiguration.objects.first()
+    )
 
 
 @pytest.mark.django_db
