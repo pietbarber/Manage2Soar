@@ -1,0 +1,15 @@
+{{ club_name }} - New Written Test Assigned
+
+Hi {{ student_name }},
+
+You have been assigned a written test by {{ assigned_by }}.
+
+Test: {{ test_name }}
+{% if test_description %}Description: {{ test_description }}
+{% endif %}Open your pending tests here:
+{{ pending_tests_url }}
+
+Please complete the test when you are ready.
+
+This is an automated message from {{ club_name }}.
+{{ site_url }}

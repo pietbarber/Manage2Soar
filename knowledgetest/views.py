@@ -1,11 +1,14 @@
 import json
 import logging
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -25,7 +28,9 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from members.decorators import active_member_required
-from utils.url_helpers import build_absolute_url
+from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 try:
     from notifications.models import Notification
@@ -36,6 +41,61 @@ except ImportError:
     Notification = None
 
 logger = logging.getLogger(__name__)
+
+
+def _get_site_config():
+    from siteconfig.models import SiteConfiguration
+
+    return SiteConfiguration.objects.first()
+
+
+def _send_written_test_assignment_email(assignment):
+    """Send student-facing email when a written test is assigned."""
+    student_email = getattr(assignment.student, "email", None)
+    if not student_email:
+        return
+
+    config = _get_site_config()
+    site_url = get_canonical_url(config=config)
+    pending_tests_url = build_absolute_url(
+        reverse("knowledgetest:quiz-pending"), canonical=site_url
+    )
+    student_name = getattr(
+        assignment.student, "full_display_name", str(assignment.student)
+    )
+    assigned_by = (
+        getattr(assignment.instructor, "full_display_name", None)
+        if assignment.instructor
+        else "your instructor"
+    )
+    club_name = config.club_name if config else "Soaring Club"
+
+    context = {
+        "student_name": student_name,
+        "assigned_by": assigned_by,
+        "test_name": assignment.template.name,
+        "test_description": assignment.template.description,
+        "pending_tests_url": pending_tests_url,
+        "club_name": club_name,
+        "club_logo_url": get_absolute_club_logo_url(config),
+        "site_url": site_url,
+    }
+
+    html_message = render_to_string(
+        "written_test/emails/written_test_assigned.html", context
+    )
+    text_message = render_to_string(
+        "written_test/emails/written_test_assigned.txt", context
+    )
+
+    send_mail(
+        subject=f"[{club_name}] New Written Test Assigned: {assignment.template.name}",
+        message=text_message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[student_email],
+        html_message=html_message,
+        fail_silently=False,
+    )
 
 
 def generate_test_subject_breakdown(attempt):
@@ -200,6 +260,7 @@ class CreateWrittenTestView(FormView):
                 # Now must is capped, and weights is capped
 
         # 2. Build a template
+        assignment = None
         with transaction.atomic():
             tmpl = WrittenTestTemplate.objects.create(
                 name=f"Test by {self.request.user} on {timezone.now().date()}",
@@ -209,7 +270,7 @@ class CreateWrittenTestView(FormView):
             )
             is_self_practice = data["student"] == self.request.user
             if not is_self_practice:
-                WrittenTestAssignment.objects.create(
+                assignment = WrittenTestAssignment.objects.create(
                     template=tmpl, student=data["student"], instructor=self.request.user
                 )
 
@@ -237,6 +298,16 @@ class CreateWrittenTestView(FormView):
                 logging.warning(
                     f"Failed to create notification for test assignment: {e}"
                 )
+
+            # Send assignment email to the student
+            if assignment is not None:
+                try:
+                    _send_written_test_assignment_email(assignment)
+                except Exception:
+                    logger.exception(
+                        "Failed to send written test assignment email for assignment_id=%s",
+                        assignment.pk,
+                    )
         order = 1
         # 3. First, include forced questions
         for qnum in must:
@@ -504,6 +575,7 @@ class InstructorRecentTestsView(ListView):
     template_name = "written_test/instructor_recent.html"
     context_object_name = "attempts"
     paginate_by = 50
+    period_days = 30
 
     def dispatch(self, request, *args, **kwargs):
         # Check if user is an instructor (has given instruction reports or is staff)
@@ -514,11 +586,12 @@ class InstructorRecentTestsView(ListView):
             return HttpResponseForbidden("Access restricted to instructors and staff")
         return super().dispatch(request, *args, **kwargs)
 
-    def get_queryset(self):
-        # Show tests from the last 30 days, most recent first
-        from datetime import timedelta
+    def _get_cutoff_date(self):
+        return timezone.now() - timedelta(days=self.period_days)
 
-        cutoff_date = timezone.now() - timedelta(days=30)
+    def get_queryset(self):
+        # Show tests from the last N days, most recent first
+        cutoff_date = self._get_cutoff_date()
 
         return (
             WrittenTestAttempt.objects.filter(date_taken__gte=cutoff_date)
@@ -526,16 +599,36 @@ class InstructorRecentTestsView(ListView):
             .order_by("-date_taken")
         )
 
+    def _get_pending_assignments_queryset(self):
+        cutoff_date = self._get_cutoff_date()
+        return (
+            WrittenTestAssignment.objects.filter(
+                completed=False,
+                assigned_at__gte=cutoff_date,
+            )
+            .select_related("student", "template", "instructor")
+            .order_by("-assigned_at")
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Add summary stats for the period
         attempts = self.get_queryset()
+        pending_assignments = self._get_pending_assignments_queryset()
+        today = timezone.localdate()
+
+        for assignment in pending_assignments:
+            assigned_date = timezone.localtime(assignment.assigned_at).date()
+            assignment.days_pending = max((today - assigned_date).days, 0)
+
         context.update(
             {
                 "total_recent": attempts.count(),
                 "recent_passed": attempts.filter(passed=True).count(),
                 "recent_failed": attempts.filter(passed=False).count(),
-                "period_days": 30,
+                "assigned_pending_recent": pending_assignments.count(),
+                "assigned_pending_tests": pending_assignments,
+                "period_days": self.period_days,
             }
         )
         return context
