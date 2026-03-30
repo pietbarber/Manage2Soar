@@ -259,8 +259,9 @@ class CreateWrittenTestView(FormView):
                     weights[q.category.code] += 1
                 # Now must is capped, and weights is capped
 
-        # 2. Build a template
+        # 2. Build template, assignment, and question rows in one transaction.
         assignment = None
+        is_self_practice = data["student"] == self.request.user
         with transaction.atomic():
             tmpl = WrittenTestTemplate.objects.create(
                 name=f"Test by {self.request.user} on {timezone.now().date()}",
@@ -268,11 +269,36 @@ class CreateWrittenTestView(FormView):
                 pass_percentage=data["pass_percentage"],
                 created_by=self.request.user,
             )
-            is_self_practice = data["student"] == self.request.user
             if not is_self_practice:
                 assignment = WrittenTestAssignment.objects.create(
                     template=tmpl, student=data["student"], instructor=self.request.user
                 )
+
+            order = 1
+            # 3. First, include forced questions.
+            for qnum in must:
+                try:
+                    q = Question.objects.get(pk=qnum)
+                    WrittenTestTemplateQuestion.objects.create(
+                        template=tmpl, question=q, order=order
+                    )
+                    order += 1
+                except Question.DoesNotExist:
+                    continue
+
+            # 4. Then, for each category, randomly choose unanswered ones.
+            import random
+
+            for code, cnt in weights.items():
+                pool = list(
+                    Question.objects.filter(category__code=code).exclude(qnum__in=must)
+                )
+                chosen = random.sample(pool, min(cnt, len(pool)))
+                for q in chosen:
+                    WrittenTestTemplateQuestion.objects.create(
+                        template=tmpl, question=q, order=order
+                    )
+                    order += 1
 
         if is_self_practice:
             practice_url = build_absolute_url(
@@ -299,7 +325,7 @@ class CreateWrittenTestView(FormView):
                     f"Failed to create notification for test assignment: {e}"
                 )
 
-            # Send assignment email to the student
+            # Send assignment email only after all test questions are created.
             if assignment is not None:
                 try:
                     _send_written_test_assignment_email(assignment)
@@ -308,32 +334,6 @@ class CreateWrittenTestView(FormView):
                         "Failed to send written test assignment email for assignment_id=%s",
                         assignment.pk,
                     )
-        order = 1
-        # 3. First, include forced questions
-        for qnum in must:
-            try:
-                q = Question.objects.get(pk=qnum)
-                WrittenTestTemplateQuestion.objects.create(
-                    template=tmpl, question=q, order=order
-                )
-                order += 1
-            except Question.DoesNotExist:
-                continue
-
-        # 4. Then, for each category, randomly choose unanswered ones
-        import random
-
-        for code, cnt in weights.items():
-            pool = list(
-                Question.objects.filter(category__code=code).exclude(qnum__in=must)
-            )
-            chosen = random.sample(pool, min(cnt, len(pool)))
-            for q in chosen:
-                WrittenTestTemplateQuestion.objects.create(
-                    template=tmpl, question=q, order=order
-                )
-                order += 1
-
         # 5. Redirect to the quiz start
         return redirect(reverse("knowledgetest:quiz-start", args=[tmpl.pk]))
 
@@ -614,7 +614,7 @@ class InstructorRecentTestsView(ListView):
         context = super().get_context_data(**kwargs)
         # Add summary stats for the period
         attempts = self.get_queryset()
-        pending_assignments = self._get_pending_assignments_queryset()
+        pending_assignments = list(self._get_pending_assignments_queryset())
         today = timezone.localdate()
 
         for assignment in pending_assignments:
@@ -626,7 +626,7 @@ class InstructorRecentTestsView(ListView):
                 "total_recent": attempts.count(),
                 "recent_passed": attempts.filter(passed=True).count(),
                 "recent_failed": attempts.filter(passed=False).count(),
-                "assigned_pending_recent": pending_assignments.count(),
+                "assigned_pending_recent": len(pending_assignments),
                 "assigned_pending_tests": pending_assignments,
                 "period_days": self.period_days,
             }
