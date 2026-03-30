@@ -4140,6 +4140,7 @@ def _notify_instructors_surge_filled(assignment):
             "primary_instructor": assignment.instructor,
             "surge_instructor": surge,
             "roster_url": email_config["roster_url"],
+            "site_url": email_config["site_url"],
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
         }
@@ -4244,6 +4245,7 @@ def _notify_tow_pilots_surge_filled(assignment):
             "primary_tow_pilot": assignment.tow_pilot,
             "surge_tow_pilot": surge,
             "roster_url": email_config["roster_url"],
+            "site_url": email_config["site_url"],
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
         }

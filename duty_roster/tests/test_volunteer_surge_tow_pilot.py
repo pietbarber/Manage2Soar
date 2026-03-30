@@ -23,6 +23,7 @@ from duty_roster.models import DutyAssignment
 from duty_roster.views import (
     _notify_primary_tow_pilot_surge_filled,
     _notify_primary_tow_pilot_surge_withdrawn,
+    _notify_tow_pilots_surge_filled,
 )
 from siteconfig.models import SiteConfiguration
 
@@ -575,6 +576,29 @@ def test_notify_helper_returns_false_when_surge_not_set(django_user_model):
 
     assert result is False
     mock_send.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_notify_tow_broadcast_includes_site_url(django_user_model):
+    """Tow-pilot broadcast email includes canonical site_url in text body."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model, "tb_primary", towpilot=True, email="tb_primary@sky.org"
+    )
+    surge = _make_member(
+        django_user_model, "tb_surge", towpilot=True, email="tb_surge@sky.org"
+    )
+    assignment = _make_assignment(primary, date_offset=75)
+    assignment.surge_tow_pilot = surge
+    assignment.save(update_fields=["surge_tow_pilot"])
+
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
+        result = _notify_tow_pilots_surge_filled(assignment)
+
+    assert result is True
+    text_body = mock_send.call_args.args[1]
+    assert "http" in text_body
 
 
 @pytest.mark.django_db

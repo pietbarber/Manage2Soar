@@ -20,6 +20,7 @@ from django.urls import reverse
 
 from duty_roster.models import DutyAssignment, InstructionSlot
 from duty_roster.views import (
+    _notify_instructors_surge_filled,
     _notify_primary_instructor_surge_filled,
     _notify_primary_instructor_surge_withdrawn,
     _notify_surge_instructor_needed,
@@ -641,6 +642,29 @@ def test_notify_primary_returns_false_when_no_surge_instructor(django_user_model
         mock_send.assert_not_called()
 
     assert result is False
+
+
+@pytest.mark.django_db
+def test_notify_instructors_broadcast_includes_site_url(django_user_model):
+    """Broadcast email includes canonical site_url in rendered text body."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model, "nb_primary", instructor=True, email="nb_primary@sky.org"
+    )
+    surge = _make_member(
+        django_user_model, "nb_surge", instructor=True, email="nb_surge@sky.org"
+    )
+    assignment = _make_assignment(primary, date_offset=84)
+    assignment.surge_instructor = surge
+    assignment.save(update_fields=["surge_instructor"])
+
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
+        result = _notify_instructors_surge_filled(assignment)
+
+    assert result is True
+    text_body = mock_send.call_args.args[1]
+    assert "http" in text_body
 
 
 # ---------------------------------------------------------------------------
