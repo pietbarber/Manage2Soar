@@ -251,14 +251,18 @@ class TestAcceptRejectNotification:
         # Accept the slot
         slot.accept(instructor, note="Looking forward to flying with you!")
 
-        # Should send acceptance email to student
-        assert len(mail.outbox) == 1
-        email = mail.outbox[0]
-        assert "sally@example.com" in email.to
-        assert "confirmed" in email.subject.lower()
+        # Should send acceptance email to student and confirmation to instructors.
+        assert len(mail.outbox) == 2
+        student_email = next(e for e in mail.outbox if "sally@example.com" in e.to)
+        instructors_email = next(
+            e for e in mail.outbox if "Instruction Accepted:" in e.subject
+        )
+
+        assert "confirmed" in student_email.subject.lower()
+        assert set(instructors_email.to) == {"john@example.com", "jane@example.com"}
 
         # Check HTML content
-        html_content = email.alternatives[0][0]
+        html_content = student_email.alternatives[0][0]
         assert "Looking forward to flying with you!" in html_content
 
     @override_settings(

@@ -277,7 +277,7 @@ def test_post_redirects_to_duty_calendar(client, django_user_model):
 
 @pytest.mark.django_db
 def test_post_notifies_primary_tow_pilot_by_email(client, django_user_model):
-    """After a successful POST, the primary tow pilot receives an HTML email."""
+    """After a successful POST, primary and tow-pilots-list emails are sent."""
     _make_site_config()
     primary = _make_member(
         django_user_model,
@@ -297,9 +297,19 @@ def test_post_notifies_primary_tow_pilot_by_email(client, django_user_model):
         mock_send.return_value = 1
         client.post(url)
 
-    mock_send.assert_called_once()
-    call_kwargs = mock_send.call_args
-    assert primary.email in call_kwargs[0][3]  # recipient list
+    assert mock_send.call_count == 2
+
+    recipients_per_call = []
+    for call in mock_send.call_args_list:
+        recipients = (
+            call.args[3]
+            if len(call.args) > 3
+            else call.kwargs.get("recipient_list", [])
+        )
+        recipients_per_call.append(set(recipients))
+
+    assert {primary.email} in recipients_per_call
+    assert {"towpilots@sky.org"} in recipients_per_call
 
 
 @pytest.mark.django_db

@@ -3538,6 +3538,7 @@ def volunteer_as_surge_instructor(request, assignment_id):
             locked.save(update_fields=["surge_instructor"])
 
         notified = _notify_primary_instructor_surge_filled(locked)
+        _notify_instructors_surge_filled(locked)
         base_msg = (
             f"You have been assigned as surge instructor for "
             f"{assignment.date.strftime('%B %d, %Y')}."
@@ -3646,6 +3647,7 @@ def volunteer_as_surge_tow_pilot(request, assignment_id):
             locked.save(update_fields=["surge_tow_pilot"])
 
         notified = _notify_primary_tow_pilot_surge_filled(locked)
+        _notify_tow_pilots_surge_filled(locked)
         base_msg = (
             f"You have been assigned as surge tow pilot for "
             f"{assignment.date.strftime('%B %d, %Y')}."
@@ -4117,6 +4119,54 @@ def _notify_primary_instructor_surge_filled(assignment):
         return False
 
 
+def _notify_instructors_surge_filled(assignment):
+    """Notify the instructors mailing list when a surge instructor slot is filled."""
+    try:
+        surge = assignment.surge_instructor
+        if not surge:
+            return False
+
+        email_config = get_email_config()
+        config = email_config["config"]
+        recipient_list = get_mailing_list(
+            "INSTRUCTORS_MAILING_LIST", "instructors", config
+        )
+
+        ops_date = assignment.date.strftime("%A, %B %d, %Y")
+        subject = f"Surge Instructor Filled - {assignment.date.strftime('%B %d, %Y')}"
+
+        context = {
+            "ops_date": ops_date,
+            "primary_instructor": assignment.instructor,
+            "surge_instructor": surge,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/surge_instructor_filled_broadcast.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_instructor_filled_broadcast.txt", context
+        )
+
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            recipient_list,
+            fail_silently=False,
+            html_message=html_message,
+        )
+        return sent_count > 0
+    except Exception:
+        logger.exception(
+            "Failed to send surge-filled broadcast notification to instructors"
+        )
+        return False
+
+
 def _notify_primary_tow_pilot_surge_filled(assignment):
     """Notify the primary tow pilot that a surge tow pilot has volunteered.
 
@@ -4171,6 +4221,52 @@ def _notify_primary_tow_pilot_surge_filled(assignment):
     except Exception:
         logger.exception(
             "Failed to send surge-filled notification to primary tow pilot"
+        )
+        return False
+
+
+def _notify_tow_pilots_surge_filled(assignment):
+    """Notify the tow-pilots mailing list when a surge tow pilot slot is filled."""
+    try:
+        surge = assignment.surge_tow_pilot
+        if not surge:
+            return False
+
+        email_config = get_email_config()
+        config = email_config["config"]
+        recipient_list = get_mailing_list("TOWPILOTS_MAILING_LIST", "towpilots", config)
+
+        ops_date = assignment.date.strftime("%A, %B %d, %Y")
+        subject = f"Surge Tow Pilot Filled - {assignment.date.strftime('%B %d, %Y')}"
+
+        context = {
+            "ops_date": ops_date,
+            "primary_tow_pilot": assignment.tow_pilot,
+            "surge_tow_pilot": surge,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/surge_tow_pilot_filled_broadcast.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_tow_pilot_filled_broadcast.txt", context
+        )
+
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            recipient_list,
+            fail_silently=False,
+            html_message=html_message,
+        )
+        return sent_count > 0
+    except Exception:
+        logger.exception(
+            "Failed to send surge-filled broadcast notification to tow pilots"
         )
         return False
 

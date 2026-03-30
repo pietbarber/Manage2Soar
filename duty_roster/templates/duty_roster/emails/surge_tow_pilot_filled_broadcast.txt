@@ -1,0 +1,13 @@
+Surge Tow Pilot Filled - {{ ops_date }}
+
+A surge tow pilot has accepted coverage.
+
+Date: {{ ops_date }}
+Surge tow pilot: {{ surge_tow_pilot.full_display_name|default:surge_tow_pilot.username }}
+{% if primary_tow_pilot %}Primary tow pilot: {{ primary_tow_pilot.full_display_name|default:primary_tow_pilot.username }}
+{% endif %}
+View duty roster:
+{{ roster_url }}
+
+This is an automated message from {{ club_name }}.
+{{ site_url }}

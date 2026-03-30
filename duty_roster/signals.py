@@ -313,6 +313,56 @@ def send_request_response_email(slot):
         logger.exception("Failed to create in-system notification for student")
 
 
+def send_instructor_acceptance_confirmation_email(slot):
+    """Notify assignment instructors when any instructor accepts a student request."""
+    if slot.instructor_response != "accepted":
+        return
+
+    config = SiteConfiguration.objects.first()
+    site_url = get_canonical_url()
+
+    recipients = []
+    for instructor in [slot.assignment.instructor, slot.assignment.surge_instructor]:
+        if instructor and instructor.email:
+            recipients.append(instructor.email)
+
+    recipients = list(dict.fromkeys(recipients))
+    if not recipients:
+        return
+
+    context = _get_email_context(slot, config, site_url)
+    context["accepted_by"] = slot.instructor
+    context["instructor_requests_url"] = build_absolute_url(
+        reverse("duty_roster:instructor_requests"), canonical=site_url
+    )
+
+    from_email = _get_from_email(config)
+    subject = (
+        f"Instruction Accepted: {slot.student.first_name} on {slot.assignment.date}"
+    )
+
+    html_message = render_to_string(
+        "instructors/emails/instructor_acceptance_confirmation.html", context
+    )
+    text_message = render_to_string(
+        "instructors/emails/instructor_acceptance_confirmation.txt", context
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=from_email,
+            recipient_list=recipients,
+            html_message=html_message,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to send instructor acceptance confirmation for slot %s",
+            slot.pk,
+        )
+
+
 def send_request_reverted_to_pending_notification(
     slot, acting_instructor=None, prior_instructor_note=""
 ):
@@ -453,6 +503,8 @@ def handle_instruction_slot_save(sender, instance, created, **kwargs):
             ):
                 # Response changed - notify student
                 send_request_response_email(instance)
+                if instance.instructor_response == "accepted":
+                    send_instructor_acceptance_confirmation_email(instance)
     except Exception:
         # Log error but don't re-raise to avoid breaking the save operation
         logger.exception("handle_instruction_slot_save failed")

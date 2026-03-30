@@ -304,7 +304,7 @@ def test_post_redirects_to_duty_calendar(client, django_user_model):
 
 @pytest.mark.django_db
 def test_post_notifies_primary_instructor_by_email(client, django_user_model):
-    """After a successful POST, the primary instructor receives an HTML email."""
+    """After a successful POST, primary and instructors-list emails are sent."""
     _make_site_config()
     primary = _make_member(
         django_user_model,
@@ -324,18 +324,23 @@ def test_post_notifies_primary_instructor_by_email(client, django_user_model):
         mock_send.return_value = 1
         client.post(url)
 
-    mock_send.assert_called_once()
-    call_kwargs = mock_send.call_args
-    # The notification must be sent to the primary instructor's email
-    recipients = (
-        call_kwargs.args[3]
-        if len(call_kwargs.args) > 3
-        else call_kwargs.kwargs.get("recipient_list", [])
-    )
-    assert "primary3@sky.org" in recipients
-    # HTML message must be present
-    html_content = call_kwargs.kwargs.get("html_message", "")
-    assert "<html" in html_content.lower()
+    assert mock_send.call_count == 2
+
+    recipients_per_call = []
+    for call in mock_send.call_args_list:
+        recipients = (
+            call.args[3]
+            if len(call.args) > 3
+            else call.kwargs.get("recipient_list", [])
+        )
+        recipients_per_call.append(set(recipients))
+
+    assert {"primary3@sky.org"} in recipients_per_call
+    assert {"instructors@sky.org"} in recipients_per_call
+
+    for call in mock_send.call_args_list:
+        html_content = call.kwargs.get("html_message", "")
+        assert "<html" in html_content.lower()
 
 
 @pytest.mark.django_db
