@@ -312,6 +312,10 @@ def test_post_notifies_primary_tow_pilot_by_email(client, django_user_model):
     assert {primary.email} in recipients_per_call
     assert {"towpilots@sky.org"} in recipients_per_call
 
+    for call in mock_send.call_args_list:
+        html_content = call.kwargs.get("html_message", "")
+        assert "<html" in html_content.lower()
+
 
 @pytest.mark.django_db
 def test_post_success_message_mentions_primary_notified(client, django_user_model):
@@ -598,7 +602,7 @@ def test_notify_tow_broadcast_includes_site_url(django_user_model):
 
     assert result is True
     text_body = mock_send.call_args.args[1]
-    assert "http" in text_body
+    assert "https://sky.org" in text_body.splitlines()
 
 
 @pytest.mark.django_db

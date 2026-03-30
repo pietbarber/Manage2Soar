@@ -236,7 +236,7 @@ class TestAcceptRejectNotification:
     def test_sends_email_on_accept(
         self, site_config, duty_assignment, student, instructor
     ):
-        """Test that accepting a slot sends email to student."""
+        """Test that accepting a slot emails student and assigned instructors."""
         # Create slot without triggering signal (bypass signals for setup)
         slot = InstructionSlot(
             assignment=duty_assignment,

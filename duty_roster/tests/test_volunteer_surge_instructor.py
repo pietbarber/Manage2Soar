@@ -664,7 +664,7 @@ def test_notify_instructors_broadcast_includes_site_url(django_user_model):
 
     assert result is True
     text_body = mock_send.call_args.args[1]
-    assert "http" in text_body
+    assert "https://sky.org" in text_body.splitlines()
 
 
 # ---------------------------------------------------------------------------
