@@ -6,6 +6,9 @@ Date: {{ ops_date }}
 Surge instructor: {{ surge_instructor.full_display_name|default:surge_instructor.username }}
 {% if primary_instructor %}Primary instructor: {{ primary_instructor.full_display_name|default:primary_instructor.username }}
 {% endif %}
+Surge prompt threshold: {{ instruction_surge_threshold }} requests.
+Acceptance cap: {{ instruction_max_students_per_instructor }} students per instructor.
+
 View duty roster:
 {{ roster_url }}
 

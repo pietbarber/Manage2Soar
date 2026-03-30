@@ -24,13 +24,20 @@ from siteconfig.models import SiteConfiguration
 # ---------------------------------------------------------------------------
 
 
-def _make_site_config(instruction_surge_threshold=4):
+def _make_site_config(
+    instruction_surge_threshold=4,
+    instruction_max_students_per_instructor=None,
+):
+    if instruction_max_students_per_instructor is None:
+        instruction_max_students_per_instructor = instruction_surge_threshold
+
     return SiteConfiguration.objects.create(
         club_name="Sky Club",
         domain_name="sky.org",
         club_abbreviation="SC",
         instructors_email="instructors@sky.org",
         instruction_surge_threshold=instruction_surge_threshold,
+        instruction_max_students_per_instructor=instruction_max_students_per_instructor,
     )
 
 
@@ -359,3 +366,63 @@ def test_surge_check_does_not_notify_when_surge_already_assigned(django_user_mod
     with patch("duty_roster.views._notify_surge_instructor_needed") as mock_notify:
         _check_surge_instructor_needed(assignment)
         mock_notify.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_signup_allows_requests_beyond_surge_threshold_when_max_higher(
+    django_user_model,
+):
+    """Issue #840: surge threshold should not act as a hard cap for signups."""
+    _make_site_config(
+        instruction_surge_threshold=2,
+        instruction_max_students_per_instructor=5,
+    )
+    primary = _make_member(django_user_model, "cp_decouple_p1", instructor=True)
+    assignment = _make_assignment(primary, date_offset=71)
+
+    for i in range(2):
+        s = _make_member(django_user_model, f"cp_decouple_st_{i}")
+        _make_accepted_slot(assignment, s, primary)
+
+    new_student = _make_member(django_user_model, "cp_decouple_new")
+    form = InstructionRequestForm(
+        {"instruction_types": [], "student_notes": ""},
+        assignment=assignment,
+        student=new_student,
+    )
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_instructor_blocked_at_configured_max_even_when_surge_threshold_lower(
+    client, django_user_model
+):
+    """Issue #840: accept cap follows max-students setting, not surge threshold."""
+    _make_site_config(
+        instruction_surge_threshold=2,
+        instruction_max_students_per_instructor=3,
+    )
+    primary = _make_member(django_user_model, "cp_decouple_p2", instructor=True)
+    surge = _make_member(django_user_model, "cp_decouple_s2", instructor=True)
+    assignment = _make_assignment(primary, date_offset=72, surge=surge)
+
+    for i in range(3):
+        s = _make_member(django_user_model, f"cp_decouple_cap_{i}")
+        _make_accepted_slot(assignment, s, primary)
+
+    pending_student = _make_member(django_user_model, "cp_decouple_pending")
+    pending_slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=pending_student,
+        instructor=None,
+        instructor_response="pending",
+        status="pending",
+    )
+
+    client.force_login(primary)
+    url = reverse("duty_roster:instructor_respond", kwargs={"slot_id": pending_slot.id})
+    response = client.post(url, {"action": "accept"})
+
+    assert response.status_code == 302
+    pending_slot.refresh_from_db()
+    assert pending_slot.instructor_response == "pending"

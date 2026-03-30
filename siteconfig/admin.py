@@ -127,6 +127,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "fields": (
                     "tow_surge_threshold",
                     "instruction_surge_threshold",
+                    "instruction_max_students_per_instructor",
                     "instructors_email",
                 ),
                 "description": (
@@ -142,6 +143,11 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "sent to the respective mailing list (tow pilots or instructors). The "
                     "<em>Instruction Surge Threshold</em> also controls when the instructors_email "
                     "alert above fires. This is a separate mechanism from the ops-intent pathway."
+                    "<br><br>"
+                    "<strong>Instruction max students per instructor</strong>: Hard cap for accepted "
+                    "students per instructor on a duty day. Example: threshold 3 + max 9 means the "
+                    "system asks for surge help at 3 accepted students, but instructors can keep "
+                    "accepting until they each reach 9."
                 ),
                 "classes": ("collapse",),
             },

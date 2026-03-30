@@ -324,6 +324,23 @@ def get_surge_thresholds():
     return tow_surge_threshold, instruction_surge_threshold
 
 
+def get_instruction_max_students_per_instructor():
+    """Get accepted-student cap per instructor from SiteConfiguration."""
+    config = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
+    if config is _SITECONFIG_CACHE_SENTINEL:
+        config = SiteConfiguration.objects.first()
+        cache.set("siteconfig_instance", config, timeout=60)
+
+    if not config:
+        return 4
+
+    return getattr(
+        config,
+        "instruction_max_students_per_instructor",
+        config.instruction_surge_threshold,
+    )
+
+
 def _check_instruction_request_window(day_date):
     """
     Check whether instruction requests are permitted for *day_date* today.
@@ -610,6 +627,9 @@ def duty_calendar_view(request, year=None, month=None):
 
     # Get site config for surge thresholds
     tow_surge_threshold, instruction_surge_threshold = get_surge_thresholds()
+    instruction_max_students_per_instructor = (
+        get_instruction_max_students_per_instructor()
+    )
 
     site_config = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
     if site_config is _SITECONFIG_CACHE_SENTINEL:
@@ -741,6 +761,7 @@ def duty_calendar_view(request, year=None, month=None):
         "surge_needed_by_date": surge_needed_by_date,
         "tow_surge_threshold": tow_surge_threshold,
         "instruction_surge_threshold": instruction_surge_threshold,
+        "instruction_max_students_per_instructor": instruction_max_students_per_instructor,
     }
 
     if request.htmx:
@@ -757,6 +778,9 @@ def calendar_day_detail(request, year, month, day):
 
     # Get site config for surge thresholds
     tow_surge_threshold, instruction_surge_threshold = get_surge_thresholds()
+    instruction_max_students_per_instructor = (
+        get_instruction_max_students_per_instructor()
+    )
 
     # Show current user intent status
     intent_exists = False
@@ -916,6 +940,8 @@ def calendar_day_detail(request, year, month, day):
             "instruction_intent_count": instruction_intent_count,
             "tow_count": tow_count,
             "show_tow_surge_alert": show_tow_surge_alert,
+            "instruction_surge_threshold": instruction_surge_threshold,
+            "instruction_max_students_per_instructor": instruction_max_students_per_instructor,
             "today": date.today(),
             "user_has_instruction_request": user_has_instruction_request,
             "instruction_request_form": instruction_request_form,
@@ -1173,6 +1199,9 @@ def maybe_notify_surge_instructor(day_date):
 
     # Get surge threshold
     _, instruction_surge_threshold = get_surge_thresholds()
+    instruction_max_students_per_instructor = (
+        get_instruction_max_students_per_instructor()
+    )
 
     # Use InstructionSlot records as the authoritative instruction-demand signal.
     # (The 'instruction' OpsIntent checkbox was removed in Issue #679.)
@@ -1190,6 +1219,10 @@ def maybe_notify_surge_instructor(day_date):
         recipient_list = get_mailing_list(
             "INSTRUCTORS_MAILING_LIST", "instructors", email_config["config"]
         )
+        volunteer_url = build_absolute_url(
+            reverse("duty_roster:volunteer_surge_instructor", args=[assignment.id]),
+            canonical=email_config["site_url"],
+        )
 
         context = {
             "student_count": instruction_count,
@@ -1197,6 +1230,9 @@ def maybe_notify_surge_instructor(day_date):
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
             "roster_url": email_config["roster_url"],
+            "volunteer_url": volunteer_url,
+            "instruction_surge_threshold": instruction_surge_threshold,
+            "instruction_max_students_per_instructor": instruction_max_students_per_instructor,
         }
 
         # Render email templates
@@ -3145,6 +3181,9 @@ def instructor_requests(request):
         accepted_by_date[slot.assignment.date].append(slot)
 
     _, instruction_surge_threshold = get_surge_thresholds()
+    instruction_max_students_per_instructor = (
+        get_instruction_max_students_per_instructor()
+    )
 
     # Build a per-date allocation map for days that have both a primary and surge
     # instructor, so the template can show the three-column split view (Issue #664).
@@ -3205,6 +3244,7 @@ def instructor_requests(request):
             "accepted_count": sum(len(v) for v in accepted_by_date.values()),
             "today": today,
             "instruction_surge_threshold": instruction_surge_threshold,
+            "instruction_max_students_per_instructor": instruction_max_students_per_instructor,
             "day_filter_options": day_filter_options,
             "selected_days": selected_days,
             "assigned_dates": assigned_dates,
@@ -3259,11 +3299,11 @@ def instructor_respond(request, slot_id):
         messages.error(request, "Invalid action.")
         return _redirect_instructor_requests_with_days(request)
 
-    # Per-instructor capacity check (Issue #665).
+    # Per-instructor capacity check (Issue #665 / #840).
     # Only applies when BOTH a primary and surge instructor are assigned; each
-    # has their own quota equal to the global instruction_surge_threshold.
+    # has their own quota from SiteConfiguration.instruction_max_students_per_instructor.
     if action == "accept" and assignment.instructor and assignment.surge_instructor:
-        _, instruction_threshold = get_surge_thresholds()
+        max_students_per_instructor = get_instruction_max_students_per_instructor()
         my_accepted_count = (
             InstructionSlot.objects.filter(
                 assignment=assignment,
@@ -3273,10 +3313,10 @@ def instructor_respond(request, slot_id):
             .exclude(status="cancelled")
             .count()
         )
-        if my_accepted_count >= instruction_threshold:
+        if my_accepted_count >= max_students_per_instructor:
             messages.error(
                 request,
-                f"You have reached your student capacity ({instruction_threshold}) for this day. "
+                f"You have reached your student capacity ({max_students_per_instructor}) for this day. "
                 "The other instructor may still accept this student.",
             )
             return _redirect_instructor_requests_with_days(request)
@@ -4021,6 +4061,10 @@ def _notify_surge_instructor_needed(assignment, student_count):
 
         ops_date = assignment.date.strftime("%A, %B %d, %Y")
         subject = f"Surge Instructor Needed - {assignment.date.strftime('%B %d, %Y')}"
+        _, instruction_surge_threshold = get_surge_thresholds()
+        instruction_max_students_per_instructor = (
+            get_instruction_max_students_per_instructor()
+        )
 
         volunteer_url = build_absolute_url(
             reverse("duty_roster:volunteer_surge_instructor", args=[assignment.id]),
@@ -4034,6 +4078,8 @@ def _notify_surge_instructor_needed(assignment, student_count):
             "volunteer_url": volunteer_url,
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
+            "instruction_surge_threshold": instruction_surge_threshold,
+            "instruction_max_students_per_instructor": instruction_max_students_per_instructor,
         }
 
         html_message = render_to_string(
@@ -4081,6 +4127,10 @@ def _notify_primary_instructor_surge_filled(assignment):
 
         email_config = get_email_config()
         config = email_config["config"]
+        _, instruction_surge_threshold = get_surge_thresholds()
+        instruction_max_students_per_instructor = (
+            get_instruction_max_students_per_instructor()
+        )
 
         ops_date = assignment.date.strftime("%A, %B %d, %Y")
         subject = (
@@ -4094,6 +4144,8 @@ def _notify_primary_instructor_surge_filled(assignment):
             "roster_url": email_config["roster_url"],
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
+            "instruction_surge_threshold": instruction_surge_threshold,
+            "instruction_max_students_per_instructor": instruction_max_students_per_instructor,
         }
 
         html_message = render_to_string(
@@ -4128,6 +4180,10 @@ def _notify_instructors_surge_filled(assignment):
 
         email_config = get_email_config()
         config = email_config["config"]
+        _, instruction_surge_threshold = get_surge_thresholds()
+        instruction_max_students_per_instructor = (
+            get_instruction_max_students_per_instructor()
+        )
         recipient_list = get_mailing_list(
             "INSTRUCTORS_MAILING_LIST", "instructors", config
         )
@@ -4143,6 +4199,8 @@ def _notify_instructors_surge_filled(assignment):
             "site_url": email_config["site_url"],
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
+            "instruction_surge_threshold": instruction_surge_threshold,
+            "instruction_max_students_per_instructor": instruction_max_students_per_instructor,
         }
 
         html_message = render_to_string(
@@ -4290,6 +4348,10 @@ def _notify_primary_instructor_surge_withdrawn(assignment, withdrawn_instructor)
 
         email_config = get_email_config()
         config = email_config["config"]
+        _, instruction_surge_threshold = get_surge_thresholds()
+        instruction_max_students_per_instructor = (
+            get_instruction_max_students_per_instructor()
+        )
 
         ops_date = assignment.date.strftime("%A, %B %d, %Y")
         subject = (
@@ -4303,6 +4365,8 @@ def _notify_primary_instructor_surge_withdrawn(assignment, withdrawn_instructor)
             "roster_url": email_config["roster_url"],
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
+            "instruction_surge_threshold": instruction_surge_threshold,
+            "instruction_max_students_per_instructor": instruction_max_students_per_instructor,
         }
 
         html_message = render_to_string(

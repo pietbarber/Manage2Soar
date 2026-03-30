@@ -237,6 +237,7 @@ def test_surge_threshold_defaults():
     )
     assert config.tow_surge_threshold == 6
     assert config.instruction_surge_threshold == 4
+    assert config.instruction_max_students_per_instructor == 4
 
 
 @pytest.mark.django_db
@@ -248,14 +249,16 @@ def test_surge_threshold_custom_values():
         club_abbreviation="TC",
         tow_surge_threshold=10,
         instruction_surge_threshold=5,
+        instruction_max_students_per_instructor=8,
     )
     assert config.tow_surge_threshold == 10
     assert config.instruction_surge_threshold == 5
+    assert config.instruction_max_students_per_instructor == 8
 
 
 @pytest.mark.django_db
 def test_surge_threshold_positive_integers():
-    """Test that surge thresholds must be positive integers (Issue #403)."""
+    """Test that surge thresholds and instruction max must be positive integers."""
     config = SiteConfiguration.objects.create(
         club_name="Test Club", domain_name="test.org", club_abbreviation="TC"
     )
@@ -263,14 +266,17 @@ def test_surge_threshold_positive_integers():
     # Should accept positive values
     config.tow_surge_threshold = 1
     config.instruction_surge_threshold = 1
+    config.instruction_max_students_per_instructor = 1
     config.save()
     config.refresh_from_db()
     assert config.tow_surge_threshold == 1
     assert config.instruction_surge_threshold == 1
+    assert config.instruction_max_students_per_instructor == 1
 
     # Zero should NOT work (business logic: minimum is 1)
     config.tow_surge_threshold = 0
     config.instruction_surge_threshold = 0
+    config.instruction_max_students_per_instructor = 0
     with pytest.raises(ValidationError):
         config.full_clean()
 
@@ -278,6 +284,7 @@ def test_surge_threshold_positive_integers():
     config.refresh_from_db()
     assert config.tow_surge_threshold == 1
     assert config.instruction_surge_threshold == 1
+    assert config.instruction_max_students_per_instructor == 1
 
 
 # Quick Altitude Buttons Tests (Issue #467)

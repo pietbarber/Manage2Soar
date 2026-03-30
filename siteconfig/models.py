@@ -317,6 +317,14 @@ class SiteConfiguration(models.Model):
         default=4,
         help_text="Surge alerts trigger when instruction requests are AT or ABOVE this value (default: 4)",
     )
+    instruction_max_students_per_instructor = models.PositiveIntegerField(
+        default=4,
+        help_text=(
+            "Maximum accepted students per instructor for a duty day (default: 4). "
+            "This is separate from the instruction surge threshold, which only controls "
+            "when surge help notifications are triggered."
+        ),
+    )
 
     # Instruction Request Window (Issue #648)
     restrict_instruction_requests_window = models.BooleanField(
@@ -597,6 +605,13 @@ class SiteConfiguration(models.Model):
         ):
             errors["instruction_surge_threshold"] = (
                 "Instruction surge threshold must be at least 1."
+            )
+        if (
+            self.instruction_max_students_per_instructor is not None
+            and self.instruction_max_students_per_instructor < 1
+        ):
+            errors["instruction_max_students_per_instructor"] = (
+                "Instruction max students per instructor must be at least 1."
             )
 
         # Validate quick altitude buttons (Issue #467)

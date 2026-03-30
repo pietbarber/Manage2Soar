@@ -25,6 +25,10 @@
                             {% if primary_instructor %}
                             <p style="margin: 0 0 8px 0;"><strong>Primary instructor:</strong> {{ primary_instructor.full_display_name|default:primary_instructor.username }}</p>
                             {% endif %}
+                            <p style="margin: 8px 0 0 0; font-size: 14px; color: #4a5568;">
+                                Surge prompt threshold: {{ instruction_surge_threshold }} requests.
+                                Acceptance cap: {{ instruction_max_students_per_instructor }} students per instructor.
+                            </p>
                             <p style="margin: 20px 0; text-align: center;">
                                 <a href="{{ roster_url }}" style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 4px; font-weight: bold;">View Duty Roster</a>
                             </p>

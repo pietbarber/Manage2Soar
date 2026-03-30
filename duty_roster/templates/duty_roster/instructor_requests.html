@@ -29,6 +29,16 @@
     {% endfor %}
   </div>
 
+  <div class="alert alert-light border small mb-3" role="note">
+    <strong>Instruction settings:</strong>
+    surge request prompt starts at
+    <strong>{{ instruction_surge_threshold }}</strong>
+    accepted student{{ instruction_surge_threshold|pluralize }}.
+    Hard cap is
+    <strong>{{ instruction_max_students_per_instructor }}</strong>
+    accepted student{{ instruction_max_students_per_instructor|pluralize }} per instructor.
+  </div>
+
   <div class="row">
     <!-- Pending Requests Column -->
     <div class="col-lg-6 mb-4">
@@ -237,7 +247,10 @@
                       <div class="alert alert-warning mt-2 mb-0 py-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
                         <span>
                           <i class="fas fa-exclamation-triangle me-1"></i>
-                          <small>High student count &mdash; a surge instructor may be needed.</small>
+                          <small>
+                            High student count &mdash; surge prompt starts at {{ instruction_surge_threshold }},
+                            while the acceptance cap is {{ instruction_max_students_per_instructor }} per instructor.
+                          </small>
                         </span>
                         <form action="{% url 'duty_roster:request_surge_instructor' assignment_id=assignment.id %}" method="post" class="d-inline">
                           {% csrf_token %}
@@ -256,7 +269,10 @@
                     {% else %}
                       <div class="alert alert-warning mt-2 mb-0 py-2">
                         <i class="fas fa-exclamation-triangle me-1"></i>
-                        <small>High student count &mdash; consider requesting a surge instructor if needed.</small>
+                        <small>
+                          High student count &mdash; surge prompt starts at {{ instruction_surge_threshold }}.
+                          Acceptance cap is {{ instruction_max_students_per_instructor }} per instructor.
+                        </small>
                       </div>
                     {% endif %}
                   {% endwith %}

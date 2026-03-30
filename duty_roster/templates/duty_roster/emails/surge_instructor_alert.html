@@ -51,6 +51,10 @@
                                     <td style="padding: 15px; color: #856404;">
                                         <strong>⚠️ Additional Instructors Needed</strong>
                                         <p style="margin: 5px 0 0 0; font-size: 14px;">{{ student_count }} students planning to fly</p>
+                                        <p style="margin: 5px 0 0 0; font-size: 13px;">
+                                            Surge prompt threshold: {{ instruction_surge_threshold }} requests.
+                                            Acceptance cap: {{ instruction_max_students_per_instructor }} students per instructor.
+                                        </p>
                                     </td>
                                 </tr>
                             </table>
@@ -60,7 +64,7 @@
                             </p>
 
                             <p style="margin: 0 0 20px 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                                If you're available to instruct on this date, your help would be greatly appreciated to ensure all students have the opportunity to fly. Please consider confirming your availability on the duty roster.
+                                This alert triggers at the configured surge threshold. Instructors may continue accepting students up to the configured per-instructor cap. If you're available to instruct on this date, your help would be greatly appreciated. Please consider confirming your availability on the duty roster.
                             </p>
 
                             <!-- Call to Action -->
