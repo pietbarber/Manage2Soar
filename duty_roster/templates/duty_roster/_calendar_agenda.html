@@ -52,7 +52,7 @@
                     <div>
                       <strong>High Demand Alert</strong>
                       {% if surge.instructor %}
-                        <br>Exceptional instruction demand ({{ instruction_surge_threshold }}+ students)
+                        <br>Exceptional instruction demand (surge trigger at {{ instruction_surge_threshold }}+ requests; cap {{ instruction_max_students_per_instructor }} per instructor)
                       {% endif %}
                       {% if surge.towpilot %}
                         <br>High tow demand ({{ tow_surge_threshold }}+ requests)

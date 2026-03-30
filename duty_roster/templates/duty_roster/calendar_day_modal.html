@@ -175,6 +175,11 @@
     <div>
       <strong>Surge Instructor Recommended:</strong>
       At least {{ intents|length }} pilots have declared intent to fly, and {{ instruction_intent_count }} want instruction.
+      <br>
+      <small>
+        Surge prompt threshold: {{ instruction_surge_threshold }} instruction requests.
+        Acceptance cap: {{ instruction_max_students_per_instructor }} students per instructor.
+      </small>
     </div>
   </div>
   {% endif %}

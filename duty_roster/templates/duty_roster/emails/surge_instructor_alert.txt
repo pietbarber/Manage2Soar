@@ -5,6 +5,9 @@ ALERT: Additional Instructors Needed
 
 {{ student_count }} students are planning to fly on {{ ops_date }}.
 
+Surge prompt threshold: {{ instruction_surge_threshold }} instruction requests.
+Acceptance cap: {{ instruction_max_students_per_instructor }} students per instructor.
+
 We're experiencing high student demand and need additional instructors to ensure
 all students have the opportunity to fly. If you're available to instruct on
 this date, your help would be greatly appreciated.

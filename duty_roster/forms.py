@@ -294,11 +294,20 @@ class InstructionRequestForm(forms.ModelForm):
             )
 
         # Capacity check: block new sign-ups when all available slots are taken.
-        # Read threshold directly to avoid a circular import with views.py.
+        # Read config directly to avoid a circular import with views.py.
         # Use .first() to avoid MultipleObjectsReturned on misconfigured DBs.
         config = SiteConfiguration.objects.order_by("pk").first()
         instruction_surge_threshold = (
             config.instruction_surge_threshold if config is not None else 4
+        )
+        max_students_per_instructor = (
+            getattr(
+                config,
+                "instruction_max_students_per_instructor",
+                instruction_surge_threshold,
+            )
+            if config is not None
+            else 4
         )
 
         current_accepted = (
@@ -315,9 +324,9 @@ class InstructionRequestForm(forms.ModelForm):
             self.assignment.instructor and self.assignment.surge_instructor
         )
         total_capacity = (
-            instruction_surge_threshold * 2
+            max_students_per_instructor * 2
             if has_surge
-            else instruction_surge_threshold
+            else max_students_per_instructor
         )
         if current_accepted >= total_capacity:
             raise forms.ValidationError(
