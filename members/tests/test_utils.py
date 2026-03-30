@@ -151,3 +151,23 @@ def test_get_active_membership_statuses_uses_cache():
 
     assert first == second
     assert wrapped.call_count == 1
+
+
+@pytest.mark.django_db
+def test_fallback_active_membership_statuses_are_not_cached():
+    """Fallback list should not be cached after transient DB/model failures."""
+    MembershipStatus.objects.create(name="Recovered Active", is_active=True)
+
+    with patch(
+        "siteconfig.models.MembershipStatus.get_active_statuses",
+        side_effect=RuntimeError("transient failure"),
+    ):
+        with pytest.warns(DeprecationWarning):
+            fallback = get_active_membership_statuses()
+
+    recovered = get_active_membership_statuses()
+
+    # If fallback had been cached, this would still return legacy constants.
+    assert "Recovered Active" not in fallback
+    assert "Recovered Active" in recovered
+    assert recovered != fallback

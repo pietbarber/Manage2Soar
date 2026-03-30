@@ -63,11 +63,8 @@ def get_active_membership_statuses() -> List[str]:
             stacklevel=2,
         )
         fallback_statuses = list(DEFAULT_ACTIVE_STATUSES)
-        cache.set(
-            ACTIVE_MEMBERSHIP_STATUSES_CACHE_KEY,
-            fallback_statuses,
-            ACTIVE_MEMBERSHIP_STATUSES_CACHE_TIMEOUT,
-        )
+        # Do not cache fallback values. This ensures DB-backed policy resumes
+        # immediately once transient startup/migration issues are resolved.
         return fallback_statuses
 
 
