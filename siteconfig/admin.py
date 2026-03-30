@@ -146,7 +146,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "<br><br>"
                     "<strong>Instruction max students per instructor</strong>: Hard cap for accepted "
                     "students per instructor on a duty day. Example: threshold 3 + max 9 means the "
-                    "system asks for surge help at 3 accepted students, but instructors can keep "
+                    "system asks for surge help when there are 3 instruction requests, but instructors can keep "
                     "accepting until they each reach 9."
                 ),
                 "classes": ("collapse",),

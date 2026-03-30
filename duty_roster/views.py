@@ -3300,9 +3300,9 @@ def instructor_respond(request, slot_id):
         return _redirect_instructor_requests_with_days(request)
 
     # Per-instructor capacity check (Issue #665 / #840).
-    # Only applies when BOTH a primary and surge instructor are assigned; each
-    # has their own quota from SiteConfiguration.instruction_max_students_per_instructor.
-    if action == "accept" and assignment.instructor and assignment.surge_instructor:
+    # Applies whenever an instructor accepts a request. The quota comes from
+    # SiteConfiguration.instruction_max_students_per_instructor.
+    if action == "accept":
         max_students_per_instructor = get_instruction_max_students_per_instructor()
         my_accepted_count = (
             InstructionSlot.objects.filter(
@@ -3314,10 +3314,16 @@ def instructor_respond(request, slot_id):
             .count()
         )
         if my_accepted_count >= max_students_per_instructor:
+            if assignment.instructor and assignment.surge_instructor:
+                detail = "The other instructor may still accept this student."
+            else:
+                detail = (
+                    "Assign a surge instructor to increase total capacity for this day."
+                )
             messages.error(
                 request,
                 f"You have reached your student capacity ({max_students_per_instructor}) for this day. "
-                "The other instructor may still accept this student.",
+                f"{detail}",
             )
             return _redirect_instructor_requests_with_days(request)
 

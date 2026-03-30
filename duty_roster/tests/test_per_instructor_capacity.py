@@ -312,8 +312,8 @@ def test_surge_instructor_blocked_when_at_own_capacity(client, django_user_model
 
 
 @pytest.mark.django_db
-def test_no_capacity_limit_without_surge(client, django_user_model):
-    """Per-instructor capacity check does NOT apply when there is no surge instructor."""
+def test_capacity_limit_applies_without_surge(client, django_user_model):
+    """Per-instructor cap still applies when there is no surge instructor."""
     _make_site_config(instruction_surge_threshold=2)
     primary = _make_member(django_user_model, "cp_vp4", instructor=True)
     student = _make_member(django_user_model, "cp_vst5")
@@ -339,8 +339,8 @@ def test_no_capacity_limit_without_surge(client, django_user_model):
 
     assert response.status_code == 302
     pending_slot.refresh_from_db()
-    # No surge → capacity check skipped → accept succeeds
-    assert pending_slot.instructor_response == "accepted"
+    # No surge → instructor has already reached cap, so accept is blocked.
+    assert pending_slot.instructor_response == "pending"
 
 
 # ---------------------------------------------------------------------------
