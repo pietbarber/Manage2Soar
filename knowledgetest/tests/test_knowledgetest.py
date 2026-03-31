@@ -672,7 +672,9 @@ class TestPresetViewIntegrationTests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        weight_fields = response.context.get("weight_fields", [])
+        weight_fields = response.context.get("weight_fields")
+        if weight_fields is None:
+            weight_fields = []
         self.assertGreaterEqual(len(weight_fields), 2)
         self.assertContains(response, 'name="weight_GF"')
         self.assertContains(response, 'name="weight_ST"')
