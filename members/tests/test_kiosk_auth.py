@@ -538,10 +538,10 @@ class KioskActiveMemberDecoratorTests(TestCase):
         )
         # Create role account status
         role_status, _ = MembershipStatus.objects.get_or_create(
-            name="Role Account", defaults={"is_active": True, "sort_order": 100}
+            name="Role Account", defaults={"is_active": False, "sort_order": 100}
         )
-        if not role_status.is_active:
-            role_status.is_active = True
+        if role_status.is_active:
+            role_status.is_active = False
             role_status.save(update_fields=["is_active"])
 
     def setUp(self):
@@ -721,6 +721,8 @@ class KioskActiveMemberDecoratorTests(TestCase):
         kiosk_fingerprint_cookie = response.cookies.get("kiosk_fingerprint")
         self.assertIsNotNone(kiosk_token_cookie)
         self.assertIsNotNone(kiosk_fingerprint_cookie)
+        assert kiosk_token_cookie is not None
+        assert kiosk_fingerprint_cookie is not None
 
         # Log out (clears session but cookies remain)
         self.client.logout()
