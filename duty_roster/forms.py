@@ -7,6 +7,7 @@ from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue
 from members.models import Member
+from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 
 from .models import (
@@ -202,8 +203,6 @@ class DutyAssignmentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # Optional: Limit dropdowns to members with the right roles
-        from members.utils.membership import get_active_membership_statuses
-
         active_statuses = get_active_membership_statuses()
         active_members = Member.objects.filter(membership_status__in=active_statuses)
         self.fields["instructor"].queryset = active_members.filter(
@@ -477,9 +476,10 @@ class DutySwapRequestForm(forms.ModelForm):
             role_attr = role_attr_map.get(role)
 
             if role_attr:
+                active_statuses = get_active_membership_statuses()
                 eligible = Member.objects.filter(
                     **{role_attr: True},
-                    membership_status__in=["Full Member", "Family Member"],
+                    membership_status__in=active_statuses,
                 ).exclude(pk=requester.pk if requester else None)
                 self.fields["direct_request_to"].queryset = eligible
             else:

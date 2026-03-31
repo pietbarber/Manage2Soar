@@ -21,7 +21,10 @@ from duty_roster.models import (
     DutySwapRequest,
     MemberBlackout,
 )
-from duty_roster.views_swap import _accept_offer_and_finalize
+from duty_roster.views_swap import (
+    _accept_offer_and_finalize,
+    get_eligible_members_for_role,
+)
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
@@ -81,6 +84,58 @@ def charlie(db):
 
 
 @pytest.fixture
+def ado_requester(db):
+    """Create an ADO requester assigned to the original duty date."""
+    return Member.objects.create(
+        username="ado_requester",
+        first_name="Ado",
+        last_name="Requester",
+        email="ado_requester@example.com",
+        membership_status="Full Member",
+        assistant_duty_officer=True,
+    )
+
+
+@pytest.fixture
+def ado_helper_probationary(db):
+    """Create an ADO-qualified helper with active non-Full/Family status."""
+    return Member.objects.create(
+        username="ado_probationary",
+        first_name="Probationary",
+        last_name="Helper",
+        email="ado_probationary@example.com",
+        membership_status="Probationary Member",
+        assistant_duty_officer=True,
+    )
+
+
+@pytest.fixture
+def ado_non_qualified(db):
+    """Create an active member without ADO qualification."""
+    return Member.objects.create(
+        username="ado_non_qualified",
+        first_name="Not",
+        last_name="Qualified",
+        email="ado_non_qualified@example.com",
+        membership_status="Full Member",
+        assistant_duty_officer=False,
+    )
+
+
+@pytest.fixture
+def ado_inactive(db):
+    """Create an ADO-qualified member in an inactive status."""
+    return Member.objects.create(
+        username="ado_inactive",
+        first_name="Inactive",
+        last_name="Helper",
+        email="ado_inactive@example.com",
+        membership_status="Inactive",
+        assistant_duty_officer=True,
+    )
+
+
+@pytest.fixture
 def alice_duty_assignment(alice, db):
     """Create a duty assignment for Alice (tow pilot) in the future."""
     return DutyAssignment.objects.create(
@@ -119,6 +174,27 @@ def swap_offer(bob, swap_request, bob_duty_assignment, db):
         offer_type="swap",
         proposed_swap_date=bob_duty_assignment.date,
         status="pending",
+    )
+
+
+@pytest.fixture
+def ado_duty_assignment(ado_requester, db):
+    """Create a future duty assignment for an assistant duty officer."""
+    return DutyAssignment.objects.create(
+        date=date.today() + timedelta(days=16),
+        assistant_duty_officer=ado_requester,
+    )
+
+
+@pytest.fixture
+def ado_swap_request(ado_requester, ado_duty_assignment, db):
+    """Create an open ADO swap request."""
+    return DutySwapRequest.objects.create(
+        requester=ado_requester,
+        original_date=ado_duty_assignment.date,
+        role="ADO",
+        request_type="general",
+        status="open",
     )
 
 
@@ -567,13 +643,81 @@ class TestSwapOfferWorkflow:
             offered_by=bob,
             offer_type="cover",
         )
-        other_offer.refresh_from_db()
-        swap_request.refresh_from_db()
+        other_offer = DutySwapOffer.objects.get(pk=other_offer.pk)
+        swap_request = DutySwapRequest.objects.get(pk=swap_request.pk)
 
         assert accepted_offer.status == "accepted"
         assert other_offer.status == "auto_declined"
         assert swap_request.status == "fulfilled"
         assert swap_request.accepted_offer == accepted_offer
+
+    def test_ado_probationary_member_can_make_offer(
+        self,
+        client,
+        ado_helper_probationary,
+        ado_swap_request,
+        site_config,
+    ):
+        """Active ADO members in Probationary status can make swap offers."""
+        client.force_login(ado_helper_probationary)
+        url = reverse("duty_roster:make_swap_offer", args=[ado_swap_request.id])
+
+        # GET should load the offer form (no false "not qualified" rejection).
+        response = client.get(url)
+        assert response.status_code == 200
+
+        # POST cover offer should succeed and auto-accept.
+        response = client.post(
+            url,
+            {
+                "offer_type": "cover",
+                "notes": "I can cover this ADO duty.",
+            },
+        )
+        assert response.status_code == 302
+
+        offer = DutySwapOffer.objects.get(
+            swap_request=ado_swap_request,
+            offered_by=ado_helper_probationary,
+            offer_type="cover",
+        )
+        ado_swap_request.refresh_from_db()
+        assert offer.status == "accepted"
+        assert ado_swap_request.status == "fulfilled"
+
+        updated_assignment = DutyAssignment.objects.get(
+            date=ado_swap_request.original_date
+        )
+        assert updated_assignment.assistant_duty_officer == ado_helper_probationary
+
+    def test_ado_non_qualified_member_is_rejected(
+        self, client, ado_non_qualified, ado_swap_request, site_config
+    ):
+        """Active members without ADO qualification are rejected for ADO offers."""
+        client.force_login(ado_non_qualified)
+        url = reverse("duty_roster:make_swap_offer", args=[ado_swap_request.id])
+        response = client.get(url, follow=True)
+
+        assert response.status_code == 200
+        assert "You are not qualified for this role." in response.content.decode()
+
+    def test_ado_inactive_member_not_eligible(self, ado_inactive, ado_swap_request):
+        """Inactive ADO members are excluded by status policy in helper."""
+        eligible = get_eligible_members_for_role(
+            ado_swap_request.role,
+            exclude_member=ado_swap_request.requester,
+        )
+        assert not eligible.filter(pk=ado_inactive.pk).exists()
+
+    def test_ado_probationary_member_is_eligible(
+        self, ado_helper_probationary, ado_swap_request
+    ):
+        """Probationary Member ADO is included when status is active in siteconfig policy."""
+        eligible = get_eligible_members_for_role(
+            ado_swap_request.role,
+            exclude_member=ado_swap_request.requester,
+        )
+        assert eligible.filter(pk=ado_helper_probationary.pk).exists()
 
 
 @pytest.mark.django_db
@@ -634,8 +778,8 @@ class TestOfferAcceptDecline:
         )
 
         accepted = _accept_offer_and_finalize(swap_request, stale_offer)
-        stale_offer.refresh_from_db()
-        swap_request.refresh_from_db()
+        stale_offer = DutySwapOffer.objects.get(pk=stale_offer.pk)
+        swap_request = DutySwapRequest.objects.get(pk=swap_request.pk)
 
         assert accepted is False
         assert stale_offer.status == "auto_declined"
@@ -681,7 +825,7 @@ class TestCancelAndConvert:
         resp = client.post(url)
         assert resp.status_code in [200, 302]
 
-        direct_request.refresh_from_db()
+        direct_request = DutySwapRequest.objects.get(pk=direct_request.pk)
         assert direct_request.request_type == "general"
         assert direct_request.direct_request_to is None
 
@@ -801,8 +945,8 @@ class TestSwapIntegration:
         client.post(accept_url)
 
         # Verify final state
-        swap_request.refresh_from_db()
-        swap_offer.refresh_from_db()
+        swap_request = DutySwapRequest.objects.get(pk=swap_request.pk)
+        swap_offer = DutySwapOffer.objects.get(pk=swap_offer.pk)
 
         assert swap_request.status == "fulfilled"
         assert swap_offer.status == "accepted"
@@ -860,8 +1004,8 @@ class TestSwapIntegration:
         assert swap_offer.proposed_swap_date is None
 
         # Verify final state (auto-accepted for cover offers)
-        swap_offer.refresh_from_db()
-        swap_request.refresh_from_db()
+        swap_offer = DutySwapOffer.objects.get(pk=swap_offer.pk)
+        swap_request = DutySwapRequest.objects.get(pk=swap_request.pk)
         assert swap_offer.status == "accepted"
         assert swap_request.status == "fulfilled"
         assert swap_request.accepted_offer == swap_offer

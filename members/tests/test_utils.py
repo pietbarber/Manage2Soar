@@ -1,12 +1,25 @@
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 from members.utils import is_active_member
-from members.utils.membership import get_active_membership_statuses
+from members.utils.membership import (
+    clear_active_membership_statuses_cache,
+    get_active_membership_statuses,
+)
 from siteconfig.models import MembershipStatus
 
 User = get_user_model()
+
+
+@pytest.fixture(autouse=True)
+def clear_membership_status_cache_between_tests():
+    clear_active_membership_statuses_cache()
+    yield
+    clear_active_membership_statuses_cache()
 
 
 @pytest.mark.django_db
@@ -75,7 +88,7 @@ def test_get_active_membership_statuses_empty():
     assert len(active_statuses) == 0
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_dynamic_membership_status_changes():
     """Test that membership status changes are reflected immediately."""
     # Create a status that starts as active
@@ -124,3 +137,67 @@ def test_membership_status_deletion_integration():
     # Now deletion should succeed (no members using it)
     status.delete()
     assert not MembershipStatus.objects.filter(name="Protected Status").exists()
+
+
+@pytest.mark.django_db
+def test_get_active_membership_statuses_uses_cache():
+    MembershipStatus.objects.create(name="Cached Active", is_active=True)
+    with patch(
+        "siteconfig.models.MembershipStatus.get_active_statuses",
+        wraps=MembershipStatus.get_active_statuses,
+    ) as wrapped:
+        first = get_active_membership_statuses()
+        second = get_active_membership_statuses()
+
+    assert first == second
+    assert wrapped.call_count == 1
+
+
+@pytest.mark.django_db
+def test_fallback_active_membership_statuses_are_not_cached():
+    """Fallback list should not be cached after transient DB/model failures."""
+    MembershipStatus.objects.create(name="Recovered Active", is_active=True)
+
+    with patch(
+        "siteconfig.models.MembershipStatus.get_active_statuses",
+        side_effect=RuntimeError("transient failure"),
+    ):
+        with pytest.warns(DeprecationWarning):
+            fallback = get_active_membership_statuses()
+
+    recovered = get_active_membership_statuses()
+
+    # If fallback had been cached, this would still return legacy constants.
+    assert "Recovered Active" not in fallback
+    assert "Recovered Active" in recovered
+    assert recovered != fallback
+
+
+@pytest.mark.django_db(transaction=True)
+def test_membership_status_save_clears_cache_on_commit():
+    """Cache clear callback should run after the surrounding transaction commits."""
+    with patch(
+        "members.utils.membership.clear_active_membership_statuses_cache"
+    ) as clear:
+        with transaction.atomic():
+            MembershipStatus.objects.create(name="Commit Save Status", is_active=True)
+            assert clear.call_count == 0
+
+        assert clear.call_count == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_membership_status_delete_clears_cache_on_commit():
+    """Delete path should also defer cache invalidation until commit."""
+    status = MembershipStatus.objects.create(
+        name="Commit Delete Status", is_active=True
+    )
+
+    with patch(
+        "members.utils.membership.clear_active_membership_statuses_cache"
+    ) as clear:
+        with transaction.atomic():
+            status.delete()
+            assert clear.call_count == 0
+
+        assert clear.call_count == 1
