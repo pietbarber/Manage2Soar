@@ -315,13 +315,13 @@ class KioskAutoLoginMiddlewareTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        # Ensure Role Account membership status exists and is active
-        status, created = MembershipStatus.objects.get_or_create(
-            name="Role Account", defaults={"is_active": True}
+        # Keep Role Account inactive to match production semantics.
+        status, _ = MembershipStatus.objects.get_or_create(
+            name="Role Account", defaults={"is_active": False}
         )
-        if not status.is_active:
-            status.is_active = True
-            status.save()
+        if status.is_active:
+            status.is_active = False
+            status.save(update_fields=["is_active"])
 
         cls.role_user = Member.objects.create_user(
             username="kiosk-laptop",
@@ -331,6 +331,9 @@ class KioskAutoLoginMiddlewareTests(TestCase):
             last_name="Laptop",
             membership_status="Role Account",
         )
+        if not cls.role_user.is_active:
+            Member.objects.filter(pk=cls.role_user.pk).update(is_active=True)
+            cls.role_user.refresh_from_db(fields=["is_active"])
         import hashlib
 
         cls.fingerprint_hash = hashlib.sha256(b"device_fp").hexdigest()
@@ -660,13 +663,13 @@ class KioskActiveMemberDecoratorTests(TestCase):
 
     def test_stale_kiosk_cookies_with_oauth_login_denied(self):
         """
-        Security test: Users with stale kiosk cookies but non-kiosk authentication
+        Security test: Users with stale kiosk cookies and unauthenticated access
         should NOT bypass membership_status checks (Issue #486).
 
         Scenario:
         1. User authenticates via kiosk, gets cookies
         2. Kiosk token is revoked
-        3. User logs out, logs in via OAuth2 with inactive membership_status
+        3. User has an inactive account and no valid authenticated session
         4. Old kiosk cookies still present in browser
         5. Should be DENIED because session flag not set (middleware didn't auth via kiosk)
         """
@@ -721,8 +724,8 @@ class KioskActiveMemberDecoratorTests(TestCase):
         kiosk_fingerprint_cookie = response.cookies.get("kiosk_fingerprint")
         self.assertIsNotNone(kiosk_token_cookie)
         self.assertIsNotNone(kiosk_fingerprint_cookie)
-        assert kiosk_token_cookie is not None
-        assert kiosk_fingerprint_cookie is not None
+        if kiosk_token_cookie is None or kiosk_fingerprint_cookie is None:
+            raise AssertionError("Expected kiosk cookies were not set in bind response")
 
         # Log out (clears session but cookies remain)
         self.client.logout()
