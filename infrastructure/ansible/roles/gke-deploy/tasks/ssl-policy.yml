@@ -90,13 +90,16 @@
       --ssl-policy {{ gke_ssl_policy_name }}
       --global
       --project={{ gcp_project }}
+  register: ssl_policy_attached
+  retries: 20
+  delay: 15
+  until: ssl_policy_attached.rc == 0
   when:
     - target_proxy_name | length > 0
     - current_ssl_policy.stdout is defined
     - current_ssl_policy.stdout != ('global/sslPolicies/' + gke_ssl_policy_name)
   delegate_to: localhost
   become: false
-  register: ssl_policy_attached
 
 - name: Display SSL policy attachment result
   ansible.builtin.debug:
