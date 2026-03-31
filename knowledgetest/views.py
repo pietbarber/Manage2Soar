@@ -528,6 +528,7 @@ class WrittenTestAttemptDeleteView(View):
         )
 
 
+@method_decorator(active_member_required, name="dispatch")
 class PendingTestsView(ListView):
     template_name = "written_test/pending.html"
     context_object_name = "assignments"
