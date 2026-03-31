@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
@@ -20,7 +19,7 @@ User = get_user_model()
 def clear_membership_status_cache_between_tests():
     clear_active_membership_statuses_cache()
     yield
-    cache.clear()
+    clear_active_membership_statuses_cache()
 
 
 @pytest.mark.django_db
