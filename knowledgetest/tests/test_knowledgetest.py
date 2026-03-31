@@ -1,8 +1,11 @@
 import json
 from datetime import timedelta
+from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.shortcuts import resolve_url
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -912,9 +915,12 @@ class PendingTestsViewAccessTests(TestCase):
         )
 
     def test_pending_view_redirects_anonymous_users(self):
-        response = self.client.get(reverse("knowledgetest:quiz-pending"))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/login/?next=/pending/", response.url)
+        pending_url = reverse("knowledgetest:quiz-pending")
+        response = self.client.get(pending_url)
+        expected_redirect = (
+            f"{resolve_url(settings.LOGIN_URL)}?{urlencode({'next': pending_url})}"
+        )
+        self.assertRedirects(response, expected_redirect, fetch_redirect_response=False)
 
     def test_pending_view_shows_assignments_for_logged_in_student(self):
         self.client.login(username="pending-student", password="pass")
