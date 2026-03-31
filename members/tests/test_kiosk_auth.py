@@ -18,6 +18,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from members.models import KioskAccessLog, KioskToken, Member
+from members.utils.membership import clear_active_membership_statuses_cache
 from siteconfig.models import MembershipStatus
 
 
@@ -323,6 +324,9 @@ class KioskAutoLoginMiddlewareTests(TestCase):
             status.is_active = False
             status.save(update_fields=["is_active"])
 
+        # `on_commit` cache invalidation does not run in TestCase class-level setup.
+        clear_active_membership_statuses_cache()
+
         cls.role_user = Member.objects.create_user(
             username="kiosk-laptop",
             email="kiosk@example.com",
@@ -547,6 +551,9 @@ class KioskActiveMemberDecoratorTests(TestCase):
             role_status.is_active = False
             role_status.save(update_fields=["is_active"])
 
+        # Keep membership-status cache deterministic in TestCase setup.
+        clear_active_membership_statuses_cache()
+
     def setUp(self):
         """Create test data for each test."""
         # Create role account for kiosk (no valid membership_status)
@@ -626,8 +633,8 @@ class KioskActiveMemberDecoratorTests(TestCase):
 
     def test_non_kiosk_inactive_member_denied(self):
         """Non-kiosk users with inactive membership_status should be denied."""
-        # Note: Inactive users have is_active=False which normally prevents login
-        # Use force_login to bypass authentication and test the decorator directly
+        # `force_login` stores the user id in session, but the default auth backend
+        # resolves inactive users as anonymous during request processing.
         self.client.force_login(self.inactive_user)
 
         # Verify NO kiosk session flag
@@ -661,17 +668,16 @@ class KioskActiveMemberDecoratorTests(TestCase):
             response.status_code, 200, "Active member should be allowed access"
         )
 
-    def test_stale_kiosk_cookies_with_oauth_login_denied(self):
+    def test_stale_kiosk_cookies_without_valid_session_denied(self):
         """
-        Security test: Users with stale kiosk cookies and unauthenticated access
-        should NOT bypass membership_status checks (Issue #486).
+        Security test: stale kiosk cookies without a valid authenticated session
+        must NOT bypass membership checks (Issue #486).
 
         Scenario:
-        1. User authenticates via kiosk, gets cookies
-        2. Kiosk token is revoked
-        3. User has an inactive account and no valid authenticated session
-        4. Old kiosk cookies still present in browser
-        5. Should be DENIED because session flag not set (middleware didn't auth via kiosk)
+        1. Kiosk token was previously issued and browser still has old cookies
+        2. Kiosk token is now revoked
+        3. No valid authenticated session is present
+        4. Request is denied because middleware cannot establish kiosk auth
         """
         # Revoke kiosk token first, then set stale cookies manually.
         self.kiosk_token.is_active = False
@@ -682,12 +688,9 @@ class KioskActiveMemberDecoratorTests(TestCase):
         # Assert fingerprint is set (device was bound in setUp)
         self.assertIsNotNone(self.kiosk_token.device_fingerprint)
         fingerprint = self.kiosk_token.device_fingerprint
-        assert fingerprint is not None  # Type narrowing for Pylance
+        if fingerprint is None:
+            raise AssertionError("Expected device fingerprint on bound kiosk token")
         self.client.cookies["kiosk_fingerprint"] = fingerprint
-
-        # Force login as inactive user (simulating OAuth2 login)
-        # Note: Normal login fails because is_active=False for inactive membership_status
-        self.client.force_login(self.inactive_user)
 
         # Verify session has NO kiosk flag (middleware didn't authenticate via kiosk)
         session = self.client.session
