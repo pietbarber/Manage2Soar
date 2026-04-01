@@ -1,8 +1,11 @@
 import json
 from datetime import timedelta
+from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.shortcuts import resolve_url
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -672,7 +675,9 @@ class TestPresetViewIntegrationTests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        weight_fields = response.context.get("weight_fields", [])
+        weight_fields = response.context.get("weight_fields")
+        if weight_fields is None:
+            weight_fields = []
         self.assertGreaterEqual(len(weight_fields), 2)
         self.assertContains(response, 'name="weight_GF"')
         self.assertContains(response, 'name="weight_ST"')
@@ -877,3 +882,48 @@ class InstructorRecentTestsViewTests(TestCase):
             content.index("Assigned Tests Not Yet Taken")
             < content.index("Recent Test Completions")
         )
+
+
+class PendingTestsViewAccessTests(TestCase):
+    def setUp(self):
+        self.student = User.objects.create_user(
+            username="pending-student",
+            password="pass",
+            membership_status="Student Member",
+        )
+        category = QuestionCategory.objects.create(code="PND", description="Pending")
+        question = Question.objects.create(
+            qnum=9201,
+            category=category,
+            question_text="Pending question?",
+            option_a="A",
+            option_b="B",
+            option_c="C",
+            option_d="D",
+            correct_answer="A",
+        )
+        template = WrittenTestTemplate.objects.create(
+            name="Pending Template",
+            pass_percentage=70,
+            created_by=self.student,
+        )
+        template.questions.add(question, through_defaults={"order": 1})
+        WrittenTestAssignment.objects.create(
+            template=template,
+            student=self.student,
+            completed=False,
+        )
+
+    def test_pending_view_redirects_anonymous_users(self):
+        pending_url = reverse("knowledgetest:quiz-pending")
+        response = self.client.get(pending_url)
+        expected_redirect = (
+            f"{resolve_url(settings.LOGIN_URL)}?{urlencode({'next': pending_url})}"
+        )
+        self.assertRedirects(response, expected_redirect, fetch_redirect_response=False)
+
+    def test_pending_view_shows_assignments_for_logged_in_student(self):
+        self.client.login(username="pending-student", password="pass")
+        response = self.client.get(reverse("knowledgetest:quiz-pending"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["assignments"]), 1)
