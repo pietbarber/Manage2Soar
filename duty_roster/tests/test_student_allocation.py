@@ -565,7 +565,7 @@ def test_view_splits_surge_day_into_allocation_context(client, django_user_model
     _make_accepted_slot(assignment, student, primary)
 
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
 
     assert response.status_code == 200
     allocation_by_date = response.context["allocation_by_date"]
@@ -590,7 +590,7 @@ def test_view_keeps_non_surge_day_in_accepted_by_date(client, django_user_model)
     _make_accepted_slot(assignment, student, primary)
 
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
 
     assert response.status_code == 200
     allocation_by_date = response.context["allocation_by_date"]
@@ -622,7 +622,7 @@ def test_accepted_students_card_populated_on_surge_day(client, django_user_model
 
     # Verify from the primary instructor's perspective
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
 
     assert response.status_code == 200
 
@@ -644,7 +644,7 @@ def test_accepted_students_card_populated_on_surge_day(client, django_user_model
 
     # Also check from the surge instructor's perspective
     client.force_login(surge)
-    response2 = client.get(reverse("duty_roster:instructor_requests"))
+    response2 = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
     assert assignment.date in response2.context["accepted_by_date"]
 
 
@@ -662,7 +662,7 @@ def test_allocation_context_has_correct_slot_split(client, django_user_model):
     _make_accepted_slot(assignment, student_b, surge)
 
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
 
     alloc = response.context["allocation_by_date"][assignment.date]
     assert len(alloc["primary_slots"]) == 1
@@ -693,7 +693,7 @@ def test_template_shows_allocation_section_for_surge_day(client, django_user_mod
     _make_accepted_slot(assignment, student, primary)
 
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -714,7 +714,7 @@ def test_template_hides_allocation_section_when_no_surge(client, django_user_mod
     _make_accepted_slot(assignment, student, primary)
 
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -732,7 +732,7 @@ def test_template_shows_move_buttons_for_surge_day(client, django_user_model):
     _make_accepted_slot(assignment, student, primary)
 
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -758,7 +758,7 @@ def test_unassigned_slots_appear_in_context_and_render_warning(
     unassigned_slot = _make_accepted_slot(assignment, student, None)
 
     client.force_login(primary)
-    response = client.get(reverse("duty_roster:instructor_requests"))
+    response = client.get(reverse("duty_roster:instructor_requests"), {"days": "all"})
 
     assert response.status_code == 200
 

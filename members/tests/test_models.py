@@ -5,6 +5,7 @@ from django.urls import reverse
 
 from members.forms import SetPasswordForm
 from members.models import Biography, Member
+from members.utils.membership import clear_active_membership_statuses_cache
 from siteconfig.models import MembershipStatus
 
 
@@ -164,6 +165,9 @@ class MembershipStatusIntegrationTests(TestCase):
         self.inactive_status = MembershipStatus.objects.create(
             name="Test Inactive Member", is_active=False, sort_order=20
         )
+        # MembershipStatus cache invalidation uses on_commit, which does not fire
+        # during per-test transactions until teardown.
+        clear_active_membership_statuses_cache()
 
     def test_is_active_member_with_dynamic_status(self):
         """Test that Member.is_active_member() works with dynamic MembershipStatus."""
@@ -209,6 +213,7 @@ class MembershipStatusIntegrationTests(TestCase):
         # Change the status to inactive
         self.active_status.is_active = False
         self.active_status.save()
+        clear_active_membership_statuses_cache()
 
         # Member should now be inactive
         self.assertFalse(member.is_active_member())

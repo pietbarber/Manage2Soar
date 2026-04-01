@@ -6,6 +6,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 
 from members.models import Member
+from members.utils.membership import clear_active_membership_statuses_cache
 from members.views import visiting_pilot_signup
 from siteconfig.forms import VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
@@ -24,6 +25,7 @@ def visiting_pilot_config():
     )
     affiliate_status.is_active = True  # Ensure it's active
     affiliate_status.save()
+    clear_active_membership_statuses_cache()
 
     return SiteConfiguration.objects.create(
         club_name="Test Soaring Club",
@@ -49,6 +51,7 @@ def visiting_pilot_config_strict():
     )
     affiliate_status.is_active = False  # Ensure it's inactive
     affiliate_status.save()
+    clear_active_membership_statuses_cache()
 
     return SiteConfiguration.objects.create(
         club_name="Test Soaring Club",
