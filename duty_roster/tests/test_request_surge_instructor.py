@@ -274,7 +274,7 @@ def test_template_shows_request_button_to_primary_instructor(client, django_user
 
     client.force_login(instructor)
     url = reverse("duty_roster:instructor_requests")
-    response = client.get(url)
+    response = client.get(url, {"days": "all"})
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -303,7 +303,7 @@ def test_template_shows_resend_button_when_surge_already_notified(
 
     client.force_login(instructor)
     url = reverse("duty_roster:instructor_requests")
-    response = client.get(url)
+    response = client.get(url, {"days": "all"})
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -339,7 +339,7 @@ def test_template_shows_assigned_message_when_surge_instructor_set(
 
     client.force_login(instructor)
     url = reverse("duty_roster:instructor_requests")
-    response = client.get(url)
+    response = client.get(url, {"days": "all"})
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -372,7 +372,7 @@ def test_template_shows_static_text_to_non_primary_instructor(
     # Log in as the surge instructor
     client.force_login(surge)
     url = reverse("duty_roster:instructor_requests")
-    response = client.get(url)
+    response = client.get(url, {"days": "all"})
 
     assert response.status_code == 200
     content = response.content.decode()

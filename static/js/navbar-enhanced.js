@@ -68,11 +68,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const href = link.getAttribute('href');
         if (!href || href === '#') return;
 
+        let hrefPath = href;
+        try {
+            hrefPath = new URL(href, window.location.origin).pathname;
+        } catch (error) {
+            // Keep original href if URL parsing fails.
+        }
+
         // Exact match, or path segment match for non-root links
         // Ensures '/member' doesn't match when on '/members/123'
         const isActive =
-            currentPath === href ||
-            (href !== '/' && currentPath.startsWith(href + '/'));
+            currentPath === hrefPath ||
+            (hrefPath !== '/' && currentPath.startsWith(hrefPath + '/'));
 
         if (isActive) {
             link.classList.add('active');

@@ -96,7 +96,7 @@ class TestSafetyOfficerTinyMCE(DjangoPlaywrightTestCase):
 
         # Wait for page to load
         self.page.wait_for_load_state("networkidle")
-        self.page.wait_for_selector("form", timeout=5000)
+        self.page.wait_for_selector("#id_status", timeout=5000)
 
         # Verify form fields exist
         status_field = self.page.query_selector("#id_status")
