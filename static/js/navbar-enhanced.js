@@ -64,22 +64,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Active page highlighting based on current URL
     const currentPath = window.location.pathname;
+    const currentSearch = window.location.search;
     document.querySelectorAll('.navbar-nav .nav-link, .navbar-nav .dropdown-item').forEach(function (link) {
         const href = link.getAttribute('href');
         if (!href || href === '#') return;
 
         let hrefPath = href;
+        let hrefSearch = '';
+        let hasSearch = false;
         try {
-            hrefPath = new URL(href, window.location.origin).pathname;
+            const parsedUrl = new URL(href, window.location.origin);
+            // Skip active matching for external links.
+            if (parsedUrl.origin !== window.location.origin) {
+                return;
+            }
+            hrefPath = parsedUrl.pathname;
+            hrefSearch = parsedUrl.search;
+            hasSearch = hrefSearch.length > 0;
         } catch (error) {
             // Keep original href if URL parsing fails.
         }
 
-        // Exact match, or path segment match for non-root links
-        // Ensures '/member' doesn't match when on '/members/123'
-        const isActive =
-            currentPath === hrefPath ||
-            (hrefPath !== '/' && currentPath.startsWith(hrefPath + '/'));
+        // For query-parameter links (e.g. ?view=calendar), require exact path+query.
+        // Otherwise use exact/path-segment matching.
+        const isDefaultCalendarMatch =
+            currentPath === hrefPath &&
+            currentSearch === '' &&
+            hrefSearch === '?view=calendar';
+
+        const isActive = hasSearch
+            ? (currentPath === hrefPath &&
+                (currentSearch === hrefSearch || isDefaultCalendarMatch))
+            : (currentPath === hrefPath ||
+                (hrefPath !== '/' && currentPath.startsWith(hrefPath + '/')));
 
         if (isActive) {
             link.classList.add('active');
