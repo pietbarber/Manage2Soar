@@ -392,7 +392,7 @@ class SiteConfiguration(models.Model):
     )
     reservation_limit_period = models.CharField(
         max_length=20,
-        choices=ReservationLimitPeriod,
+        choices=tuple(ReservationLimitPeriod.choices),
         default=ReservationLimitPeriod.YEARLY,
         help_text="Primary reservation limit period. Set to yearly or quarterly. Existing clubs default to yearly.",
     )
