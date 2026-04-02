@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from members.decorators import active_member_required
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 
 from .forms import GliderReservationCancelForm, GliderReservationForm
 from .models import GliderReservation
@@ -59,14 +59,32 @@ def reservation_list(request):
         .order_by("-date")[:20]
     )
 
-    # Get yearly reservation counts
+    # Get reservation counts for status card
     yearly_counts = GliderReservation.get_reservations_by_year(member)
     current_year_count = yearly_counts.get(today.year, 0)
     current_month_count = GliderReservation.get_member_monthly_count(member)
 
     config = SiteConfiguration.objects.first()
+    reservation_limit_period = (
+        config.reservation_limit_period if config else ReservationLimitPeriod.YEARLY
+    )
     max_per_year = config.max_reservations_per_year if config else 3
     max_per_month = config.max_reservations_per_month if config else 0
+
+    if reservation_limit_period == ReservationLimitPeriod.QUARTERLY:
+        current_quarter = ((today.month - 1) // 3) + 1
+        current_period_label = f"Q{current_quarter} {today.year}"
+        current_period_count = GliderReservation.get_member_quarterly_count(
+            member,
+            year=today.year,
+            quarter=current_quarter,
+        )
+        primary_period_unit = "quarter"
+    else:
+        current_period_label = str(today.year)
+        current_period_count = current_year_count
+        primary_period_unit = "year"
+
     can_reserve, message = GliderReservation.can_member_reserve(member)
 
     context = {
@@ -78,6 +96,11 @@ def reservation_list(request):
         "current_year": today.year,
         "current_month": today.month,
         "max_per_year": max_per_year,
+        "max_per_period": max_per_year,
+        "reservation_limit_period": reservation_limit_period,
+        "current_period_label": current_period_label,
+        "current_period_count": current_period_count,
+        "primary_period_unit": primary_period_unit,
         "max_per_month": max_per_month,
         "can_reserve": can_reserve,
         "reservations_enabled": config.allow_glider_reservations if config else False,
@@ -204,6 +227,8 @@ def reservation_create(request, year=None, month=None, day=None):
         "selected_glider": selected_glider,
         "selected_glider_expired_deadlines": selected_glider_expired_deadlines,
         "max_per_year": config.max_reservations_per_year,
+        "max_per_period": config.max_reservations_per_year,
+        "reservation_limit_period": config.reservation_limit_period,
     }
 
     return render(request, "duty_roster/reservations/create.html", context)

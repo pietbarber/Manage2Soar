@@ -36,6 +36,7 @@ def site_config(db):
     config.allow_glider_reservations = True
     config.allow_two_seater_reservations = True
     config.max_reservations_per_year = 3
+    config.reservation_limit_period = "yearly"
     config.save()
     return config
 
@@ -295,6 +296,59 @@ class TestGliderReservationModel:
         )
         assert can_reserve is False
         assert "month" in message.lower()
+
+    def test_quarterly_count(self, site_config, member, glider):
+        """Test getting quarterly reservation count for a member."""
+        # Two reservations in Q2, one in Q3
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=timezone.datetime(2026, 4, 10).date(),
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=timezone.datetime(2026, 6, 20).date(),
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=timezone.datetime(2026, 7, 1).date(),
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        q2_count = GliderReservation.get_member_quarterly_count(member, 2026, 2)
+        q3_count = GliderReservation.get_member_quarterly_count(member, 2026, 3)
+        assert q2_count == 2
+        assert q3_count == 1
+
+    def test_can_member_reserve_with_quarterly_limit(self, site_config, member, glider):
+        """Test quarterly reservation limit enforcement."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 2
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        # Create reservations in Q2 up to limit
+        for day in (10, 20):
+            GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=timezone.datetime(2026, 4, day).date(),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+
+        can_reserve, message = GliderReservation.can_member_reserve(
+            member, year=2026, month=5
+        )
+        assert can_reserve is False
+        assert "Q2 2026" in message
 
     def test_monthly_limit_unlimited(self, site_config, member, glider, future_date):
         """Test unlimited monthly reservations when max_per_month is 0."""
@@ -738,6 +792,51 @@ class TestGliderReservationViews:
         # Check that error message mentions month
         errors_str = str(form.errors)
         assert "month" in errors_str.lower() or "maximum" in errors_str.lower()
+
+    def test_reservation_form_blocks_quarterly_limit(self, site_config, member, glider):
+        """Test that form validation blocks reservations at quarterly limit."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        existing_date = timezone.datetime(2026, 8, 5).date()  # Q3
+        attempted_date = timezone.datetime(2026, 9, 5).date()  # Same Q3
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=existing_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        form = GliderReservationForm(
+            data={
+                "glider": glider.pk,
+                "date": attempted_date,
+                "reservation_type": "solo",
+                "time_preference": "afternoon",
+            },
+            member=member,
+        )
+
+        assert form.is_valid() is False
+        assert "Q3 2026" in str(form.errors)
+
+    def test_reservation_list_shows_quarterly_period_label(
+        self, client, site_config, member, glider
+    ):
+        """Reservation list should show quarter label when quarterly policy is selected."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 3
+        site_config.save()
+
+        client.force_login(member)
+        response = client.get(reverse("duty_roster:reservation_list"))
+
+        assert response.status_code == 200
+        assert "Reservation Status for Q" in response.content.decode("utf-8")
 
 
 class TestGetReservationsForDate:

@@ -10,7 +10,7 @@ from django.utils import timezone
 from tinymce.models import HTMLField
 
 from members.models import Member
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 
 # Allowed HTML tags and attributes for roster messages
 ALLOWED_TAGS = [
@@ -857,6 +857,31 @@ class GliderReservation(models.Model):
         ).count()
 
     @classmethod
+    def get_member_quarterly_count(cls, member, year=None, quarter=None, month=None):
+        """
+        Get the count of reservations a member has made for a given calendar quarter.
+        Used to enforce quarterly reservation limits.
+        """
+        now = timezone.now()
+        if year is None:
+            year = now.year
+
+        if quarter is None:
+            quarter_source_month = month or now.month
+            quarter = ((quarter_source_month - 1) // 3) + 1
+
+        start_month = ((quarter - 1) * 3) + 1
+        end_month = start_month + 2
+
+        return cls.objects.filter(
+            member=member,
+            date__year=year,
+            date__month__gte=start_month,
+            date__month__lte=end_month,
+            status__in=["confirmed", "completed"],  # Don't count cancelled/no-show
+        ).count()
+
+    @classmethod
     def get_reservations_by_year(cls, member):
         """
         Return reservation counts grouped by year for a member.
@@ -886,7 +911,8 @@ class GliderReservation(models.Model):
     @classmethod
     def can_member_reserve(cls, member, year=None, month=None, config=None):
         """
-        Check if a member can make a new reservation based on yearly and monthly limits.
+        Check if a member can make a new reservation based on configured primary period
+        (yearly or quarterly) and optional monthly limits.
         Returns tuple: (can_reserve: bool, message: str)
         """
         if config is None:
@@ -898,15 +924,35 @@ class GliderReservation(models.Model):
         if not config.allow_glider_reservations:
             return False, "Glider reservations are currently disabled."
 
-        # Check yearly limit (0 = unlimited)
-        max_per_year = config.max_reservations_per_year
-        if max_per_year > 0:
-            current_count = cls.get_member_yearly_count(member, year)
-            if current_count >= max_per_year:
-                return (
-                    False,
-                    f"You have reached your limit of {max_per_year} reservations for this year.",
+        # Check primary period limit (0 = unlimited)
+        max_per_period = config.max_reservations_per_year
+        reservation_limit_period = getattr(
+            config,
+            "reservation_limit_period",
+            ReservationLimitPeriod.YEARLY,
+        )
+        if max_per_period > 0:
+            if reservation_limit_period == ReservationLimitPeriod.QUARTERLY:
+                target_year = year or timezone.now().year
+                target_month = month or timezone.now().month
+                quarter = ((target_month - 1) // 3) + 1
+                current_count = cls.get_member_quarterly_count(
+                    member,
+                    year=target_year,
+                    quarter=quarter,
                 )
+                if current_count >= max_per_period:
+                    return (
+                        False,
+                        f"You have reached your limit of {max_per_period} reservations for Q{quarter} {target_year}.",
+                    )
+            else:
+                current_count = cls.get_member_yearly_count(member, year)
+                if current_count >= max_per_period:
+                    return (
+                        False,
+                        f"You have reached your limit of {max_per_period} reservations for this year.",
+                    )
 
         # Check monthly limit (0 = unlimited)
         max_per_month = config.max_reservations_per_month

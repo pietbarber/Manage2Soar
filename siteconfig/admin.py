@@ -56,8 +56,29 @@ class MailingListAdminForm(forms.ModelForm):
         return instance
 
 
+class SiteConfigurationAdminForm(forms.ModelForm):
+    """Admin form with period-neutral reservation cap wording."""
+
+    class Meta:
+        model = SiteConfiguration
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        reservation_cap_field = self.fields.get("max_reservations_per_year")
+        if reservation_cap_field:
+            reservation_cap_field.label = "Max reservations per selected period"
+            reservation_cap_field.help_text = (
+                "Maximum number of glider reservations a member can make in the "
+                "selected reservation limit period (yearly or quarterly). Set to 0 "
+                "for unlimited."
+            )
+
+
 @admin.register(SiteConfiguration)
 class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
+    form = SiteConfigurationAdminForm
+
     def has_add_permission(self, request):
         # Only allow adding if no config exists
         return not SiteConfiguration.objects.exists()
@@ -223,6 +244,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "allow_glider_reservations",
                     "allow_two_seater_reservations",
                     "max_reservations_per_year",
+                    "reservation_limit_period",
                     "max_reservations_per_month",
                     "allow_towplane_rental",
                     "waive_tow_fee_on_retrieve",
