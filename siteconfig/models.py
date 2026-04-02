@@ -385,7 +385,10 @@ class SiteConfiguration(models.Model):
     )
     max_reservations_per_year = models.PositiveIntegerField(
         default=3,
-        help_text="Maximum number of glider reservations a member can make per calendar year (default: 3). Set to 0 for unlimited.",
+        help_text=(
+            "Maximum number of glider reservations a member can make per "
+            "primary reservation limit period (default: 3). Set to 0 for unlimited."
+        ),
     )
     reservation_limit_period = models.CharField(
         max_length=20,

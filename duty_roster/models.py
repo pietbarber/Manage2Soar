@@ -947,11 +947,12 @@ class GliderReservation(models.Model):
                         f"You have reached your limit of {max_per_period} reservations for Q{quarter} {target_year}.",
                     )
             else:
-                current_count = cls.get_member_yearly_count(member, year)
+                target_year = year or timezone.now().year
+                current_count = cls.get_member_yearly_count(member, target_year)
                 if current_count >= max_per_period:
                     return (
                         False,
-                        f"You have reached your limit of {max_per_period} reservations for this year.",
+                        f"You have reached your limit of {max_per_period} reservations for {target_year}.",
                     )
 
         # Check monthly limit (0 = unlimited)
