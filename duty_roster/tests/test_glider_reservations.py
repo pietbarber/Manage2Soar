@@ -722,6 +722,48 @@ class TestGliderReservationViews:
         # Should redirect with message
         assert response.status_code == 302
 
+    def test_reservation_create_for_future_quarter_not_blocked_by_current_quarter_limit(
+        self, client, site_config, member, glider
+    ):
+        """Quarterly caps should be evaluated against the target reservation quarter."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        today = timezone.now().date()
+        current_quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        current_quarter_date = today.replace(month=current_quarter_start_month, day=1)
+
+        # Fill current quarter to the limit.
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=current_quarter_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        # Target a date in a future quarter.
+        if today.month <= 9:
+            future_quarter_date = today.replace(month=today.month + 3, day=1)
+        else:
+            future_quarter_date = today.replace(year=today.year + 1, month=1, day=1)
+
+        client.force_login(member)
+        url = reverse(
+            "duty_roster:reservation_create_for_day",
+            args=[
+                future_quarter_date.year,
+                future_quarter_date.month,
+                future_quarter_date.day,
+            ],
+        )
+        response = client.get(url)
+
+        assert response.status_code == 200
+        assert "form" in response.context
+
     def test_reservation_create_shows_warning_for_expired_deadline(
         self, client, site_config, member, glider, future_date
     ):

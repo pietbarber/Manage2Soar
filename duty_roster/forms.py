@@ -706,6 +706,10 @@ class GliderReservationForm(forms.ModelForm):
         # Check reservation limits (use transaction to prevent race conditions)
         if self.member and date:
             with transaction.atomic():
+                # Lock a deterministic row to serialize reservation-cap checks for
+                # this member and avoid phantom inserts bypassing count limits.
+                Member.objects.select_for_update().filter(pk=self.member.pk).exists()
+
                 config = SiteConfiguration.objects.first()
                 reservation_limit = getattr(config, "max_reservations_per_year", 3)
                 reservation_limit_period = getattr(

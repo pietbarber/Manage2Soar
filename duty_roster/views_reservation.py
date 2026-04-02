@@ -118,13 +118,35 @@ def reservation_create(request, year=None, month=None, day=None):
     member = request.user
     config = SiteConfiguration.objects.first()
 
+    target_year = None
+    target_month = None
+    if request.method == "POST":
+        posted_date = request.POST.get("date")
+        if posted_date:
+            try:
+                target_date = date.fromisoformat(posted_date)
+                target_year = target_date.year
+                target_month = target_date.month
+            except ValueError:
+                pass
+    elif year and month:
+        try:
+            target_year = int(year)
+            target_month = int(month)
+        except (TypeError, ValueError):
+            pass
+
     # Check if reservations are enabled
     if not config or not config.allow_glider_reservations:
         messages.error(request, "Glider reservations are currently disabled.")
         return redirect("duty_roster:reservation_list")
 
     # Check if member can make a reservation
-    can_reserve, message = GliderReservation.can_member_reserve(member)
+    can_reserve, message = GliderReservation.can_member_reserve(
+        member,
+        year=target_year,
+        month=target_month,
+    )
     if not can_reserve:
         messages.warning(request, message)
         return redirect("duty_roster:reservation_list")
