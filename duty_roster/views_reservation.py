@@ -144,14 +144,13 @@ def reservation_create(request, year=None, month=None, day=None):
         try:
             parsed_year = int(year)
             parsed_month = int(month)
-            if 1 <= parsed_month <= 12:
-                target_year = parsed_year
-                target_month = parsed_month
-            else:
-                messages.error(request, "Invalid reservation date.")
-                return redirect("duty_roster:reservation_list")
+            parsed_day = int(day) if day is not None else 1
+            target_date = date(parsed_year, parsed_month, parsed_day)
+            target_year = target_date.year
+            target_month = target_date.month
         except (TypeError, ValueError):
-            pass
+            messages.error(request, "Invalid reservation date.")
+            return redirect("duty_roster:reservation_list")
 
     # Check if reservations are enabled
     if not config or not config.allow_glider_reservations:
@@ -161,11 +160,18 @@ def reservation_create(request, year=None, month=None, day=None):
     # Pre-check limits only when a target date is known; otherwise let the user
     # open the form and rely on date-aware validation at submit time.
     if target_year is not None and target_month is not None:
-        can_reserve, message = GliderReservation.can_member_reserve(
-            member,
-            year=target_year,
-            month=target_month,
-        )
+        try:
+            can_reserve, message = GliderReservation.can_member_reserve(
+                member,
+                year=target_year,
+                month=target_month,
+            )
+        except ValueError:
+            messages.error(
+                request,
+                "Invalid reservation period specified. Please choose a valid month.",
+            )
+            return redirect("duty_roster:reservation_list")
         if not can_reserve:
             messages.warning(request, message)
             return redirect("duty_roster:reservation_list")
