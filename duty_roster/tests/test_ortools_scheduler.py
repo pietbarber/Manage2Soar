@@ -21,13 +21,20 @@ from duty_roster.models import (
     MemberBlackout,
 )
 from duty_roster.ortools_scheduler import (
+    MAX_ASSIGNMENT_CONCENTRATION_WEIGHT,
+    WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS,
     DutyRosterScheduler,
     SchedulingData,
     extract_scheduling_data,
     generate_roster_ortools,
 )
+from duty_roster.roster_generator import (
+    clear_operational_season_cache,
+    get_default_max_assignments_per_month,
+)
 from members.constants.membership import DEFAULT_ROLES
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 
 class ORToolsSchedulerBasicTests(TestCase):
@@ -517,6 +524,328 @@ class ORToolsHardConstraintsTests(TestCase):
             f"member1 assigned {member1_assignments} times (max is 2)",
         )
 
+    def test_default_max_assignments_uses_site_configuration(self):
+        """Members without preferences should use SiteConfiguration fallback cap."""
+        clear_operational_season_cache()
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="example.org",
+            club_abbreviation="TC",
+            duty_default_max_assignments_per_month=1,
+        )
+
+        member_without_pref = Member.objects.create(
+            username="nopref_instructor",
+            email="nopref@test.com",
+            first_name="NoPref",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+            is_active=True,
+        )
+
+        data = SchedulingData(
+            members=[member_without_pref],
+            duty_days=[date(2026, 3, 1), date(2026, 3, 8)],
+            roles=["instructor"],
+            preferences={},
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 1),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertEqual(result["status"], "INFEASIBLE")
+
+    def test_default_max_assignments_cache_invalidates_after_config_save(self):
+        """Updated SiteConfiguration values should be reflected without process restart."""
+        clear_operational_season_cache()
+        config = SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="example.org",
+            club_abbreviation="TC",
+            duty_default_max_assignments_per_month=1,
+        )
+
+        self.assertEqual(get_default_max_assignments_per_month(), 1)
+
+        config.duty_default_max_assignments_per_month = 3
+        config.save()
+
+        self.assertEqual(get_default_max_assignments_per_month(), 3)
+
+    def test_adjacent_weekend_spacing_allows_when_member_opted_in(self):
+        """Members opted in to weekend doubles can be assigned adjacent weekends."""
+        pref1 = DutyPreference.objects.get(member=self.member1)
+        pref1.allow_weekend_double = True
+        pref1.save()
+
+        # Force member1 to be the only available member on two adjacent weekends.
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 7))
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 14))
+
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[date(2026, 3, 7), date(2026, 3, 14)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: pref1,
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts={
+                (self.member2.id, date(2026, 3, 7)),
+                (self.member2.id, date(2026, 3, 14)),
+            },
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 7),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned_member_ids = [
+            day_schedule["slots"]["instructor"] for day_schedule in result["schedule"]
+        ]
+        self.assertEqual(assigned_member_ids, [self.member1.id, self.member1.id])
+
+    def test_concentration_penalty_reduces_peak_load_in_two_month_window(self):
+        """Max-load concentration penalty should lower peak assignments when feasible."""
+        # Build a realistic pool similar to tenant-demo constraints: many eligible members,
+        # with a subset marked very stale so baseline objective tends to over-prefer them.
+        members = []
+        for idx in range(20):
+            member = Member.objects.create(
+                username=f"fairness_member_{idx}",
+                email=f"fairness_member_{idx}@test.com",
+                first_name=f"Fair{idx}",
+                last_name="Member",
+                membership_status="Full Member",
+                instructor=True,
+                is_active=True,
+            )
+            members.append(member)
+
+            pref = DutyPreference.objects.create(member=member)
+            pref.instructor_percent = 100
+            pref.max_assignments_per_month = 4
+            if idx < 4:
+                pref.last_duty_date = date(2020, 1, 1)
+            else:
+                pref.last_duty_date = date(2026, 3, 20)
+            pref.save()
+
+        two_month_sundays = [
+            date(2026, 4, 5),
+            date(2026, 4, 12),
+            date(2026, 4, 19),
+            date(2026, 4, 26),
+            date(2026, 5, 3),
+            date(2026, 5, 10),
+            date(2026, 5, 17),
+            date(2026, 5, 24),
+            date(2026, 5, 31),
+        ]
+
+        data = SchedulingData(
+            members=members,
+            duty_days=two_month_sundays,
+            roles=["instructor"],
+            preferences={m.id: DutyPreference.objects.get(member=m) for m in members},
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=two_month_sundays[0],
+            month_span=2,
+        )
+
+        with patch(
+            "duty_roster.ortools_scheduler.MAX_ASSIGNMENT_CONCENTRATION_WEIGHT", 0
+        ):
+            baseline = DutyRosterScheduler(data).solve(timeout_seconds=10.0)
+        tuned = DutyRosterScheduler(data).solve(timeout_seconds=10.0)
+
+        self.assertIn(baseline["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertIn(tuned["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertGreater(MAX_ASSIGNMENT_CONCENTRATION_WEIGHT, 0)
+
+        def _max_assignments(result):
+            counts = {}
+            for day in result["schedule"]:
+                for member_id in day["slots"].values():
+                    if member_id is None:
+                        continue
+                    counts[member_id] = counts.get(member_id, 0) + 1
+            return max(counts.values()) if counts else 0
+
+        baseline_peak = _max_assignments(baseline)
+        tuned_peak = _max_assignments(tuned)
+
+        self.assertLessEqual(
+            tuned_peak,
+            baseline_peak,
+            f"Expected tuned objective to reduce or match peak load; baseline={baseline_peak}, tuned={tuned_peak}",
+        )
+
+    def test_adjacent_weekend_spacing_can_make_schedule_infeasible(self):
+        """Adjacent-weekend spacing should fail clearly when staffing cannot satisfy it."""
+        pref1 = DutyPreference.objects.get(member=self.member1)
+        pref1.allow_weekend_double = False
+        pref1.save()
+
+        # Force member1 to be the only available member on two adjacent weekends.
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 7))
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 14))
+
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[date(2026, 3, 7), date(2026, 3, 14)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: pref1,
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts={
+                (self.member2.id, date(2026, 3, 7)),
+                (self.member2.id, date(2026, 3, 14)),
+            },
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 7),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertEqual(result["status"], "INFEASIBLE")
+        self.assertIn(
+            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
+            result["diagnostics"]["infeasible_hints"],
+        )
+
+    def test_adjacent_weekend_spacing_enforced_with_sat_sun_schedule(self):
+        """Saturday-to-Saturday spacing must apply even when Sundays are also duty days."""
+        pref1 = DutyPreference.objects.get(member=self.member1)
+        pref1.allow_weekend_double = False
+        pref1.save()
+
+        # Only member1 can cover Saturdays; member2 can still cover Sundays.
+        # Without Saturday->next Saturday spacing, this would incorrectly be feasible.
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 7))
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 14))
+
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[
+                date(2026, 3, 7),
+                date(2026, 3, 8),
+                date(2026, 3, 14),
+                date(2026, 3, 15),
+            ],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: pref1,
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts={
+                (self.member2.id, date(2026, 3, 7)),
+                (self.member2.id, date(2026, 3, 14)),
+            },
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 7),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertEqual(result["status"], "INFEASIBLE")
+        self.assertIn(
+            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
+            result["diagnostics"]["infeasible_hints"],
+        )
+
+    def test_adjacent_weekend_spacing_defaults_missing_preference_to_no_double(self):
+        """Missing preference rows should default to no adjacent-weekend doubles."""
+        # Force member1 to be the only available member on two adjacent weekends.
+        # member1 is intentionally omitted from preferences to validate default behavior.
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 7))
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 14))
+
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[date(2026, 3, 7), date(2026, 3, 14)],
+            roles=["instructor"],
+            preferences={
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts={
+                (self.member2.id, date(2026, 3, 7)),
+                (self.member2.id, date(2026, 3, 14)),
+            },
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 7),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertEqual(result["status"], "INFEASIBLE")
+        self.assertIn(
+            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
+            result["diagnostics"]["infeasible_hints"],
+        )
+
+    def test_adjacent_weekend_hint_not_added_without_seven_day_weekday_pair(self):
+        """Do not emit adjacent-weekend hint when no day has a matching day+7."""
+        pref1 = DutyPreference.objects.get(member=self.member1)
+        pref1.allow_weekend_double = False
+        pref1.max_assignments_per_month = 1
+        pref1.save()
+
+        # Keep member2 unavailable so infeasibility is caused by assignment capacity,
+        # not by adjacent-weekend spacing.
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 7))
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 15))
+
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[date(2026, 3, 7), date(2026, 3, 15)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: pref1,
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts={
+                (self.member2.id, date(2026, 3, 7)),
+                (self.member2.id, date(2026, 3, 15)),
+            },
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 7),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertEqual(result["status"], "INFEASIBLE")
+        self.assertNotIn(
+            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
+            result["diagnostics"]["infeasible_hints"],
+        )
+
 
 class ORToolsSoftConstraintsTests(TestCase):
     """Test soft constraints (objective function optimization)."""
@@ -708,6 +1037,99 @@ class ORToolsSoftConstraintsTests(TestCase):
             member2_assignments,
             "Staler member (older last_duty_date) should get more assignments",
         )
+
+    def test_spacing_penalty_weights_prefer_wider_gaps(self):
+        """Lag penalties should decrease as weekend gap width increases."""
+        self.assertGreater(
+            WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS[1],
+            WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS[2],
+        )
+        self.assertGreater(
+            WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS[2],
+            WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS[3],
+        )
+
+    def test_spacing_prefers_three_week_gap_over_two_week_gap(self):
+        """When both are feasible, objective should prefer 3-week repeat over 2-week."""
+        member3 = Member.objects.create(
+            username="member3",
+            email="m3@test.com",
+            first_name="Member",
+            last_name="Three",
+            membership_status="Full Member",
+            instructor=True,
+            is_active=True,
+        )
+
+        anchor = date(2026, 3, 7)
+        duty_days = [anchor + timedelta(days=7 * i) for i in range(5)]
+
+        pref1 = DutyPreference.objects.create(
+            member=self.member1,
+            max_assignments_per_month=2,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 1, 1),
+        )
+        pref2 = DutyPreference.objects.create(
+            member=self.member2,
+            max_assignments_per_month=2,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 1, 1),
+        )
+        pref3 = DutyPreference.objects.create(
+            member=member3,
+            max_assignments_per_month=1,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 1, 1),
+        )
+
+        # day1 must be member1, day2/day5 must be member2.
+        # The only flexible choice is whether member1 takes day3 (2-week gap)
+        # or day4 (3-week gap) from day1.
+        blackouts = {
+            (self.member1.id, duty_days[1]),
+            (self.member1.id, duty_days[4]),
+            (self.member2.id, duty_days[0]),
+            (self.member2.id, duty_days[2]),
+            (self.member2.id, duty_days[3]),
+            (member3.id, duty_days[0]),
+            (member3.id, duty_days[1]),
+            (member3.id, duty_days[4]),
+        }
+
+        data = SchedulingData(
+            members=[self.member1, self.member2, member3],
+            duty_days=duty_days,
+            roles=["instructor"],
+            preferences={
+                self.member1.id: pref1,
+                self.member2.id: pref2,
+                member3.id: pref3,
+            },
+            blackouts=blackouts,
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=duty_days[0],
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        schedule_by_day = {
+            day_schedule["date"]: day_schedule["slots"]["instructor"]
+            for day_schedule in result["schedule"]
+        }
+
+        self.assertEqual(schedule_by_day[duty_days[0]], self.member1.id)
+        self.assertEqual(schedule_by_day[duty_days[1]], self.member2.id)
+        self.assertEqual(schedule_by_day[duty_days[4]], self.member2.id)
+
+        # Core assertion: choose 3-week spacing for member1 (day1 -> day4),
+        # not 2-week spacing (day1 -> day3).
+        self.assertEqual(schedule_by_day[duty_days[3]], self.member1.id)
+        self.assertEqual(schedule_by_day[duty_days[2]], member3.id)
 
 
 class ORToolsEdgeCasesTests(TestCase):

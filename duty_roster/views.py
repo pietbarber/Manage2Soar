@@ -59,6 +59,7 @@ from .roster_generator import (
     calculate_assignment_cap,
     count_calendar_months_inclusive,
     generate_roster,
+    get_default_max_assignments_per_month,
     get_operational_season_bounds,
     get_weekend_dates_in_range,
     is_within_operational_season,
@@ -1891,8 +1892,9 @@ def get_eligible_members_for_slot(request):
                 )
 
         # Find eligible members
-        DEFAULT_MAX_ASSIGNMENTS = 8
-        default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, range_months)
+        default_cap = calculate_assignment_cap(
+            get_default_max_assignments_per_month(), range_months
+        )
         eligible_members = []
         for m in members:
             # Check if member has the role flag
@@ -2346,6 +2348,7 @@ def propose_roster(request):
 
     # Get site config and determine which roles to schedule
     siteconfig = SiteConfiguration.objects.first()
+    use_ortools_scheduler = bool(siteconfig and siteconfig.use_ortools_scheduler)
     enabled_roles = []
     if siteconfig:
         if getattr(siteconfig, "schedule_instructors", False):
@@ -2374,6 +2377,7 @@ def propose_roster(request):
                 "incomplete": False,
                 "enabled_roles": [],
                 "no_scheduling": True,
+                "use_ortools_scheduler": use_ortools_scheduler,
             },
         )
 
@@ -2440,7 +2444,11 @@ def propose_roster(request):
                 messages.success(
                     request,
                     f"Removed {len(dates_to_remove_set)} date(s) from the proposed roster. "
-                    f"These dates will stay removed on Roll Again.",
+                    + (
+                        "These dates will stay removed on Generate For Range."
+                        if use_ortools_scheduler
+                        else "These dates will stay removed on Roll Again."
+                    ),
                 )
 
         elif action == "roll":
@@ -2624,7 +2632,11 @@ def propose_roster(request):
             messages.info(
                 request,
                 "All previously removed dates have been restored. "
-                "Click Roll Again to regenerate the full roster.",
+                + (
+                    "Click Generate For Range to regenerate the full roster."
+                    if use_ortools_scheduler
+                    else "Click Roll Again to regenerate the full roster."
+                ),
             )
 
         elif action == "cancel":
@@ -2698,6 +2710,7 @@ def propose_roster(request):
             "operational_info": operational_info,
             "filtered_dates": filtered_dates,
             "siteconfig": siteconfig,
+            "use_ortools_scheduler": use_ortools_scheduler,
             "removed_dates": removed_dates,
         },
     )

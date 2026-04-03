@@ -6,6 +6,8 @@ from collections import defaultdict
 from datetime import date, timedelta
 from decimal import ROUND_CEILING, Decimal
 
+from django.core.cache import cache
+
 from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
@@ -19,6 +21,10 @@ from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger("duty_roster.generator")
 
+DEFAULT_MAX_ASSIGNMENTS = 8
+DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY = "duty_default_max_assignments_per_month"
+DEFAULT_MAX_ASSIGNMENTS_CACHE_TTL_SECONDS = 300
+
 
 # Cache for operational season boundaries
 _operational_season_cache = {}
@@ -28,6 +34,38 @@ def clear_operational_season_cache():
     """Clear the operational season cache. Useful for testing."""
     global _operational_season_cache
     _operational_season_cache.clear()
+    cache.delete(DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY)
+
+
+def get_default_max_assignments_per_month() -> int:
+    """Return site-configured fallback assignment cap for members without preferences.
+
+    Uses Django cache so updates propagate across workers once SiteConfiguration
+    save/delete hooks clear the shared cache key.
+    """
+    cached_value = cache.get(DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY)
+    if cached_value is not None:
+        return int(cached_value)
+
+    try:
+        config = SiteConfiguration.objects.first()
+        configured_value = (
+            config.duty_default_max_assignments_per_month
+            if config
+            else DEFAULT_MAX_ASSIGNMENTS
+        )
+    except Exception as e:
+        logger.warning(
+            "Error fetching default max assignments from SiteConfiguration: %s", e
+        )
+        configured_value = DEFAULT_MAX_ASSIGNMENTS
+
+    cache.set(
+        DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY,
+        configured_value,
+        timeout=DEFAULT_MAX_ASSIGNMENTS_CACHE_TTL_SECONDS,
+    )
+    return configured_value
 
 
 def get_operational_season_bounds(year: int):
@@ -311,8 +349,6 @@ def diagnose_empty_slot(
         - reasons: Dict of reason -> list of member names
         - summary: Human-readable summary string
     """
-    DEFAULT_MAX_ASSIGNMENTS = 8
-
     reasons = {
         "no_preference": [],  # Note: These are now ELIGIBLE, just informational
         "dont_schedule": [],
@@ -327,7 +363,9 @@ def diagnose_empty_slot(
     }
 
     total_with_role = 0
-    default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, range_months)
+    default_cap = calculate_assignment_cap(
+        get_default_max_assignments_per_month(), range_months
+    )
 
     for m in members:
         # Check if member has the role flag

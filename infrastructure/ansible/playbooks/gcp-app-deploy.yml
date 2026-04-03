@@ -525,7 +525,7 @@
         (migrate_check_results.rc not in [0, 1]) or
         (migrate_check_results.rc != 0 and
          (migrate_check_results.stderr | default('') |
-          regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container')))
+          regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container')) is not none)
       changed_when: false
       loop: "{{ gke_deploy_tenants }}"
       loop_control:

@@ -138,6 +138,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "schedule_tow_pilots",
                     "schedule_duty_officers",
                     "schedule_assistant_duty_officers",
+                    "duty_default_max_assignments_per_month",
                     "use_ortools_scheduler",
                 ),
                 "classes": ("collapse",),
