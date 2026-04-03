@@ -356,6 +356,11 @@ class DutyRosterScheduler:
         duty_day_set = set(self.data.duty_days)
         return any((day + timedelta(days=7)) in duty_day_set for day in duty_day_set)
 
+    def _member_allows_weekend_double(self, member_id: int) -> bool:
+        """Return effective weekend-double opt-in state for a member."""
+        pref = self.data.preferences.get(member_id)
+        return bool(pref and pref.allow_weekend_double)
+
     def _add_adjacent_weekend_spacing_constraints(self):
         """
         Constraint: selected members cannot repeat the same role on adjacent weekends.
@@ -377,8 +382,7 @@ class DutyRosterScheduler:
         sorted_days = sorted(duty_day_set)
 
         for member in self.data.members:
-            pref = self.data.preferences.get(member.id)
-            if not pref or pref.allow_weekend_double:
+            if self._member_allows_weekend_double(member.id):
                 continue
 
             for role in self.data.roles:
@@ -790,8 +794,8 @@ class DutyRosterScheduler:
             result["objective_value"] = None
             if result["status"] == "INFEASIBLE":
                 if self._has_adjacent_weekday_pairs() and any(
-                    pref.allow_weekend_double is False
-                    for pref in self.data.preferences.values()
+                    not self._member_allows_weekend_double(member.id)
+                    for member in self.data.members
                 ):
                     result["diagnostics"]["infeasible_hints"].append(
                         "Adjacent-weekend same-role spacing constraints may be too strict for available staffing."

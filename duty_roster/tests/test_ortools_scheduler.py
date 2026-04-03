@@ -635,6 +635,39 @@ class ORToolsHardConstraintsTests(TestCase):
             result["diagnostics"]["infeasible_hints"],
         )
 
+    def test_adjacent_weekend_spacing_defaults_missing_preference_to_no_double(self):
+        """Missing preference rows should default to no adjacent-weekend doubles."""
+        # Force member1 to be the only available member on two adjacent weekends.
+        # member1 is intentionally omitted from preferences to validate default behavior.
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 7))
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 14))
+
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[date(2026, 3, 7), date(2026, 3, 14)],
+            roles=["instructor"],
+            preferences={
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts={
+                (self.member2.id, date(2026, 3, 7)),
+                (self.member2.id, date(2026, 3, 14)),
+            },
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 7),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertEqual(result["status"], "INFEASIBLE")
+        self.assertIn(
+            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
+            result["diagnostics"]["infeasible_hints"],
+        )
+
     def test_adjacent_weekend_hint_not_added_without_seven_day_weekday_pair(self):
         """Do not emit adjacent-weekend hint when no day has a matching day+7."""
         pref1 = DutyPreference.objects.get(member=self.member1)
