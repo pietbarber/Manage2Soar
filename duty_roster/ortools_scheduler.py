@@ -234,19 +234,19 @@ class DutyRosterScheduler:
         # Constraint 1: One assignment per slot
         self._add_one_assignment_per_slot()
 
-        # Constraint 5: Avoidance constraints
+        # Constraint 2: Avoidance constraints
         self._add_avoidance_constraints()
 
-        # Constraint 6: One assignment per day
+        # Constraint 3: One assignment per day
         self._add_one_assignment_per_day()
 
-        # Constraint 7: Anti-repeat constraint
+        # Constraint 4: Anti-repeat constraint
         self._add_anti_repeat_constraints()
 
-        # Constraint 8: Adjacent-weekend spacing for members who opt out
+        # Constraint 5: Adjacent-weekend spacing for members who opt out
         self._add_adjacent_weekend_spacing_constraints()
 
-        # Constraint 9: Max assignments per month
+        # Constraint 6: Max assignments per month
         self._add_max_assignments_constraints()
 
         logger.info("Hard constraints added successfully")

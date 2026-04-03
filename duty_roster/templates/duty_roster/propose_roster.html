@@ -10,7 +10,11 @@
 {% if incomplete %}
   <div class="alert alert-warning">
     ⚠️ Could not fully auto-generate a complete roster for {{ start_date }} to {{ end_date }}.
+    {% if siteconfig and siteconfig.use_ortools_scheduler %}
+    Showing weekend dates so you can review or adjust the date range and use "Generate For Range".
+    {% else %}
     Showing weekend dates so you can review (or try "🔄 Roll Again").
+    {% endif %}
   </div>
 {% endif %}
 

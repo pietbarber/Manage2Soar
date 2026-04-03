@@ -216,6 +216,39 @@ class TestProposeRosterSessionTracking:
             joined_club=date.today(),
         )
 
+    def _create_full_role_coverage_members(self):
+        """Create eligible members for all scheduled roles so draft controls render."""
+        Member.objects.create(
+            username="test_towpilot",
+            email="towpilot@test.com",
+            first_name="Tow",
+            last_name="Pilot",
+            towpilot=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today(),
+        )
+        Member.objects.create(
+            username="test_duty_officer",
+            email="do@test.com",
+            first_name="Duty",
+            last_name="Officer",
+            duty_officer=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today(),
+        )
+        Member.objects.create(
+            username="test_assistant_duty_officer",
+            email="ado@test.com",
+            first_name="Assistant",
+            last_name="DutyOfficer",
+            assistant_duty_officer=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today(),
+        )
+
     def test_remove_dates_stores_in_session(
         self, client, rostermeister, instructor_member
     ):
@@ -379,10 +412,17 @@ class TestProposeRosterSessionTracking:
 
         client.login(username="rostermeister", password="testpass123")
         url = reverse("duty_roster:propose_roster")
-        response = client.get(url, {"year": 2026, "month": 3})
+
+        session = client.session
+        session["proposed_roster"] = [
+            {"date": "2026-03-07", "slots": {}, "diagnostics": {}}
+        ]
+        session.save()
+
+        response = client.post(url, {"year": 2026, "month": 3})
 
         assert response.status_code == 200
-        assert 'value="roll" class="btn btn-secondary"' not in response.content.decode(
+        assert 'btn btn-secondary">🔄 Roll Again<' not in response.content.decode(
             "utf-8"
         )
 
@@ -411,12 +451,17 @@ class TestProposeRosterSessionTracking:
 
         client.login(username="rostermeister", password="testpass123")
         url = reverse("duty_roster:propose_roster")
-        response = client.get(url, {"year": 2026, "month": 3})
+
+        session = client.session
+        session["proposed_roster"] = [
+            {"date": "2026-03-07", "slots": {}, "diagnostics": {}}
+        ]
+        session.save()
+
+        response = client.post(url, {"year": 2026, "month": 3})
 
         assert response.status_code == 200
-        assert 'value="roll" class="btn btn-secondary"' in response.content.decode(
-            "utf-8"
-        )
+        assert 'btn btn-secondary">🔄 Roll Again<' in response.content.decode("utf-8")
 
     def test_publish_clears_removed_dates(self, client, rostermeister, airfield):
         """Publishing roster should clear both proposed roster and removed dates."""
