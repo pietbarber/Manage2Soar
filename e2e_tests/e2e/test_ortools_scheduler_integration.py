@@ -196,8 +196,8 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
             abs(legacy_filled_count - ortools_filled_count) <= 5
         ), "Both schedulers should produce similar fill rates"
 
-    def test_roster_roll_again_with_ortools(self):
-        """Test that 'Roll Again' functionality works with OR-Tools scheduler."""
+    def test_roster_roll_again_hidden_with_ortools(self):
+        """Roll Again should be hidden when OR-Tools scheduler is enabled."""
         # Enable OR-Tools scheduler
         self.config.use_ortools_scheduler = True
         self.config.save()
@@ -221,20 +221,8 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         first_filled_count = self.page.locator(".roster-slot:not(.empty-slot)").count()
         assert first_filled_count > 0, "Initial roster should have filled slots"
 
-        # Click "Roll Again" button
         roll_again_button = self.page.get_by_role("button", name="🔄 Roll Again")
-        assert roll_again_button.count() > 0, "Roll Again button should be present"
-        roll_again_button.click()
-        self.page.wait_for_load_state("networkidle", timeout=15000)
-
-        second_filled_count = self.page.locator(".roster-slot:not(.empty-slot)").count()
-        assert second_filled_count > 0, "Re-rolled roster should have filled slots"
-
-        # Verify no error messages
-        error_messages = self.page.locator(".alert-danger")
-        assert (
-            error_messages.count() == 0
-        ), "Should not have error messages after re-roll"
+        assert roll_again_button.count() == 0, "Roll Again button should be hidden"
 
     def test_roster_publish_with_ortools(self):
         """Test that publishing roster works with OR-Tools scheduler."""

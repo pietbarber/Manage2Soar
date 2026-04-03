@@ -149,7 +149,7 @@
     </tbody>
   </table>
 
-  {% if draft %}
+  {% if draft and not siteconfig.use_ortools_scheduler %}
   <div class="d-flex gap-2 mb-3">
     <button name="action" value="remove_dates" class="btn btn-warning">🗑️ Remove Selected Dates</button>
     <button name="action" value="roll" class="btn btn-secondary">🔄 Roll Again</button>

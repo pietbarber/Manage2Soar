@@ -230,6 +230,9 @@ class DutyRosterScheduler:
         # Constraint 7: Anti-repeat constraint
         self._add_anti_repeat_constraints()
 
+        # Constraint 8: Adjacent-weekend spacing for members who opt out
+        self._add_adjacent_weekend_spacing_constraints()
+
         # Constraint 9: Max assignments per month
         self._add_max_assignments_constraints()
 
@@ -334,6 +337,60 @@ class DutyRosterScheduler:
                         if key1 in self.x and key2 in self.x:
                             # Constraint: can't do same role on both days
                             self.model.Add(self.x[key1] + self.x[key2] <= 1)
+
+    def _get_weekend_anchor(self, day: date) -> date:
+        """Return Monday anchor date for the ISO week containing ``day``."""
+        iso_year, iso_week, _ = day.isocalendar()
+        return date.fromisocalendar(iso_year, iso_week, 1)
+
+    def _get_adjacent_weekend_pairs(self) -> list[tuple[date, date]]:
+        """Return adjacent weekend anchors separated by exactly one calendar week."""
+        weekend_anchors = sorted(
+            {self._get_weekend_anchor(day) for day in self.data.duty_days}
+        )
+
+        adjacent_pairs: list[tuple[date, date]] = []
+        for i in range(len(weekend_anchors) - 1):
+            first_anchor = weekend_anchors[i]
+            second_anchor = weekend_anchors[i + 1]
+            if (second_anchor - first_anchor).days == 7:
+                adjacent_pairs.append((first_anchor, second_anchor))
+
+        return adjacent_pairs
+
+    def _add_adjacent_weekend_spacing_constraints(self):
+        """
+        Constraint: selected members cannot repeat the same role on adjacent weekends.
+
+        For members with allow_weekend_double=False, assignment on weekend N blocks
+        assignment to the same role/day-of-week on weekend N+1.
+
+        This is intentionally narrower than a full "any duty on adjacent weekends"
+        block to reduce infeasibility in sparse rosters while still addressing
+        repetitive same-role assignment patterns.
+        """
+        if len(self.data.duty_days) < 2:
+            return
+
+        for member in self.data.members:
+            pref = self.data.preferences.get(member.id)
+            if not pref or pref.allow_weekend_double:
+                continue
+
+            for role in self.data.roles:
+                sorted_days = sorted(self.data.duty_days)
+                for i in range(len(sorted_days) - 1):
+                    day1 = sorted_days[i]
+                    day2 = sorted_days[i + 1]
+
+                    # Adjacent weekend matching by exact 7-day separation and same weekday.
+                    if (day2 - day1).days != 7 or day1.weekday() != day2.weekday():
+                        continue
+
+                    key1 = (member.id, role, day1)
+                    key2 = (member.id, role, day2)
+                    if key1 in self.x and key2 in self.x:
+                        self.model.Add(self.x[key1] + self.x[key2] <= 1)
 
     def _add_max_assignments_constraints(self):
         """
@@ -624,6 +681,7 @@ class DutyRosterScheduler:
             "diagnostics": {
                 "num_conflicts": self.solver.NumConflicts(),
                 "num_branches": self.solver.NumBranches(),
+                "infeasible_hints": [],
             },
         }
 
@@ -633,6 +691,14 @@ class DutyRosterScheduler:
             result["schedule"] = self._build_schedule_from_solution()
         else:
             result["objective_value"] = None
+            if result["status"] == "INFEASIBLE":
+                if self._get_adjacent_weekend_pairs() and any(
+                    pref.allow_weekend_double is False
+                    for pref in self.data.preferences.values()
+                ):
+                    result["diagnostics"]["infeasible_hints"].append(
+                        "Adjacent-weekend same-role spacing constraints may be too strict for available staffing."
+                    )
             logger.error(f"Solver failed with status: {result['status']}")
 
         return result
@@ -824,13 +890,18 @@ def generate_roster_ortools(
 
     # Check solver status
     if result["status"] not in ("OPTIMAL", "FEASIBLE"):
+        hint_text = ""
+        hints = result.get("diagnostics", {}).get("infeasible_hints", [])
+        if hints:
+            hint_text = f" Hint: {hints[0]}"
+
         logger.error(
             f"OR-Tools scheduler failed: status={result['status']}, "
             f"diagnostics={result['diagnostics']}"
         )
         raise RuntimeError(
             f"OR-Tools solver failed with status: {result['status']}. "
-            "Falling back to legacy algorithm may be required."
+            f"Falling back to legacy algorithm may be required.{hint_text}"
         )
 
     return result["schedule"]

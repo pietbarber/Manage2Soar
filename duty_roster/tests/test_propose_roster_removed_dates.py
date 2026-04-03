@@ -354,6 +354,66 @@ class TestProposeRosterSessionTracking:
             date_to_remove not in dates_after_roll
         ), f"Date {date_to_remove} should still be excluded after Roll Again"
 
+    def test_roll_again_hidden_when_ortools_enabled(
+        self, client, rostermeister, instructor_member
+    ):
+        """Roll Again button should not render when OR-Tools scheduler is enabled."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                domain_name="test.org",
+                club_abbreviation="TC",
+                schedule_instructors=True,
+                schedule_tow_pilots=True,
+                schedule_duty_officers=True,
+                schedule_assistant_duty_officers=True,
+            )
+        else:
+            config.schedule_instructors = True
+            config.schedule_tow_pilots = True
+            config.schedule_duty_officers = True
+            config.schedule_assistant_duty_officers = True
+        config.use_ortools_scheduler = True
+        config.save()
+
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+        response = client.get(url, {"year": 2026, "month": 3})
+
+        assert response.status_code == 200
+        assert "🔄 Roll Again" not in response.content.decode("utf-8")
+
+    def test_roll_again_visible_when_ortools_disabled(
+        self, client, rostermeister, instructor_member
+    ):
+        """Roll Again button should render when OR-Tools scheduler is disabled."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                domain_name="test.org",
+                club_abbreviation="TC",
+                schedule_instructors=True,
+                schedule_tow_pilots=True,
+                schedule_duty_officers=True,
+                schedule_assistant_duty_officers=True,
+            )
+        else:
+            config.schedule_instructors = True
+            config.schedule_tow_pilots = True
+            config.schedule_duty_officers = True
+            config.schedule_assistant_duty_officers = True
+        config.use_ortools_scheduler = False
+        config.save()
+
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+        response = client.get(url, {"year": 2026, "month": 3})
+
+        assert response.status_code == 200
+        assert "🔄 Roll Again" in response.content.decode("utf-8")
+
     def test_publish_clears_removed_dates(self, client, rostermeister, airfield):
         """Publishing roster should clear both proposed roster and removed dates."""
         client.login(username="rostermeister", password="testpass123")
