@@ -358,6 +358,11 @@ class DutyRosterScheduler:
 
         return adjacent_pairs
 
+    def _has_adjacent_weekday_pairs(self) -> bool:
+        """Return True when any duty day has a matching day exactly 7 days later."""
+        duty_day_set = set(self.data.duty_days)
+        return any((day + timedelta(days=7)) in duty_day_set for day in duty_day_set)
+
     def _add_adjacent_weekend_spacing_constraints(self):
         """
         Constraint: selected members cannot repeat the same role on adjacent weekends.
@@ -370,6 +375,9 @@ class DutyRosterScheduler:
         repetitive same-role assignment patterns.
         """
         if len(self.data.duty_days) < 2:
+            return
+
+        if not self._has_adjacent_weekday_pairs():
             return
 
         duty_day_set = set(self.data.duty_days)
@@ -694,7 +702,7 @@ class DutyRosterScheduler:
         else:
             result["objective_value"] = None
             if result["status"] == "INFEASIBLE":
-                if self._get_adjacent_weekend_pairs() and any(
+                if self._has_adjacent_weekday_pairs() and any(
                     pref.allow_weekend_double is False
                     for pref in self.data.preferences.values()
                 ):
