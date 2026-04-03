@@ -30,7 +30,7 @@ logger = logging.getLogger("duty_roster.ortools_scheduler")
 
 
 # Constants
-DEFAULT_MAX_ASSIGNMENTS = 4  # For members without DutyPreference
+DEFAULT_MAX_ASSIGNMENTS = 8  # Legacy-aligned fallback for no DutyPreference row
 PAIRING_MULTIPLIER = 3  # Weight multiplier for preferred pairings
 FAIRNESS_PENALTY_WEIGHT = (
     200  # Weight for penalizing deviation from average assignments
@@ -41,7 +41,12 @@ WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS = {
     3: 5,
 }
 WEEKEND_SPACING_CONSISTENCY_WEIGHT = 4
-MAX_WEEKEND_SPACING_PAIR_TERMS = 120
+# Keep this high enough that spacing preferences remain active for typical
+# month-sized schedules with several eligible members.
+MAX_WEEKEND_SPACING_PAIR_TERMS = 1200
+# Avoid adding spacing soft-terms on very large models where objective expansion
+# can dominate solve time.
+MAX_WEEKEND_SPACING_DECISION_VARS = 500
 
 
 @dataclass
@@ -590,6 +595,14 @@ class DutyRosterScheduler:
 
         sorted_days = sorted(set(self.data.duty_days))
         if len(sorted_days) < 2:
+            return
+
+        if len(self.x) > MAX_WEEKEND_SPACING_DECISION_VARS:
+            logger.info(
+                "Skipping weekend spacing soft objective for this run: "
+                f"{len(self.x)} decision vars exceeds "
+                f"{MAX_WEEKEND_SPACING_DECISION_VARS}"
+            )
             return
 
         candidate_pair_terms = 0
