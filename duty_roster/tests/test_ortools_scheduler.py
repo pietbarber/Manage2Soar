@@ -27,6 +27,10 @@ from duty_roster.ortools_scheduler import (
     extract_scheduling_data,
     generate_roster_ortools,
 )
+from duty_roster.roster_generator import (
+    clear_operational_season_cache,
+    get_default_max_assignments_per_month,
+)
 from members.constants.membership import DEFAULT_ROLES
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -521,6 +525,7 @@ class ORToolsHardConstraintsTests(TestCase):
 
     def test_default_max_assignments_uses_site_configuration(self):
         """Members without preferences should use SiteConfiguration fallback cap."""
+        clear_operational_season_cache()
         SiteConfiguration.objects.create(
             club_name="Test Club",
             domain_name="example.org",
@@ -554,6 +559,23 @@ class ORToolsHardConstraintsTests(TestCase):
         result = scheduler.solve(timeout_seconds=5.0)
 
         self.assertEqual(result["status"], "INFEASIBLE")
+
+    def test_default_max_assignments_cache_invalidates_after_config_save(self):
+        """Updated SiteConfiguration values should be reflected without process restart."""
+        clear_operational_season_cache()
+        config = SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="example.org",
+            club_abbreviation="TC",
+            duty_default_max_assignments_per_month=1,
+        )
+
+        self.assertEqual(get_default_max_assignments_per_month(), 1)
+
+        config.duty_default_max_assignments_per_month = 3
+        config.save()
+
+        self.assertEqual(get_default_max_assignments_per_month(), 3)
 
     def test_adjacent_weekend_spacing_allows_when_member_opted_in(self):
         """Members opted in to weekend doubles can be assigned adjacent weekends."""

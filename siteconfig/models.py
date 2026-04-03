@@ -716,7 +716,12 @@ class SiteConfiguration(models.Model):
         from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
 
         cache.delete_many(
-            ["siteconfig_instance", "siteconfig_deferred", "siteconfig_webcam_enabled"]
+            [
+                "siteconfig_instance",
+                "siteconfig_deferred",
+                "siteconfig_webcam_enabled",
+                "duty_default_max_assignments_per_month",
+            ]
         )
 
         # Generate favicon + PWA icon if logo was uploaded/changed
@@ -805,7 +810,12 @@ class SiteConfiguration(models.Model):
         from django.core.cache import cache
 
         cache.delete_many(
-            ["siteconfig_instance", "siteconfig_deferred", "siteconfig_webcam_enabled"]
+            [
+                "siteconfig_instance",
+                "siteconfig_deferred",
+                "siteconfig_webcam_enabled",
+                "duty_default_max_assignments_per_month",
+            ]
         )
         super().delete(*args, **kwargs)
 

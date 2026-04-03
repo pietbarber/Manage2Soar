@@ -6,6 +6,8 @@ from collections import defaultdict
 from datetime import date, timedelta
 from decimal import ROUND_CEILING, Decimal
 
+from django.core.cache import cache
+
 from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
@@ -20,41 +22,50 @@ from siteconfig.models import SiteConfiguration
 logger = logging.getLogger("duty_roster.generator")
 
 DEFAULT_MAX_ASSIGNMENTS = 8
+DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY = "duty_default_max_assignments_per_month"
+DEFAULT_MAX_ASSIGNMENTS_CACHE_TTL_SECONDS = 300
 
 
 # Cache for operational season boundaries
 _operational_season_cache = {}
-_default_max_assignments_cache = None
 
 
 def clear_operational_season_cache():
     """Clear the operational season cache. Useful for testing."""
-    global _operational_season_cache, _default_max_assignments_cache
+    global _operational_season_cache
     _operational_season_cache.clear()
-    _default_max_assignments_cache = None
+    cache.delete(DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY)
 
 
 def get_default_max_assignments_per_month() -> int:
-    """Return site-configured fallback assignment cap for members without preferences."""
-    global _default_max_assignments_cache
+    """Return site-configured fallback assignment cap for members without preferences.
 
-    if _default_max_assignments_cache is not None:
-        return _default_max_assignments_cache
+    Uses Django cache so updates propagate across workers once SiteConfiguration
+    save/delete hooks clear the shared cache key.
+    """
+    cached_value = cache.get(DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY)
+    if cached_value is not None:
+        return int(cached_value)
 
     try:
         config = SiteConfiguration.objects.first()
-        if config:
-            _default_max_assignments_cache = (
-                config.duty_default_max_assignments_per_month
-            )
-            return _default_max_assignments_cache
+        configured_value = (
+            config.duty_default_max_assignments_per_month
+            if config
+            else DEFAULT_MAX_ASSIGNMENTS
+        )
     except Exception as e:
         logger.warning(
             "Error fetching default max assignments from SiteConfiguration: %s", e
         )
+        configured_value = DEFAULT_MAX_ASSIGNMENTS
 
-    _default_max_assignments_cache = DEFAULT_MAX_ASSIGNMENTS
-    return _default_max_assignments_cache
+    cache.set(
+        DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY,
+        configured_value,
+        timeout=DEFAULT_MAX_ASSIGNMENTS_CACHE_TTL_SECONDS,
+    )
+    return configured_value
 
 
 def get_operational_season_bounds(year: int):
