@@ -12,7 +12,7 @@
       <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-outline-secondary me-2">
         <i class="fas fa-calendar me-1"></i>Calendar
       </a>
-      {% if reservations_enabled and can_reserve %}
+      {% if can_create_reservation %}
         <a href="{% url 'duty_roster:reservation_create' %}" class="btn btn-primary">
           <i class="fas fa-plus me-1"></i>New Reservation
         </a>
@@ -27,12 +27,12 @@
     <div class="card-body">
       <div class="row align-items-center">
         <div class="col-md-8">
-          <h6 class="mb-1">Reservation Status for {{ current_year }}</h6>
+          <h6 class="mb-1">Reservation Status for {{ current_period_label }}</h6>
           <p class="mb-0 text-muted">
-            {% if max_per_year > 0 %}
-              You have used <strong>{{ current_year_count }}</strong> of <strong>{{ max_per_year }}</strong> reservations this year.
+            {% if max_per_period > 0 %}
+              You have used <strong>{{ current_period_count }}</strong> of <strong>{{ max_per_period }}</strong> reservations this {{ primary_period_unit }}.
             {% else %}
-              Unlimited yearly reservations available.
+              Unlimited {{ primary_period_unit }}ly reservations available.
             {% endif %}
             {% if max_per_month > 0 %}
               <br>You have used <strong>{{ current_month_count }}</strong> of <strong>{{ max_per_month }}</strong> reservations this month.
@@ -42,7 +42,7 @@
         <div class="col-md-4 text-md-end">
           {% if not reservations_enabled %}
             <span class="badge bg-secondary fs-6">Reservations Disabled</span>
-          {% elif not can_reserve %}
+          {% elif at_primary_period_limit or at_monthly_limit %}
             <span class="badge bg-warning text-dark fs-6">Limit Reached</span>
           {% else %}
             <span class="badge bg-success fs-6">Available</span>
@@ -107,7 +107,7 @@
       {% else %}
         <p class="text-muted mb-0">
           <i class="fas fa-info-circle me-1"></i>No upcoming reservations.
-          {% if reservations_enabled and can_reserve %}
+          {% if can_create_reservation %}
             <a href="{% url 'duty_roster:reservation_create' %}">Make a reservation</a>
           {% endif %}
         </p>

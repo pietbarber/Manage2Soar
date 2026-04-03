@@ -14,12 +14,13 @@ import logging
 from datetime import date, timedelta
 
 from django.contrib import messages
+from django.db import transaction
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from members.decorators import active_member_required
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 
 from .forms import GliderReservationCancelForm, GliderReservationForm
 from .models import GliderReservation
@@ -59,15 +60,41 @@ def reservation_list(request):
         .order_by("-date")[:20]
     )
 
-    # Get yearly reservation counts
+    # Get reservation counts for status card
     yearly_counts = GliderReservation.get_reservations_by_year(member)
     current_year_count = yearly_counts.get(today.year, 0)
     current_month_count = GliderReservation.get_member_monthly_count(member)
 
     config = SiteConfiguration.objects.first()
+    reservation_limit_period = (
+        config.reservation_limit_period if config else ReservationLimitPeriod.YEARLY
+    )
     max_per_year = config.max_reservations_per_year if config else 3
     max_per_month = config.max_reservations_per_month if config else 0
-    can_reserve, message = GliderReservation.can_member_reserve(member)
+
+    if reservation_limit_period == ReservationLimitPeriod.QUARTERLY:
+        current_quarter = ((today.month - 1) // 3) + 1
+        current_period_label = f"Q{current_quarter} {today.year}"
+        current_period_count = GliderReservation.get_member_quarterly_count(
+            member,
+            year=today.year,
+            quarter=current_quarter,
+        )
+        primary_period_unit = "quarter"
+    else:
+        current_period_label = str(today.year)
+        current_period_count = current_year_count
+        primary_period_unit = "year"
+
+    # Only show current-period capacity status here; do not treat this as
+    # global create eligibility because users may reserve in a future period.
+    at_primary_period_limit = False
+    if max_per_year > 0 and current_period_count >= max_per_year:
+        at_primary_period_limit = True
+
+    at_monthly_limit = False
+    if max_per_month > 0 and current_month_count >= max_per_month:
+        at_monthly_limit = True
 
     context = {
         "upcoming": upcoming,
@@ -78,8 +105,15 @@ def reservation_list(request):
         "current_year": today.year,
         "current_month": today.month,
         "max_per_year": max_per_year,
+        "max_per_period": max_per_year,
+        "reservation_limit_period": reservation_limit_period,
+        "current_period_label": current_period_label,
+        "current_period_count": current_period_count,
+        "primary_period_unit": primary_period_unit,
         "max_per_month": max_per_month,
-        "can_reserve": can_reserve,
+        "can_create_reservation": config.allow_glider_reservations if config else False,
+        "at_primary_period_limit": at_primary_period_limit,
+        "at_monthly_limit": at_monthly_limit,
         "reservations_enabled": config.allow_glider_reservations if config else False,
     }
 
@@ -95,54 +129,94 @@ def reservation_create(request, year=None, month=None, day=None):
     member = request.user
     config = SiteConfiguration.objects.first()
 
+    target_year = None
+    target_month = None
+    if request.method == "POST":
+        posted_date = request.POST.get("date")
+        if posted_date:
+            try:
+                target_date = date.fromisoformat(posted_date)
+                target_year = target_date.year
+                target_month = target_date.month
+            except ValueError:
+                pass
+    elif year is not None and month is not None:
+        try:
+            parsed_year = int(year)
+            parsed_month = int(month)
+            parsed_day = int(day) if day is not None else 1
+            target_date = date(parsed_year, parsed_month, parsed_day)
+            target_year = target_date.year
+            target_month = target_date.month
+        except (TypeError, ValueError):
+            messages.error(request, "Invalid reservation date.")
+            return redirect("duty_roster:reservation_list")
+
     # Check if reservations are enabled
     if not config or not config.allow_glider_reservations:
         messages.error(request, "Glider reservations are currently disabled.")
         return redirect("duty_roster:reservation_list")
 
-    # Check if member can make a reservation
-    can_reserve, message = GliderReservation.can_member_reserve(member)
-    if not can_reserve:
-        messages.warning(request, message)
-        return redirect("duty_roster:reservation_list")
+    # Pre-check limits only when a target date is known; otherwise let the user
+    # open the form and rely on date-aware validation at submit time.
+    if target_year is not None and target_month is not None:
+        try:
+            can_reserve, message = GliderReservation.can_member_reserve(
+                member,
+                year=target_year,
+                month=target_month,
+            )
+        except ValueError:
+            messages.error(
+                request,
+                "Invalid reservation period specified. Please choose a valid month.",
+            )
+            return redirect("duty_roster:reservation_list")
+        if not can_reserve:
+            messages.warning(request, message)
+            return redirect("duty_roster:reservation_list")
 
     if request.method == "POST":
-        form = GliderReservationForm(request.POST, member=member)
-        if form.is_valid():
-            reservation = form.save()
-            # Check if save was actually successful (form.save() may add errors without raising)
-            if reservation.pk:
-                expired_deadlines = []
-                if reservation.glider:
-                    expired_deadlines = list(
-                        reservation.glider.get_expired_maintenance_deadlines()
-                    )
+        # Hold member-limit locks across validation and insert to avoid races.
+        with transaction.atomic():
+            form = GliderReservationForm(request.POST, member=member)
+            if form.is_valid():
+                reservation = form.save()
+                # Check if save was actually successful (form.save() may add errors without raising)
+                if reservation.pk:
+                    expired_deadlines = []
+                    if reservation.glider:
+                        expired_deadlines = list(
+                            reservation.glider.get_expired_maintenance_deadlines()
+                        )
 
-                if expired_deadlines:
-                    overdue_items = ", ".join(
-                        f"{d.description_label} (due {d.due_date:%b %d, %Y})"
-                        for d in expired_deadlines
+                    if expired_deadlines:
+                        overdue_items = ", ".join(
+                            f"{d.description_label} (due {d.due_date:%b %d, %Y})"
+                            for d in expired_deadlines
+                        )
+                        messages.warning(
+                            request,
+                            "Warning: this aircraft has expired maintenance deadlines: "
+                            f"{overdue_items}. Please confirm with operations staff before flying.",
+                        )
+
+                    # Defensive programming: ensure glider exists before displaying
+                    glider_display = (
+                        str(reservation.glider)
+                        if reservation.glider
+                        else "Unknown glider"
                     )
-                    messages.warning(
+                    messages.success(
                         request,
-                        "Warning: this aircraft has expired maintenance deadlines: "
-                        f"{overdue_items}. Please confirm with operations staff before flying.",
+                        f"Reservation confirmed for {glider_display} on {reservation.date}.",
                     )
-
-                # Defensive programming: ensure glider exists before displaying
-                glider_display = (
-                    str(reservation.glider) if reservation.glider else "Unknown glider"
-                )
-                messages.success(
-                    request,
-                    f"Reservation confirmed for {glider_display} on {reservation.date}.",
-                )
-                logger.info(
-                    f"Reservation created: {member.full_display_name} reserved "
-                    f"{glider_display} for {reservation.date}"
-                )
-                return redirect("duty_roster:reservation_list")
-            # If save failed (pk is None), form has errors - fall through to re-render
+                    logger.info(
+                        f"Reservation created: {member.full_display_name} reserved "
+                        f"{glider_display} for {reservation.date}"
+                    )
+                    return redirect("duty_roster:reservation_list")
+                # If save failed (pk is None), form has errors - fall through to re-render
     else:
         # Pre-fill date if provided in URL
         initial = {}
@@ -204,6 +278,8 @@ def reservation_create(request, year=None, month=None, day=None):
         "selected_glider": selected_glider,
         "selected_glider_expired_deadlines": selected_glider_expired_deadlines,
         "max_per_year": config.max_reservations_per_year,
+        "max_per_period": config.max_reservations_per_year,
+        "reservation_limit_period": config.reservation_limit_period,
     }
 
     return render(request, "duty_roster/reservations/create.html", context)
@@ -289,11 +365,17 @@ def day_reservations(request, year, month, day):
         return HttpResponseBadRequest("Invalid date")
 
     reservations = GliderReservation.get_reservations_for_date(target_date)
+    config = SiteConfiguration.objects.first()
 
     context = {
         "reservations": reservations,
         "date": target_date,
-        "can_reserve": GliderReservation.can_member_reserve(request.user)[0],
+        "can_reserve": GliderReservation.can_member_reserve(
+            request.user,
+            year=target_date.year,
+            month=target_date.month,
+            config=config,
+        )[0],
     }
 
     return render(request, "duty_roster/reservations/_day_reservations.html", context)

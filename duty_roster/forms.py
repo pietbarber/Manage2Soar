@@ -8,7 +8,7 @@ from tinymce.widgets import TinyMCE
 from logsheet.models import Glider, MaintenanceIssue
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 
 from .models import (
     DutyAssignment,
@@ -703,30 +703,57 @@ class GliderReservationForm(forms.ModelForm):
                     "date", "Reservation date must be today or in the future."
                 )
 
-        # Check for yearly reservation limits (use transaction to prevent race conditions)
+        # Check reservation limits (use transaction to prevent race conditions)
         if self.member and date:
             with transaction.atomic():
-                # Lock the member's reservations for this year to prevent concurrent modifications
+                # Lock a deterministic row to serialize reservation-cap checks for
+                # this member and avoid phantom inserts bypassing count limits.
+                Member.objects.select_for_update().filter(pk=self.member.pk).exists()
+
+                config = SiteConfiguration.objects.first()
+                reservation_limit = getattr(config, "max_reservations_per_year", 3)
+                reservation_limit_period = getattr(
+                    config,
+                    "reservation_limit_period",
+                    ReservationLimitPeriod.YEARLY,
+                )
+
+                # Lock the member's reservations for the active policy period.
                 reservations_qs = GliderReservation.objects.filter(
                     member=self.member,
-                    date__year=date.year,
                     status__in=["confirmed", "completed"],
-                ).select_for_update()
+                )
+                if reservation_limit_period == ReservationLimitPeriod.QUARTERLY:
+                    quarter = ((date.month - 1) // 3) + 1
+                    start_month = ((quarter - 1) * 3) + 1
+                    end_month = start_month + 2
+                    reservations_qs = reservations_qs.filter(
+                        date__year=date.year,
+                        date__month__gte=start_month,
+                        date__month__lte=end_month,
+                    )
+                else:
+                    reservations_qs = reservations_qs.filter(date__year=date.year)
+
+                reservations_qs = reservations_qs.select_for_update()
 
                 # Exclude the current instance if editing (not creating)
                 if self.instance and self.instance.pk:
                     reservations_qs = reservations_qs.exclude(pk=self.instance.pk)
 
-                # Get the reservation limit from SiteConfiguration or set a sensible default
-                config = SiteConfiguration.objects.first()
-                reservation_limit = getattr(config, "max_reservations_per_year", 3)
                 current_count = reservations_qs.count()
                 # Skip limit check if reservation_limit is 0 (unlimited)
                 if reservation_limit > 0 and current_count >= reservation_limit:
-                    self.add_error(
-                        None,
-                        f"You have reached the maximum of {reservation_limit} reservations for {date.year}.",
-                    )
+                    if reservation_limit_period == ReservationLimitPeriod.QUARTERLY:
+                        self.add_error(
+                            None,
+                            f"You have reached the maximum of {reservation_limit} reservations for Q{quarter} {date.year}.",
+                        )
+                    else:
+                        self.add_error(
+                            None,
+                            f"You have reached the maximum of {reservation_limit} reservations for {date.year}.",
+                        )
 
                 # Check for monthly reservation limits
                 monthly_limit = config.max_reservations_per_month if config else 0

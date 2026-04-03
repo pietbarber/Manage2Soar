@@ -177,7 +177,11 @@
         <div class="card-body">
           <ul class="small mb-0">
             <li>Reservations are for fun flying only (solo, badge flights, guest flying).</li>
-            <li>Maximum of <strong>{{ max_per_year }}</strong> reservations per year{% if max_per_year == 0 %} (unlimited){% endif %}.</li>
+            <li>
+              Maximum of <strong>{{ max_per_period }}</strong> reservations per
+              {% if reservation_limit_period == "quarterly" %}quarter{% else %}year{% endif %}
+              {% if max_per_period == 0 %} (unlimited){% endif %}.
+            </li>
             <li>Grounded aircraft cannot be reserved.</li>
             <li>Expired maintenance deadlines may still allow reservation but require operations review.</li>
             <li>Please cancel promptly if your plans change.</li>

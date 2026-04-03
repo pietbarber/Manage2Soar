@@ -39,6 +39,13 @@ class MailingListCriterion(models.TextChoices):
     PRIVATE_GLIDER_OWNER = "private_glider_owner", "Private Glider Owner"
 
 
+class ReservationLimitPeriod(models.TextChoices):
+    """Primary reservation-cap period for glider reservations."""
+
+    YEARLY = "yearly", "Yearly"
+    QUARTERLY = "quarterly", "Quarterly"
+
+
 class MailingList(models.Model):
     """
     Configurable mailing list definitions for the club email system.
@@ -378,7 +385,16 @@ class SiteConfiguration(models.Model):
     )
     max_reservations_per_year = models.PositiveIntegerField(
         default=3,
-        help_text="Maximum number of glider reservations a member can make per calendar year (default: 3). Set to 0 for unlimited.",
+        help_text=(
+            "Maximum number of glider reservations a member can make per "
+            "primary reservation limit period (default: 3). Set to 0 for unlimited."
+        ),
+    )
+    reservation_limit_period = models.CharField(
+        max_length=20,
+        choices=tuple(ReservationLimitPeriod.choices),
+        default=ReservationLimitPeriod.YEARLY,
+        help_text="Primary reservation limit period. Set to yearly or quarterly. Existing clubs default to yearly.",
     )
     max_reservations_per_month = models.PositiveIntegerField(
         default=0,

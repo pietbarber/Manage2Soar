@@ -36,6 +36,7 @@ def site_config(db):
     config.allow_glider_reservations = True
     config.allow_two_seater_reservations = True
     config.max_reservations_per_year = 3
+    config.reservation_limit_period = "yearly"
     config.save()
     return config
 
@@ -295,6 +296,81 @@ class TestGliderReservationModel:
         )
         assert can_reserve is False
         assert "month" in message.lower()
+
+    def test_quarterly_count(self, site_config, member, glider):
+        """Test getting quarterly reservation count for a member."""
+        # Two reservations in Q2, one in Q3
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=timezone.datetime(2026, 4, 10).date(),
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=timezone.datetime(2026, 6, 20).date(),
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=timezone.datetime(2026, 7, 1).date(),
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        q2_count = GliderReservation.get_member_quarterly_count(member, 2026, 2)
+        q3_count = GliderReservation.get_member_quarterly_count(member, 2026, 3)
+        assert q2_count == 2
+        assert q3_count == 1
+
+    def test_quarterly_count_invalid_quarter_raises(self, site_config, member):
+        """Quarterly helper should fail fast for invalid quarter values."""
+        with pytest.raises(ValueError, match="quarter must be between 1 and 4"):
+            GliderReservation.get_member_quarterly_count(member, year=2026, quarter=0)
+
+    def test_quarterly_count_invalid_month_raises(self, site_config, member):
+        """Quarterly helper should fail fast for invalid month values."""
+        with pytest.raises(ValueError, match="month must be between 1 and 12"):
+            GliderReservation.get_member_quarterly_count(member, year=2026, month=0)
+
+    def test_can_member_reserve_with_quarterly_limit(self, site_config, member, glider):
+        """Test quarterly reservation limit enforcement."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 2
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        # Create reservations in Q2 up to limit
+        for day in (10, 20):
+            GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=timezone.datetime(2026, 4, day).date(),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+
+        can_reserve, message = GliderReservation.can_member_reserve(
+            member, year=2026, month=5
+        )
+        assert can_reserve is False
+        assert "Q2 2026" in message
+
+    def test_can_member_reserve_invalid_month_raises_in_quarterly_mode(
+        self, site_config, member
+    ):
+        """Invalid explicit month should not be treated as missing input."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 3
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        with pytest.raises(ValueError, match="month must be between 1 and 12"):
+            GliderReservation.can_member_reserve(member, year=2026, month=0)
 
     def test_monthly_limit_unlimited(self, site_config, member, glider, future_date):
         """Test unlimited monthly reservations when max_per_month is 0."""
@@ -648,10 +724,10 @@ class TestGliderReservationViews:
         # Should redirect with message
         assert response.status_code == 302
 
-    def test_reservation_create_at_limit(
+    def test_reservation_create_with_no_target_date_not_blocked_at_limit(
         self, client, site_config, member, glider, future_date
     ):
-        """Test that reservation create redirects when at limit."""
+        """Create view should load when no target date is provided."""
         # Create max reservations
         for i in range(site_config.max_reservations_per_year):
             GliderReservation.objects.create(
@@ -665,8 +741,130 @@ class TestGliderReservationViews:
         client.force_login(member)
         url = reverse("duty_roster:reservation_create")
         response = client.get(url)
-        # Should redirect with message
+        assert response.status_code == 200
+        assert "form" in response.context
+
+    def test_reservation_create_for_day_blocks_when_target_period_at_limit(
+        self, client, site_config, member, glider, future_date
+    ):
+        """Date-prefilled create view should enforce period limits for that date."""
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        url = reverse(
+            "duty_roster:reservation_create_for_day",
+            args=[future_date.year, future_date.month, future_date.day],
+        )
+        response = client.get(url)
         assert response.status_code == 302
+
+    def test_reservation_create_for_day_invalid_month_redirects_safely(
+        self, client, site_config, member
+    ):
+        """Invalid URL month should not raise server error during pre-check."""
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_create_for_day", args=[2026, 0, 1])
+        response = client.get(url)
+
+        assert response.status_code == 302
+
+    def test_reservation_create_for_day_out_of_range_month_redirects_safely(
+        self, client, site_config, member
+    ):
+        """Out-of-range URL month should redirect safely without server error."""
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_create_for_day", args=[2026, 13, 1])
+        response = client.get(url)
+
+        assert response.status_code == 302
+
+    def test_reservation_create_for_future_quarter_not_blocked_by_current_quarter_limit(
+        self, client, site_config, member, glider
+    ):
+        """Quarterly caps should be evaluated against the target reservation quarter."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        today = timezone.now().date()
+        current_quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        current_quarter_date = today.replace(month=current_quarter_start_month, day=1)
+
+        # Fill current quarter to the limit.
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=current_quarter_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        # Target a date in a future quarter.
+        if today.month <= 9:
+            future_quarter_date = today.replace(month=today.month + 3, day=1)
+        else:
+            future_quarter_date = today.replace(year=today.year + 1, month=1, day=1)
+
+        client.force_login(member)
+        url = reverse(
+            "duty_roster:reservation_create_for_day",
+            args=[
+                future_quarter_date.year,
+                future_quarter_date.month,
+                future_quarter_date.day,
+            ],
+        )
+        response = client.get(url)
+
+        assert response.status_code == 200
+        assert "form" in response.context
+
+    def test_day_reservations_uses_target_period_for_can_reserve(
+        self, client, site_config, member, glider
+    ):
+        """Day detail CTA eligibility should be based on viewed day, not current period."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        today = timezone.now().date()
+        current_quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        current_quarter_date = today.replace(month=current_quarter_start_month, day=1)
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=current_quarter_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        if today.month <= 9:
+            target_date = today.replace(month=today.month + 3, day=1)
+        else:
+            target_date = today.replace(year=today.year + 1, month=1, day=1)
+
+        client.force_login(member)
+        url = reverse(
+            "duty_roster:day_reservations",
+            args=[target_date.year, target_date.month, target_date.day],
+        )
+        response = client.get(url)
+
+        assert response.status_code == 200
+        assert "Reserve a Glider" in response.content.decode("utf-8")
 
     def test_reservation_create_shows_warning_for_expired_deadline(
         self, client, site_config, member, glider, future_date
@@ -738,6 +936,107 @@ class TestGliderReservationViews:
         # Check that error message mentions month
         errors_str = str(form.errors)
         assert "month" in errors_str.lower() or "maximum" in errors_str.lower()
+
+    def test_reservation_form_blocks_quarterly_limit(self, site_config, member, glider):
+        """Test that form validation blocks reservations at quarterly limit."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        existing_date = timezone.datetime(2026, 8, 5).date()  # Q3
+        attempted_date = timezone.datetime(2026, 9, 5).date()  # Same Q3
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=existing_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        form = GliderReservationForm(
+            data={
+                "glider": glider.pk,
+                "date": attempted_date,
+                "reservation_type": "solo",
+                "time_preference": "afternoon",
+            },
+            member=member,
+        )
+
+        assert form.is_valid() is False
+        assert "Q3 2026" in str(form.errors)
+
+    def test_reservation_list_shows_quarterly_period_label(
+        self, client, site_config, member, glider
+    ):
+        """Reservation list should show quarter label when quarterly policy is selected."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 3
+        site_config.save()
+
+        client.force_login(member)
+        response = client.get(reverse("duty_roster:reservation_list"))
+
+        assert response.status_code == 200
+        assert "Reservation Status for Q" in response.content.decode("utf-8")
+
+    def test_reservation_list_keeps_create_cta_when_current_quarter_limit_reached(
+        self, client, site_config, member, glider
+    ):
+        """List page should still show create CTA while indicating current-period cap."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        today = timezone.now().date()
+        current_quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        quarter_date = today.replace(month=current_quarter_start_month, day=1)
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=quarter_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(reverse("duty_roster:reservation_list"))
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "New Reservation" in content
+        assert "Limit Reached" in content
+
+    def test_reservation_list_shows_limit_reached_when_monthly_limit_hit(
+        self, client, site_config, member, glider
+    ):
+        """Status badge should reflect monthly limit saturation."""
+        site_config.reservation_limit_period = "yearly"
+        site_config.max_reservations_per_year = 10
+        site_config.max_reservations_per_month = 1
+        site_config.save()
+
+        today = timezone.now().date()
+        reservation_date = today + timedelta(days=1)
+        if reservation_date.month != today.month:
+            reservation_date = today.replace(day=1)
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=reservation_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(reverse("duty_roster:reservation_list"))
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Limit Reached" in content
 
 
 class TestGetReservationsForDate:
