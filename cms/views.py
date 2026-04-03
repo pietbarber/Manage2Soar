@@ -454,10 +454,13 @@ def contact(request):
             # Silently discard submissions that match configured spam keywords
             # so bots cannot infer filtering behavior.
             if _is_spam_contact_submission(contact_submission, site_config):
+                log_safe_subject = (
+                    contact_submission.subject.replace("\r", " ").replace("\n", " ")
+                )[:120]
                 logger.warning(
                     "Contact form spam keyword match. Email: %s, Subject: %s",
                     contact_submission.email,
-                    contact_submission.subject[:120],
+                    log_safe_subject,
                 )
                 return redirect("contact_success")
 
