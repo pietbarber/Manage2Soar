@@ -866,9 +866,15 @@ class GliderReservation(models.Model):
         if year is None:
             year = now.year
 
+        if month is not None and not 1 <= month <= 12:
+            raise ValueError("month must be between 1 and 12")
+
         if quarter is None:
-            quarter_source_month = month or now.month
+            quarter_source_month = month if month is not None else now.month
             quarter = ((quarter_source_month - 1) // 3) + 1
+
+        if not 1 <= quarter <= 4:
+            raise ValueError("quarter must be between 1 and 4")
 
         start_month = ((quarter - 1) * 3) + 1
         end_month = start_month + 2
@@ -933,8 +939,10 @@ class GliderReservation(models.Model):
         )
         if max_per_period > 0:
             if reservation_limit_period == ReservationLimitPeriod.QUARTERLY:
-                target_year = year or timezone.now().year
-                target_month = month or timezone.now().month
+                target_year = year if year is not None else timezone.now().year
+                target_month = month if month is not None else timezone.now().month
+                if not 1 <= target_month <= 12:
+                    raise ValueError("month must be between 1 and 12")
                 quarter = ((target_month - 1) // 3) + 1
                 current_count = cls.get_member_quarterly_count(
                     member,
@@ -947,7 +955,7 @@ class GliderReservation(models.Model):
                         f"You have reached your limit of {max_per_period} reservations for Q{quarter} {target_year}.",
                     )
             else:
-                target_year = year or timezone.now().year
+                target_year = year if year is not None else timezone.now().year
                 current_count = cls.get_member_yearly_count(member, target_year)
                 if current_count >= max_per_period:
                     return (

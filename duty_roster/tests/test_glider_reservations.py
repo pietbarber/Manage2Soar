@@ -327,6 +327,16 @@ class TestGliderReservationModel:
         assert q2_count == 2
         assert q3_count == 1
 
+    def test_quarterly_count_invalid_quarter_raises(self, site_config, member):
+        """Quarterly helper should fail fast for invalid quarter values."""
+        with pytest.raises(ValueError, match="quarter must be between 1 and 4"):
+            GliderReservation.get_member_quarterly_count(member, year=2026, quarter=0)
+
+    def test_quarterly_count_invalid_month_raises(self, site_config, member):
+        """Quarterly helper should fail fast for invalid month values."""
+        with pytest.raises(ValueError, match="month must be between 1 and 12"):
+            GliderReservation.get_member_quarterly_count(member, year=2026, month=0)
+
     def test_can_member_reserve_with_quarterly_limit(self, site_config, member, glider):
         """Test quarterly reservation limit enforcement."""
         site_config.reservation_limit_period = "quarterly"
@@ -349,6 +359,18 @@ class TestGliderReservationModel:
         )
         assert can_reserve is False
         assert "Q2 2026" in message
+
+    def test_can_member_reserve_invalid_month_raises_in_quarterly_mode(
+        self, site_config, member
+    ):
+        """Invalid explicit month should not be treated as missing input."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 3
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        with pytest.raises(ValueError, match="month must be between 1 and 12"):
+            GliderReservation.can_member_reserve(member, year=2026, month=0)
 
     def test_monthly_limit_unlimited(self, site_config, member, glider, future_date):
         """Test unlimited monthly reservations when max_per_month is 0."""
