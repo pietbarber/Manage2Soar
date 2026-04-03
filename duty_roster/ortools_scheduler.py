@@ -12,7 +12,7 @@ Phase 2 Implementation: Full production constraints matching legacy scheduler be
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from ortools.sat.python import cp_model
@@ -23,18 +23,35 @@ from duty_roster.models import (
     DutyPreference,
     MemberBlackout,
 )
-from duty_roster.roster_generator import calculate_assignment_cap
+from duty_roster.roster_generator import (
+    calculate_assignment_cap,
+    get_default_max_assignments_per_month,
+)
 from members.models import Member
 
 logger = logging.getLogger("duty_roster.ortools_scheduler")
 
 
 # Constants
-DEFAULT_MAX_ASSIGNMENTS = 8  # For members without DutyPreference
 PAIRING_MULTIPLIER = 3  # Weight multiplier for preferred pairings
 FAIRNESS_PENALTY_WEIGHT = (
     200  # Weight for penalizing deviation from average assignments
 )
+MAX_ASSIGNMENT_CONCENTRATION_WEIGHT = (
+    120  # Extra penalty for high single-member assignment concentration
+)
+WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS = {
+    1: 60,
+    2: 20,
+    3: 5,
+}
+WEEKEND_SPACING_CONSISTENCY_WEIGHT = 4
+# Keep this high enough that spacing preferences remain active for typical
+# month-sized schedules with several eligible members.
+MAX_WEEKEND_SPACING_PAIR_TERMS = 1200
+# Avoid adding spacing soft-terms on very large models where objective expansion
+# can dominate solve time.
+MAX_WEEKEND_SPACING_DECISION_VARS = 500
 
 
 @dataclass
@@ -207,30 +224,34 @@ class DutyRosterScheduler:
 
         Hard constraints MUST be satisfied for a valid solution:
         1. One assignment per slot (100% slot fill)
-        2. Role qualification (member has role flag)
-        3. Don't schedule / suspended flags (handled in variable creation)
-        4. Blackout dates (handled in variable creation)
-        5. Avoidance constraints (can't work with certain members)
-        6. One assignment per day (no double-booking)
-        7. Anti-repeat constraint (no same role on consecutive days)
-        8. Role percentage zero (handled in variable creation for most cases)
-        9. Max assignments per month
+        2. Avoidance constraints (can't work with certain members)
+        3. One assignment per day (no double-booking)
+        4. Anti-repeat constraint (no same role on consecutive days)
+        5. Adjacent-weekend spacing for opted-out members
+        6. Max assignments per month
+
+        Additional eligibility constraints (role qualification, blackout,
+        dont_schedule/suspended, and role-percentage gating) are enforced during
+        sparse decision-variable creation.
         """
         logger.info("Adding hard constraints...")
 
         # Constraint 1: One assignment per slot
         self._add_one_assignment_per_slot()
 
-        # Constraint 5: Avoidance constraints
+        # Constraint 2: Avoidance constraints
         self._add_avoidance_constraints()
 
-        # Constraint 6: One assignment per day
+        # Constraint 3: One assignment per day
         self._add_one_assignment_per_day()
 
-        # Constraint 7: Anti-repeat constraint
+        # Constraint 4: Anti-repeat constraint
         self._add_anti_repeat_constraints()
 
-        # Constraint 9: Max assignments per month
+        # Constraint 5: Adjacent-weekend spacing for members who opt out
+        self._add_adjacent_weekend_spacing_constraints()
+
+        # Constraint 6: Max assignments per month
         self._add_max_assignments_constraints()
 
         logger.info("Hard constraints added successfully")
@@ -335,16 +356,67 @@ class DutyRosterScheduler:
                             # Constraint: can't do same role on both days
                             self.model.Add(self.x[key1] + self.x[key2] <= 1)
 
+    def _has_adjacent_weekday_pairs(self) -> bool:
+        """Return True when any duty day has a matching day exactly 7 days later."""
+        duty_day_set = set(self.data.duty_days)
+        return any((day + timedelta(days=7)) in duty_day_set for day in duty_day_set)
+
+    def _member_allows_weekend_double(self, member_id: int) -> bool:
+        """Return effective weekend-double opt-in state for a member."""
+        pref = self.data.preferences.get(member_id)
+        return bool(pref and pref.allow_weekend_double)
+
+    def _add_adjacent_weekend_spacing_constraints(self):
+        """
+        Constraint: selected members cannot repeat the same role on adjacent weekends.
+
+        For members with allow_weekend_double=False, assignment on weekend N blocks
+        assignment to the same role/day-of-week on weekend N+1.
+
+        This is intentionally narrower than a full "any duty on adjacent weekends"
+        block to reduce infeasibility in sparse rosters while still addressing
+        repetitive same-role assignment patterns.
+        """
+        if len(self.data.duty_days) < 2:
+            return
+
+        if not self._has_adjacent_weekday_pairs():
+            return
+
+        duty_day_set = set(self.data.duty_days)
+        sorted_days = sorted(duty_day_set)
+
+        for member in self.data.members:
+            if self._member_allows_weekend_double(member.id):
+                continue
+
+            for role in self.data.roles:
+                for day1 in sorted_days:
+                    day2 = day1 + timedelta(days=7)
+
+                    # Enforce spacing whenever the same weekday exists on the adjacent weekend,
+                    # regardless of other duty days in between (e.g. Saturday/Sunday schedules).
+                    if day2 not in duty_day_set:
+                        continue
+
+                    key1 = (member.id, role, day1)
+                    key2 = (member.id, role, day2)
+                    if key1 in self.x and key2 in self.x:
+                        self.model.Add(self.x[key1] + self.x[key2] <= 1)
+
     def _add_max_assignments_constraints(self):
         """
         Constraint: Members cannot exceed their max assignments per month.
 
-        Default is 8 for members without DutyPreference.
+        Members without a DutyPreference use the site-configurable default
+        max-assignments-per-month value (defaulting to 8 if not configured).
         """
+        default_monthly_limit = get_default_max_assignments_per_month()
+
         for member in self.data.members:
             pref = self.data.preferences.get(member.id)
             monthly_limit = (
-                pref.max_assignments_per_month if pref else DEFAULT_MAX_ASSIGNMENTS
+                pref.max_assignments_per_month if pref else default_monthly_limit
             )
             max_assignments = calculate_assignment_cap(
                 monthly_limit, self.data.month_span
@@ -378,6 +450,7 @@ class DutyRosterScheduler:
         2. Pairing affinity bonus (members who prefer to work together)
         3. Last duty date balancing (prioritize members who haven't worked recently)
         4. Balanced assignment distribution (minimize variance across members)
+        5. Weekend spacing preference (favor wider, more consistent repeat gaps)
 
         The solver will maximize the sum of these weighted terms while respecting
         all hard constraints.
@@ -481,6 +554,8 @@ class DutyRosterScheduler:
                 f"avg={avg_assignments:.2f} assignments/member"
             )
 
+            member_total_assignment_vars = []
+
             # For each qualified member, penalize deviation from average
             for member in qualified_members:
                 # Collect all assignment variables for this member
@@ -497,6 +572,7 @@ class DutyRosterScheduler:
                         0, total_slots, f"total_assignments_{member.id}"
                     )
                     self.model.Add(total_assignments == sum(member_assignments))
+                    member_total_assignment_vars.append(total_assignments)
 
                     # Calculate deviation from average
                     deviation = self.model.NewIntVar(
@@ -516,9 +592,112 @@ class DutyRosterScheduler:
                     # Weight of 100 makes fairness comparable to preference weights (0-100)
                     objective_terms.append(-FAIRNESS_PENALTY_WEIGHT * abs_deviation)
 
+            if member_total_assignment_vars:
+                # Soft cap concentration by penalizing the single busiest member's load.
+                max_member_load = self.model.NewIntVar(
+                    0, total_slots, "max_member_load"
+                )
+                self.model.AddMaxEquality(max_member_load, member_total_assignment_vars)
+                objective_terms.append(
+                    -MAX_ASSIGNMENT_CONCENTRATION_WEIGHT * max_member_load
+                )
+
+            # Soft constraint 5: Weekend spacing preference and consistency
+            self._add_weekend_spacing_soft_constraints(
+                objective_terms, member_assigned_on_day
+            )
+
         # Set objective: maximize total weighted satisfaction
         self.model.Maximize(sum(objective_terms))
         logger.info(f"Objective function built with {len(objective_terms)} terms")
+
+    def _add_weekend_spacing_soft_constraints(
+        self, objective_terms, member_assigned_on_day
+    ):
+        """Add soft penalties favoring wider and more consistent weekly spacing."""
+        if len(self.data.duty_days) < 2:
+            return
+
+        sorted_days = sorted(set(self.data.duty_days))
+        if len(sorted_days) < 2:
+            return
+
+        if len(self.x) > MAX_WEEKEND_SPACING_DECISION_VARS:
+            logger.info(
+                "Skipping weekend spacing soft objective for this run: "
+                f"{len(self.x)} decision vars exceeds "
+                f"{MAX_WEEKEND_SPACING_DECISION_VARS}"
+            )
+            return
+
+        candidate_pair_terms = 0
+        for member in self.data.members:
+            for day1 in sorted_days:
+                if (member.id, day1) not in member_assigned_on_day:
+                    continue
+
+                for lag_weeks in WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS:
+                    day2 = day1 + timedelta(days=7 * lag_weeks)
+                    if (member.id, day2) in member_assigned_on_day:
+                        candidate_pair_terms += 1
+
+        if candidate_pair_terms > MAX_WEEKEND_SPACING_PAIR_TERMS:
+            logger.info(
+                "Skipping weekend spacing soft objective for this run: "
+                f"{candidate_pair_terms} candidate pair terms exceeds "
+                f"{MAX_WEEKEND_SPACING_PAIR_TERMS}"
+            )
+            return
+
+        member_spacing_burden = {}
+        member_spacing_burden_upper_bound = {}
+
+        for member in self.data.members:
+            burden_terms = []
+
+            for day1 in sorted_days:
+                assigned_day1 = member_assigned_on_day.get((member.id, day1))
+                if assigned_day1 is None:
+                    continue
+
+                for lag_weeks, penalty in WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS.items():
+                    day2 = day1 + timedelta(days=7 * lag_weeks)
+                    assigned_day2 = member_assigned_on_day.get((member.id, day2))
+                    if assigned_day2 is None:
+                        continue
+
+                    repeat_pair = self.model.NewBoolVar(
+                        f"repeat_{member.id}_{day1}_{lag_weeks}w"
+                    )
+                    self.model.AddMultiplicationEquality(
+                        repeat_pair, [assigned_day1, assigned_day2]
+                    )
+
+                    # Smaller gaps incur stronger penalties; 3-week repeats are penalized lightly.
+                    objective_terms.append(-penalty * repeat_pair)
+                    burden_terms.append((penalty, repeat_pair))
+
+            if burden_terms:
+                upper_bound = sum(weight for weight, _ in burden_terms)
+                burden = self.model.NewIntVar(
+                    0, upper_bound, f"spacing_burden_{member.id}"
+                )
+                self.model.Add(
+                    burden
+                    == sum(weight * indicator for weight, indicator in burden_terms)
+                )
+                member_spacing_burden[member.id] = burden
+                member_spacing_burden_upper_bound[member.id] = upper_bound
+
+        # Encourage consistency by minimizing the worst member burden.
+        if member_spacing_burden:
+            max_upper_bound = max(member_spacing_burden_upper_bound.values())
+            max_burden = self.model.NewIntVar(0, max_upper_bound, "spacing_burden_max")
+
+            for burden in member_spacing_burden.values():
+                self.model.Add(max_burden >= burden)
+
+            objective_terms.append(-WEEKEND_SPACING_CONSISTENCY_WEIGHT * max_burden)
 
     def _calculate_preference_weight(self, member: Member, role: str) -> int:
         """
@@ -624,6 +803,7 @@ class DutyRosterScheduler:
             "diagnostics": {
                 "num_conflicts": self.solver.NumConflicts(),
                 "num_branches": self.solver.NumBranches(),
+                "infeasible_hints": [],
             },
         }
 
@@ -633,6 +813,14 @@ class DutyRosterScheduler:
             result["schedule"] = self._build_schedule_from_solution()
         else:
             result["objective_value"] = None
+            if result["status"] == "INFEASIBLE":
+                if self._has_adjacent_weekday_pairs() and any(
+                    not self._member_allows_weekend_double(member.id)
+                    for member in self.data.members
+                ):
+                    result["diagnostics"]["infeasible_hints"].append(
+                        "Adjacent-weekend same-role spacing constraints may be too strict for available staffing."
+                    )
             logger.error(f"Solver failed with status: {result['status']}")
 
         return result
@@ -824,13 +1012,18 @@ def generate_roster_ortools(
 
     # Check solver status
     if result["status"] not in ("OPTIMAL", "FEASIBLE"):
+        hint_text = ""
+        hints = result.get("diagnostics", {}).get("infeasible_hints", [])
+        if hints:
+            hint_text = f" Hint: {hints[0]}"
+
         logger.error(
             f"OR-Tools scheduler failed: status={result['status']}, "
             f"diagnostics={result['diagnostics']}"
         )
         raise RuntimeError(
             f"OR-Tools solver failed with status: {result['status']}. "
-            "Falling back to legacy algorithm may be required."
+            f"Falling back to legacy algorithm may be required.{hint_text}"
         )
 
     return result["schedule"]

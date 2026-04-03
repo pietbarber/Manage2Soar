@@ -10,7 +10,11 @@
 {% if incomplete %}
   <div class="alert alert-warning">
     ⚠️ Could not fully auto-generate a complete roster for {{ start_date }} to {{ end_date }}.
+    {% if use_ortools_scheduler %}
+    Showing weekend dates so you can review or adjust the date range and use "Generate For Range".
+    {% else %}
     Showing weekend dates so you can review (or try "🔄 Roll Again").
+    {% endif %}
   </div>
 {% endif %}
 
@@ -42,13 +46,29 @@
 
 {% if removed_dates %}
   <div class="alert alert-info">
-    <strong>📌 Removed dates (will stay removed on Roll Again):</strong>
+    <strong>
+      📌 Removed dates
+      {% if use_ortools_scheduler %}
+      (will stay removed on Generate For Range)
+      {% else %}
+      (will stay removed on Roll Again)
+      {% endif %}
+      :
+    </strong>
     <ul class="mb-1">
       {% for rd in removed_dates %}
         <li>{{ rd|date:"l, F j" }}</li>
       {% endfor %}
     </ul>
-    <small class="text-muted">Click "Restore All Dates" below, then "Roll Again" to re-include these dates in the draft roster.</small>
+    <small class="text-muted">
+      Click "Restore All Dates" below, then
+      {% if use_ortools_scheduler %}
+      "Generate For Range"
+      {% else %}
+      "Roll Again"
+      {% endif %}
+      to re-include these dates in the draft roster.
+    </small>
   </div>
 {% endif %}
 
@@ -149,7 +169,7 @@
     </tbody>
   </table>
 
-  {% if draft %}
+  {% if draft and not use_ortools_scheduler %}
   <div class="d-flex gap-2 mb-3">
     <button name="action" value="remove_dates" class="btn btn-warning">🗑️ Remove Selected Dates</button>
     <button name="action" value="roll" class="btn btn-secondary">🔄 Roll Again</button>
