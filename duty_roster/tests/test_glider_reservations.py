@@ -810,6 +810,42 @@ class TestGliderReservationViews:
         assert response.status_code == 200
         assert "form" in response.context
 
+    def test_day_reservations_uses_target_period_for_can_reserve(
+        self, client, site_config, member, glider
+    ):
+        """Day detail CTA eligibility should be based on viewed day, not current period."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        today = timezone.now().date()
+        current_quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        current_quarter_date = today.replace(month=current_quarter_start_month, day=1)
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=current_quarter_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        if today.month <= 9:
+            target_date = today.replace(month=today.month + 3, day=1)
+        else:
+            target_date = today.replace(year=today.year + 1, month=1, day=1)
+
+        client.force_login(member)
+        url = reverse(
+            "duty_roster:day_reservations",
+            args=[target_date.year, target_date.month, target_date.day],
+        )
+        response = client.get(url)
+
+        assert response.status_code == 200
+        assert "Reserve a Glider" in response.content.decode("utf-8")
+
     def test_reservation_create_shows_warning_for_expired_deadline(
         self, client, site_config, member, glider, future_date
     ):

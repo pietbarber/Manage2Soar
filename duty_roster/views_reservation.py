@@ -14,6 +14,7 @@ import logging
 from datetime import date, timedelta
 
 from django.contrib import messages
+from django.db import transaction
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -164,42 +165,46 @@ def reservation_create(request, year=None, month=None, day=None):
             return redirect("duty_roster:reservation_list")
 
     if request.method == "POST":
-        form = GliderReservationForm(request.POST, member=member)
-        if form.is_valid():
-            reservation = form.save()
-            # Check if save was actually successful (form.save() may add errors without raising)
-            if reservation.pk:
-                expired_deadlines = []
-                if reservation.glider:
-                    expired_deadlines = list(
-                        reservation.glider.get_expired_maintenance_deadlines()
-                    )
+        # Hold member-limit locks across validation and insert to avoid races.
+        with transaction.atomic():
+            form = GliderReservationForm(request.POST, member=member)
+            if form.is_valid():
+                reservation = form.save()
+                # Check if save was actually successful (form.save() may add errors without raising)
+                if reservation.pk:
+                    expired_deadlines = []
+                    if reservation.glider:
+                        expired_deadlines = list(
+                            reservation.glider.get_expired_maintenance_deadlines()
+                        )
 
-                if expired_deadlines:
-                    overdue_items = ", ".join(
-                        f"{d.description_label} (due {d.due_date:%b %d, %Y})"
-                        for d in expired_deadlines
+                    if expired_deadlines:
+                        overdue_items = ", ".join(
+                            f"{d.description_label} (due {d.due_date:%b %d, %Y})"
+                            for d in expired_deadlines
+                        )
+                        messages.warning(
+                            request,
+                            "Warning: this aircraft has expired maintenance deadlines: "
+                            f"{overdue_items}. Please confirm with operations staff before flying.",
+                        )
+
+                    # Defensive programming: ensure glider exists before displaying
+                    glider_display = (
+                        str(reservation.glider)
+                        if reservation.glider
+                        else "Unknown glider"
                     )
-                    messages.warning(
+                    messages.success(
                         request,
-                        "Warning: this aircraft has expired maintenance deadlines: "
-                        f"{overdue_items}. Please confirm with operations staff before flying.",
+                        f"Reservation confirmed for {glider_display} on {reservation.date}.",
                     )
-
-                # Defensive programming: ensure glider exists before displaying
-                glider_display = (
-                    str(reservation.glider) if reservation.glider else "Unknown glider"
-                )
-                messages.success(
-                    request,
-                    f"Reservation confirmed for {glider_display} on {reservation.date}.",
-                )
-                logger.info(
-                    f"Reservation created: {member.full_display_name} reserved "
-                    f"{glider_display} for {reservation.date}"
-                )
-                return redirect("duty_roster:reservation_list")
-            # If save failed (pk is None), form has errors - fall through to re-render
+                    logger.info(
+                        f"Reservation created: {member.full_display_name} reserved "
+                        f"{glider_display} for {reservation.date}"
+                    )
+                    return redirect("duty_roster:reservation_list")
+                # If save failed (pk is None), form has errors - fall through to re-render
     else:
         # Pre-fill date if provided in URL
         initial = {}
@@ -348,11 +353,17 @@ def day_reservations(request, year, month, day):
         return HttpResponseBadRequest("Invalid date")
 
     reservations = GliderReservation.get_reservations_for_date(target_date)
+    config = SiteConfiguration.objects.first()
 
     context = {
         "reservations": reservations,
         "date": target_date,
-        "can_reserve": GliderReservation.can_member_reserve(request.user)[0],
+        "can_reserve": GliderReservation.can_member_reserve(
+            request.user,
+            year=target_date.year,
+            month=target_date.month,
+            config=config,
+        )[0],
     }
 
     return render(request, "duty_roster/reservations/_day_reservations.html", context)
