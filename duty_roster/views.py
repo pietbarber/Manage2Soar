@@ -2443,7 +2443,8 @@ def propose_roster(request):
 
                 messages.success(
                     request,
-                    f"Removed {len(dates_to_remove_set)} date(s) from the proposed roster. "(
+                    f"Removed {len(dates_to_remove_set)} date(s) from the proposed roster. "
+                    + (
                         "These dates will stay removed on Generate For Range."
                         if use_ortools_scheduler
                         else "These dates will stay removed on Roll Again."
@@ -2630,7 +2631,8 @@ def propose_roster(request):
             request.session.pop(session_key, None)
             messages.info(
                 request,
-                "All previously removed dates have been restored. "(
+                "All previously removed dates have been restored. "
+                + (
                     "Click Generate For Range to regenerate the full roster."
                     if use_ortools_scheduler
                     else "Click Roll Again to regenerate the full roster."
