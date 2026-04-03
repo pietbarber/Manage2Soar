@@ -702,10 +702,10 @@ class TestGliderReservationViews:
         # Should redirect with message
         assert response.status_code == 302
 
-    def test_reservation_create_at_limit(
+    def test_reservation_create_with_no_target_date_not_blocked_at_limit(
         self, client, site_config, member, glider, future_date
     ):
-        """Test that reservation create redirects when at limit."""
+        """Create view should load when no target date is provided."""
         # Create max reservations
         for i in range(site_config.max_reservations_per_year):
             GliderReservation.objects.create(
@@ -719,7 +719,31 @@ class TestGliderReservationViews:
         client.force_login(member)
         url = reverse("duty_roster:reservation_create")
         response = client.get(url)
-        # Should redirect with message
+        assert response.status_code == 200
+        assert "form" in response.context
+
+    def test_reservation_create_for_day_blocks_when_target_period_at_limit(
+        self, client, site_config, member, glider, future_date
+    ):
+        """Date-prefilled create view should enforce period limits for that date."""
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        url = reverse(
+            "duty_roster:reservation_create_for_day",
+            args=[future_date.year, future_date.month, future_date.day],
+        )
+        response = client.get(url)
         assert response.status_code == 302
 
     def test_reservation_create_for_future_quarter_not_blocked_by_current_quarter_limit(
@@ -879,6 +903,34 @@ class TestGliderReservationViews:
 
         assert response.status_code == 200
         assert "Reservation Status for Q" in response.content.decode("utf-8")
+
+    def test_reservation_list_keeps_create_cta_when_current_quarter_limit_reached(
+        self, client, site_config, member, glider
+    ):
+        """List page should still show create CTA while indicating current-period cap."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 1
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        today = timezone.now().date()
+        current_quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        quarter_date = today.replace(month=current_quarter_start_month, day=1)
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=quarter_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(reverse("duty_roster:reservation_list"))
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "New Reservation" in content
+        assert "Limit Reached" in content
 
 
 class TestGetReservationsForDate:

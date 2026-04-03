@@ -12,7 +12,7 @@
       <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-outline-secondary me-2">
         <i class="fas fa-calendar me-1"></i>Calendar
       </a>
-      {% if reservations_enabled and can_reserve %}
+      {% if can_create_reservation %}
         <a href="{% url 'duty_roster:reservation_create' %}" class="btn btn-primary">
           <i class="fas fa-plus me-1"></i>New Reservation
         </a>
@@ -42,7 +42,7 @@
         <div class="col-md-4 text-md-end">
           {% if not reservations_enabled %}
             <span class="badge bg-secondary fs-6">Reservations Disabled</span>
-          {% elif not can_reserve %}
+          {% elif at_primary_period_limit %}
             <span class="badge bg-warning text-dark fs-6">Limit Reached</span>
           {% else %}
             <span class="badge bg-success fs-6">Available</span>
@@ -107,7 +107,7 @@
       {% else %}
         <p class="text-muted mb-0">
           <i class="fas fa-info-circle me-1"></i>No upcoming reservations.
-          {% if reservations_enabled and can_reserve %}
+          {% if can_create_reservation %}
             <a href="{% url 'duty_roster:reservation_create' %}">Make a reservation</a>
           {% endif %}
         </p>

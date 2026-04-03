@@ -85,7 +85,11 @@ def reservation_list(request):
         current_period_count = current_year_count
         primary_period_unit = "year"
 
-    can_reserve, message = GliderReservation.can_member_reserve(member)
+    # Only show current-period capacity status here; do not treat this as
+    # global create eligibility because users may reserve in a future period.
+    at_primary_period_limit = False
+    if max_per_year > 0 and current_period_count >= max_per_year:
+        at_primary_period_limit = True
 
     context = {
         "upcoming": upcoming,
@@ -102,7 +106,8 @@ def reservation_list(request):
         "current_period_count": current_period_count,
         "primary_period_unit": primary_period_unit,
         "max_per_month": max_per_month,
-        "can_reserve": can_reserve,
+        "can_create_reservation": config.allow_glider_reservations if config else False,
+        "at_primary_period_limit": at_primary_period_limit,
         "reservations_enabled": config.allow_glider_reservations if config else False,
     }
 
@@ -141,15 +146,17 @@ def reservation_create(request, year=None, month=None, day=None):
         messages.error(request, "Glider reservations are currently disabled.")
         return redirect("duty_roster:reservation_list")
 
-    # Check if member can make a reservation
-    can_reserve, message = GliderReservation.can_member_reserve(
-        member,
-        year=target_year,
-        month=target_month,
-    )
-    if not can_reserve:
-        messages.warning(request, message)
-        return redirect("duty_roster:reservation_list")
+    # Pre-check limits only when a target date is known; otherwise let the user
+    # open the form and rely on date-aware validation at submit time.
+    if target_year is not None and target_month is not None:
+        can_reserve, message = GliderReservation.can_member_reserve(
+            member,
+            year=target_year,
+            month=target_month,
+        )
+        if not can_reserve:
+            messages.warning(request, message)
+            return redirect("duty_roster:reservation_list")
 
     if request.method == "POST":
         form = GliderReservationForm(request.POST, member=member)
