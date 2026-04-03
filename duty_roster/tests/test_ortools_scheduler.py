@@ -21,6 +21,7 @@ from duty_roster.models import (
     MemberBlackout,
 )
 from duty_roster.ortools_scheduler import (
+    MAX_ASSIGNMENT_CONCENTRATION_WEIGHT,
     WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS,
     DutyRosterScheduler,
     SchedulingData,
@@ -613,6 +614,85 @@ class ORToolsHardConstraintsTests(TestCase):
             day_schedule["slots"]["instructor"] for day_schedule in result["schedule"]
         ]
         self.assertEqual(assigned_member_ids, [self.member1.id, self.member1.id])
+
+    def test_concentration_penalty_reduces_peak_load_in_two_month_window(self):
+        """Max-load concentration penalty should lower peak assignments when feasible."""
+        # Build a realistic pool similar to tenant-demo constraints: many eligible members,
+        # with a subset marked very stale so baseline objective tends to over-prefer them.
+        members = []
+        for idx in range(20):
+            member = Member.objects.create(
+                username=f"fairness_member_{idx}",
+                email=f"fairness_member_{idx}@test.com",
+                first_name=f"Fair{idx}",
+                last_name="Member",
+                membership_status="Full Member",
+                instructor=True,
+                is_active=True,
+            )
+            members.append(member)
+
+            pref = DutyPreference.objects.create(member=member)
+            pref.instructor_percent = 100
+            pref.max_assignments_per_month = 4
+            if idx < 4:
+                pref.last_duty_date = date(2020, 1, 1)
+            else:
+                pref.last_duty_date = date(2026, 3, 20)
+            pref.save()
+
+        two_month_sundays = [
+            date(2026, 4, 5),
+            date(2026, 4, 12),
+            date(2026, 4, 19),
+            date(2026, 4, 26),
+            date(2026, 5, 3),
+            date(2026, 5, 10),
+            date(2026, 5, 17),
+            date(2026, 5, 24),
+            date(2026, 5, 31),
+        ]
+
+        data = SchedulingData(
+            members=members,
+            duty_days=two_month_sundays,
+            roles=["instructor"],
+            preferences={m.id: DutyPreference.objects.get(member=m) for m in members},
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=two_month_sundays[0],
+            month_span=2,
+        )
+
+        with patch(
+            "duty_roster.ortools_scheduler.MAX_ASSIGNMENT_CONCENTRATION_WEIGHT", 0
+        ):
+            baseline = DutyRosterScheduler(data).solve(timeout_seconds=10.0)
+        tuned = DutyRosterScheduler(data).solve(timeout_seconds=10.0)
+
+        self.assertIn(baseline["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertIn(tuned["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertGreater(MAX_ASSIGNMENT_CONCENTRATION_WEIGHT, 0)
+
+        def _max_assignments(result):
+            counts = {}
+            for day in result["schedule"]:
+                for member_id in day["slots"].values():
+                    if member_id is None:
+                        continue
+                    counts[member_id] = counts.get(member_id, 0) + 1
+            return max(counts.values()) if counts else 0
+
+        baseline_peak = _max_assignments(baseline)
+        tuned_peak = _max_assignments(tuned)
+
+        self.assertLessEqual(
+            tuned_peak,
+            baseline_peak,
+            f"Expected tuned objective to reduce or match peak load; baseline={baseline_peak}, tuned={tuned_peak}",
+        )
 
     def test_adjacent_weekend_spacing_can_make_schedule_infeasible(self):
         """Adjacent-weekend spacing should fail clearly when staffing cannot satisfy it."""

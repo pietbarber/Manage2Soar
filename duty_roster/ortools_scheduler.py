@@ -37,6 +37,9 @@ PAIRING_MULTIPLIER = 3  # Weight multiplier for preferred pairings
 FAIRNESS_PENALTY_WEIGHT = (
     200  # Weight for penalizing deviation from average assignments
 )
+MAX_ASSIGNMENT_CONCENTRATION_WEIGHT = (
+    120  # Extra penalty for high single-member assignment concentration
+)
 WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS = {
     1: 60,
     2: 20,
@@ -551,6 +554,8 @@ class DutyRosterScheduler:
                 f"avg={avg_assignments:.2f} assignments/member"
             )
 
+            member_total_assignment_vars = []
+
             # For each qualified member, penalize deviation from average
             for member in qualified_members:
                 # Collect all assignment variables for this member
@@ -567,6 +572,7 @@ class DutyRosterScheduler:
                         0, total_slots, f"total_assignments_{member.id}"
                     )
                     self.model.Add(total_assignments == sum(member_assignments))
+                    member_total_assignment_vars.append(total_assignments)
 
                     # Calculate deviation from average
                     deviation = self.model.NewIntVar(
@@ -585,6 +591,16 @@ class DutyRosterScheduler:
                     # Penalize deviation (negative weight to minimize in maximization objective)
                     # Weight of 100 makes fairness comparable to preference weights (0-100)
                     objective_terms.append(-FAIRNESS_PENALTY_WEIGHT * abs_deviation)
+
+            if member_total_assignment_vars:
+                # Soft cap concentration by penalizing the single busiest member's load.
+                max_member_load = self.model.NewIntVar(
+                    0, total_slots, "max_member_load"
+                )
+                self.model.AddMaxEquality(max_member_load, member_total_assignment_vars)
+                objective_terms.append(
+                    -MAX_ASSIGNMENT_CONCENTRATION_WEIGHT * max_member_load
+                )
 
             # Soft constraint 5: Weekend spacing preference and consistency
             self._add_weekend_spacing_soft_constraints(
