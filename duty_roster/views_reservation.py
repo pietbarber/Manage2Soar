@@ -91,6 +91,10 @@ def reservation_list(request):
     if max_per_year > 0 and current_period_count >= max_per_year:
         at_primary_period_limit = True
 
+    at_monthly_limit = False
+    if max_per_month > 0 and current_month_count >= max_per_month:
+        at_monthly_limit = True
+
     context = {
         "upcoming": upcoming,
         "past": past,
@@ -108,6 +112,7 @@ def reservation_list(request):
         "max_per_month": max_per_month,
         "can_create_reservation": config.allow_glider_reservations if config else False,
         "at_primary_period_limit": at_primary_period_limit,
+        "at_monthly_limit": at_monthly_limit,
         "reservations_enabled": config.allow_glider_reservations if config else False,
     }
 

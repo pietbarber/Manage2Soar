@@ -42,7 +42,7 @@
         <div class="col-md-4 text-md-end">
           {% if not reservations_enabled %}
             <span class="badge bg-secondary fs-6">Reservations Disabled</span>
-          {% elif at_primary_period_limit %}
+          {% elif at_primary_period_limit or at_monthly_limit %}
             <span class="badge bg-warning text-dark fs-6">Limit Reached</span>
           {% else %}
             <span class="badge bg-success fs-6">Available</span>

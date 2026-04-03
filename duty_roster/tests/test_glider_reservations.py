@@ -954,6 +954,34 @@ class TestGliderReservationViews:
         assert "New Reservation" in content
         assert "Limit Reached" in content
 
+    def test_reservation_list_shows_limit_reached_when_monthly_limit_hit(
+        self, client, site_config, member, glider
+    ):
+        """Status badge should reflect monthly limit saturation."""
+        site_config.reservation_limit_period = "yearly"
+        site_config.max_reservations_per_year = 10
+        site_config.max_reservations_per_month = 1
+        site_config.save()
+
+        today = timezone.now().date()
+        reservation_date = today + timedelta(days=1)
+        if reservation_date.month != today.month:
+            reservation_date = today.replace(day=1)
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=reservation_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(reverse("duty_roster:reservation_list"))
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Limit Reached" in content
+
 
 class TestGetReservationsForDate:
     """Tests for the get_reservations_for_date method."""
