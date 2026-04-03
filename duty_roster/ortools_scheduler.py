@@ -12,7 +12,7 @@ Phase 2 Implementation: Full production constraints matching legacy scheduler be
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from ortools.sat.python import cp_model
@@ -372,19 +372,21 @@ class DutyRosterScheduler:
         if len(self.data.duty_days) < 2:
             return
 
+        duty_day_set = set(self.data.duty_days)
+        sorted_days = sorted(duty_day_set)
+
         for member in self.data.members:
             pref = self.data.preferences.get(member.id)
             if not pref or pref.allow_weekend_double:
                 continue
 
             for role in self.data.roles:
-                sorted_days = sorted(self.data.duty_days)
-                for i in range(len(sorted_days) - 1):
-                    day1 = sorted_days[i]
-                    day2 = sorted_days[i + 1]
+                for day1 in sorted_days:
+                    day2 = day1 + timedelta(days=7)
 
-                    # Adjacent weekend matching by exact 7-day separation and same weekday.
-                    if (day2 - day1).days != 7 or day1.weekday() != day2.weekday():
+                    # Enforce spacing whenever the same weekday exists on the adjacent weekend,
+                    # regardless of other duty days in between (e.g. Saturday/Sunday schedules).
+                    if day2 not in duty_day_set:
                         continue
 
                     key1 = (member.id, role, day1)

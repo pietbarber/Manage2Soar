@@ -591,6 +591,49 @@ class ORToolsHardConstraintsTests(TestCase):
             result["diagnostics"]["infeasible_hints"],
         )
 
+    def test_adjacent_weekend_spacing_enforced_with_sat_sun_schedule(self):
+        """Saturday-to-Saturday spacing must apply even when Sundays are also duty days."""
+        pref1 = DutyPreference.objects.get(member=self.member1)
+        pref1.allow_weekend_double = False
+        pref1.save()
+
+        # Only member1 can cover Saturdays; member2 can still cover Sundays.
+        # Without Saturday->next Saturday spacing, this would incorrectly be feasible.
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 7))
+        MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 14))
+
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[
+                date(2026, 3, 7),
+                date(2026, 3, 8),
+                date(2026, 3, 14),
+                date(2026, 3, 15),
+            ],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: pref1,
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts={
+                (self.member2.id, date(2026, 3, 7)),
+                (self.member2.id, date(2026, 3, 14)),
+            },
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 7),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertEqual(result["status"], "INFEASIBLE")
+        self.assertIn(
+            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
+            result["diagnostics"]["infeasible_hints"],
+        )
+
 
 class ORToolsSoftConstraintsTests(TestCase):
     """Test soft constraints (objective function optimization)."""
