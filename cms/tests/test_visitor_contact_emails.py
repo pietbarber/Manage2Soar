@@ -12,6 +12,7 @@ from cms.forms import VisitorContactForm
 from cms.models import VisitorContact
 from cms.views import _notify_member_managers_of_contact
 from members.models import Member
+from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 
 
@@ -261,3 +262,58 @@ class HoneypotSpamPreventionTests(TestCase):
         contact = VisitorContact.objects.latest("submitted_at")
         self.assertEqual(contact.name, "Real Human")
         self.assertEqual(contact.email, "human@example.com")
+
+    @override_settings(
+        DEFAULT_FROM_EMAIL="noreply@testclub.com",
+        EMAIL_DEV_MODE=False,
+    )
+    def test_keyword_matched_submission_is_silently_discarded(self):
+        """Configured spam keywords should silently discard contact submissions."""
+        self.config.contact_spam_keywords = "exclusive offer\nbook now"
+        self.config.save()
+
+        form_data = {
+            "name": "Spam Sender",
+            "email": "spam@example.com",
+            "phone": "555-0000",
+            "subject": "Exclusive Offer For You",
+            "message": "This message is long enough to pass form validation.",
+            "website": "",
+        }
+
+        initial_count = VisitorContact.objects.count()
+
+        response = self.client.post(reverse("contact"), form_data)
+
+        # Silent success response to avoid giving bots feedback
+        self.assertRedirects(response, reverse("contact_success"))
+        self.assertEqual(VisitorContact.objects.count(), initial_count)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(
+        DEFAULT_FROM_EMAIL="noreply@testclub.com",
+        SITE_URL="https://testclub.com",
+        EMAIL_DEV_MODE=False,
+    )
+    def test_deleting_contact_deletes_related_notifications(self):
+        """VisitorContact deletion should cascade to linked notifications."""
+        contact = VisitorContact.objects.create(
+            name="Delete Me",
+            email="deleteme@example.com",
+            phone="555-8888",
+            subject="General question",
+            message="I have a question about your operations schedule.",
+        )
+
+        _notify_member_managers_of_contact(contact)
+
+        self.assertEqual(
+            Notification.objects.filter(contact_submission=contact).count(), 1
+        )
+
+        contact_pk = contact.pk
+        contact.delete()
+
+        self.assertEqual(
+            Notification.objects.filter(contact_submission_id=contact_pk).count(), 0
+        )

@@ -71,6 +71,29 @@ def test_manual_whitelist_persists():
     assert config.manual_whitelist == "new@example.com"
 
 
+@pytest.mark.django_db
+def test_contact_spam_keywords_default_present():
+    """Contact spam keywords should have a safe default list."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+    keywords = config.get_contact_spam_keywords_list()
+    assert "viagra" in keywords
+    assert "click here" in keywords
+
+
+@pytest.mark.django_db
+def test_contact_spam_keywords_parsed_from_newlines():
+    """Contact spam keywords are newline-delimited and normalized."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        contact_spam_keywords="  Book Now  \n\nLimited Time\n",
+    )
+    assert config.get_contact_spam_keywords_list() == ["book now", "limited time"]
+
+
 # MembershipStatus Tests
 @pytest.mark.django_db
 def test_create_membership_status():
