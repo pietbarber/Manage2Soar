@@ -21,6 +21,7 @@ from duty_roster.models import (
     MemberBlackout,
 )
 from duty_roster.ortools_scheduler import (
+    WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS,
     DutyRosterScheduler,
     SchedulingData,
     extract_scheduling_data,
@@ -864,6 +865,99 @@ class ORToolsSoftConstraintsTests(TestCase):
             member2_assignments,
             "Staler member (older last_duty_date) should get more assignments",
         )
+
+    def test_spacing_penalty_weights_prefer_wider_gaps(self):
+        """Lag penalties should decrease as weekend gap width increases."""
+        self.assertGreater(
+            WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS[1],
+            WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS[2],
+        )
+        self.assertGreater(
+            WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS[2],
+            WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS[3],
+        )
+
+    def test_spacing_prefers_three_week_gap_over_two_week_gap(self):
+        """When both are feasible, objective should prefer 3-week repeat over 2-week."""
+        member3 = Member.objects.create(
+            username="member3",
+            email="m3@test.com",
+            first_name="Member",
+            last_name="Three",
+            membership_status="Full Member",
+            instructor=True,
+            is_active=True,
+        )
+
+        anchor = date(2026, 3, 7)
+        duty_days = [anchor + timedelta(days=7 * i) for i in range(5)]
+
+        pref1 = DutyPreference.objects.create(
+            member=self.member1,
+            max_assignments_per_month=2,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 1, 1),
+        )
+        pref2 = DutyPreference.objects.create(
+            member=self.member2,
+            max_assignments_per_month=2,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 1, 1),
+        )
+        pref3 = DutyPreference.objects.create(
+            member=member3,
+            max_assignments_per_month=1,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 1, 1),
+        )
+
+        # day1 must be member1, day2/day5 must be member2.
+        # The only flexible choice is whether member1 takes day3 (2-week gap)
+        # or day4 (3-week gap) from day1.
+        blackouts = {
+            (self.member1.id, duty_days[1]),
+            (self.member1.id, duty_days[4]),
+            (self.member2.id, duty_days[0]),
+            (self.member2.id, duty_days[2]),
+            (self.member2.id, duty_days[3]),
+            (member3.id, duty_days[0]),
+            (member3.id, duty_days[1]),
+            (member3.id, duty_days[4]),
+        }
+
+        data = SchedulingData(
+            members=[self.member1, self.member2, member3],
+            duty_days=duty_days,
+            roles=["instructor"],
+            preferences={
+                self.member1.id: pref1,
+                self.member2.id: pref2,
+                member3.id: pref3,
+            },
+            blackouts=blackouts,
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=duty_days[0],
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        schedule_by_day = {
+            day_schedule["date"]: day_schedule["slots"]["instructor"]
+            for day_schedule in result["schedule"]
+        }
+
+        self.assertEqual(schedule_by_day[duty_days[0]], self.member1.id)
+        self.assertEqual(schedule_by_day[duty_days[1]], self.member2.id)
+        self.assertEqual(schedule_by_day[duty_days[4]], self.member2.id)
+
+        # Core assertion: choose 3-week spacing for member1 (day1 -> day4),
+        # not 2-week spacing (day1 -> day3).
+        self.assertEqual(schedule_by_day[duty_days[3]], self.member1.id)
+        self.assertEqual(schedule_by_day[duty_days[2]], member3.id)
 
 
 class ORToolsEdgeCasesTests(TestCase):

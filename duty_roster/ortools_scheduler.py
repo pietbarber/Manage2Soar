@@ -35,6 +35,13 @@ PAIRING_MULTIPLIER = 3  # Weight multiplier for preferred pairings
 FAIRNESS_PENALTY_WEIGHT = (
     200  # Weight for penalizing deviation from average assignments
 )
+WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS = {
+    1: 60,
+    2: 20,
+    3: 5,
+}
+WEEKEND_SPACING_CONSISTENCY_WEIGHT = 4
+MAX_WEEKEND_SPACING_PAIR_TERMS = 120
 
 
 @dataclass
@@ -338,26 +345,6 @@ class DutyRosterScheduler:
                             # Constraint: can't do same role on both days
                             self.model.Add(self.x[key1] + self.x[key2] <= 1)
 
-    def _get_weekend_anchor(self, day: date) -> date:
-        """Return Monday anchor date for the ISO week containing ``day``."""
-        iso_year, iso_week, _ = day.isocalendar()
-        return date.fromisocalendar(iso_year, iso_week, 1)
-
-    def _get_adjacent_weekend_pairs(self) -> list[tuple[date, date]]:
-        """Return adjacent weekend anchors separated by exactly one calendar week."""
-        weekend_anchors = sorted(
-            {self._get_weekend_anchor(day) for day in self.data.duty_days}
-        )
-
-        adjacent_pairs: list[tuple[date, date]] = []
-        for i in range(len(weekend_anchors) - 1):
-            first_anchor = weekend_anchors[i]
-            second_anchor = weekend_anchors[i + 1]
-            if (second_anchor - first_anchor).days == 7:
-                adjacent_pairs.append((first_anchor, second_anchor))
-
-        return adjacent_pairs
-
     def _has_adjacent_weekday_pairs(self) -> bool:
         """Return True when any duty day has a matching day exactly 7 days later."""
         duty_day_set = set(self.data.duty_days)
@@ -445,6 +432,7 @@ class DutyRosterScheduler:
         2. Pairing affinity bonus (members who prefer to work together)
         3. Last duty date balancing (prioritize members who haven't worked recently)
         4. Balanced assignment distribution (minimize variance across members)
+        5. Weekend spacing preference (favor wider, more consistent repeat gaps)
 
         The solver will maximize the sum of these weighted terms while respecting
         all hard constraints.
@@ -583,9 +571,94 @@ class DutyRosterScheduler:
                     # Weight of 100 makes fairness comparable to preference weights (0-100)
                     objective_terms.append(-FAIRNESS_PENALTY_WEIGHT * abs_deviation)
 
+                # Soft constraint 5: Weekend spacing preference and consistency
+                self._add_weekend_spacing_soft_constraints(
+                    objective_terms, member_assigned_on_day
+                )
+
         # Set objective: maximize total weighted satisfaction
         self.model.Maximize(sum(objective_terms))
         logger.info(f"Objective function built with {len(objective_terms)} terms")
+
+    def _add_weekend_spacing_soft_constraints(
+        self, objective_terms, member_assigned_on_day
+    ):
+        """Add soft penalties favoring wider and more consistent weekly spacing."""
+        if len(self.data.duty_days) < 2:
+            return
+
+        sorted_days = sorted(set(self.data.duty_days))
+        if len(sorted_days) < 2:
+            return
+
+        candidate_pair_terms = 0
+        for member in self.data.members:
+            for day1 in sorted_days:
+                if (member.id, day1) not in member_assigned_on_day:
+                    continue
+
+                for lag_weeks in WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS:
+                    day2 = day1 + timedelta(days=7 * lag_weeks)
+                    if (member.id, day2) in member_assigned_on_day:
+                        candidate_pair_terms += 1
+
+        if candidate_pair_terms > MAX_WEEKEND_SPACING_PAIR_TERMS:
+            logger.info(
+                "Skipping weekend spacing soft objective for this run: "
+                f"{candidate_pair_terms} candidate pair terms exceeds "
+                f"{MAX_WEEKEND_SPACING_PAIR_TERMS}"
+            )
+            return
+
+        member_spacing_burden = {}
+        member_spacing_burden_upper_bound = {}
+
+        for member in self.data.members:
+            burden_terms = []
+
+            for day1 in sorted_days:
+                assigned_day1 = member_assigned_on_day.get((member.id, day1))
+                if assigned_day1 is None:
+                    continue
+
+                for lag_weeks, penalty in WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS.items():
+                    day2 = day1 + timedelta(days=7 * lag_weeks)
+                    assigned_day2 = member_assigned_on_day.get((member.id, day2))
+                    if assigned_day2 is None:
+                        continue
+
+                    repeat_pair = self.model.NewBoolVar(
+                        f"repeat_{member.id}_{day1}_{lag_weeks}w"
+                    )
+                    self.model.AddMultiplicationEquality(
+                        repeat_pair, [assigned_day1, assigned_day2]
+                    )
+
+                    # Smaller gaps incur stronger penalties; 3-week repeats are penalized lightly.
+                    objective_terms.append(-penalty * repeat_pair)
+                    burden_terms.append((penalty, repeat_pair))
+
+            if burden_terms:
+                upper_bound = sum(weight for weight, _ in burden_terms)
+                burden = self.model.NewIntVar(
+                    0, upper_bound, f"spacing_burden_{member.id}"
+                )
+                self.model.Add(
+                    burden
+                    == sum(weight * indicator for weight, indicator in burden_terms)
+                )
+                member_spacing_burden[member.id] = burden
+                member_spacing_burden_upper_bound[member.id] = upper_bound
+
+        # Encourage consistency by minimizing the worst member burden.
+        if member_spacing_burden:
+            max_upper_bound = max(member_spacing_burden_upper_bound.values())
+            max_burden = self.model.NewIntVar(0, max_upper_bound, "spacing_burden_max")
+
+            for burden in member_spacing_burden.values():
+                self.model.Add(max_burden >= burden)
+
+            objective_terms.append(-WEEKEND_SPACING_CONSISTENCY_WEIGHT * max_burden)
 
     def _calculate_preference_weight(self, member: Member, role: str) -> int:
         """
