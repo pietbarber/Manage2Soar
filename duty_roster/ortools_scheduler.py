@@ -405,7 +405,8 @@ class DutyRosterScheduler:
         """
         Constraint: Members cannot exceed their max assignments per month.
 
-        Default is 8 for members without DutyPreference.
+        Members without a DutyPreference use the site-configurable default
+        max-assignments-per-month value (defaulting to 8 if not configured).
         """
         default_monthly_limit = get_default_max_assignments_per_month()
 

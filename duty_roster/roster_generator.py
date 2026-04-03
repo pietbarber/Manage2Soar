@@ -24,26 +24,37 @@ DEFAULT_MAX_ASSIGNMENTS = 8
 
 # Cache for operational season boundaries
 _operational_season_cache = {}
+_default_max_assignments_cache = None
 
 
 def clear_operational_season_cache():
     """Clear the operational season cache. Useful for testing."""
-    global _operational_season_cache
+    global _operational_season_cache, _default_max_assignments_cache
     _operational_season_cache.clear()
+    _default_max_assignments_cache = None
 
 
 def get_default_max_assignments_per_month() -> int:
     """Return site-configured fallback assignment cap for members without preferences."""
+    global _default_max_assignments_cache
+
+    if _default_max_assignments_cache is not None:
+        return _default_max_assignments_cache
+
     try:
         config = SiteConfiguration.objects.first()
         if config:
-            return config.duty_default_max_assignments_per_month
+            _default_max_assignments_cache = (
+                config.duty_default_max_assignments_per_month
+            )
+            return _default_max_assignments_cache
     except Exception as e:
         logger.warning(
             "Error fetching default max assignments from SiteConfiguration: %s", e
         )
 
-    return DEFAULT_MAX_ASSIGNMENTS
+    _default_max_assignments_cache = DEFAULT_MAX_ASSIGNMENTS
+    return _default_max_assignments_cache
 
 
 def get_operational_season_bounds(year: int):
