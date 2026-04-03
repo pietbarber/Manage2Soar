@@ -140,10 +140,16 @@ def reservation_create(request, year=None, month=None, day=None):
                 target_month = target_date.month
             except ValueError:
                 pass
-    elif year and month:
+    elif year is not None and month is not None:
         try:
-            target_year = int(year)
-            target_month = int(month)
+            parsed_year = int(year)
+            parsed_month = int(month)
+            if 1 <= parsed_month <= 12:
+                target_year = parsed_year
+                target_month = parsed_month
+            else:
+                messages.error(request, "Invalid reservation date.")
+                return redirect("duty_roster:reservation_list")
         except (TypeError, ValueError):
             pass
 

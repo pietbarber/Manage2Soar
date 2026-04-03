@@ -768,6 +768,16 @@ class TestGliderReservationViews:
         response = client.get(url)
         assert response.status_code == 302
 
+    def test_reservation_create_for_day_invalid_month_redirects_safely(
+        self, client, site_config, member
+    ):
+        """Invalid URL month should not raise server error during pre-check."""
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_create_for_day", args=[2026, 0, 1])
+        response = client.get(url)
+
+        assert response.status_code == 302
+
     def test_reservation_create_for_future_quarter_not_blocked_by_current_quarter_limit(
         self, client, site_config, member, glider
     ):
