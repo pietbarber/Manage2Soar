@@ -5,6 +5,7 @@ Verifies that when a user removes dates from a proposed roster, those dates
 stay removed when clicking Roll Again, and can be restored with Restore All Dates.
 """
 
+import re
 from datetime import date
 
 import pytest
@@ -216,39 +217,6 @@ class TestProposeRosterSessionTracking:
             joined_club=date.today(),
         )
 
-    def _create_full_role_coverage_members(self):
-        """Create eligible members for all scheduled roles so draft controls render."""
-        Member.objects.create(
-            username="test_towpilot",
-            email="towpilot@test.com",
-            first_name="Tow",
-            last_name="Pilot",
-            towpilot=True,
-            is_active=True,
-            membership_status="Full Member",
-            joined_club=date.today(),
-        )
-        Member.objects.create(
-            username="test_duty_officer",
-            email="do@test.com",
-            first_name="Duty",
-            last_name="Officer",
-            duty_officer=True,
-            is_active=True,
-            membership_status="Full Member",
-            joined_club=date.today(),
-        )
-        Member.objects.create(
-            username="test_assistant_duty_officer",
-            email="ado@test.com",
-            first_name="Assistant",
-            last_name="DutyOfficer",
-            assistant_duty_officer=True,
-            is_active=True,
-            membership_status="Full Member",
-            joined_club=date.today(),
-        )
-
     def test_remove_dates_stores_in_session(
         self, client, rostermeister, instructor_member
     ):
@@ -422,9 +390,12 @@ class TestProposeRosterSessionTracking:
         response = client.post(url, {"year": 2026, "month": 3})
 
         assert response.status_code == 200
-        assert 'btn btn-secondary">🔄 Roll Again<' not in response.content.decode(
-            "utf-8"
+        content = response.content.decode("utf-8")
+        roll_again_button = re.search(
+            r'<button[^>]*name="action"[^>]*value="roll"[^>]*class="[^"]*btn btn-secondary[^"]*"[^>]*>\s*🔄\s*Roll Again\s*</button>',
+            content,
         )
+        assert roll_again_button is None
 
     def test_roll_again_visible_when_ortools_disabled(
         self, client, rostermeister, instructor_member
@@ -461,7 +432,12 @@ class TestProposeRosterSessionTracking:
         response = client.post(url, {"year": 2026, "month": 3})
 
         assert response.status_code == 200
-        assert 'btn btn-secondary">🔄 Roll Again<' in response.content.decode("utf-8")
+        content = response.content.decode("utf-8")
+        roll_again_button = re.search(
+            r'<button[^>]*name="action"[^>]*value="roll"[^>]*class="[^"]*btn btn-secondary[^"]*"[^>]*>\s*🔄\s*Roll Again\s*</button>',
+            content,
+        )
+        assert roll_again_button is not None
 
     def test_publish_clears_removed_dates(self, client, rostermeister, airfield):
         """Publishing roster should clear both proposed roster and removed dates."""
