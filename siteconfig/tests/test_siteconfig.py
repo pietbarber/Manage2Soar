@@ -71,6 +71,28 @@ def test_manual_whitelist_persists():
     assert config.manual_whitelist == "new@example.com"
 
 
+@pytest.mark.django_db
+def test_duty_default_max_assignments_per_month_default():
+    """Duty fallback assignment cap should default to 8."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+    assert config.duty_default_max_assignments_per_month == 8
+
+
+@pytest.mark.django_db
+def test_duty_default_max_assignments_per_month_can_be_customized():
+    """Duty fallback assignment cap should be configurable."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        duty_default_max_assignments_per_month=5,
+    )
+    config.refresh_from_db()
+    assert config.duty_default_max_assignments_per_month == 5
+
+
 # MembershipStatus Tests
 @pytest.mark.django_db
 def test_create_membership_status():

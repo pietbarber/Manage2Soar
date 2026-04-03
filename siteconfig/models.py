@@ -259,6 +259,13 @@ class SiteConfiguration(models.Model):
     schedule_assistant_duty_officers = models.BooleanField(
         default=False, help_text="We schedule Assistant Duty Officers ahead of time"
     )
+    duty_default_max_assignments_per_month = models.PositiveIntegerField(
+        default=8,
+        help_text=(
+            "Default monthly assignment limit for members without a DutyPreference row. "
+            "Set to 0 to disable assignments for members who have not saved preferences."
+        ),
+    )
     use_ortools_scheduler = models.BooleanField(
         default=False,
         verbose_name="Use OR-Tools Scheduler",

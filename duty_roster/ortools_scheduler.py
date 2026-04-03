@@ -23,14 +23,16 @@ from duty_roster.models import (
     DutyPreference,
     MemberBlackout,
 )
-from duty_roster.roster_generator import calculate_assignment_cap
+from duty_roster.roster_generator import (
+    calculate_assignment_cap,
+    get_default_max_assignments_per_month,
+)
 from members.models import Member
 
 logger = logging.getLogger("duty_roster.ortools_scheduler")
 
 
 # Constants
-DEFAULT_MAX_ASSIGNMENTS = 8  # Legacy-aligned fallback for no DutyPreference row
 PAIRING_MULTIPLIER = 3  # Weight multiplier for preferred pairings
 FAIRNESS_PENALTY_WEIGHT = (
     200  # Weight for penalizing deviation from average assignments
@@ -405,10 +407,12 @@ class DutyRosterScheduler:
 
         Default is 8 for members without DutyPreference.
         """
+        default_monthly_limit = get_default_max_assignments_per_month()
+
         for member in self.data.members:
             pref = self.data.preferences.get(member.id)
             monthly_limit = (
-                pref.max_assignments_per_month if pref else DEFAULT_MAX_ASSIGNMENTS
+                pref.max_assignments_per_month if pref else default_monthly_limit
             )
             max_assignments = calculate_assignment_cap(
                 monthly_limit, self.data.month_span

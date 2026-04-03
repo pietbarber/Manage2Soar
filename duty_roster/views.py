@@ -59,6 +59,7 @@ from .roster_generator import (
     calculate_assignment_cap,
     count_calendar_months_inclusive,
     generate_roster,
+    get_default_max_assignments_per_month,
     get_operational_season_bounds,
     get_weekend_dates_in_range,
     is_within_operational_season,
@@ -1891,8 +1892,9 @@ def get_eligible_members_for_slot(request):
                 )
 
         # Find eligible members
-        DEFAULT_MAX_ASSIGNMENTS = 8
-        default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, range_months)
+        default_cap = calculate_assignment_cap(
+            get_default_max_assignments_per_month(), range_months
+        )
         eligible_members = []
         for m in members:
             # Check if member has the role flag

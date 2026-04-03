@@ -19,6 +19,8 @@ from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger("duty_roster.generator")
 
+DEFAULT_MAX_ASSIGNMENTS = 8
+
 
 # Cache for operational season boundaries
 _operational_season_cache = {}
@@ -28,6 +30,20 @@ def clear_operational_season_cache():
     """Clear the operational season cache. Useful for testing."""
     global _operational_season_cache
     _operational_season_cache.clear()
+
+
+def get_default_max_assignments_per_month() -> int:
+    """Return site-configured fallback assignment cap for members without preferences."""
+    try:
+        config = SiteConfiguration.objects.first()
+        if config:
+            return config.duty_default_max_assignments_per_month
+    except Exception as e:
+        logger.warning(
+            "Error fetching default max assignments from SiteConfiguration: %s", e
+        )
+
+    return DEFAULT_MAX_ASSIGNMENTS
 
 
 def get_operational_season_bounds(year: int):
@@ -311,8 +327,6 @@ def diagnose_empty_slot(
         - reasons: Dict of reason -> list of member names
         - summary: Human-readable summary string
     """
-    DEFAULT_MAX_ASSIGNMENTS = 8
-
     reasons = {
         "no_preference": [],  # Note: These are now ELIGIBLE, just informational
         "dont_schedule": [],
@@ -327,7 +341,9 @@ def diagnose_empty_slot(
     }
 
     total_with_role = 0
-    default_cap = calculate_assignment_cap(DEFAULT_MAX_ASSIGNMENTS, range_months)
+    default_cap = calculate_assignment_cap(
+        get_default_max_assignments_per_month(), range_months
+    )
 
     for m in members:
         # Check if member has the role flag

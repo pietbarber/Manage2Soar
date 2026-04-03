@@ -29,6 +29,7 @@ from duty_roster.ortools_scheduler import (
 )
 from members.constants.membership import DEFAULT_ROLES
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 
 class ORToolsSchedulerBasicTests(TestCase):
@@ -517,6 +518,42 @@ class ORToolsHardConstraintsTests(TestCase):
             2,
             f"member1 assigned {member1_assignments} times (max is 2)",
         )
+
+    def test_default_max_assignments_uses_site_configuration(self):
+        """Members without preferences should use SiteConfiguration fallback cap."""
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="example.org",
+            club_abbreviation="TC",
+            duty_default_max_assignments_per_month=1,
+        )
+
+        member_without_pref = Member.objects.create(
+            username="nopref_instructor",
+            email="nopref@test.com",
+            first_name="NoPref",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+            is_active=True,
+        )
+
+        data = SchedulingData(
+            members=[member_without_pref],
+            duty_days=[date(2026, 3, 1), date(2026, 3, 8)],
+            roles=["instructor"],
+            preferences={},
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 1),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertEqual(result["status"], "INFEASIBLE")
 
     def test_adjacent_weekend_spacing_allows_when_member_opted_in(self):
         """Members opted in to weekend doubles can be assigned adjacent weekends."""
