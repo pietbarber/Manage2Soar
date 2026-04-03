@@ -2348,6 +2348,7 @@ def propose_roster(request):
 
     # Get site config and determine which roles to schedule
     siteconfig = SiteConfiguration.objects.first()
+    use_ortools_scheduler = bool(siteconfig and siteconfig.use_ortools_scheduler)
     enabled_roles = []
     if siteconfig:
         if getattr(siteconfig, "schedule_instructors", False):
@@ -2376,6 +2377,7 @@ def propose_roster(request):
                 "incomplete": False,
                 "enabled_roles": [],
                 "no_scheduling": True,
+                "use_ortools_scheduler": use_ortools_scheduler,
             },
         )
 
@@ -2441,8 +2443,11 @@ def propose_roster(request):
 
                 messages.success(
                     request,
-                    f"Removed {len(dates_to_remove_set)} date(s) from the proposed roster. "
-                    f"These dates will stay removed on Roll Again.",
+                    f"Removed {len(dates_to_remove_set)} date(s) from the proposed roster. "(
+                        "These dates will stay removed on Generate For Range."
+                        if use_ortools_scheduler
+                        else "These dates will stay removed on Roll Again."
+                    ),
                 )
 
         elif action == "roll":
@@ -2625,8 +2630,11 @@ def propose_roster(request):
             request.session.pop(session_key, None)
             messages.info(
                 request,
-                "All previously removed dates have been restored. "
-                "Click Roll Again to regenerate the full roster.",
+                "All previously removed dates have been restored. "(
+                    "Click Generate For Range to regenerate the full roster."
+                    if use_ortools_scheduler
+                    else "Click Roll Again to regenerate the full roster."
+                ),
             )
 
         elif action == "cancel":
@@ -2700,6 +2708,7 @@ def propose_roster(request):
             "operational_info": operational_info,
             "filtered_dates": filtered_dates,
             "siteconfig": siteconfig,
+            "use_ortools_scheduler": use_ortools_scheduler,
             "removed_dates": removed_dates,
         },
     )
