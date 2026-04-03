@@ -30,7 +30,7 @@ logger = logging.getLogger("duty_roster.ortools_scheduler")
 
 
 # Constants
-DEFAULT_MAX_ASSIGNMENTS = 8  # For members without DutyPreference
+DEFAULT_MAX_ASSIGNMENTS = 4  # For members without DutyPreference
 PAIRING_MULTIPLIER = 3  # Weight multiplier for preferred pairings
 FAIRNESS_PENALTY_WEIGHT = (
     200  # Weight for penalizing deviation from average assignments
@@ -214,14 +214,15 @@ class DutyRosterScheduler:
 
         Hard constraints MUST be satisfied for a valid solution:
         1. One assignment per slot (100% slot fill)
-        2. Role qualification (member has role flag)
-        3. Don't schedule / suspended flags (handled in variable creation)
-        4. Blackout dates (handled in variable creation)
-        5. Avoidance constraints (can't work with certain members)
-        6. One assignment per day (no double-booking)
-        7. Anti-repeat constraint (no same role on consecutive days)
-        8. Role percentage zero (handled in variable creation for most cases)
-        9. Max assignments per month
+        2. Avoidance constraints (can't work with certain members)
+        3. One assignment per day (no double-booking)
+        4. Anti-repeat constraint (no same role on consecutive days)
+        5. Adjacent-weekend spacing for opted-out members
+        6. Max assignments per month
+
+        Additional eligibility constraints (role qualification, blackout,
+        dont_schedule/suspended, and role-percentage gating) are enforced during
+        sparse decision-variable creation.
         """
         logger.info("Adding hard constraints...")
 
@@ -571,10 +572,10 @@ class DutyRosterScheduler:
                     # Weight of 100 makes fairness comparable to preference weights (0-100)
                     objective_terms.append(-FAIRNESS_PENALTY_WEIGHT * abs_deviation)
 
-                # Soft constraint 5: Weekend spacing preference and consistency
-                self._add_weekend_spacing_soft_constraints(
-                    objective_terms, member_assigned_on_day
-                )
+            # Soft constraint 5: Weekend spacing preference and consistency
+            self._add_weekend_spacing_soft_constraints(
+                objective_terms, member_assigned_on_day
+            )
 
         # Set objective: maximize total weighted satisfaction
         self.model.Maximize(sum(objective_terms))

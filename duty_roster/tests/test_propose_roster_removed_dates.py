@@ -382,7 +382,9 @@ class TestProposeRosterSessionTracking:
         response = client.get(url, {"year": 2026, "month": 3})
 
         assert response.status_code == 200
-        assert "🔄 Roll Again" not in response.content.decode("utf-8")
+        assert 'value="roll" class="btn btn-secondary"' not in response.content.decode(
+            "utf-8"
+        )
 
     def test_roll_again_visible_when_ortools_disabled(
         self, client, rostermeister, instructor_member
@@ -412,7 +414,9 @@ class TestProposeRosterSessionTracking:
         response = client.get(url, {"year": 2026, "month": 3})
 
         assert response.status_code == 200
-        assert "🔄 Roll Again" in response.content.decode("utf-8")
+        assert 'value="roll" class="btn btn-secondary"' in response.content.decode(
+            "utf-8"
+        )
 
     def test_publish_clears_removed_dates(self, client, rostermeister, airfield):
         """Publishing roster should clear both proposed roster and removed dates."""
