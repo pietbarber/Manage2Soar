@@ -397,6 +397,48 @@ class TestProposeRosterSessionTracking:
         )
         assert roll_again_button is None
 
+    def test_remove_dates_visible_when_ortools_enabled(
+        self, client, rostermeister, instructor_member
+    ):
+        """Remove Selected Dates should remain available when OR-Tools is enabled."""
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                domain_name="test.org",
+                club_abbreviation="TC",
+                schedule_instructors=True,
+                schedule_tow_pilots=True,
+                schedule_duty_officers=True,
+                schedule_assistant_duty_officers=True,
+            )
+        else:
+            config.schedule_instructors = True
+            config.schedule_tow_pilots = True
+            config.schedule_duty_officers = True
+            config.schedule_assistant_duty_officers = True
+        config.use_ortools_scheduler = True
+        config.save()
+
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        session = client.session
+        session["proposed_roster"] = [
+            {"date": "2026-03-07", "slots": {}, "diagnostics": {}}
+        ]
+        session.save()
+
+        response = client.post(url, {"year": 2026, "month": 3})
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        remove_dates_button = re.search(
+            r'<button[^>]*name="action"[^>]*value="remove_dates"[^>]*class="[^"]*btn btn-warning[^"]*"[^>]*>\s*🗑️\s*Remove Selected Dates\s*</button>',
+            content,
+        )
+        assert remove_dates_button is not None
+
     def test_roll_again_visible_when_ortools_disabled(
         self, client, rostermeister, instructor_member
     ):
