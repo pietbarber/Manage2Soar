@@ -116,6 +116,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "fields": (
                     "contact_welcome_text",
                     "contact_response_info",
+                    "contact_spam_keywords",
                     "club_address_line1",
                     "club_address_line2",
                     "club_city",

@@ -433,6 +433,11 @@ def contact(request):
     Includes honeypot spam prevention (Issue #590) - if honeypot field is filled,
     we silently redirect to success page without saving, so bot thinks it worked.
     """
+    # Get site configuration for club-specific information and spam filtering
+    from siteconfig.models import SiteConfiguration
+
+    site_config = SiteConfiguration.objects.first()
+
     if request.method == "POST":
         form = VisitorContactForm(request.POST)
         if form.is_valid():
@@ -445,6 +450,20 @@ def contact(request):
 
             # Capture IP address for spam prevention
             contact_submission.ip_address = _get_client_ip(request)
+
+            # Silently discard submissions that match configured spam keywords
+            # so bots cannot infer filtering behavior.
+            if _is_spam_contact_submission(contact_submission, site_config):
+                log_safe_subject = (
+                    contact_submission.subject.replace("\r", " ").replace("\n", " ")
+                )[:120]
+                logger.warning(
+                    "Contact form spam keyword match. Email: %s, Subject: %s",
+                    contact_submission.email,
+                    log_safe_subject,
+                )
+                return redirect("contact_success")
+
             contact_submission.save()
 
             # Send notification to member managers
@@ -456,11 +475,6 @@ def contact(request):
             return redirect("contact_success")
     else:
         form = VisitorContactForm()
-
-    # Get site configuration for club-specific information
-    from siteconfig.models import SiteConfiguration
-
-    site_config = SiteConfiguration.objects.first()
 
     return render(
         request,
@@ -498,6 +512,21 @@ def _get_client_ip(request):
     else:
         ip = request.META.get("REMOTE_ADDR")
     return ip
+
+
+def _is_spam_contact_submission(contact_submission, site_config):
+    """Check if subject or message matches configured spam keywords."""
+    if not site_config:
+        return False
+
+    spam_keywords = site_config.get_contact_spam_keywords_list()
+    if not spam_keywords:
+        return False
+
+    subject = (contact_submission.subject or "").lower()
+    message = (contact_submission.message or "").lower()
+
+    return any(keyword in subject or keyword in message for keyword in spam_keywords)
 
 
 def _notify_member_managers_of_contact(contact_submission):
@@ -590,7 +619,10 @@ def _notify_member_managers_of_contact(contact_submission):
                 )
 
                 Notification.objects.create(
-                    user=manager, message=notification_message, url=notification_url
+                    user=manager,
+                    message=notification_message,
+                    url=notification_url,
+                    contact_submission=contact_submission,
                 )
         except ImportError:
             # Notifications app not available

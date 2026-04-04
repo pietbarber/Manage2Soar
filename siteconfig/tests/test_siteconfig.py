@@ -72,6 +72,29 @@ def test_manual_whitelist_persists():
 
 
 @pytest.mark.django_db
+def test_contact_spam_keywords_default_present():
+    """Contact spam keywords should have a safe default list."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+    keywords = config.get_contact_spam_keywords_list()
+    assert "viagra" in keywords
+    assert "click here" in keywords
+
+
+@pytest.mark.django_db
+def test_contact_spam_keywords_parsed_from_newlines():
+    """Contact spam keywords are newline-delimited and normalized."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        contact_spam_keywords="  Book Now  \n\nLimited Time\n",
+    )
+    assert config.get_contact_spam_keywords_list() == ["book now", "limited time"]
+
+
+@pytest.mark.django_db
 def test_duty_default_max_assignments_per_month_default():
     """Duty fallback assignment cap should default to 8."""
     config = SiteConfiguration.objects.create(

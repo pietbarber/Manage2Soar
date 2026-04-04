@@ -12,6 +12,13 @@ class Notification(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     read = models.BooleanField(default=False)
     dismissed = models.BooleanField(default=False)
+    contact_submission = models.ForeignKey(
+        "cms.VisitorContact",
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         ordering = ["-created_at"]

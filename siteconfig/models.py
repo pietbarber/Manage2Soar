@@ -219,6 +219,17 @@ class SiteConfiguration(models.Model):
         default="Our member managers will receive your message immediately\nWe typically respond within 24-48 hours\nFor urgent questions, feel free to visit us at the airfield during operations\nAll contact information is kept private and not shared with third parties",
         help_text="Information about what happens after contact form submission (one item per line)",
     )
+    contact_spam_keywords = models.TextField(
+        blank=True,
+        default=(
+            "viagra\ncialis\ncasino\nlottery\nwinner\nclick here\nact now\n"
+            "limited time\nmake money\nwork from home\nguaranteed\nrisk free"
+        ),
+        help_text=(
+            "Spam keywords for the public contact form, one phrase per line. "
+            "Matching is case-insensitive substring search on subject and message."
+        ),
+    )
 
     # Club location
     club_address_line1 = models.CharField(
@@ -613,6 +624,14 @@ class SiteConfiguration(models.Model):
                 except ValueError:
                     continue  # Skip invalid entries
         return altitudes
+
+    def get_contact_spam_keywords_list(self):
+        """Return normalized contact spam keywords from newline-delimited config."""
+        return [
+            line.strip().lower()
+            for line in self.contact_spam_keywords.splitlines()
+            if line.strip()
+        ]
 
     def clean(self):
         if SiteConfiguration.objects.exclude(id=self.id).exists():

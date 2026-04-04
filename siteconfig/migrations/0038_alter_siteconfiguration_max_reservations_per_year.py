@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     # Keeping this explicit alter avoids future accidental regeneration noise.
 
     dependencies = [
-        ("siteconfig", "0036_add_reservation_limit_period"),
+        ("siteconfig", "0037_add_contact_spam_keywords"),
     ]
 
     operations = [

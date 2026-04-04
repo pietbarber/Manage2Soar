@@ -125,7 +125,7 @@ class VisitorContactForm(forms.ModelForm):
         return email
 
     def clean_message(self):
-        """Basic message validation and spam prevention."""
+        """Basic message validation."""
         message = self.cleaned_data.get("message", "")
 
         # Check for minimum length
@@ -133,29 +133,6 @@ class VisitorContactForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Please provide a more detailed message (at least 10 characters)."
             )
-
-        # Basic spam keyword detection
-        spam_keywords = [
-            "viagra",
-            "cialis",
-            "casino",
-            "lottery",
-            "winner",
-            "click here",
-            "act now",
-            "limited time",
-            "make money",
-            "work from home",
-            "guaranteed",
-            "risk free",
-        ]
-
-        message_lower = message.lower()
-        for keyword in spam_keywords:
-            if keyword in message_lower:
-                raise forms.ValidationError(
-                    "Your message contains content that appears to be spam. Please rephrase your inquiry."
-                )
 
         return message
 
