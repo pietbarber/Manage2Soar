@@ -4,12 +4,8 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    # This migration aligns historical migration state with the current
-    # SiteConfiguration model wording after reservation_limit_period was added.
-    # Keeping this explicit alter avoids future accidental regeneration noise.
-
     dependencies = [
-        ("siteconfig", "0037_add_contact_spam_keywords"),
+        ("siteconfig", "0036_add_reservation_limit_period"),
     ]
 
     operations = [
