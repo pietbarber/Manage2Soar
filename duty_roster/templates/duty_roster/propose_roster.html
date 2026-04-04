@@ -169,10 +169,12 @@
     </tbody>
   </table>
 
-  {% if draft and not use_ortools_scheduler %}
+  {% if draft %}
   <div class="d-flex gap-2 mb-3">
     <button name="action" value="remove_dates" class="btn btn-warning">🗑️ Remove Selected Dates</button>
+    {% if not use_ortools_scheduler %}
     <button name="action" value="roll" class="btn btn-secondary">🔄 Roll Again</button>
+    {% endif %}
     {% if removed_dates %}
     <button name="action" value="restore_dates" class="btn btn-outline-secondary">↩️ Restore All Dates</button>
     {% endif %}
