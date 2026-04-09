@@ -270,6 +270,14 @@ class SiteConfiguration(models.Model):
     schedule_assistant_duty_officers = models.BooleanField(
         default=False, help_text="We schedule Assistant Duty Officers ahead of time"
     )
+    schedule_commercial_pilots = models.BooleanField(
+        default=False,
+        help_text="We schedule Commercial Pilots ahead of time",
+    )
+    commercial_rides_enabled = models.BooleanField(
+        default=False,
+        help_text="Enable commercial ride ticketing and logsheet workflows",
+    )
     duty_default_max_assignments_per_month = models.PositiveIntegerField(
         default=8,
         help_text=(
@@ -322,6 +330,11 @@ class SiteConfiguration(models.Model):
         max_length=40,
         default="Instructor",
         help_text="We refer to the position of Instructor as ...",
+    )
+    commercial_pilot_title = models.CharField(
+        max_length=40,
+        default="Commercial Pilot",
+        help_text="We refer to the position of Commercial Pilot as ...",
     )
     surge_instructor_title = models.CharField(
         max_length=40,

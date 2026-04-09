@@ -116,6 +116,34 @@ def test_duty_default_max_assignments_per_month_can_be_customized():
     assert config.duty_default_max_assignments_per_month == 5
 
 
+@pytest.mark.django_db
+def test_commercial_configuration_defaults():
+    """Commercial scheduling/ride feature flags default to disabled."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+    assert config.schedule_commercial_pilots is False
+    assert config.commercial_rides_enabled is False
+    assert config.commercial_pilot_title == "Commercial Pilot"
+
+
+@pytest.mark.django_db
+def test_commercial_configuration_custom_values():
+    """Commercial scheduling/ride feature flags can be customized."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        schedule_commercial_pilots=True,
+        commercial_rides_enabled=True,
+        commercial_pilot_title="Ride Pilot",
+    )
+    config.refresh_from_db()
+    assert config.schedule_commercial_pilots is True
+    assert config.commercial_rides_enabled is True
+    assert config.commercial_pilot_title == "Ride Pilot"
+
+
 # MembershipStatus Tests
 @pytest.mark.django_db
 def test_create_membership_status():
