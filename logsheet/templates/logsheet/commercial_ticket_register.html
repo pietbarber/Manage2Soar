@@ -31,7 +31,7 @@
           <td>{{ ticket.ticket_number }}</td>
           <td>{{ ticket.get_status_display }}</td>
           <td>{{ ticket.get_ride_type_display }}</td>
-          <td>{% if ticket.amount_paid %}${{ ticket.amount_paid }}{% else %}-{% endif %}</td>
+          <td>{% if ticket.amount_paid != None %}${{ ticket.amount_paid }}{% else %}-{% endif %}</td>
           <td>{% if ticket.entered_by %}{{ ticket.entered_by.get_full_name|default:ticket.entered_by.username }}{% else %}-{% endif %}</td>
           <td>{{ ticket.entered_at|date:"Y-m-d H:i" }}</td>
           <td>

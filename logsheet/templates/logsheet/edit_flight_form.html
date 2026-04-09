@@ -391,6 +391,8 @@
   (function () {
     const commercialToggle = document.getElementById('id_commercial_ride');
     const ticketGroup = document.getElementById('ticket-number-group');
+    const passengerMemberInput = document.getElementById('{{ form.passenger.id_for_label }}');
+    const passengerNameInput = document.getElementById('{{ form.passenger_name.id_for_label }}');
     const passengerMemberGroup = document.querySelector('label[for="{{ form.passenger.id_for_label }}"]')?.closest('.col-md-6');
     const passengerNameGroup = document.querySelector('label[for="{{ form.passenger_name.id_for_label }}"]')?.closest('.col-md-6');
 
@@ -398,15 +400,27 @@
       return;
     }
 
+    const setPassengerFieldState = (input, group, shouldHide) => {
+      if (group) {
+        group.style.display = shouldHide ? 'none' : '';
+      }
+      if (input) {
+        if (shouldHide) {
+          if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+          } else {
+            input.value = '';
+          }
+        }
+        input.disabled = shouldHide;
+      }
+    };
+
     const syncCommercialUi = () => {
       const isCommercial = commercialToggle.checked;
       ticketGroup.style.display = isCommercial ? '' : 'none';
-      if (passengerMemberGroup) {
-        passengerMemberGroup.style.display = isCommercial ? 'none' : '';
-      }
-      if (passengerNameGroup) {
-        passengerNameGroup.style.display = isCommercial ? 'none' : '';
-      }
+      setPassengerFieldState(passengerMemberInput, passengerMemberGroup, isCommercial);
+      setPassengerFieldState(passengerNameInput, passengerNameGroup, isCommercial);
     };
 
     syncCommercialUi();
