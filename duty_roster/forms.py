@@ -20,6 +20,7 @@ from .models import (
     InstructionSlot,
     MemberBlackout,
 )
+from .utils.roles import member_has_role
 
 # Maps member role attributes to their corresponding form field names
 DUTY_ROLE_FIELDS = [
@@ -106,9 +107,7 @@ class DutyPreferenceForm(forms.ModelForm):
 
     @staticmethod
     def _member_has_role(member, role_attr):
-        if role_attr == "commercial_pilot":
-            return (getattr(member, "glider_rating", "") or "").lower() == "commercial"
-        return bool(getattr(member, role_attr, False))
+        return member_has_role(member, role_attr)
 
     def _count_member_roles(self, member):
         """Count how many duty roles the member has."""

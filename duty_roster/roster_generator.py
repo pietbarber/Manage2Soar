@@ -15,6 +15,7 @@ from duty_roster.models import (
     MemberBlackout,
 )
 from duty_roster.operational_calendar import get_operational_weekend
+from duty_roster.utils.roles import member_has_role
 from members.constants.membership import DEFAULT_ROLES
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -35,9 +36,7 @@ PERCENT_FIELDS = {
 
 
 def _member_has_role(member: Member, role: str) -> bool:
-    if role == "commercial_pilot":
-        return (getattr(member, "glider_rating", "") or "").lower() == "commercial"
-    return bool(getattr(member, role, False))
+    return member_has_role(member, role)
 
 
 # Cache for operational season boundaries

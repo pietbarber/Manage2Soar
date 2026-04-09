@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import IntegrityError, models
+from django.db.models.functions import Length
 from django.utils import timezone
 from tinymce.models import HTMLField
 
@@ -484,12 +485,29 @@ class CommercialTicket(models.Model):
         ]
 
     @classmethod
-    def _next_ticket_sequence(cls, prefix="T-"):
-        """Return next numeric sequence for ticket numbers matching prefix."""
+    def _next_ticket_sequence(cls, prefix="T-", pad=6):
+        """Return next numeric sequence for ticket numbers matching prefix.
+
+        Fast path uses DB ordering over fixed-width ticket numbers (for example,
+        ``T-000123``) so issuance does not scan the full table each time.
+        Falls back to a one-time legacy scan when older variable-width numbers
+        are present.
+        """
+        prefixed = cls.objects.filter(ticket_number__startswith=prefix)
+
+        standard_length = len(prefix) + pad
+        latest_standard = (
+            prefixed.annotate(ticket_len=Length("ticket_number"))
+            .filter(ticket_len=standard_length)
+            .order_by("-ticket_number")
+            .values_list("ticket_number", flat=True)
+            .first()
+        )
+        if latest_standard:
+            return int(latest_standard[len(prefix) :]) + 1
+
         max_value = 0
-        for ticket_number in cls.objects.filter(
-            ticket_number__startswith=prefix
-        ).values_list("ticket_number", flat=True):
+        for ticket_number in prefixed.values_list("ticket_number", flat=True):
             suffix = ticket_number[len(prefix) :]
             if suffix.isdigit():
                 max_value = max(max_value, int(suffix))
@@ -510,7 +528,7 @@ class CommercialTicket(models.Model):
         max_attempts=25,
     ):
         """Create an AVAILABLE ticket with a unique sequential ticket number."""
-        base_seq = cls._next_ticket_sequence(prefix=prefix)
+        base_seq = cls._next_ticket_sequence(prefix=prefix, pad=pad)
 
         for attempt in range(max_attempts):
             ticket_number = f"{prefix}{base_seq + attempt:0{pad}d}"

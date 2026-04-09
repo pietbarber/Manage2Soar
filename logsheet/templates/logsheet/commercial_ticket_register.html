@@ -31,9 +31,9 @@
           <td>{{ ticket.ticket_number }}</td>
           <td>{{ ticket.get_status_display }}</td>
           <td>{{ ticket.get_ride_type_display }}</td>
-          <td>${{ ticket.amount_paid }}</td>
+          <td>{% if ticket.amount_paid %}${{ ticket.amount_paid }}{% else %}-{% endif %}</td>
           <td>{% if ticket.entered_by %}{{ ticket.entered_by.get_full_name|default:ticket.entered_by.username }}{% else %}-{% endif %}</td>
-          <td>{{ ticket.created_at|date:"Y-m-d H:i" }}</td>
+          <td>{{ ticket.entered_at|date:"Y-m-d H:i" }}</td>
           <td>
             {% if ticket.flight %}
               <a href="{% url 'logsheet:manage' ticket.flight.logsheet.pk %}">Logsheet {{ ticket.flight.logsheet.pk }}</a>
@@ -50,5 +50,21 @@
       </tbody>
     </table>
   </div>
+
+  {% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <nav aria-label="Commercial ticket register pagination" class="mt-3">
+    <ul class="pagination mb-0">
+      <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+        <a class="page-link" href="?page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Previous</a>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      </li>
+      <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+        <a class="page-link" href="?page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Next</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
 </div>
 {% endblock %}

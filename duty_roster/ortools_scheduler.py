@@ -27,15 +27,14 @@ from duty_roster.roster_generator import (
     calculate_assignment_cap,
     get_default_max_assignments_per_month,
 )
+from duty_roster.utils.roles import member_has_role
 from members.models import Member
 
 logger = logging.getLogger("duty_roster.ortools_scheduler")
 
 
 def _member_has_role(member: Member, role: str) -> bool:
-    if role == "commercial_pilot":
-        return (getattr(member, "glider_rating", "") or "").lower() == "commercial"
-    return bool(getattr(member, role, False))
+    return member_has_role(member, role)
 
 
 # Constants

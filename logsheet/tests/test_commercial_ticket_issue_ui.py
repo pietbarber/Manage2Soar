@@ -1,4 +1,5 @@
 import pytest
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 
 from logsheet.models import CommercialTicket
@@ -197,3 +198,98 @@ def test_commercial_ticket_register_redirects_when_feature_disabled(
 
     assert response.status_code == 302
     assert response.url == reverse("logsheet:index")
+
+
+@pytest.mark.django_db
+def test_issue_ticket_post_handles_allocation_validation_error(
+    client, django_user_model, monkeypatch
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="error_treasurer",
+        password="testpass123",
+        email="error-treasurer@example.com",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+
+    def _raise_allocation_error(**_kwargs):
+        raise ValidationError(
+            "Could not allocate a unique commercial ticket number. Please try again."
+        )
+
+    monkeypatch.setattr(
+        "logsheet.views.CommercialTicket.issue_next_available", _raise_allocation_error
+    )
+
+    client.force_login(user)
+    response = client.post(
+        reverse("logsheet:issue_commercial_ticket"),
+        data={"ride_type": CommercialTicket.RideType.STANDARD},
+    )
+
+    assert response.status_code == 200
+    assert (
+        b"Could not allocate a unique commercial ticket number. Please try again."
+        in response.content
+    )
+
+
+@pytest.mark.django_db
+def test_commercial_ticket_register_paginates_results(client, django_user_model):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="pagination_treasurer",
+        password="testpass123",
+        email="pagination-treasurer@example.com",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+
+    for i in range(55):
+        CommercialTicket.objects.create(ticket_number=f"T-{i + 1:06d}")
+
+    client.force_login(user)
+    response = client.get(reverse("logsheet:commercial_ticket_register"))
+
+    assert response.status_code == 200
+    assert len(response.context["tickets"]) == 50
+    assert response.context["page_obj"].has_next()
+
+
+@pytest.mark.django_db
+def test_commercial_ticket_register_renders_entered_at_and_blank_amount(
+    client, django_user_model
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="render_duty_officer",
+        password="testpass123",
+        email="render-duty-officer@example.com",
+        membership_status="Full Member",
+        duty_officer=True,
+    )
+    ticket = CommercialTicket.objects.create(ticket_number="T-000111", amount_paid=None)
+
+    client.force_login(user)
+    response = client.get(reverse("logsheet:commercial_ticket_register"))
+
+    assert response.status_code == 200
+    assert b"T-000111" in response.content
+    assert b"$None" not in response.content
+    assert response.context["tickets"][0].entered_at == ticket.entered_at

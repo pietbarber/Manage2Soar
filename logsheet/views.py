@@ -84,21 +84,29 @@ def issue_commercial_ticket(request):
     if request.method == "POST":
         form = CommercialTicketIssueForm(request.POST)
         if form.is_valid():
-            issued_ticket = CommercialTicket.issue_next_available(
-                entered_by=request.user,
-                ride_type=form.cleaned_data["ride_type"],
-                amount_paid=form.cleaned_data["amount_paid"],
-                gift_certificate_number=form.cleaned_data["gift_certificate_number"],
-                gift_certificate_expires_on=form.cleaned_data[
-                    "gift_certificate_expires_on"
-                ],
-                remarks=form.cleaned_data["remarks"],
-            )
-            messages.success(
-                request,
-                f"Commercial ticket {issued_ticket.ticket_number} issued successfully.",
-            )
-            form = CommercialTicketIssueForm()
+            try:
+                issued_ticket = CommercialTicket.issue_next_available(
+                    entered_by=request.user,
+                    ride_type=form.cleaned_data["ride_type"],
+                    amount_paid=form.cleaned_data["amount_paid"],
+                    gift_certificate_number=form.cleaned_data[
+                        "gift_certificate_number"
+                    ],
+                    gift_certificate_expires_on=form.cleaned_data[
+                        "gift_certificate_expires_on"
+                    ],
+                    remarks=form.cleaned_data["remarks"],
+                )
+            except ValidationError as exc:
+                message = get_validation_message(exc)
+                form.add_error(None, message)
+                messages.error(request, message)
+            else:
+                messages.success(
+                    request,
+                    f"Commercial ticket {issued_ticket.ticket_number} issued successfully.",
+                )
+                form = CommercialTicketIssueForm()
     else:
         form = CommercialTicketIssueForm()
 
@@ -127,13 +135,16 @@ def commercial_ticket_register(request):
     if not _can_issue_commercial_ticket(request.user):
         return render(request, "403.html", status=403)
 
-    tickets = CommercialTicket.objects.select_related("entered_by", "flight")
+    tickets_qs = CommercialTicket.objects.select_related("entered_by", "flight")
+    paginator = Paginator(tickets_qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
 
     return render(
         request,
         "logsheet/commercial_ticket_register.html",
         {
-            "tickets": tickets,
+            "tickets": page_obj.object_list,
+            "page_obj": page_obj,
         },
     )
 

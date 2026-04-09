@@ -65,6 +65,7 @@ from .roster_generator import (
     is_within_operational_season,
     resolve_roster_date_range,
 )
+from .utils.roles import member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views")
 
@@ -83,7 +84,7 @@ TOW_INTENT_KEYS = {"club", "club_single", "club_two", "guest", "private"}
 
 
 def _is_commercial_pilot_qualified(member):
-    return (getattr(member, "glider_rating", "") or "").lower() == "commercial"
+    return member_is_commercial_pilot(member)
 
 
 def calendar_refresh_response(year, month):
