@@ -64,7 +64,7 @@
   {% if issued_ticket %}
   <div class="alert alert-success">
     <strong>Issued:</strong> {{ issued_ticket.ticket_number }}
-    {% if issued_ticket.amount_paid %}
+    {% if issued_ticket.amount_paid != None %}
       for ${{ issued_ticket.amount_paid }}
     {% endif %}
   </div>
@@ -92,7 +92,7 @@
             <td>{{ ticket.ticket_number }}</td>
             <td>{{ ticket.get_status_display }}</td>
             <td>{{ ticket.get_ride_type_display }}</td>
-            <td>{% if ticket.amount_paid %}${{ ticket.amount_paid }}{% else %}-{% endif %}</td>
+            <td>{% if ticket.amount_paid != None %}${{ ticket.amount_paid }}{% else %}-{% endif %}</td>
             <td>{% if ticket.entered_by %}{{ ticket.entered_by.full_display_name }}{% else %}-{% endif %}</td>
             <td>{{ ticket.entered_at|date:"Y-m-d H:i" }}</td>
           </tr>

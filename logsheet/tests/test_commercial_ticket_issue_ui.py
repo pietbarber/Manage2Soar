@@ -293,3 +293,27 @@ def test_commercial_ticket_register_renders_entered_at_and_blank_amount(
     assert b"T-000111" in response.content
     assert b"$None" not in response.content
     assert response.context["tickets"][0].entered_at == ticket.entered_at
+
+
+@pytest.mark.django_db
+def test_issue_ticket_page_renders_zero_amount_values(client, django_user_model):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="zero_amount_treasurer",
+        password="testpass123",
+        email="zero-amount@example.com",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+    CommercialTicket.objects.create(ticket_number="T-000222", amount_paid="0.00")
+
+    client.force_login(user)
+    response = client.get(reverse("logsheet:issue_commercial_ticket"))
+
+    assert response.status_code == 200
+    assert b"$0.00" in response.content

@@ -37,6 +37,7 @@ from .models import (
     OpsIntent,
 )
 from .utils.ics import generate_swap_ics
+from .utils.roles import member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views_swap")
 
@@ -458,7 +459,7 @@ def _build_volunteer_opportunities(member, today):
             if (
                 config.schedule_commercial_pilots
                 and not assignment.commercial_pilot
-                and (getattr(member, "glider_rating", "") or "").lower() == "commercial"
+                and member_is_commercial_pilot(member)
             ):
                 opportunities.append(
                     {

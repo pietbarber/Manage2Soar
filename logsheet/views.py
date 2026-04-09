@@ -1563,6 +1563,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
     if request.method == "POST":
         form = FlightForm(request.POST, instance=flight, logsheet=logsheet)
         if form.is_valid():
+            ticket_link_error = None
             with transaction.atomic():
                 flight = form.save(commit=False)
                 flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
@@ -1579,36 +1580,39 @@ def edit_flight(request, logsheet_pk, flight_pk):
                             ticket_number=ticket_number,
                         )
                     except ValidationError as exc:
-                        form.add_error("ticket_number", get_validation_message(exc))
-                        if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                            return render(
-                                request,
-                                "logsheet/edit_flight_form.html",
-                                {
-                                    "form": form,
-                                    "flight": flight,
-                                    "logsheet": logsheet,
-                                    "club_gliders": club_gliders,
-                                    "club_private": club_private,
-                                    "inactive_gliders": inactive_gliders,
-                                    "commercial_rides_enabled": commercial_rides_enabled,
-                                },
-                                status=400,
-                            )
-                        return render(
-                            request,
-                            "logsheet/edit_flight_form.html",
-                            {
-                                "form": form,
-                                "flight": flight,
-                                "logsheet": logsheet,
-                                "club_gliders": club_gliders,
-                                "club_private": club_private,
-                                "inactive_gliders": inactive_gliders,
-                                "commercial_rides_enabled": commercial_rides_enabled,
-                            },
-                            status=400,
-                        )
+                        ticket_link_error = get_validation_message(exc)
+                        transaction.set_rollback(True)
+            if ticket_link_error:
+                form.add_error("ticket_number", ticket_link_error)
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return render(
+                        request,
+                        "logsheet/edit_flight_form.html",
+                        {
+                            "form": form,
+                            "flight": flight,
+                            "logsheet": logsheet,
+                            "club_gliders": club_gliders,
+                            "club_private": club_private,
+                            "inactive_gliders": inactive_gliders,
+                            "commercial_rides_enabled": commercial_rides_enabled,
+                        },
+                        status=400,
+                    )
+                return render(
+                    request,
+                    "logsheet/edit_flight_form.html",
+                    {
+                        "form": form,
+                        "flight": flight,
+                        "logsheet": logsheet,
+                        "club_gliders": club_gliders,
+                        "club_private": club_private,
+                        "inactive_gliders": inactive_gliders,
+                        "commercial_rides_enabled": commercial_rides_enabled,
+                    },
+                    status=400,
+                )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"success": True})
             messages.success(request, "Flight updated.")
@@ -1701,6 +1705,7 @@ def add_flight(request, logsheet_pk):
     if request.method == "POST":
         form = FlightForm(request.POST, logsheet=logsheet)
         if form.is_valid():
+            ticket_link_error = None
             with transaction.atomic():
                 flight = form.save(commit=False)
                 flight.logsheet = logsheet
@@ -1718,36 +1723,39 @@ def add_flight(request, logsheet_pk):
                             ticket_number=ticket_number,
                         )
                     except ValidationError as exc:
-                        form.add_error("ticket_number", get_validation_message(exc))
-                        if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                            return render(
-                                request,
-                                "logsheet/edit_flight_form.html",
-                                {
-                                    "form": form,
-                                    "logsheet": logsheet,
-                                    "mode": "add",
-                                    "club_gliders": club_gliders,
-                                    "club_private": club_private,
-                                    "inactive_gliders": inactive_gliders,
-                                    "commercial_rides_enabled": commercial_rides_enabled,
-                                },
-                                status=400,
-                            )
-                        return render(
-                            request,
-                            "logsheet/edit_flight_form.html",
-                            {
-                                "form": form,
-                                "logsheet": logsheet,
-                                "mode": "add",
-                                "club_gliders": club_gliders,
-                                "club_private": club_private,
-                                "inactive_gliders": inactive_gliders,
-                                "commercial_rides_enabled": commercial_rides_enabled,
-                            },
-                            status=400,
-                        )
+                        ticket_link_error = get_validation_message(exc)
+                        transaction.set_rollback(True)
+            if ticket_link_error:
+                form.add_error("ticket_number", ticket_link_error)
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return render(
+                        request,
+                        "logsheet/edit_flight_form.html",
+                        {
+                            "form": form,
+                            "logsheet": logsheet,
+                            "mode": "add",
+                            "club_gliders": club_gliders,
+                            "club_private": club_private,
+                            "inactive_gliders": inactive_gliders,
+                            "commercial_rides_enabled": commercial_rides_enabled,
+                        },
+                        status=400,
+                    )
+                return render(
+                    request,
+                    "logsheet/edit_flight_form.html",
+                    {
+                        "form": form,
+                        "logsheet": logsheet,
+                        "mode": "add",
+                        "club_gliders": club_gliders,
+                        "club_private": club_private,
+                        "inactive_gliders": inactive_gliders,
+                        "commercial_rides_enabled": commercial_rides_enabled,
+                    },
+                    status=400,
+                )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"success": True})
             return redirect("logsheet:manage", pk=logsheet.pk)
