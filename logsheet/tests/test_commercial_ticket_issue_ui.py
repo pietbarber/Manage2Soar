@@ -343,3 +343,32 @@ def test_commercial_ticket_register_renders_zero_amount_values(
 
     assert response.status_code == 200
     assert b"$0.00" in response.content
+
+
+@pytest.mark.django_db
+def test_issue_next_available_retries_on_ticket_uniqueness_validation_error(
+    monkeypatch,
+):
+    original_create = CommercialTicket.objects.create
+    state = {"attempts": 0}
+
+    def _create_with_duplicate_on_first_call(**kwargs):
+        state["attempts"] += 1
+        if state["attempts"] == 1:
+            raise ValidationError(
+                {
+                    "ticket_number": [
+                        "Commercial ticket with this Ticket number already exists."
+                    ]
+                }
+            )
+        return original_create(**kwargs)
+
+    monkeypatch.setattr(
+        CommercialTicket.objects, "create", _create_with_duplicate_on_first_call
+    )
+
+    ticket = CommercialTicket.issue_next_available()
+
+    assert state["attempts"] == 2
+    assert ticket.ticket_number == "T-000002"

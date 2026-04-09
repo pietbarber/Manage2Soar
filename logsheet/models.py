@@ -544,6 +544,18 @@ class CommercialTicket(models.Model):
                 )
             except IntegrityError:
                 continue
+            except ValidationError as exc:
+                ticket_number_errors = []
+                if hasattr(exc, "message_dict"):
+                    ticket_number_errors = exc.message_dict.get("ticket_number", [])
+
+                if ticket_number_errors and any(
+                    "unique" in str(error).lower()
+                    or "already exists" in str(error).lower()
+                    for error in ticket_number_errors
+                ):
+                    continue
+                raise
 
         raise ValidationError(
             "Could not allocate a unique commercial ticket number. Please try again."
