@@ -202,6 +202,7 @@ class DutyPreference(models.Model):
     duty_officer_percent = models.PositiveIntegerField(default=0)
     ado_percent = models.PositiveIntegerField(default=0)
     towpilot_percent = models.PositiveIntegerField(default=0)
+    commercial_pilot_percent = models.PositiveIntegerField(default=0)
     max_assignments_per_month = models.DecimalField(
         max_digits=4,
         decimal_places=2,
@@ -280,6 +281,13 @@ class DutyAssignment(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="as_tow_pilot",
+    )
+    commercial_pilot = models.ForeignKey(
+        Member,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="as_commercial_pilot",
     )
     surge_tow_pilot = models.ForeignKey(
         Member,

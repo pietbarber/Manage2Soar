@@ -120,6 +120,7 @@
               {% if role == 'duty_officer' %}{{ siteconfig.duty_officer_title }}
               {% elif role == 'assistant_duty_officer' %}{{ siteconfig.assistant_duty_officer_title }}
               {% elif role == 'towpilot' %}{{ siteconfig.towpilot_title }}
+              {% elif role == 'commercial_pilot' %}{{ siteconfig.commercial_pilot_title|default:'Commercial Pilot' }}
               {% elif role == 'instructor' %}{{ siteconfig.instructor_title }}
               {% elif role == 'surge_towpilot' %}{{ siteconfig.surge_towpilot_title|default:'Surge Tow Pilot' }}
               {% elif role == 'surge_instructor' %}{{ siteconfig.surge_instructor_title|default:'Surge Instructor' }}
@@ -237,12 +238,14 @@
     "instructor": "{{ siteconfig.instructor_title|default:'Instructor'|escapejs }}",
     "duty_officer": "{{ siteconfig.duty_officer_title|default:'Duty Officer'|escapejs }}",
     "assistant_duty_officer": "{{ siteconfig.assistant_duty_officer_title|default:'Assistant Duty Officer'|escapejs }}",
-    "towpilot": "{{ siteconfig.towpilot_title|default:'Tow Pilot'|escapejs }}"
+    "towpilot": "{{ siteconfig.towpilot_title|default:'Tow Pilot'|escapejs }}",
+    "commercial_pilot": "{{ siteconfig.commercial_pilot_title|default:'Commercial Pilot'|escapejs }}"
   {% else %}
     "instructor": "Instructor",
     "duty_officer": "Duty Officer",
     "assistant_duty_officer": "Assistant Duty Officer",
-    "towpilot": "Tow Pilot"
+    "towpilot": "Tow Pilot",
+    "commercial_pilot": "Commercial Pilot"
   {% endif %}
 }
 </script>

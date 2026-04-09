@@ -322,6 +322,7 @@ def _build_volunteer_opportunities(member, today):
             "assistant_duty_officer",
             "surge_instructor",
             "surge_tow_pilot",
+            "commercial_pilot",
         )
         .order_by("date")
     )
@@ -351,6 +352,9 @@ def _build_volunteer_opportunities(member, today):
         "assistant_duty_officer": (
             getattr(config, "assistant_duty_officer_title", None)
             or "Assistant Duty Officer"
+        ),
+        "commercial_pilot": (
+            getattr(config, "commercial_pilot_title", None) or "Commercial Pilot"
         ),
         "surge_instructor": (
             getattr(config, "surge_instructor_title", None) or "Surge Instructor"
@@ -446,6 +450,26 @@ def _build_volunteer_opportunities(member, today):
                             kwargs={
                                 "assignment_id": assignment.id,
                                 "role": "assistant_duty_officer",
+                            },
+                        ),
+                        "assignment": assignment,
+                    }
+                )
+            if (
+                config.schedule_commercial_pilots
+                and not assignment.commercial_pilot
+                and (getattr(member, "glider_rating", "") or "").lower() == "commercial"
+            ):
+                opportunities.append(
+                    {
+                        "date": d,
+                        "role_label": role_label["commercial_pilot"],
+                        "kind": "hole",
+                        "volunteer_url": reverse(
+                            "duty_roster:volunteer_fill_role",
+                            kwargs={
+                                "assignment_id": assignment.id,
+                                "role": "commercial_pilot",
                             },
                         ),
                         "assignment": assignment,

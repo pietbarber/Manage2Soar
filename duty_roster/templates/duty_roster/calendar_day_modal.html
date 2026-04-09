@@ -115,6 +115,30 @@
         </div>
         {% endif %}
 
+        {% if config.schedule_commercial_pilots or assignment.commercial_pilot %}
+        <div class="col-6">
+          <div class="d-flex align-items-start">
+            <span class="badge bg-primary me-2 mt-1"><i class="bi bi-briefcase" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ config.commercial_pilot_title|default:'Commercial Pilot' }}</small>
+              {% if assignment.commercial_pilot %}
+                <span class="fw-medium">{{ assignment.commercial_pilot.full_display_name }}</span>
+              {% elif scheduled_holes.commercial_pilot %}
+                <span class="fw-medium text-warning small">🕳️ Unfilled</span>
+                {% if volunteerable_holes.commercial_pilot %}
+                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='commercial_pilot' %}"
+                   class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
+                  🪏 Volunteer to fill
+                </a>
+                {% endif %}
+              {% else %}
+                <span class="fw-medium">—</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
         {% if assignment.surge_instructor or can_volunteer_surge_instructor %}
         <div class="col-6">
           <div class="d-flex align-items-center">

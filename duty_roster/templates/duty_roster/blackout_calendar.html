@@ -29,7 +29,7 @@
   {% include "duty_roster/_messages.html" %}
 
   <!-- Warning if all eligible role percents are zero -->
-  {% with total_percent=preference.instructor_percent|add:preference.duty_officer_percent|add:preference.ado_percent|add:preference.towpilot_percent %}
+  {% with total_percent=preference.instructor_percent|add:preference.duty_officer_percent|add:preference.ado_percent|add:preference.towpilot_percent|add:preference.commercial_pilot_percent %}
     {% if total_percent == 0 %}
       <div class="alert alert-warning alert-dismissible fade show" role="alert">
         <i class="fas fa-exclamation-triangle me-2"></i>
@@ -338,6 +338,8 @@
                           <i class="fas fa-user-check me-1 text-info"></i>
                         {% elif role == 'towpilot' %}
                           <i class="fas fa-plane me-1 text-success"></i>
+                        {% elif role == 'commercial_pilot' %}
+                          <i class="fas fa-briefcase me-1 text-primary"></i>
                         {% endif %}
                         {{ label }}
                       </label>
@@ -348,6 +350,7 @@
                             {% if role == 'duty_officer' and preference.duty_officer_percent == val %}selected{% endif %}
                             {% if role == 'ado' and preference.ado_percent == val %}selected{% endif %}
                             {% if role == 'towpilot' and preference.towpilot_percent == val %}selected{% endif %}
+                            {% if role == 'commercial_pilot' and preference.commercial_pilot_percent == val %}selected{% endif %}
                           >{{ val }}%</option>
                         {% endfor %}
                       </select>

@@ -191,6 +191,7 @@ def send_roster_published_notifications(year, month, assignments):
         ("assistant_duty_officer", "assistant_duty_officer"),
         ("instructor", "instructor"),
         ("tow_pilot", "towpilot"),
+        ("commercial_pilot", "commercial_pilot"),
         ("surge_instructor", "surge_instructor"),
         ("surge_tow_pilot", "surge_towpilot"),
     ]

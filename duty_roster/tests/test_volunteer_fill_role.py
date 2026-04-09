@@ -2,8 +2,8 @@
 Tests for the volunteer_fill_role view (Issue #679).
 
 A qualified member can volunteer to fill an empty primary roster role on a
-scheduled duty day.  The view accepts four role slugs:
-  instructor, tow_pilot, duty_officer, assistant_duty_officer
+scheduled duty day. The view accepts five role slugs:
+    instructor, tow_pilot, duty_officer, assistant_duty_officer, commercial_pilot
 """
 
 from datetime import date, timedelta
@@ -28,6 +28,7 @@ def _make_config(**kwargs):
         schedule_tow_pilots=True,
         schedule_duty_officers=True,
         schedule_assistant_duty_officers=True,
+        schedule_commercial_pilots=True,
     )
     defaults.update(kwargs)
     existing = SiteConfiguration.objects.first()
@@ -149,15 +150,18 @@ def test_get_redirects_for_past_day(client, django_user_model):
         ("tow_pilot", "towpilot", "tow_pilot"),
         ("duty_officer", "duty_officer", "duty_officer"),
         ("assistant_duty_officer", "assistant_duty_officer", "assistant_duty_officer"),
+        ("commercial_pilot", "glider_rating", "commercial_pilot"),
     ],
 )
 @pytest.mark.django_db
-def test_post_assigns_role_for_all_four_roles(
+def test_post_assigns_role_for_all_five_roles(
     client, django_user_model, role, qual_attr, assign_attr
 ):
     """A qualified member is assigned to each fillable role via POST."""
     _make_config()
-    kwargs = {qual_attr: True}
+    kwargs = (
+        {qual_attr: "commercial"} if role == "commercial_pilot" else {qual_attr: True}
+    )
     user = _make_user(django_user_model, username=f"vol_{role}", **kwargs)
     assignment = _future_assignment()
 
@@ -310,6 +314,33 @@ def test_volunteerable_holes_visible_to_qualified_user(client, django_user_model
     assert response.status_code == 200
     holes = response.context["volunteerable_holes"]
     assert "instructor" in holes
+
+
+@pytest.mark.django_db
+def test_commercial_hole_requires_commercial_rating(client, django_user_model):
+    """Commercial pilot hole is volunteerable only for members with commercial glider rating."""
+    _make_config()
+    user = _make_user(
+        django_user_model,
+        username="commercial_pilot_user",
+        glider_rating="commercial",
+    )
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    holes = response.context["volunteerable_holes"]
+    assert "commercial_pilot" in holes
 
 
 @pytest.mark.django_db
