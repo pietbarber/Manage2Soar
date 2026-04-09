@@ -13,5 +13,11 @@
     "files.associations": {
         ".bandit": "yaml",
         "*.bandit": "yaml"
+    },
+    "chat.tools.terminal.autoApprove": {
+        "/^source \\.venv/bin/activate && pytest logsheet/tests/test_commercial_flight_views\\.py logsheet/tests/test_commercial_ticket_issue_ui\\.py duty_roster/tests/test_duty_swap\\.py -q$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }
