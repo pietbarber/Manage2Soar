@@ -1,8 +1,10 @@
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from logsheet.models import CommercialTicket
+from logsheet.models import Airfield, CommercialTicket, Flight, Glider, Logsheet
 from siteconfig.models import SiteConfiguration
 
 
@@ -86,7 +88,8 @@ def test_issue_ticket_post_creates_available_ticket_with_entered_by(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 302
+    assert response.url == reverse("logsheet:issue_commercial_ticket")
     ticket = CommercialTicket.objects.get()
     assert ticket.status == CommercialTicket.Status.AVAILABLE
     assert ticket.entered_by == user
@@ -118,7 +121,8 @@ def test_issue_ticket_post_auto_numbers_sequentially(client, django_user_model):
         data={"ride_type": CommercialTicket.RideType.STANDARD},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 302
+    assert response.url == reverse("logsheet:issue_commercial_ticket")
     new_ticket = CommercialTicket.objects.exclude(ticket_number="T-000009").get()
     assert new_ticket.ticket_number == "T-000010"
 
@@ -343,6 +347,54 @@ def test_commercial_ticket_register_renders_zero_amount_values(
 
     assert response.status_code == 200
     assert b"$0.00" in response.content
+
+
+@pytest.mark.django_db
+def test_commercial_ticket_register_avoids_extra_queries_for_flight_logsheet(
+    client, django_user_model
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="register_prefetch_treasurer",
+        password="testpass123",
+        email="register-prefetch@example.com",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+    airfield = Airfield.objects.create(identifier="KPRG", name="PRG Field")
+    glider = Glider.objects.create(
+        make="Schleicher",
+        model="ASK-21",
+        n_number="N860PR",
+        competition_number="P1",
+        seats=2,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        airfield=airfield,
+        log_date="2026-04-09",
+        created_by=user,
+    )
+    flight = Flight.objects.create(logsheet=logsheet, pilot=user, glider=glider)
+    CommercialTicket.objects.create(
+        ticket_number="T-000300",
+        flight=flight,
+        status=CommercialTicket.Status.REDEEMED,
+    )
+
+    client.force_login(user)
+    response = client.get(reverse("logsheet:commercial_ticket_register"))
+
+    assert response.status_code == 200
+    tickets = list(response.context["tickets"])
+    with CaptureQueriesContext(connection) as query_context:
+        _ = [ticket.flight.logsheet.pk for ticket in tickets if ticket.flight_id]
+    assert len(query_context) == 0
 
 
 @pytest.mark.django_db

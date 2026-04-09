@@ -17,6 +17,7 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_time
 from django.utils.timezone import now
@@ -106,7 +107,7 @@ def issue_commercial_ticket(request):
                     request,
                     f"Commercial ticket {issued_ticket.ticket_number} issued successfully.",
                 )
-                form = CommercialTicketIssueForm()
+                return redirect(reverse("logsheet:issue_commercial_ticket"))
     else:
         form = CommercialTicketIssueForm()
 
@@ -135,7 +136,9 @@ def commercial_ticket_register(request):
     if not _can_issue_commercial_ticket(request.user):
         return render(request, "403.html", status=403)
 
-    tickets_qs = CommercialTicket.objects.select_related("entered_by", "flight")
+    tickets_qs = CommercialTicket.objects.select_related(
+        "entered_by", "flight", "flight__logsheet"
+    )
     paginator = Paginator(tickets_qs, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
 

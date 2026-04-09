@@ -192,7 +192,7 @@ class FlightForm(forms.ModelForm):
         ticket_number = (cleaned_data.get("ticket_number") or "").strip()
 
         if commercial_ride:
-            config = SiteConfiguration.objects.first()
+            config = getattr(self, "site_config", None)
             if not config or not config.commercial_rides_enabled:
                 self.add_error(
                     "commercial_ride",
@@ -340,6 +340,7 @@ class FlightForm(forms.ModelForm):
         # Always fetch configuration from database for security-sensitive flags
         # The visiting_pilot_enabled flag is security-critical and should not be cached
         config = SiteConfiguration.objects.first()
+        self.site_config = config
         if config is None:
             from django.core.exceptions import ImproperlyConfigured
 
