@@ -29,6 +29,7 @@ from members.models import Member
 from siteconfig.models import SiteConfiguration
 
 from .forms import (
+    CommercialTicketIssueForm,
     CreateLogsheetForm,
     FlightForm,
     LogsheetCloseoutForm,
@@ -61,6 +62,80 @@ logger = logging.getLogger(__name__)
 
 TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW = Decimal("0.1")
 TOW_LOGBOOK_ESTIMATED_HOBBS_PER_TOW = Decimal("0.2")
+
+
+def _can_issue_commercial_ticket(user):
+    return bool(
+        getattr(user, "duty_officer", False) or getattr(user, "treasurer", False)
+    )
+
+
+@active_member_required
+def issue_commercial_ticket(request):
+    config = SiteConfiguration.objects.first()
+    if not (config and config.commercial_rides_enabled):
+        messages.error(request, "Commercial rides are currently disabled.")
+        return redirect("logsheet:index")
+
+    if not _can_issue_commercial_ticket(request.user):
+        return render(request, "403.html", status=403)
+
+    issued_ticket = None
+    if request.method == "POST":
+        form = CommercialTicketIssueForm(request.POST)
+        if form.is_valid():
+            issued_ticket = CommercialTicket.issue_next_available(
+                entered_by=request.user,
+                ride_type=form.cleaned_data["ride_type"],
+                amount_paid=form.cleaned_data["amount_paid"],
+                gift_certificate_number=form.cleaned_data["gift_certificate_number"],
+                gift_certificate_expires_on=form.cleaned_data[
+                    "gift_certificate_expires_on"
+                ],
+                remarks=form.cleaned_data["remarks"],
+            )
+            messages.success(
+                request,
+                f"Commercial ticket {issued_ticket.ticket_number} issued successfully.",
+            )
+            form = CommercialTicketIssueForm()
+    else:
+        form = CommercialTicketIssueForm()
+
+    recent_tickets = CommercialTicket.objects.select_related("entered_by", "flight")[
+        :20
+    ]
+
+    return render(
+        request,
+        "logsheet/issue_commercial_ticket.html",
+        {
+            "form": form,
+            "issued_ticket": issued_ticket,
+            "recent_tickets": recent_tickets,
+        },
+    )
+
+
+@active_member_required
+def commercial_ticket_register(request):
+    config = SiteConfiguration.objects.first()
+    if not (config and config.commercial_rides_enabled):
+        messages.error(request, "Commercial rides are currently disabled.")
+        return redirect("logsheet:index")
+
+    if not _can_issue_commercial_ticket(request.user):
+        return render(request, "403.html", status=403)
+
+    tickets = CommercialTicket.objects.select_related("entered_by", "flight")
+
+    return render(
+        request,
+        "logsheet/commercial_ticket_register.html",
+        {
+            "tickets": tickets,
+        },
+    )
 
 
 def _sanitize_csv_cell(value):
@@ -1379,6 +1454,8 @@ def list_logsheets(request):
 
     from .forms import CreateLogsheetForm
 
+    site_config = SiteConfiguration.objects.first()
+
     # If a log_date is provided in GET, use it to prepopulate from duty roster
     log_date = request.GET.get("log_date")
     form = None
@@ -1404,6 +1481,8 @@ def list_logsheets(request):
             "paginator": paginator,
             "available_years": available_years,
             "form": form,
+            "can_issue_commercial_ticket": _can_issue_commercial_ticket(request.user)
+            and bool(site_config and site_config.commercial_rides_enabled),
         },
     )
 

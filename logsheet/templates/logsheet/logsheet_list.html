@@ -17,9 +17,16 @@
     </h1>
     <p class="text-muted mb-0">Track and manage daily flight operations</p>
   </div>
-  <button type="button" class="btn btn-success btn-modern" data-bs-toggle="modal" data-bs-target="#createLogsheetModal">
-    <i class="bi bi-plus-circle me-2"></i>Create New Logsheet
-  </button>
+  <div class="d-flex gap-2">
+    {% if can_issue_commercial_ticket %}
+      <a href="{% url 'logsheet:issue_commercial_ticket' %}" class="btn btn-outline-primary btn-modern">
+        <i class="bi bi-ticket-perforated me-2"></i>Issue Ticket
+      </a>
+    {% endif %}
+    <button type="button" class="btn btn-success btn-modern" data-bs-toggle="modal" data-bs-target="#createLogsheetModal">
+      <i class="bi bi-plus-circle me-2"></i>Create New Logsheet
+    </button>
+  </div>
 </div>
 
 {% if messages %}

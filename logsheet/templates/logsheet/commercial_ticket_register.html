@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Commercial Ticket Register{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Commercial Ticket Register</h1>
+    <div class="d-flex gap-2">
+      <a href="{% url 'logsheet:issue_commercial_ticket' %}" class="btn btn-primary">Issue Ticket</a>
+      <a href="{% url 'logsheet:index' %}" class="btn btn-outline-secondary">Back to Logsheets</a>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+      <thead>
+        <tr>
+          <th>Ticket #</th>
+          <th>Status</th>
+          <th>Ride Type</th>
+          <th>Amount</th>
+          <th>Issued By</th>
+          <th>Issued At</th>
+          <th>Flight</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+        <tr>
+          <td>{{ ticket.ticket_number }}</td>
+          <td>{{ ticket.get_status_display }}</td>
+          <td>{{ ticket.get_ride_type_display }}</td>
+          <td>${{ ticket.amount_paid }}</td>
+          <td>{% if ticket.entered_by %}{{ ticket.entered_by.get_full_name|default:ticket.entered_by.username }}{% else %}-{% endif %}</td>
+          <td>{{ ticket.created_at|date:"Y-m-d H:i" }}</td>
+          <td>
+            {% if ticket.flight %}
+              <a href="{% url 'logsheet:manage' ticket.flight.logsheet.pk %}">Logsheet {{ ticket.flight.logsheet.pk }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted">No commercial tickets found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

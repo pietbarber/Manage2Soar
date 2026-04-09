@@ -11,6 +11,9 @@ from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
     Airfield,
+    CommercialPassenger,
+    CommercialRide,
+    CommercialTicket,
     Flight,
     Glider,
     Logsheet,
@@ -295,6 +298,90 @@ class FlightAdmin(AdminHelperMixin, admin.ModelAdmin):
         "Flights: low-level flight records for debugging or data fixes. Not used by the public site. "
         "See docs/admin/flights.md for guidance."
     )
+
+
+class CommercialPassengerInline(admin.StackedInline):
+    model = CommercialPassenger
+    extra = 0
+    can_delete = False
+
+
+@admin.register(CommercialTicket)
+class CommercialTicketAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "ticket_number",
+        "status",
+        "ride_type",
+        "amount_paid",
+        "flight",
+        "entered_by",
+        "entered_at",
+    )
+    list_filter = ("status", "ride_type", "entered_at")
+    search_fields = (
+        "ticket_number",
+        "gift_certificate_number",
+        "remarks",
+        "flight__id",
+        "entered_by__first_name",
+        "entered_by__last_name",
+    )
+    autocomplete_fields = ("flight", "entered_by")
+    list_select_related = ("flight", "entered_by")
+    readonly_fields = ("entered_at", "redeemed_at", "refunded_at")
+    inlines = [CommercialPassengerInline]
+
+    admin_helper_message = (
+        "Commercial tickets: create and track paid ride tickets. "
+        "Tickets are redeemed automatically when linked from commercial flights."
+    )
+
+
+@admin.register(CommercialPassenger)
+class CommercialPassengerAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "ticket",
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "waiver_signed",
+    )
+    list_filter = ("waiver_signed",)
+    search_fields = (
+        "ticket__ticket_number",
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+    )
+    autocomplete_fields = ("ticket",)
+    list_select_related = ("ticket",)
+
+    admin_helper_message = "Commercial passengers: contact and waiver details attached to commercial tickets."
+
+
+@admin.register(CommercialRide)
+class CommercialRideAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "flight",
+        "ticket",
+        "commercial_pilot",
+        "revenue_amount",
+        "created_at",
+    )
+    list_filter = ("created_at",)
+    search_fields = (
+        "ticket__ticket_number",
+        "commercial_pilot__first_name",
+        "commercial_pilot__last_name",
+        "flight__id",
+    )
+    autocomplete_fields = ("flight", "ticket", "commercial_pilot")
+    list_select_related = ("flight", "ticket", "commercial_pilot")
+    readonly_fields = ("created_at",)
+
+    admin_helper_message = "Commercial rides: linkage between a flight and redeemed ticket, including pilot and revenue."
 
 
 # Each time a member locks a flight log because it's finalized, no more changes can be done

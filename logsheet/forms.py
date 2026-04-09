@@ -1245,3 +1245,31 @@ class MemberChargeForm(forms.ModelForm):
                     )
 
         return cleaned_data
+
+
+class CommercialTicketIssueForm(forms.Form):
+    ride_type = forms.ChoiceField(
+        choices=CommercialTicket.RideType.choices,
+        initial=CommercialTicket.RideType.STANDARD,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    amount_paid = forms.DecimalField(
+        required=False,
+        max_digits=8,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    gift_certificate_number = forms.CharField(
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    gift_certificate_expires_on = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    remarks = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+    )

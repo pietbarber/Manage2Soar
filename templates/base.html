@@ -196,6 +196,12 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="logsheetDropdown">
               <li><a class="dropdown-item" href="{% url 'logsheet:index' %}"><i class="bi bi-journal-text me-1"></i> Manage Log Sheets</a></li>
+              {% if siteconfig and siteconfig.commercial_rides_enabled and user.is_authenticated and user.is_active_member %}
+              {% if user.duty_officer or user.treasurer %}
+              <li><a class="dropdown-item" href="{% url 'logsheet:commercial_ticket_register' %}"><i class="bi bi-receipt me-1"></i> Commercial Ticket Register</a></li>
+              <li><a class="dropdown-item" href="{% url 'logsheet:issue_commercial_ticket' %}"><i class="bi bi-ticket-perforated me-1"></i> Issue Commercial Ticket</a></li>
+              {% endif %}
+              {% endif %}
               {% if user.is_authenticated %}
               <li><a class="dropdown-item" href="{% url 'analytics:dashboard' %}">📈 Analytics</a></li>
               {% endif %}

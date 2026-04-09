@@ -5,7 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import IntegrityError, models
 from django.utils import timezone
 from tinymce.models import HTMLField
 
@@ -482,6 +482,54 @@ class CommercialTicket(models.Model):
         indexes = [
             models.Index(fields=["status", "entered_at"]),
         ]
+
+    @classmethod
+    def _next_ticket_sequence(cls, prefix="T-"):
+        """Return next numeric sequence for ticket numbers matching prefix."""
+        max_value = 0
+        for ticket_number in cls.objects.filter(
+            ticket_number__startswith=prefix
+        ).values_list("ticket_number", flat=True):
+            suffix = ticket_number[len(prefix) :]
+            if suffix.isdigit():
+                max_value = max(max_value, int(suffix))
+        return max_value + 1
+
+    @classmethod
+    def issue_next_available(
+        cls,
+        *,
+        entered_by=None,
+        ride_type=RideType.STANDARD,
+        amount_paid=None,
+        gift_certificate_number="",
+        gift_certificate_expires_on=None,
+        remarks="",
+        prefix="T-",
+        pad=6,
+        max_attempts=25,
+    ):
+        """Create an AVAILABLE ticket with a unique sequential ticket number."""
+        base_seq = cls._next_ticket_sequence(prefix=prefix)
+
+        for attempt in range(max_attempts):
+            ticket_number = f"{prefix}{base_seq + attempt:0{pad}d}"
+            try:
+                return cls.objects.create(
+                    ticket_number=ticket_number,
+                    entered_by=entered_by,
+                    ride_type=ride_type,
+                    amount_paid=amount_paid,
+                    gift_certificate_number=gift_certificate_number,
+                    gift_certificate_expires_on=gift_certificate_expires_on,
+                    remarks=remarks,
+                )
+            except IntegrityError:
+                continue
+
+        raise ValidationError(
+            "Could not allocate a unique commercial ticket number. Please try again."
+        )
 
     def clean(self):
         if self.status == self.Status.REDEEMED and not self.flight:
