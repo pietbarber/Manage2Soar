@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Value
@@ -38,6 +39,8 @@ from .forms import (
 )
 from .models import (
     AircraftMeister,
+    CommercialRide,
+    CommercialTicket,
     Flight,
     Glider,
     Logsheet,
@@ -123,6 +126,9 @@ def _csv_towplane_product_name(towplane):
 
 def _member_flight_charge_breakdown(flight, member):
     """Return (tow, rental, total) owed by `member` for a single flight."""
+    if flight.commercial_ride:
+        return Decimal("0.00"), Decimal("0.00"), Decimal("0.00")
+
     # Prefer locked-in actual values for finalized logsheets, but fall back to
     # calculated values when legacy rows have NULL actuals.
     if flight.logsheet.finalized and flight.tow_cost_actual is not None:
@@ -157,6 +163,7 @@ def _get_personal_charge_data(member, start_date):
     """Build per-flight and misc-charge rows for a member from start_date onward."""
     flights = (
         Flight.objects.filter(logsheet__log_date__gte=start_date)
+        .exclude(commercial_ride=True)
         .filter(Q(pilot=member) | Q(split_with=member))
         .select_related(
             "logsheet",
@@ -216,6 +223,38 @@ def _get_personal_charge_data(member, start_date):
     )
 
     return flight_rows, misc_charges
+
+
+def _link_commercial_ticket_to_flight(*, flight, ticket_number):
+    """Redeem and attach ticket data to a commercial flight."""
+    ticket = (
+        CommercialTicket.objects.select_for_update()
+        .filter(ticket_number=ticket_number)
+        .first()
+    )
+    if not ticket:
+        raise ValidationError("Ticket number does not exist.")
+
+    if ticket.status == CommercialTicket.Status.REFUNDED:
+        raise ValidationError("Refunded tickets cannot be used for flights.")
+
+    if ticket.status == CommercialTicket.Status.REDEEMED and ticket.flight_id not in {
+        None,
+        flight.pk,
+    }:
+        raise ValidationError("Ticket is already redeemed by a different flight.")
+
+    if ticket.status == CommercialTicket.Status.AVAILABLE:
+        ticket.transition_to(CommercialTicket.Status.REDEEMED, flight=flight)
+
+    CommercialRide.objects.update_or_create(
+        flight=flight,
+        defaults={
+            "ticket": ticket,
+            "commercial_pilot": flight.pilot,
+            "revenue_amount": ticket.amount_paid,
+        },
+    )
 
 
 def _tow_logbook_estimates(total_tows):
@@ -538,7 +577,9 @@ def export_logsheet_finances_csv(request, pk):
             "split_with",
             "glider",
             "towplane",
-        ).order_by("launch_time", "pk")
+        )
+        .exclude(commercial_ride=True)
+        .order_by("launch_time", "pk")
     )
 
     # Avoid per-flight SiteConfiguration lookups when legacy finalized flights
@@ -1004,12 +1045,13 @@ def manage_logsheet(request, pk):
             split = flight.split_type
 
             # Ensure that the flight has a valid pilot
-            if partner and split == "full":
-                responsible_members.add(partner)
-            elif partner and split in ("even", "tow", "rental"):
-                responsible_members.update([pilot, partner])
-            elif pilot:
-                responsible_members.add(pilot)
+            if not flight.commercial_ride:
+                if partner and split == "full":
+                    responsible_members.add(partner)
+                elif partner and split in ("even", "tow", "rental"):
+                    responsible_members.update([pilot, partner])
+                elif pilot:
+                    responsible_members.add(pilot)
 
             # Validate required fields before finalization
             if flight.landing_time is None:
@@ -1425,11 +1467,58 @@ def edit_flight(request, logsheet_pk, flight_pk):
     club_gliders = [g for g in gliders_sorted if g.club_owned and g.is_active]
     club_private = [g for g in gliders_sorted if not g.club_owned and g.is_active]
     inactive_gliders = [g for g in gliders_sorted if not g.is_active]
+    config = SiteConfiguration.objects.first()
+    commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
     if request.method == "POST":
         form = FlightForm(request.POST, instance=flight, logsheet=logsheet)
         if form.is_valid():
-            form.save()
+            with transaction.atomic():
+                flight = form.save(commit=False)
+                flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
+                if flight.commercial_ride:
+                    flight.passenger = None
+                    flight.passenger_name = ""
+                flight.save()
+
+                if flight.commercial_ride:
+                    ticket_number = form.cleaned_data.get("ticket_number")
+                    try:
+                        _link_commercial_ticket_to_flight(
+                            flight=flight,
+                            ticket_number=ticket_number,
+                        )
+                    except ValidationError as exc:
+                        form.add_error("ticket_number", get_validation_message(exc))
+                        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                            return render(
+                                request,
+                                "logsheet/edit_flight_form.html",
+                                {
+                                    "form": form,
+                                    "flight": flight,
+                                    "logsheet": logsheet,
+                                    "club_gliders": club_gliders,
+                                    "club_private": club_private,
+                                    "inactive_gliders": inactive_gliders,
+                                    "commercial_rides_enabled": commercial_rides_enabled,
+                                },
+                                status=400,
+                            )
+                        return render(
+                            request,
+                            "logsheet/edit_flight_form.html",
+                            {
+                                "form": form,
+                                "flight": flight,
+                                "logsheet": logsheet,
+                                "club_gliders": club_gliders,
+                                "club_private": club_private,
+                                "inactive_gliders": inactive_gliders,
+                                "commercial_rides_enabled": commercial_rides_enabled,
+                            },
+                            status=400,
+                        )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"success": True})
             messages.success(request, "Flight updated.")
@@ -1446,6 +1535,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
                     "club_gliders": club_gliders,
                     "club_private": club_private,
                     "inactive_gliders": inactive_gliders,
+                    "commercial_rides_enabled": commercial_rides_enabled,
                 },
                 status=400,
             )
@@ -1462,6 +1552,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
             "club_gliders": club_gliders,
             "club_private": club_private,
             "inactive_gliders": inactive_gliders,
+            "commercial_rides_enabled": commercial_rides_enabled,
         },
     )
 
@@ -1514,13 +1605,59 @@ def add_flight(request, logsheet_pk):
     club_gliders = [g for g in gliders_sorted if g.club_owned and g.is_active]
     club_private = [g for g in gliders_sorted if not g.club_owned and g.is_active]
     inactive_gliders = [g for g in gliders_sorted if not g.is_active]
+    config = SiteConfiguration.objects.first()
+    commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
     if request.method == "POST":
         form = FlightForm(request.POST, logsheet=logsheet)
         if form.is_valid():
-            flight = form.save(commit=False)
-            flight.logsheet = logsheet
-            flight.save()
+            with transaction.atomic():
+                flight = form.save(commit=False)
+                flight.logsheet = logsheet
+                flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
+                if flight.commercial_ride:
+                    flight.passenger = None
+                    flight.passenger_name = ""
+                flight.save()
+
+                if flight.commercial_ride:
+                    ticket_number = form.cleaned_data.get("ticket_number")
+                    try:
+                        _link_commercial_ticket_to_flight(
+                            flight=flight,
+                            ticket_number=ticket_number,
+                        )
+                    except ValidationError as exc:
+                        form.add_error("ticket_number", get_validation_message(exc))
+                        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                            return render(
+                                request,
+                                "logsheet/edit_flight_form.html",
+                                {
+                                    "form": form,
+                                    "logsheet": logsheet,
+                                    "mode": "add",
+                                    "club_gliders": club_gliders,
+                                    "club_private": club_private,
+                                    "inactive_gliders": inactive_gliders,
+                                    "commercial_rides_enabled": commercial_rides_enabled,
+                                },
+                                status=400,
+                            )
+                        return render(
+                            request,
+                            "logsheet/edit_flight_form.html",
+                            {
+                                "form": form,
+                                "logsheet": logsheet,
+                                "mode": "add",
+                                "club_gliders": club_gliders,
+                                "club_private": club_private,
+                                "inactive_gliders": inactive_gliders,
+                                "commercial_rides_enabled": commercial_rides_enabled,
+                            },
+                            status=400,
+                        )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"success": True})
             return redirect("logsheet:manage", pk=logsheet.pk)
@@ -1536,6 +1673,7 @@ def add_flight(request, logsheet_pk):
                     "club_gliders": club_gliders,
                     "club_private": club_private,
                     "inactive_gliders": inactive_gliders,
+                    "commercial_rides_enabled": commercial_rides_enabled,
                 },
                 status=400,
             )
@@ -1545,7 +1683,7 @@ def add_flight(request, logsheet_pk):
             initial["tow_pilot"] = logsheet.tow_pilot_id
         if logsheet.default_towplane_id:
             initial["towplane"] = logsheet.default_towplane_id
-        form = FlightForm(initial=initial)
+        form = FlightForm(initial=initial, logsheet=logsheet)
 
     return render(
         request,
@@ -1557,6 +1695,7 @@ def add_flight(request, logsheet_pk):
             "club_gliders": club_gliders,
             "club_private": club_private,
             "inactive_gliders": inactive_gliders,
+            "commercial_rides_enabled": commercial_rides_enabled,
         },
     )
 
@@ -1734,7 +1873,7 @@ def manage_logsheet_finances(request, pk):
     # OPTIMIZATION: Use select_related to avoid N+1 queries for pilot, glider, towplane
     flights = logsheet.flights.select_related(
         "pilot", "instructor", "glider", "towplane", "split_with"
-    ).all()
+    ).exclude(commercial_ride=True)
 
     # Get towplane rental costs for this logsheet
     # OPTIMIZATION: Already optimized with select_related
@@ -1902,6 +2041,8 @@ def manage_logsheet_finances(request, pk):
             responsible_members = set()
 
             for flight in flights:
+                if flight.commercial_ride:
+                    continue
                 pilot = flight.pilot
                 partner = flight.split_with
                 split = flight.split_type

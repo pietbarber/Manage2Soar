@@ -253,3 +253,106 @@ def test_misc_charges_column_not_shown_when_empty(
     assert ">Misc</th>" not in response.content.decode(
         "utf-8"
     ) and ">Misc<" not in response.content.decode("utf-8")
+
+
+@pytest.mark.django_db
+def test_finances_excludes_commercial_ride_from_member_charges(
+    client, active_member, another_member, logsheet_with_flights
+):
+    from logsheet.models import CommercialRide, CommercialTicket
+    from members.models import Member
+
+    commercial_only_member = Member.objects.create_user(
+        username="commercial_only_member",
+        password="testpass123",
+        first_name="Commercial",
+        last_name="Only",
+        membership_status="Full Member",
+    )
+
+    commercial_flight = Flight.objects.create(
+        logsheet=logsheet_with_flights,
+        pilot=commercial_only_member,
+        glider=Flight.objects.filter(logsheet=logsheet_with_flights).first().glider,
+        flight_type="intro",
+        commercial_ride=True,
+        launch_time=time(10, 0),
+        landing_time=time(10, 30),
+        tow_cost_actual=Decimal("200.00"),
+        rental_cost_actual=Decimal("150.00"),
+    )
+    ticket = CommercialTicket.objects.create(ticket_number="T-300")
+    ticket.transition_to(CommercialTicket.Status.REDEEMED, flight=commercial_flight)
+    CommercialRide.objects.create(
+        flight=commercial_flight,
+        ticket=ticket,
+        commercial_pilot=commercial_only_member,
+        revenue_amount=Decimal("350.00"),
+    )
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+
+    assert response.status_code == 200
+    billed_members = {
+        row["member"].id for row in response.context["member_payment_data_sorted"]
+    }
+    assert commercial_only_member.id not in billed_members
+
+
+@pytest.mark.django_db
+def test_export_finances_csv_excludes_commercial_ride_rows(
+    client, active_member, another_member, logsheet, glider
+):
+    from logsheet.models import CommercialRide, CommercialTicket, Towplane
+
+    towplane = Towplane.objects.create(name="Tow 1", n_number="N123AA", is_active=True)
+
+    normal_flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        towplane=towplane,
+        flight_type="dual",
+        launch_time=time(9, 0),
+        landing_time=time(9, 30),
+        release_altitude=3000,
+        tow_cost_actual=Decimal("50.00"),
+        rental_cost_actual=Decimal("25.00"),
+    )
+    assert normal_flight is not None
+
+    commercial_flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=another_member,
+        glider=glider,
+        towplane=towplane,
+        flight_type="intro",
+        commercial_ride=True,
+        launch_time=time(10, 0),
+        landing_time=time(10, 30),
+        release_altitude=6600,
+        tow_cost_actual=Decimal("200.00"),
+        rental_cost_actual=Decimal("150.00"),
+    )
+    ticket = CommercialTicket.objects.create(ticket_number="T-301")
+    ticket.transition_to(CommercialTicket.Status.REDEEMED, flight=commercial_flight)
+    CommercialRide.objects.create(
+        flight=commercial_flight,
+        ticket=ticket,
+        commercial_pilot=another_member,
+        revenue_amount=Decimal("350.00"),
+    )
+
+    logsheet.finalized = True
+    logsheet.save(update_fields=["finalized"])
+
+    url = reverse("logsheet:export_logsheet_finances_csv", args=[logsheet.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+
+    assert response.status_code == 200
+    body = response.content.decode("utf-8")
+    assert "3000Tow1Tow" in body
+    assert "6600Tow1Tow" not in body

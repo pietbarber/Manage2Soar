@@ -561,3 +561,94 @@ def test_flight_form_release_altitude_sequential_ordering(
         f"Release altitude choices should be sequential 0-7000. "
         f"Got first 10: {altitude_choices[:10]}"
     )
+
+
+@pytest.mark.django_db
+def test_flight_form_commercial_requires_ticket(active_member, glider, logsheet):
+    from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    active_member.glider_rating = "commercial"
+    active_member.save(update_fields=["glider_rating"])
+
+    form = FlightForm(
+        data={
+            "pilot": active_member.id,
+            "glider": glider.id,
+            "launch_time": "14:00",
+            "commercial_ride": "on",
+        },
+        logsheet=logsheet,
+    )
+
+    assert not form.is_valid()
+    assert "ticket_number" in form.errors
+
+
+@pytest.mark.django_db
+def test_flight_form_commercial_requires_commercial_rating(
+    active_member, glider, logsheet
+):
+    from logsheet.forms import FlightForm
+    from logsheet.models import CommercialTicket
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    CommercialTicket.objects.create(ticket_number="T-200")
+
+    form = FlightForm(
+        data={
+            "pilot": active_member.id,
+            "glider": glider.id,
+            "launch_time": "14:00",
+            "commercial_ride": "on",
+            "ticket_number": "T-200",
+        },
+        logsheet=logsheet,
+    )
+
+    assert not form.is_valid()
+    assert "pilot" in form.errors
+
+
+@pytest.mark.django_db
+def test_flight_form_commercial_valid_with_ticket_and_rating(
+    active_member, glider, logsheet
+):
+    from logsheet.forms import FlightForm
+    from logsheet.models import CommercialTicket
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    CommercialTicket.objects.create(ticket_number="T-201")
+    active_member.glider_rating = "commercial"
+    active_member.save(update_fields=["glider_rating"])
+
+    form = FlightForm(
+        data={
+            "pilot": active_member.id,
+            "glider": glider.id,
+            "launch_time": "14:00",
+            "commercial_ride": "on",
+            "ticket_number": "T-201",
+        },
+        logsheet=logsheet,
+    )
+
+    assert form.is_valid(), f"Form errors: {form.errors}"

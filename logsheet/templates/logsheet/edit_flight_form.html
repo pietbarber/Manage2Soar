@@ -288,6 +288,43 @@
       </p>
 
       <div class="row g-3">
+        {% if commercial_rides_enabled %}
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input type="checkbox"
+                   name="commercial_ride"
+                   id="id_commercial_ride"
+                   class="form-check-input"
+                   {% if form.commercial_ride.value %}checked{% endif %}>
+            <label for="id_commercial_ride" class="form-check-label">
+              <i class="bi bi-cash-coin me-1"></i>Commercial Ride
+            </label>
+          </div>
+          {% if form.commercial_ride.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.commercial_ride.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-6" id="ticket-number-group">
+          <label for="id_ticket_number" class="form-label fw-semibold">
+            <i class="bi bi-ticket-perforated me-1"></i>Ticket Number
+          </label>
+          <input type="text"
+                 name="ticket_number"
+                 id="id_ticket_number"
+                 class="form-control{% if form.ticket_number.errors %} is-invalid{% endif %}"
+                 value="{{ form.ticket_number.value|default_if_none:'' }}"
+                 placeholder="Enter paid ticket number">
+          {% if form.ticket_number.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.ticket_number.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
         <!-- Is Retrieve -->
         <div class="col-md-4">
           <div class="form-check">
@@ -349,6 +386,33 @@
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
   </div>
 </form>
+
+<script>
+  (function () {
+    const commercialToggle = document.getElementById('id_commercial_ride');
+    const ticketGroup = document.getElementById('ticket-number-group');
+    const passengerMemberGroup = document.querySelector('label[for="{{ form.passenger.id_for_label }}"]')?.closest('.col-md-6');
+    const passengerNameGroup = document.querySelector('label[for="{{ form.passenger_name.id_for_label }}"]')?.closest('.col-md-6');
+
+    if (!commercialToggle || !ticketGroup) {
+      return;
+    }
+
+    const syncCommercialUi = () => {
+      const isCommercial = commercialToggle.checked;
+      ticketGroup.style.display = isCommercial ? '' : 'none';
+      if (passengerMemberGroup) {
+        passengerMemberGroup.style.display = isCommercial ? 'none' : '';
+      }
+      if (passengerNameGroup) {
+        passengerNameGroup.style.display = isCommercial ? 'none' : '';
+      }
+    };
+
+    syncCommercialUi();
+    commercialToggle.addEventListener('change', syncCommercialUi);
+  })();
+</script>
 
 
 

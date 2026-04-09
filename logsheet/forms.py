@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 
 from django import forms
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.db.models import Case, IntegerField, Q, When
 from django.forms import modelformset_factory
@@ -15,6 +15,7 @@ from siteconfig.models import SiteConfiguration
 
 from .models import (
     Airfield,
+    CommercialTicket,
     Flight,
     Logsheet,
     LogsheetCloseout,
@@ -119,6 +120,9 @@ def get_active_members():
 # - Filters active members for "split_with", ordered by last name.
 # Additionally, if the form is for a new instance, the "launch_time" field is pre-filled with the current local time.
 class FlightForm(forms.ModelForm):
+    commercial_ride = forms.BooleanField(required=False)
+    ticket_number = forms.CharField(max_length=50, required=False)
+
     def clean(self):
         cleaned_data = super().clean()
         glider = cleaned_data.get("glider")
@@ -184,11 +188,96 @@ class FlightForm(forms.ModelForm):
                     f"but please verify this is correct."
                 )
 
+        commercial_ride = cleaned_data.get("commercial_ride")
+        ticket_number = (cleaned_data.get("ticket_number") or "").strip()
+
+        if commercial_ride:
+            config = SiteConfiguration.objects.first()
+            if not config or not config.commercial_rides_enabled:
+                self.add_error(
+                    "commercial_ride",
+                    "Commercial rides are disabled in site configuration.",
+                )
+
+            if not ticket_number:
+                self.add_error(
+                    "ticket_number",
+                    "Ticket number is required for commercial rides.",
+                )
+
+            if pilot and pilot.glider_rating != "commercial":
+                self.add_error(
+                    "pilot",
+                    "Commercial rides require a pilot with a commercial glider rating.",
+                )
+
+            if passenger:
+                self.add_error(
+                    "passenger",
+                    "Commercial rides use ticket IDs and cannot have a member passenger.",
+                )
+
+            if (cleaned_data.get("passenger_name") or "").strip():
+                self.add_error(
+                    "passenger_name",
+                    "Commercial rides use ticket IDs and cannot have passenger name text.",
+                )
+
+            if ticket_number:
+                ticket = CommercialTicket.objects.filter(
+                    ticket_number=ticket_number
+                ).first()
+                if not ticket:
+                    self.add_error(
+                        "ticket_number",
+                        "Ticket number does not exist.",
+                    )
+                elif ticket.status == CommercialTicket.Status.REFUNDED:
+                    self.add_error(
+                        "ticket_number",
+                        "Refunded tickets cannot be used for flights.",
+                    )
+                elif (
+                    ticket.status == CommercialTicket.Status.REDEEMED
+                    and ticket.flight_id not in {None, self.instance.pk}
+                ):
+                    self.add_error(
+                        "ticket_number",
+                        "Ticket is already redeemed by a different flight.",
+                    )
+
+            if self.instance.pk:
+                try:
+                    existing_ride = self.instance.commercial_ride_record
+                except ObjectDoesNotExist:
+                    existing_ride = None
+
+                if (
+                    existing_ride
+                    and ticket_number != existing_ride.ticket.ticket_number
+                ):
+                    self.add_error(
+                        "ticket_number",
+                        "Changing ticket number for an existing commercial ride is not allowed.",
+                    )
+        else:
+            if self.instance.pk:
+                try:
+                    existing_ride = self.instance.commercial_ride_record
+                except ObjectDoesNotExist:
+                    existing_ride = None
+                if existing_ride:
+                    self.add_error(
+                        "commercial_ride",
+                        "Existing commercial rides cannot be converted to regular flights.",
+                    )
+
         return cleaned_data
 
     class Meta:
         model = Flight
         fields = [
+            "commercial_ride",
             "launch_time",
             "landing_time",
             "pilot",
@@ -525,6 +614,17 @@ class FlightForm(forms.ModelForm):
         )
 
         # Removed glider_obj pilot auto-selection logic for clarity and to avoid undefined variable
+
+        if self.instance and self.instance.pk:
+            self.fields["commercial_ride"].initial = bool(self.instance.commercial_ride)
+            try:
+                existing_ride = self.instance.commercial_ride_record
+            except ObjectDoesNotExist:
+                existing_ride = None
+            if existing_ride:
+                self.fields["ticket_number"].initial = (
+                    existing_ride.ticket.ticket_number
+                )
 
 
 # CreateLogsheetForm
