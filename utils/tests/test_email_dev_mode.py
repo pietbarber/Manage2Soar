@@ -60,6 +60,23 @@ class DevModeEmailTests(TestCase):
         self.assertEqual(
             call_kwargs["recipient_list"], ["user1@example.com", "user2@example.com"]
         )
+        self.assertEqual(call_kwargs["from_email"], "noreply@example.com")
+
+    @override_settings(EMAIL_DEV_MODE=False)
+    @patch("utils.email.django_send_mail")
+    def test_send_mail_normalizes_from_email_local_part(self, mock_send):
+        """send_mail should normalize sender local-part to noreply."""
+        mock_send.return_value = 1
+
+        send_mail(
+            subject="Test Subject",
+            message="Test body",
+            from_email="board-bounces@test.com",
+            recipient_list=["user@example.com"],
+        )
+
+        call_kwargs = mock_send.call_args.kwargs
+        self.assertEqual(call_kwargs["from_email"], "noreply@test.com")
 
     @override_settings(
         EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
@@ -142,6 +159,7 @@ class DevModeEmailTests(TestCase):
         # Subject should NOT be modified
         self.assertEqual(msg.subject, "Test Subject")
         self.assertNotIn("[DEV MODE]", msg.subject)
+        self.assertEqual(msg.from_email, "noreply@example.com")
 
     @override_settings(
         EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
@@ -198,8 +216,29 @@ class SendMassMailTests(TestCase):
         sent_datatuple = mock_send.call_args[0][0]
         self.assertEqual(sent_datatuple[0][0], "Subject 1")
         self.assertEqual(sent_datatuple[0][3], ["user1@example.com"])
+        self.assertEqual(sent_datatuple[0][2], "noreply@example.com")
         self.assertEqual(sent_datatuple[1][0], "Subject 2")
         self.assertEqual(sent_datatuple[1][3], ["user2@example.com"])
+        self.assertEqual(sent_datatuple[1][2], "noreply@example.com")
+
+    @override_settings(EMAIL_DEV_MODE=False)
+    @patch("django.core.mail.send_mass_mail")
+    def test_send_mass_mail_normalizes_from_email_local_part(self, mock_send):
+        """send_mass_mail should normalize sender local-part to noreply."""
+        mock_send.return_value = 1
+
+        datatuple = [
+            (
+                "Subject 1",
+                "Body 1",
+                "board-bounces@test.com",
+                ["user1@example.com"],
+            ),
+        ]
+        send_mass_mail(datatuple)
+
+        sent_datatuple = mock_send.call_args[0][0]
+        self.assertEqual(sent_datatuple[0][2], "noreply@test.com")
 
     @override_settings(
         EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
