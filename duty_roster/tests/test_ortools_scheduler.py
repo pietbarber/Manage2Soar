@@ -533,6 +533,33 @@ class ORToolsHardConstraintsTests(TestCase):
             "Carry-over anti-repeat should prevent first-day same-role repeat.",
         )
 
+    def test_carryover_uses_latest_scheduled_assignment_only(self):
+        """Carry-over source should skip ad-hoc days and use latest scheduled day."""
+        # Last published/scheduled roster day before anchor
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 21),
+            instructor=self.member1,
+            is_scheduled=True,
+        )
+        # Later ad-hoc day should be ignored for carry-over sourcing
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 28),
+            instructor=self.member2,
+            is_scheduled=False,
+        )
+
+        data = extract_scheduling_data(
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 1),
+            roles=["instructor"],
+        )
+
+        self.assertEqual(
+            data.prior_assignments.get("instructor"),
+            self.member1.id,
+            "Expected latest scheduled assignment to be used for carry-over.",
+        )
+
     def test_max_assignments_constraint(self):
         """Test that members don't exceed max_assignments_per_month."""
         # Set low max for member1

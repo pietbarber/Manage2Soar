@@ -18,7 +18,6 @@ from typing import Any
 from ortools.sat.python import cp_model
 
 from duty_roster.models import (
-    DutyAssignment,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
@@ -899,8 +898,9 @@ def extract_scheduling_data(
     from django.utils.timezone import now
 
     from duty_roster.roster_generator import (
+        DUTY_ROLE_TO_ASSIGNMENT_FIELD,
         count_calendar_months_inclusive,
-        get_previous_duty_day,
+        get_previous_scheduled_assignment,
         get_weekend_dates_in_range,
         resolve_roster_date_range,
     )
@@ -971,24 +971,12 @@ def extract_scheduling_data(
 
     prior_assignments = {}
     if duty_days:
-        previous_duty_day = get_previous_duty_day(duty_days[0])
-        if previous_duty_day:
-            previous_assignment = DutyAssignment.objects.filter(
-                date=previous_duty_day
-            ).first()
-            if previous_assignment:
-                role_to_field = {
-                    "instructor": "instructor_id",
-                    "duty_officer": "duty_officer_id",
-                    "assistant_duty_officer": "assistant_duty_officer_id",
-                    "towpilot": "tow_pilot_id",
-                }
-                for role in roles:
-                    field_name = role_to_field.get(role)
-                    if field_name:
-                        prior_assignments[role] = getattr(
-                            previous_assignment, field_name
-                        )
+        previous_assignment = get_previous_scheduled_assignment(duty_days[0])
+        if previous_assignment:
+            for role in roles:
+                field_name = DUTY_ROLE_TO_ASSIGNMENT_FIELD.get(role)
+                if field_name:
+                    prior_assignments[role] = getattr(previous_assignment, field_name)
 
     return SchedulingData(
         members=members,

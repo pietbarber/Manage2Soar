@@ -22,6 +22,13 @@ from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger("duty_roster.generator")
 
+DUTY_ROLE_TO_ASSIGNMENT_FIELD = {
+    "instructor": "instructor_id",
+    "duty_officer": "duty_officer_id",
+    "assistant_duty_officer": "assistant_duty_officer_id",
+    "towpilot": "tow_pilot_id",
+}
+
 DEFAULT_MAX_ASSIGNMENTS = 8
 DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY = "duty_default_max_assignments_per_month"
 DEFAULT_MAX_ASSIGNMENTS_CACHE_TTL_SECONDS = 300
@@ -183,15 +190,16 @@ def get_weekend_dates_in_range(start_date: date, end_date: date) -> list[date]:
     return weekend_dates
 
 
-def get_previous_duty_day(anchor_date: date) -> date | None:
-    """Return the nearest prior operational weekend day before anchor_date."""
-    probe = anchor_date - timedelta(days=1)
-    # Two weeks safely spans weekend adjacency patterns across month boundaries.
-    for _ in range(14):
-        if probe.weekday() in (5, 6) and is_within_operational_season(probe):
-            return probe
-        probe -= timedelta(days=1)
-    return None
+def get_previous_scheduled_assignment(anchor_date: date):
+    """Return most recent scheduled DutyAssignment before anchor_date."""
+    return (
+        DutyAssignment.objects.filter(
+            date__lt=anchor_date,
+            is_scheduled=True,
+        )
+        .order_by("-date")
+        .first()
+    )
 
 
 def count_calendar_months_inclusive(start_date: date, end_date: date) -> int:
@@ -798,22 +806,12 @@ def _generate_roster_legacy(
     schedule = []
     last_assigned = {role: None for role in roles_to_schedule}
     if weekend_dates:
-        previous_duty_day = get_previous_duty_day(weekend_dates[0])
-        if previous_duty_day:
-            previous_assignment = DutyAssignment.objects.filter(
-                date=previous_duty_day
-            ).first()
-            if previous_assignment:
-                role_to_field = {
-                    "instructor": "instructor_id",
-                    "duty_officer": "duty_officer_id",
-                    "assistant_duty_officer": "assistant_duty_officer_id",
-                    "towpilot": "tow_pilot_id",
-                }
-                for role in roles_to_schedule:
-                    field_name = role_to_field.get(role)
-                    if field_name:
-                        last_assigned[role] = getattr(previous_assignment, field_name)
+        previous_assignment = get_previous_scheduled_assignment(weekend_dates[0])
+        if previous_assignment:
+            for role in roles_to_schedule:
+                field_name = DUTY_ROLE_TO_ASSIGNMENT_FIELD.get(role)
+                if field_name:
+                    last_assigned[role] = getattr(previous_assignment, field_name)
     for day in weekend_dates:
         assigned_today = set()
         slots = {}
