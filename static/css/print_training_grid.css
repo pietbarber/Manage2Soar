@@ -1,0 +1,75 @@
+@page {
+  size: landscape;
+  margin: 0.5in;
+}
+
+@media print {
+  .training-grid-scroll {
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  table.training-grid {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+
+  .training-grid th,
+  .training-grid td {
+    font-size: 9pt;
+    line-height: 1.1;
+    padding: 0.12rem 0.2rem !important;
+    vertical-align: middle;
+    word-break: break-word;
+  }
+
+  .training-grid-lesson-col {
+    width: 2.3in;
+  }
+
+  .training-grid-date-col {
+    width: 0.62in;
+    text-align: center;
+  }
+
+  .training-grid-max-col {
+    width: 0.62in;
+    text-align: center;
+  }
+
+  .sticky-col,
+  .sticky-max {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: auto !important;
+  }
+
+  .training-grid img {
+    display: none !important;
+  }
+
+  .print-score-text {
+    display: inline;
+    font-weight: 700;
+  }
+
+  .print-hide-old-col {
+    display: none !important;
+  }
+
+  .training-grid tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .btn,
+  .alert .btn-close,
+  .tooltip {
+    display: none !important;
+  }
+}
