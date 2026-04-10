@@ -11,7 +11,7 @@ Phase 2 Implementation: Full production constraints matching legacy scheduler be
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
@@ -72,6 +72,7 @@ class SchedulingData:
     role_scarcity: dict[str, dict[str, Any]]
     earliest_duty_day: date
     month_span: int = 1
+    prior_assignments: dict[str, int | None] = field(default_factory=dict)
 
 
 class DutyRosterScheduler:
@@ -253,6 +254,9 @@ class DutyRosterScheduler:
 
         # Constraint 6: Max assignments per month
         self._add_max_assignments_constraints()
+
+        # Constraint 7: Carry-over anti-repeat from prior duty day
+        self._add_carryover_anti_repeat_constraints()
 
         logger.info("Hard constraints added successfully")
 
@@ -439,6 +443,29 @@ class DutyRosterScheduler:
 
             if total_assignments:
                 self.model.Add(sum(total_assignments) <= max_assignments)
+
+    def _add_carryover_anti_repeat_constraints(self):
+        """Block same-role repeats from prior duty day into first scheduled day."""
+        if not self.data.duty_days:
+            return
+
+        first_day = self.data.duty_days[0]
+        for role in self.data.roles:
+            prior_member_id = self.data.prior_assignments.get(role)
+            if not prior_member_id:
+                continue
+
+            key = (prior_member_id, role, first_day)
+            alternative_candidates = [
+                self.x[m.id, role, first_day]
+                for m in self.data.members
+                if m.id != prior_member_id and (m.id, role, first_day) in self.x
+            ]
+
+            # Only enforce carry-over hard-block when at least one alternative
+            # candidate can satisfy the slot on the first generated day.
+            if key in self.x and alternative_candidates:
+                self.model.Add(self.x[key] == 0)
 
     def _add_objective_function(self):
         """
@@ -879,7 +906,9 @@ def extract_scheduling_data(
     from django.utils.timezone import now
 
     from duty_roster.roster_generator import (
+        DUTY_ROLE_TO_ASSIGNMENT_FIELD,
         count_calendar_months_inclusive,
+        get_previous_scheduled_assignment,
         get_weekend_dates_in_range,
         resolve_roster_date_range,
     )
@@ -948,6 +977,15 @@ def extract_scheduling_data(
     # Determine earliest duty day for staleness calculation
     earliest_duty_day = min(duty_days) if duty_days else today
 
+    prior_assignments = {}
+    if duty_days:
+        previous_assignment = get_previous_scheduled_assignment(duty_days[0])
+        if previous_assignment:
+            for role in roles:
+                field_name = DUTY_ROLE_TO_ASSIGNMENT_FIELD.get(role)
+                if field_name:
+                    prior_assignments[role] = getattr(previous_assignment, field_name)
+
     return SchedulingData(
         members=members,
         duty_days=duty_days,
@@ -959,6 +997,7 @@ def extract_scheduling_data(
         role_scarcity=role_scarcity,
         earliest_duty_day=earliest_duty_day,
         month_span=month_span,
+        prior_assignments=prior_assignments,
     )
 
 

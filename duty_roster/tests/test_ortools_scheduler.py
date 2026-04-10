@@ -15,6 +15,7 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from duty_roster.models import (
+    DutyAssignment,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
@@ -504,6 +505,87 @@ class ORToolsHardConstraintsTests(TestCase):
             slots_day1,
             slots_day2,
             "Instructor should not repeat on adjacent duty days even across week gaps.",
+        )
+
+    def test_carryover_anti_repeat_blocks_first_day_repeat(self):
+        """First generated day should respect prior published duty-day assignment."""
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 28),
+            instructor=self.member1,
+        )
+
+        data = extract_scheduling_data(
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 1),
+            roles=["instructor"],
+        )
+
+        self.assertEqual(data.prior_assignments.get("instructor"), self.member1.id)
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned = result["schedule"][0]["slots"]["instructor"]
+        self.assertNotEqual(
+            assigned,
+            self.member1.id,
+            "Carry-over anti-repeat should prevent first-day same-role repeat.",
+        )
+
+    def test_carryover_uses_latest_scheduled_assignment_only(self):
+        """Carry-over source should skip ad-hoc days and use latest scheduled day."""
+        # Last published/scheduled roster day before anchor
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 21),
+            instructor=self.member1,
+            is_scheduled=True,
+        )
+        # Later ad-hoc day should be ignored for carry-over sourcing
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 28),
+            instructor=self.member2,
+            is_scheduled=False,
+        )
+
+        data = extract_scheduling_data(
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 1),
+            roles=["instructor"],
+        )
+
+        self.assertEqual(
+            data.prior_assignments.get("instructor"),
+            self.member1.id,
+            "Expected latest scheduled assignment to be used for carry-over.",
+        )
+
+    def test_carryover_hard_block_skips_when_no_alternative_candidate(self):
+        """Carry-over should not make model infeasible when first day has one option."""
+        data = SchedulingData(
+            members=[self.member1],
+            duty_days=[date(2026, 3, 1)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: DutyPreference.objects.get(member=self.member1),
+            },
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 1),
+            prior_assignments={"instructor": self.member1.id},
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned = result["schedule"][0]["slots"]["instructor"]
+        self.assertEqual(
+            assigned,
+            self.member1.id,
+            "Expected first day to remain assignable when no alternative exists.",
         )
 
     def test_max_assignments_constraint(self):

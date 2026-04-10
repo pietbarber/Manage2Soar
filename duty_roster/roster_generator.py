@@ -9,17 +9,22 @@ from decimal import ROUND_CEILING, Decimal
 from django.core.cache import cache
 
 from duty_roster.models import (
+    DutyAssignment,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
     MemberBlackout,
 )
 from duty_roster.operational_calendar import get_operational_weekend
-from members.constants.membership import DEFAULT_ROLES
+from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger("duty_roster.generator")
+
+DUTY_ROLE_TO_ASSIGNMENT_FIELD = {
+    role: f"{field_name}_id" for role, field_name in ROLE_FIELD_MAP.items()
+}
 
 DEFAULT_MAX_ASSIGNMENTS = 8
 DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY = "duty_default_max_assignments_per_month"
@@ -180,6 +185,18 @@ def get_weekend_dates_in_range(start_date: date, end_date: date) -> list[date]:
             weekend_dates.append(current)
         current += timedelta(days=1)
     return weekend_dates
+
+
+def get_previous_scheduled_assignment(anchor_date: date):
+    """Return most recent scheduled DutyAssignment before anchor_date."""
+    return (
+        DutyAssignment.objects.filter(
+            date__lt=anchor_date,
+            is_scheduled=True,
+        )
+        .order_by("-date")
+        .first()
+    )
 
 
 def count_calendar_months_inclusive(start_date: date, end_date: date) -> int:
@@ -785,6 +802,13 @@ def _generate_roster_legacy(
 
     schedule = []
     last_assigned = {role: None for role in roles_to_schedule}
+    if weekend_dates:
+        previous_assignment = get_previous_scheduled_assignment(weekend_dates[0])
+        if previous_assignment:
+            for role in roles_to_schedule:
+                field_name = DUTY_ROLE_TO_ASSIGNMENT_FIELD.get(role)
+                if field_name:
+                    last_assigned[role] = getattr(previous_assignment, field_name)
     for day in weekend_dates:
         assigned_today = set()
         slots = {}
