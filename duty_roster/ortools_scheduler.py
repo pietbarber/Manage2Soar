@@ -40,6 +40,9 @@ FAIRNESS_PENALTY_WEIGHT = (
 MAX_ASSIGNMENT_CONCENTRATION_WEIGHT = (
     120  # Extra penalty for high single-member assignment concentration
 )
+ROLE_SPLIT_BALANCE_WEIGHT = (
+    1  # Penalty weight for drifting away from preferred multi-role split
+)
 WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS = {
     1: 60,
     2: 20,
@@ -628,7 +631,10 @@ class DutyRosterScheduler:
                     -MAX_ASSIGNMENT_CONCENTRATION_WEIGHT * max_member_load
                 )
 
-            # Soft constraint 5: Weekend spacing preference and consistency
+            # Soft constraint 5: Multi-role split balancing per member
+            self._add_role_split_balance_soft_constraints(objective_terms)
+
+            # Soft constraint 6: Weekend spacing preference and consistency
             self._add_weekend_spacing_soft_constraints(
                 objective_terms, member_assigned_on_day
             )
@@ -636,6 +642,94 @@ class DutyRosterScheduler:
         # Set objective: maximize total weighted satisfaction
         self.model.Maximize(sum(objective_terms))
         logger.info(f"Objective function built with {len(objective_terms)} terms")
+
+    def _add_role_split_balance_soft_constraints(self, objective_terms):
+        """Penalize drift from preferred role split for multi-role members."""
+        if not self.data.duty_days:
+            return
+
+        max_days = len(self.data.duty_days)
+
+        for member in self.data.members:
+            pref = self.data.preferences.get(member.id)
+            if not pref:
+                continue
+
+            eligible_roles = [
+                role
+                for role in self.data.roles
+                if getattr(member, role, False)
+                and any((member.id, role, day) in self.x for day in self.data.duty_days)
+            ]
+            if len(eligible_roles) < 2:
+                continue
+
+            role_percentages = {
+                role: self._get_role_percent(pref, role) for role in eligible_roles
+            }
+            if all(percent == 0 for percent in role_percentages.values()):
+                role_targets = {role: 1 for role in eligible_roles}
+            else:
+                role_targets = {
+                    role: percent
+                    for role, percent in role_percentages.items()
+                    if percent > 0
+                }
+                if len(role_targets) < 2:
+                    continue
+
+            denominator = sum(role_targets.values())
+            role_count_vars = {}
+
+            for role in role_targets:
+                role_vars = [
+                    self.x[member.id, role, day]
+                    for day in self.data.duty_days
+                    if (member.id, role, day) in self.x
+                ]
+                if not role_vars:
+                    continue
+
+                count_var = self.model.NewIntVar(
+                    0,
+                    max_days,
+                    f"role_count_{member.id}_{role}",
+                )
+                self.model.Add(count_var == sum(role_vars))
+                role_count_vars[role] = count_var
+
+            if len(role_count_vars) < 2:
+                continue
+
+            total_var = self.model.NewIntVar(
+                0,
+                max_days,
+                f"role_count_total_{member.id}",
+            )
+            self.model.Add(total_var == sum(role_count_vars.values()))
+
+            abs_bound = denominator * max_days
+            for role, target in role_targets.items():
+                count_var = role_count_vars.get(role)
+                if count_var is None:
+                    continue
+
+                deviation = self.model.NewIntVar(
+                    -abs_bound,
+                    abs_bound,
+                    f"role_split_dev_{member.id}_{role}",
+                )
+                self.model.Add(
+                    deviation == denominator * count_var - target * total_var
+                )
+
+                abs_deviation = self.model.NewIntVar(
+                    0,
+                    abs_bound,
+                    f"role_split_abs_dev_{member.id}_{role}",
+                )
+                self.model.AddAbsEquality(abs_deviation, deviation)
+                objective_terms.append(-ROLE_SPLIT_BALANCE_WEIGHT * abs_deviation)
 
     def _add_weekend_spacing_soft_constraints(
         self, objective_terms, member_assigned_on_day

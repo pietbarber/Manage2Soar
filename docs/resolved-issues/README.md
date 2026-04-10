@@ -106,6 +106,21 @@ Enhanced logsheet unfinalization permissions expanding access beyond superuser-o
 
 ---
 
+### [Dual-Role Balance Weighting (Duty Roster)](issue-dual-role-balance-weighting.md)
+**Status**: Complete ✅ | **Date**: April 9, 2026 | **Branch**: `feature/fix-dual-role-balance-weighting`
+
+Improved OR-Tools objective behavior for dual-role members (for example `instructor` + `towpilot`) so assignment outcomes better follow configured split preferences instead of drifting into a single role.
+
+**Key Achievements**:
+- ✅ Added multi-role split balancing soft objective terms
+- ✅ Preserved hard feasibility constraints while improving fairness pressure
+- ✅ Added targeted regression coverage to verify reduced role-drift
+- ✅ Documented tenant-specific allegation context and fix rationale
+
+**Technologies**: OR-Tools CP-SAT objective tuning, Django duty roster scheduling, pytest regression tests
+
+---
+
 ### [GitHub MCP Integration Enhancement](github-mcp-integration-enhancement.md)
 **Status**: Complete ✅ | **Date**: October 29, 2025 | **Scope**: Development Workflow
 
