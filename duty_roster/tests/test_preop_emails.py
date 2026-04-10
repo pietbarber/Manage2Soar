@@ -17,7 +17,12 @@ from django.core import mail
 from django.core.management import call_command
 from django.test import override_settings
 
-from duty_roster.models import DutyAssignment, InstructionSlot, OpsIntent
+from duty_roster.models import (
+    DutyAssignment,
+    GliderReservation,
+    InstructionSlot,
+    OpsIntent,
+)
 from logsheet.models import Glider, MaintenanceDeadline, MaintenanceIssue, Towplane
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -572,6 +577,26 @@ class TestSendDutyPreopEmails:
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="board-bounces-bounces@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_from_email_derives_noreply_local_part(
+        self, site_config, duty_assignment, tomorrow
+    ):
+        """Sender should use noreply@domain regardless of configured local-part."""
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        email = mail.outbox[0]
+        assert email.from_email == "noreply@test.com"
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
         DEFAULT_FROM_EMAIL="noreply@test.com",
         SITE_URL="https://test.manage2soar.com",
     )
@@ -621,6 +646,112 @@ class TestSendDutyPreopEmails:
         # Generic flying-day ICS must not contain any crew member's name
         assert "Assigned to:" not in ics_text
         assert "SUMMARY:Flying Day" in ics_text
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_cc_glider_reservation_members(
+        self, site_config, duty_assignment, members, glider, tomorrow
+    ):
+        """Confirmed reservation members should receive participant emails."""
+        GliderReservation.objects.create(
+            member=members["private_owner"],
+            glider=glider,
+            date=tomorrow,
+            status="confirmed",
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        # 3 crew emails + 1 reservation participant email
+        assert len(mail.outbox) == 4
+        reservation_email = next(
+            e for e in mail.outbox if e.to == [members["private_owner"].email]
+        )
+        assert reservation_email.cc == []
+        assert len(reservation_email.attachments) == 1
+        assert reservation_email.attachments[0][0].startswith("flying-day-")
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_skips_non_confirmed_reservations(
+        self, site_config, duty_assignment, members, glider, tomorrow
+    ):
+        """Cancelled/no-show reservations should not produce participant emails."""
+        GliderReservation.objects.create(
+            member=members["private_owner"],
+            glider=glider,
+            date=tomorrow,
+            status="cancelled",
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        GliderReservation.objects.create(
+            member=members["student"],
+            glider=glider,
+            date=tomorrow,
+            status="no_show",
+            reservation_type="solo",
+            time_preference="afternoon",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        # Only crew emails should be sent.
+        assert len(mail.outbox) == 3
+        all_recipients = [email.to[0] for email in mail.outbox]
+        assert members["private_owner"].email not in all_recipients
+        assert members["student"].email not in all_recipients
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_cc_excludes_duplicate_reservation_for_duty_crew(
+        self, site_config, duty_assignment, members, glider, tomorrow
+    ):
+        """Crew member with reservation should not get duplicate participant email."""
+        GliderReservation.objects.create(
+            member=members["instructor"],
+            glider=glider,
+            date=tomorrow,
+            status="confirmed",
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        # Still only the 3 crew emails.
+        assert len(mail.outbox) == 3
+        all_recipients = [email.to[0] for email in mail.outbox]
+        assert all_recipients.count(members["instructor"].email) == 1
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",

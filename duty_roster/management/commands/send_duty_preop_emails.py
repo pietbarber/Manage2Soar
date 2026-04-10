@@ -111,7 +111,8 @@ class Command(BaseCommand):
         # Build context for templates
         context = self._build_context(assignment, target_date, config, site_url)
 
-        # Collect CC emails from students and ops intent members
+        # Collect participant emails from students, ops intent members,
+        # and confirmed glider reservations.
         crew_emails = [member.email for member, _ in crew_with_roles]
         cc_emails = []
         for slot in context.get("instruction_requests", []):
@@ -120,6 +121,9 @@ class Command(BaseCommand):
         for intent in context.get("ops_intents", []):
             if intent.member and intent.member.email:
                 cc_emails.append(intent.member.email)
+        for reservation in context.get("reservations", []):
+            if reservation.member and reservation.member.email:
+                cc_emails.append(reservation.member.email)
         # Remove duplicates and any emails already in crew_emails
         cc_emails = list(set(cc_emails) - set(crew_emails))
 

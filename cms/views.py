@@ -537,7 +537,7 @@ def _notify_member_managers_of_contact(contact_submission):
     try:
         from members.models import Member
         from siteconfig.models import SiteConfiguration
-        from utils.email import send_mail
+        from utils.email import enforce_noreply_from_email, send_mail
 
         # Get site configuration for domain info
         site_config = SiteConfiguration.objects.first()
@@ -598,7 +598,7 @@ def _notify_member_managers_of_contact(contact_submission):
             send_mail(
                 subject=subject,
                 message=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
+                from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
                 recipient_list=recipient_emails,
                 html_message=html_message,
                 fail_silently=False,  # We want to know if email fails

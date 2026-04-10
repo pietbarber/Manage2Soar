@@ -24,7 +24,7 @@ from members.models import Member
 from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
-from utils.email import get_dev_mode_info, send_mail
+from utils.email import enforce_noreply_from_email, get_dev_mode_info, send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import get_canonical_url
 
@@ -933,7 +933,9 @@ def get_email_context_base():
 
 def get_from_email():
     """Get the from email address for notifications."""
-    return getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
+    return enforce_noreply_from_email(
+        getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
+    )
 
 
 def send_swap_request_notifications(swap_request):

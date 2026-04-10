@@ -28,7 +28,7 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from members.decorators import active_member_required
-from utils.email import send_mail
+from utils.email import enforce_noreply_from_email, send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
@@ -91,7 +91,7 @@ def _send_written_test_assignment_email(assignment):
     send_mail(
         subject=f"[{club_name}] New Written Test Assigned: {assignment.template.name}",
         message=text_message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
         recipient_list=[student_email],
         html_message=html_message,
         fail_silently=False,
