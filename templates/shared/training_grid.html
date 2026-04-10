@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Training Grid{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/print_training_grid.css' %}" media="print">
+{% endblock %}
 {% block content %}
 <style>
 /* Scrollable grid container and sticky columns */
@@ -30,6 +33,10 @@ th.sticky-max, td.sticky-max {
   z-index: 2;
 }
 
+.print-score-text {
+  display: none;
+}
+
 
 </style>
 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -57,18 +64,18 @@ th.sticky-max, td.sticky-max {
 <table class="table table-bordered table-sm border-dark-subtle training-grid">
   <thead>
     <tr>
-  <th rowspan="3" class="sticky-col">Lesson</th>
+  <th rowspan="3" class="sticky-col training-grid-lesson-col">Lesson</th>
       {% for meta in column_metadata %}
-        <th>
+        <th class="training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}">
           {{ meta.date|date:"M d" }}<br>
           <span class="text-muted small">{{ meta.date|date:"Y" }}</span>
         </th>
       {% endfor %}
-  <th rowspan="3" class="max_score sticky-max">⭐ Max</th>
+  <th rowspan="3" class="max_score sticky-max training-grid-max-col">⭐ Max</th>
     </tr>
     <tr>
         {% for meta in column_metadata %}
-          <th class="small text-muted" data-bs-toggle="tooltip" data-bs-placement="top"{% if meta.instructor_name %} title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}"{% endif %}>
+          <th class="small text-muted training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}" data-bs-toggle="tooltip" data-bs-placement="top"{% if meta.instructor_name %} title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}"{% endif %}>
             {% if meta.initials %}
               {{ meta.initials }}<br>
             {% else %}
@@ -81,13 +88,13 @@ th.sticky-max, td.sticky-max {
     </tr>
     <tr>
         {% for meta in column_metadata %}
-          <th>
+          <th class="training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}">
             {% if meta.num_flights > 0 %}
               <span class="badge bg-secondary text-light fs-6" style="min-width:2em;"{% if meta.flights_tooltip %} title="{{ meta.flights_tooltip }}"{% endif %}>{{ meta.num_flights }}</span>
             {% endif %}
           </th>
         {% endfor %}
-        <th></th>
+        <th class="training-grid-max-col"></th>
     </tr>
   </thead>
 
@@ -96,14 +103,14 @@ th.sticky-max, td.sticky-max {
 
     {% for group in phase_groups %}
       <tr class="table-secondary">
-  <th class="text-start sticky-col" colspan="1">{{ group.grouper }}</th>
-  {% for _ in report_dates %}<td></td>{% endfor %}
-  <th class="sticky-max"></th>
+      <th class="text-start sticky-col training-grid-lesson-col" colspan="1">{{ group.grouper }}</th>
+      {% for _ in report_dates %}<td class="training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}"></td>{% endfor %}
+      <th class="sticky-max training-grid-max-col"></th>
       </tr>
 
         {% for row in group.list %}
           <tr>
-            <td class="text-end pe-2 sticky-col">
+            <td class="text-end pe-2 sticky-col training-grid-lesson-col">
               {% if row.code %}
                 <a href="/TRAINING/Syllabus/{{ row.code }}/" target="_blank">{{ row.label }}</a>
               {% else %}
@@ -111,7 +118,7 @@ th.sticky-max, td.sticky-max {
               {% endif %}
             </td>
             {% for cell in row.scores %}
-            <td class="text-center
+            <td class="text-center training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}
                 {% if cell.score == '1' %}score-1
                 {% elif cell.score == '2' %}score-2
                 {% elif cell.score == '3' %}score-3
@@ -119,23 +126,44 @@ th.sticky-max, td.sticky-max {
                 {% elif cell.score == '!' %}score-attn
                 {% endif %}
             " title="{{ cell.tooltip }}">
-              {% if cell.score == "1" %} <img src="{% static 'images/blob1.png' %}">
-              {% elif cell.score == "2" %} <img src="{% static 'images/blob2.png' %}">
-              {% elif cell.score == "3" %} <img src="{% static 'images/blob3.png' %}">
-              {% elif cell.score == "4" %} <img src="{% static 'images/blob4.png' %}">
-              {% elif cell.score == "!" %}️ <img src="{% static 'images/blob5.png' %}">
-              {% else %}&mdash;
+              {% if cell.score == "1" %}
+                <img src="{% static 'images/blob1.png' %}" alt="Score 1">
+                <span class="print-score-text">1</span>
+              {% elif cell.score == "2" %}
+                <img src="{% static 'images/blob2.png' %}" alt="Score 2">
+                <span class="print-score-text">2</span>
+              {% elif cell.score == "3" %}
+                <img src="{% static 'images/blob3.png' %}" alt="Score 3">
+                <span class="print-score-text">3</span>
+              {% elif cell.score == "4" %}
+                <img src="{% static 'images/blob4.png' %}" alt="Score 4">
+                <span class="print-score-text">4</span>
+              {% elif cell.score == "!" %}
+                <img src="{% static 'images/blob5.png' %}" alt="Needs attention">
+                <span class="print-score-text">!</span>
+              {% else %}
+                &mdash;
               {% endif %}
             </td>
           {% endfor %}
 
 
-          <td class="text-center border border-2 border-primary fw-bold max_score sticky-max">
-              {% if row.max_score == "1" %} <img src="{% static 'images/blob1.png' %}">
-              {% elif row.max_score == "2" %} <img src="{% static 'images/blob2.png' %}">
-              {% elif row.max_score == "3" %} <img src="{% static 'images/blob3.png' %}">
-              {% elif row.max_score == "4" %} <img src="{% static 'images/blob4.png' %}">
-            {% else %}&mdash;{% endif %}
+          <td class="text-center border border-2 border-primary fw-bold max_score sticky-max training-grid-max-col">
+            {% if row.max_score == "1" %}
+              <img src="{% static 'images/blob1.png' %}" alt="Max score 1">
+              <span class="print-score-text">1</span>
+            {% elif row.max_score == "2" %}
+              <img src="{% static 'images/blob2.png' %}" alt="Max score 2">
+              <span class="print-score-text">2</span>
+            {% elif row.max_score == "3" %}
+              <img src="{% static 'images/blob3.png' %}" alt="Max score 3">
+              <span class="print-score-text">3</span>
+            {% elif row.max_score == "4" %}
+              <img src="{% static 'images/blob4.png' %}" alt="Max score 4">
+              <span class="print-score-text">4</span>
+            {% else %}
+              &mdash;
+            {% endif %}
           </td>
         </tr>
       {% endfor %}
