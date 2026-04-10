@@ -335,10 +335,11 @@ class DutyRosterScheduler:
 
     def _add_anti_repeat_constraints(self):
         """
-        Constraint: Members cannot do the same role on consecutive days.
+        Constraint: Members cannot do the same role on consecutive duty days.
 
-        Only applies to calendar-consecutive days (e.g., Saturday->Sunday),
-        not across week gaps (e.g., Sunday->next Saturday).
+        Applies to adjacent entries in the duty day sequence, which preserves
+        historical behavior for weekend rosters where the next duty day may be
+        several calendar days later (for example Sunday -> next Saturday).
         """
         for member in self.data.members:
             for role in self.data.roles:
@@ -346,15 +347,13 @@ class DutyRosterScheduler:
                     day1 = self.data.duty_days[i]
                     day2 = self.data.duty_days[i + 1]
 
-                    # Check if days are calendar-consecutive (not week-separated)
-                    if (day2 - day1).days == 1:
-                        # Check if both variables exist in our sparse set
-                        key1 = (member.id, role, day1)
-                        key2 = (member.id, role, day2)
+                    # Check if both variables exist in our sparse set
+                    key1 = (member.id, role, day1)
+                    key2 = (member.id, role, day2)
 
-                        if key1 in self.x and key2 in self.x:
-                            # Constraint: can't do same role on both days
-                            self.model.Add(self.x[key1] + self.x[key2] <= 1)
+                    if key1 in self.x and key2 in self.x:
+                        # Constraint: can't do same role on consecutive duty days
+                        self.model.Add(self.x[key1] + self.x[key2] <= 1)
 
     def _has_adjacent_weekday_pairs(self) -> bool:
         """Return True when any duty day has a matching day exactly 7 days later."""

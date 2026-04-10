@@ -477,6 +477,35 @@ class ORToolsHardConstraintsTests(TestCase):
                     f"Member {day1_slots[role]} assigned to {role} on consecutive days",
                 )
 
+    def test_anti_repeat_constraint_applies_to_adjacent_duty_days(self):
+        """Test anti-repeat across adjacent duty days with a calendar gap."""
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[date(2026, 3, 1), date(2026, 3, 7)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: DutyPreference.objects.get(member=self.member1),
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 1),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        slots_day1 = result["schedule"][0]["slots"]["instructor"]
+        slots_day2 = result["schedule"][1]["slots"]["instructor"]
+        self.assertNotEqual(
+            slots_day1,
+            slots_day2,
+            "Instructor should not repeat on adjacent duty days even across week gaps.",
+        )
+
     def test_max_assignments_constraint(self):
         """Test that members don't exceed max_assignments_per_month."""
         # Set low max for member1
