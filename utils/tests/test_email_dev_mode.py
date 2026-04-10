@@ -78,6 +78,22 @@ class DevModeEmailTests(TestCase):
         call_kwargs = mock_send.call_args.kwargs
         self.assertEqual(call_kwargs["from_email"], "noreply@test.com")
 
+    @override_settings(EMAIL_DEV_MODE=False)
+    @patch("utils.email.django_send_mail")
+    def test_send_mail_normalizes_display_name_from_email(self, mock_send):
+        """send_mail should normalize display-name sender addresses."""
+        mock_send.return_value = 1
+
+        send_mail(
+            subject="Test Subject",
+            message="Test body",
+            from_email="Club Name <members@test.com>",
+            recipient_list=["user@example.com"],
+        )
+
+        call_kwargs = mock_send.call_args.kwargs
+        self.assertEqual(call_kwargs["from_email"], "noreply@test.com")
+
     @override_settings(
         EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
     )
@@ -232,6 +248,25 @@ class SendMassMailTests(TestCase):
                 "Subject 1",
                 "Body 1",
                 "board-bounces@test.com",
+                ["user1@example.com"],
+            ),
+        ]
+        send_mass_mail(datatuple)
+
+        sent_datatuple = mock_send.call_args[0][0]
+        self.assertEqual(sent_datatuple[0][2], "noreply@test.com")
+
+    @override_settings(EMAIL_DEV_MODE=False)
+    @patch("django.core.mail.send_mass_mail")
+    def test_send_mass_mail_normalizes_display_name_from_email(self, mock_send):
+        """send_mass_mail should normalize display-name sender addresses."""
+        mock_send.return_value = 1
+
+        datatuple = [
+            (
+                "Subject 1",
+                "Body 1",
+                "Club Name <members@test.com>",
                 ["user1@example.com"],
             ),
         ]

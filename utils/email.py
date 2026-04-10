@@ -10,6 +10,8 @@ them), so dev mode redirection has no practical effect in that case. EMAIL_DEV_M
 is primarily useful for staging/production environments where real SMTP is configured.
 """
 
+from email.utils import parseaddr
+
 from django.conf import settings
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.core.mail import send_mail as django_send_mail
@@ -25,9 +27,11 @@ def enforce_noreply_from_email(from_email):
     tenant/domain routing from the configured sender domain.
     """
     raw = (from_email or getattr(settings, "DEFAULT_FROM_EMAIL", "") or "").strip()
+    parsed_addr = parseaddr(raw)[1] if raw else ""
+    candidate = parsed_addr or raw
 
-    if "@" in raw:
-        domain = raw.split("@")[-1]
+    if "@" in candidate:
+        domain = candidate.split("@")[-1]
         return f"noreply@{domain}"
 
     return "noreply@manage2soar.com"

@@ -125,7 +125,7 @@ class Command(BaseCommand):
             if reservation.member and reservation.member.email:
                 participant_emails.append(reservation.member.email)
         # Remove duplicates and any emails already in crew_emails
-        participant_emails = list(set(participant_emails) - set(crew_emails))
+        participant_emails = sorted(set(participant_emails) - set(crew_emails))
 
         # Render templates — two variants: crew (default) and participant.
         # Participant emails use the same template but with is_participant=True
