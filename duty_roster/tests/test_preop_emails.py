@@ -653,7 +653,7 @@ class TestSendDutyPreopEmails:
         DEFAULT_FROM_EMAIL="noreply@test.com",
         SITE_URL="https://test.manage2soar.com",
     )
-    def test_cc_glider_reservation_members(
+    def test_includes_glider_reservation_members(
         self, site_config, duty_assignment, members, glider, tomorrow
     ):
         """Confirmed reservation members should receive participant emails."""
@@ -728,7 +728,7 @@ class TestSendDutyPreopEmails:
         DEFAULT_FROM_EMAIL="noreply@test.com",
         SITE_URL="https://test.manage2soar.com",
     )
-    def test_cc_excludes_duplicate_reservation_for_duty_crew(
+    def test_participant_email_excludes_duplicate_reservation_for_duty_crew(
         self, site_config, duty_assignment, members, glider, tomorrow
     ):
         """Crew member with reservation should not get duplicate participant email."""
@@ -759,7 +759,7 @@ class TestSendDutyPreopEmails:
         DEFAULT_FROM_EMAIL="noreply@test.com",
         SITE_URL="https://test.manage2soar.com",
     )
-    def test_cc_ops_intent_members(
+    def test_participant_email_includes_ops_intent_members(
         self, site_config, duty_assignment, members, glider, tomorrow
     ):
         """Test that ops intent members receive their own dedicated email

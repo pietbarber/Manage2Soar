@@ -921,7 +921,7 @@ def _notify_safety_officers_of_new_report(report):
     """
     from django.template.loader import render_to_string
 
-    from utils.email import enforce_noreply_from_email, send_mail
+    from utils.email import send_mail
 
     try:
         # Get all safety officers
@@ -981,7 +981,7 @@ def _notify_safety_officers_of_new_report(report):
             send_mail(
                 subject=subject,
                 message=text_message,
-                from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+                from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=recipient_emails,
                 html_message=html_message,
                 fail_silently=False,
