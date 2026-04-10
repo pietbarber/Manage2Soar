@@ -9,6 +9,7 @@ from decimal import ROUND_CEILING, Decimal
 from django.core.cache import cache
 
 from duty_roster.models import (
+    DutyAssignment,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
@@ -180,6 +181,17 @@ def get_weekend_dates_in_range(start_date: date, end_date: date) -> list[date]:
             weekend_dates.append(current)
         current += timedelta(days=1)
     return weekend_dates
+
+
+def get_previous_duty_day(anchor_date: date) -> date | None:
+    """Return the nearest prior operational weekend day before anchor_date."""
+    probe = anchor_date - timedelta(days=1)
+    # Two weeks safely spans weekend adjacency patterns across month boundaries.
+    for _ in range(14):
+        if probe.weekday() in (5, 6) and is_within_operational_season(probe):
+            return probe
+        probe -= timedelta(days=1)
+    return None
 
 
 def count_calendar_months_inclusive(start_date: date, end_date: date) -> int:
@@ -785,6 +797,23 @@ def _generate_roster_legacy(
 
     schedule = []
     last_assigned = {role: None for role in roles_to_schedule}
+    if weekend_dates:
+        previous_duty_day = get_previous_duty_day(weekend_dates[0])
+        if previous_duty_day:
+            previous_assignment = DutyAssignment.objects.filter(
+                date=previous_duty_day
+            ).first()
+            if previous_assignment:
+                role_to_field = {
+                    "instructor": "instructor_id",
+                    "duty_officer": "duty_officer_id",
+                    "assistant_duty_officer": "assistant_duty_officer_id",
+                    "towpilot": "tow_pilot_id",
+                }
+                for role in roles_to_schedule:
+                    field_name = role_to_field.get(role)
+                    if field_name:
+                        last_assigned[role] = getattr(previous_assignment, field_name)
     for day in weekend_dates:
         assigned_today = set()
         slots = {}

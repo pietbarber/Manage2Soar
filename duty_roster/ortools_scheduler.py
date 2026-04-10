@@ -11,13 +11,14 @@ Phase 2 Implementation: Full production constraints matching legacy scheduler be
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
 from ortools.sat.python import cp_model
 
 from duty_roster.models import (
+    DutyAssignment,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
@@ -72,6 +73,7 @@ class SchedulingData:
     role_scarcity: dict[str, dict[str, Any]]
     earliest_duty_day: date
     month_span: int = 1
+    prior_assignments: dict[str, int | None] = field(default_factory=dict)
 
 
 class DutyRosterScheduler:
@@ -253,6 +255,9 @@ class DutyRosterScheduler:
 
         # Constraint 6: Max assignments per month
         self._add_max_assignments_constraints()
+
+        # Constraint 7: Carry-over anti-repeat from prior duty day
+        self._add_carryover_anti_repeat_constraints()
 
         logger.info("Hard constraints added successfully")
 
@@ -439,6 +444,21 @@ class DutyRosterScheduler:
 
             if total_assignments:
                 self.model.Add(sum(total_assignments) <= max_assignments)
+
+    def _add_carryover_anti_repeat_constraints(self):
+        """Block same-role repeats from prior duty day into first scheduled day."""
+        if not self.data.duty_days:
+            return
+
+        first_day = self.data.duty_days[0]
+        for role in self.data.roles:
+            prior_member_id = self.data.prior_assignments.get(role)
+            if not prior_member_id:
+                continue
+
+            key = (prior_member_id, role, first_day)
+            if key in self.x:
+                self.model.Add(self.x[key] == 0)
 
     def _add_objective_function(self):
         """
@@ -880,6 +900,7 @@ def extract_scheduling_data(
 
     from duty_roster.roster_generator import (
         count_calendar_months_inclusive,
+        get_previous_duty_day,
         get_weekend_dates_in_range,
         resolve_roster_date_range,
     )
@@ -948,6 +969,27 @@ def extract_scheduling_data(
     # Determine earliest duty day for staleness calculation
     earliest_duty_day = min(duty_days) if duty_days else today
 
+    prior_assignments = {}
+    if duty_days:
+        previous_duty_day = get_previous_duty_day(duty_days[0])
+        if previous_duty_day:
+            previous_assignment = DutyAssignment.objects.filter(
+                date=previous_duty_day
+            ).first()
+            if previous_assignment:
+                role_to_field = {
+                    "instructor": "instructor_id",
+                    "duty_officer": "duty_officer_id",
+                    "assistant_duty_officer": "assistant_duty_officer_id",
+                    "towpilot": "tow_pilot_id",
+                }
+                for role in roles:
+                    field_name = role_to_field.get(role)
+                    if field_name:
+                        prior_assignments[role] = getattr(
+                            previous_assignment, field_name
+                        )
+
     return SchedulingData(
         members=members,
         duty_days=duty_days,
@@ -959,6 +1001,7 @@ def extract_scheduling_data(
         role_scarcity=role_scarcity,
         earliest_duty_day=earliest_duty_day,
         month_span=month_span,
+        prior_assignments=prior_assignments,
     )
 
 

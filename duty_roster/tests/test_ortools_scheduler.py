@@ -15,6 +15,7 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from duty_roster.models import (
+    DutyAssignment,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
@@ -504,6 +505,32 @@ class ORToolsHardConstraintsTests(TestCase):
             slots_day1,
             slots_day2,
             "Instructor should not repeat on adjacent duty days even across week gaps.",
+        )
+
+    def test_carryover_anti_repeat_blocks_first_day_repeat(self):
+        """First generated day should respect prior published duty-day assignment."""
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 28),
+            instructor=self.member1,
+        )
+
+        data = extract_scheduling_data(
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 1),
+            roles=["instructor"],
+        )
+
+        self.assertEqual(data.prior_assignments.get("instructor"), self.member1.id)
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned = result["schedule"][0]["slots"]["instructor"]
+        self.assertNotEqual(
+            assigned,
+            self.member1.id,
+            "Carry-over anti-repeat should prevent first-day same-role repeat.",
         )
 
     def test_max_assignments_constraint(self):
