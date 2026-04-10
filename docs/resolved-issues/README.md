@@ -8,21 +8,6 @@ Each document provides detailed technical analysis, implementation details, test
 
 ## Resolved Issues
 
-### [Issue #749 - Flight Cost Backfill Skip Logic](issue-749-flight-cost-backfill-skip.md)
-**Status**: Complete ✅ | **Date**: March 8, 2026 | **Branch**: `feature/issue-749-update-flight-cost-backfill` | **PR**: #750
-
-Fixed a financial backfill edge case where `update_flight_costs` skipped rental updates when tow actual values were already present.
-
-**Key Achievements**:
-- ✅ Independent field-level backfill logic for tow and rental actuals
-- ✅ Regression tests for rental backfill with existing tow values
-- ✅ Boundary test coverage for strict `--after` date behavior
-- ✅ Safe production behavior with no schema migration required
-
-**Technologies**: Django management commands, pytest, financial data backfill logic
-
----
-
 ### [Dual-Role Balance Weighting (Duty Roster)](issue-dual-role-balance-weighting.md)
 **Status**: Complete ✅ | **Date**: April 9, 2026 | **Branch**: `feature/fix-dual-role-balance-weighting`
 
@@ -35,6 +20,21 @@ Improved OR-Tools objective behavior for dual-role members (for example `instruc
 - ✅ Documented tenant-specific allegation context and fix rationale
 
 **Technologies**: OR-Tools CP-SAT objective tuning, Django duty roster scheduling, pytest regression tests
+
+---
+
+### [Issue #749 - Flight Cost Backfill Skip Logic](issue-749-flight-cost-backfill-skip.md)
+**Status**: Complete ✅ | **Date**: March 8, 2026 | **Branch**: `feature/issue-749-update-flight-cost-backfill` | **PR**: #750
+
+Fixed a financial backfill edge case where `update_flight_costs` skipped rental updates when tow actual values were already present.
+
+**Key Achievements**:
+- ✅ Independent field-level backfill logic for tow and rental actuals
+- ✅ Regression tests for rental backfill with existing tow values
+- ✅ Boundary test coverage for strict `--after` date behavior
+- ✅ Safe production behavior with no schema migration required
+
+**Technologies**: Django management commands, pytest, financial data backfill logic
 
 ---
 

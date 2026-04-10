@@ -479,7 +479,8 @@ class DutyRosterScheduler:
         2. Pairing affinity bonus (members who prefer to work together)
         3. Last duty date balancing (prioritize members who haven't worked recently)
         4. Balanced assignment distribution (minimize variance across members)
-        5. Weekend spacing preference (favor wider, more consistent repeat gaps)
+        5. Multi-role split balancing (reduce drift from configured role split)
+        6. Weekend spacing preference (favor wider, more consistent repeat gaps)
 
         The solver will maximize the sum of these weighted terms while respecting
         all hard constraints.
