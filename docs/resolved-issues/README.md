@@ -8,6 +8,21 @@ Each document provides detailed technical analysis, implementation details, test
 
 ## Resolved Issues
 
+### [Dual-Role Balance Weighting (Duty Roster)](issue-dual-role-balance-weighting.md)
+**Status**: Complete ✅ | **Date**: April 9, 2026 | **Branch**: `feature/fix-dual-role-balance-weighting`
+
+Improved OR-Tools objective behavior for dual-role members (for example `instructor` + `towpilot`) so assignment outcomes better follow configured split preferences instead of drifting into a single role.
+
+**Key Achievements**:
+- ✅ Added multi-role split balancing soft objective terms
+- ✅ Preserved hard feasibility constraints while improving fairness pressure
+- ✅ Added targeted regression coverage to verify reduced role-drift
+- ✅ Documented tenant-specific allegation context and fix rationale
+
+**Technologies**: OR-Tools CP-SAT objective tuning, Django duty roster scheduling, pytest regression tests
+
+---
+
 ### [Issue #749 - Flight Cost Backfill Skip Logic](issue-749-flight-cost-backfill-skip.md)
 **Status**: Complete ✅ | **Date**: March 8, 2026 | **Branch**: `feature/issue-749-update-flight-cost-backfill` | **PR**: #750
 

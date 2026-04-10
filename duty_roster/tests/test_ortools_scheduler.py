@@ -23,6 +23,7 @@ from duty_roster.models import (
 )
 from duty_roster.ortools_scheduler import (
     MAX_ASSIGNMENT_CONCENTRATION_WEIGHT,
+    ROLE_SPLIT_BALANCE_WEIGHT,
     WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS,
     DutyRosterScheduler,
     SchedulingData,
@@ -803,6 +804,128 @@ class ORToolsHardConstraintsTests(TestCase):
             tuned_peak,
             baseline_peak,
             f"Expected tuned objective to reduce or match peak load; baseline={baseline_peak}, tuned={tuned_peak}",
+        )
+
+    def test_role_split_penalty_reduces_dual_role_drift(self):
+        """Role-split penalty should not worsen dual-role split drift."""
+        dual_member = Member.objects.create(
+            username="dual_split_member",
+            email="dual_split_member@test.com",
+            first_name="Dual",
+            last_name="Split",
+            membership_status="Full Member",
+            instructor=True,
+            towpilot=True,
+            is_active=True,
+        )
+        dual_pref = DutyPreference.objects.create(member=dual_member)
+        dual_pref.instructor_percent = 50
+        dual_pref.towpilot_percent = 50
+        dual_pref.max_assignments_per_month = 8
+        dual_pref.allow_weekend_double = True
+        dual_pref.last_duty_date = date(2019, 1, 1)
+        dual_pref.save()
+
+        instructor_only = Member.objects.create(
+            username="instructor_only_split",
+            email="instructor_only_split@test.com",
+            first_name="Instructor",
+            last_name="Only",
+            membership_status="Full Member",
+            instructor=True,
+            is_active=True,
+        )
+        DutyPreference.objects.create(
+            member=instructor_only,
+            instructor_percent=100,
+            max_assignments_per_month=8,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 3, 20),
+        )
+
+        tow_only = Member.objects.create(
+            username="tow_only_split",
+            email="tow_only_split@test.com",
+            first_name="Tow",
+            last_name="Only",
+            membership_status="Full Member",
+            towpilot=True,
+            is_active=True,
+        )
+        DutyPreference.objects.create(
+            member=tow_only,
+            towpilot_percent=100,
+            max_assignments_per_month=8,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 3, 20),
+        )
+
+        duty_days = [
+            date(2026, 4, 4),
+            date(2026, 4, 5),
+            date(2026, 4, 11),
+            date(2026, 4, 12),
+            date(2026, 4, 18),
+            date(2026, 4, 19),
+        ]
+
+        data = SchedulingData(
+            members=[dual_member, instructor_only, tow_only],
+            duty_days=duty_days,
+            roles=["instructor", "towpilot"],
+            preferences={
+                dual_member.id: dual_pref,
+                instructor_only.id: DutyPreference.objects.get(member=instructor_only),
+                tow_only.id: DutyPreference.objects.get(member=tow_only),
+            },
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={
+                "instructor": {"scarcity_score": 1.0},
+                "towpilot": {"scarcity_score": 1.0},
+            },
+            earliest_duty_day=duty_days[0],
+            month_span=1,
+        )
+
+        deterministic_seed = 12345
+
+        baseline_scheduler = DutyRosterScheduler(data)
+        baseline_scheduler.solver.parameters.num_search_workers = 1
+        baseline_scheduler.solver.parameters.random_seed = deterministic_seed
+        with patch("duty_roster.ortools_scheduler.ROLE_SPLIT_BALANCE_WEIGHT", 0):
+            baseline = baseline_scheduler.solve(timeout_seconds=10.0)
+
+        tuned_scheduler = DutyRosterScheduler(data)
+        tuned_scheduler.solver.parameters.num_search_workers = 1
+        tuned_scheduler.solver.parameters.random_seed = deterministic_seed
+        tuned = tuned_scheduler.solve(timeout_seconds=10.0)
+
+        self.assertIn(baseline["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertIn(tuned["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertGreater(ROLE_SPLIT_BALANCE_WEIGHT, 0)
+
+        def _dual_counts(result):
+            instructor_count = 0
+            tow_count = 0
+            for day in result["schedule"]:
+                if day["slots"].get("instructor") == dual_member.id:
+                    instructor_count += 1
+                if day["slots"].get("towpilot") == dual_member.id:
+                    tow_count += 1
+            return instructor_count, tow_count
+
+        baseline_inst, baseline_tow = _dual_counts(baseline)
+        tuned_inst, tuned_tow = _dual_counts(tuned)
+
+        baseline_drift = abs(baseline_inst - baseline_tow)
+        tuned_drift = abs(tuned_inst - tuned_tow)
+
+        self.assertLessEqual(
+            tuned_drift,
+            baseline_drift,
+            f"Expected role split penalty to reduce or match drift; baseline={baseline_drift}, tuned={tuned_drift}",
         )
 
     def test_adjacent_weekend_spacing_can_make_schedule_infeasible(self):
