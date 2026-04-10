@@ -16,17 +16,14 @@ from duty_roster.models import (
     MemberBlackout,
 )
 from duty_roster.operational_calendar import get_operational_weekend
-from members.constants.membership import DEFAULT_ROLES
+from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger("duty_roster.generator")
 
 DUTY_ROLE_TO_ASSIGNMENT_FIELD = {
-    "instructor": "instructor_id",
-    "duty_officer": "duty_officer_id",
-    "assistant_duty_officer": "assistant_duty_officer_id",
-    "towpilot": "tow_pilot_id",
+    role: f"{field_name}_id" for role, field_name in ROLE_FIELD_MAP.items()
 }
 
 DEFAULT_MAX_ASSIGNMENTS = 8

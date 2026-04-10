@@ -560,6 +560,34 @@ class ORToolsHardConstraintsTests(TestCase):
             "Expected latest scheduled assignment to be used for carry-over.",
         )
 
+    def test_carryover_hard_block_skips_when_no_alternative_candidate(self):
+        """Carry-over should not make model infeasible when first day has one option."""
+        data = SchedulingData(
+            members=[self.member1],
+            duty_days=[date(2026, 3, 1)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: DutyPreference.objects.get(member=self.member1),
+            },
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 1),
+            prior_assignments={"instructor": self.member1.id},
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned = result["schedule"][0]["slots"]["instructor"]
+        self.assertEqual(
+            assigned,
+            self.member1.id,
+            "Expected first day to remain assignable when no alternative exists.",
+        )
+
     def test_max_assignments_constraint(self):
         """Test that members don't exceed max_assignments_per_month."""
         # Set low max for member1

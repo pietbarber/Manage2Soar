@@ -456,7 +456,15 @@ class DutyRosterScheduler:
                 continue
 
             key = (prior_member_id, role, first_day)
-            if key in self.x:
+            alternative_candidates = [
+                self.x[m.id, role, first_day]
+                for m in self.data.members
+                if m.id != prior_member_id and (m.id, role, first_day) in self.x
+            ]
+
+            # Only enforce carry-over hard-block when at least one alternative
+            # candidate can satisfy the slot on the first generated day.
+            if key in self.x and alternative_candidates:
                 self.model.Add(self.x[key] == 0)
 
     def _add_objective_function(self):
