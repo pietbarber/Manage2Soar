@@ -889,9 +889,18 @@ class ORToolsHardConstraintsTests(TestCase):
             month_span=1,
         )
 
+        deterministic_seed = 12345
+
+        baseline_scheduler = DutyRosterScheduler(data)
+        baseline_scheduler.solver.parameters.num_search_workers = 1
+        baseline_scheduler.solver.parameters.random_seed = deterministic_seed
         with patch("duty_roster.ortools_scheduler.ROLE_SPLIT_BALANCE_WEIGHT", 0):
-            baseline = DutyRosterScheduler(data).solve(timeout_seconds=10.0)
-        tuned = DutyRosterScheduler(data).solve(timeout_seconds=10.0)
+            baseline = baseline_scheduler.solve(timeout_seconds=10.0)
+
+        tuned_scheduler = DutyRosterScheduler(data)
+        tuned_scheduler.solver.parameters.num_search_workers = 1
+        tuned_scheduler.solver.parameters.random_seed = deterministic_seed
+        tuned = tuned_scheduler.solve(timeout_seconds=10.0)
 
         self.assertIn(baseline["status"], ("OPTIMAL", "FEASIBLE"))
         self.assertIn(tuned["status"], ("OPTIMAL", "FEASIBLE"))

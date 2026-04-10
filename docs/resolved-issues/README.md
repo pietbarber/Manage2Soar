@@ -23,6 +23,21 @@ Fixed a financial backfill edge case where `update_flight_costs` skipped rental 
 
 ---
 
+### [Dual-Role Balance Weighting (Duty Roster)](issue-dual-role-balance-weighting.md)
+**Status**: Complete ✅ | **Date**: April 9, 2026 | **Branch**: `feature/fix-dual-role-balance-weighting`
+
+Improved OR-Tools objective behavior for dual-role members (for example `instructor` + `towpilot`) so assignment outcomes better follow configured split preferences instead of drifting into a single role.
+
+**Key Achievements**:
+- ✅ Added multi-role split balancing soft objective terms
+- ✅ Preserved hard feasibility constraints while improving fairness pressure
+- ✅ Added targeted regression coverage to verify reduced role-drift
+- ✅ Documented tenant-specific allegation context and fix rationale
+
+**Technologies**: OR-Tools CP-SAT objective tuning, Django duty roster scheduling, pytest regression tests
+
+---
+
 ### [Issue #253 - Bootstrap5 Logsheet UI/UX Modernization](issue-253-bootstrap5-logsheet-ui-ux.md)
 **Status**: Complete ✅ | **Date**: November 11, 2025 | **Branch**: `issue-253` | **PR**: #255
 
@@ -103,21 +118,6 @@ Enhanced logsheet unfinalization permissions expanding access beyond superuser-o
 - ✅ Enhanced error messages and UI feedback
 
 **Technologies**: Django permissions, RevisionLog integration, Role-based access control, Member model fields
-
----
-
-### [Dual-Role Balance Weighting (Duty Roster)](issue-dual-role-balance-weighting.md)
-**Status**: Complete ✅ | **Date**: April 9, 2026 | **Branch**: `feature/fix-dual-role-balance-weighting`
-
-Improved OR-Tools objective behavior for dual-role members (for example `instructor` + `towpilot`) so assignment outcomes better follow configured split preferences instead of drifting into a single role.
-
-**Key Achievements**:
-- ✅ Added multi-role split balancing soft objective terms
-- ✅ Preserved hard feasibility constraints while improving fairness pressure
-- ✅ Added targeted regression coverage to verify reduced role-drift
-- ✅ Documented tenant-specific allegation context and fix rationale
-
-**Technologies**: OR-Tools CP-SAT objective tuning, Django duty roster scheduling, pytest regression tests
 
 ---
 
