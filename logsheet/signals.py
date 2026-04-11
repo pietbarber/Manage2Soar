@@ -7,7 +7,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 
 from notifications.models import Notification
-from utils.email import enforce_noreply_from_email, send_mail
+from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
@@ -105,7 +105,7 @@ def _send_maintenance_issue_email(issue, meisters):
         send_mail(
             subject=subject,
             message=text_message,
-            from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+            from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=recipient_emails,
             html_message=html_message,
             fail_silently=False,
