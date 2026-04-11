@@ -933,9 +933,7 @@ def get_email_context_base():
 
 def get_from_email():
     """Get the from email address for notifications."""
-    return enforce_noreply_from_email(
-        getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
-    )
+    return getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
 
 
 def send_swap_request_notifications(swap_request):
@@ -1084,7 +1082,7 @@ def send_offer_accepted_notifications(offer):
         email = EmailMultiAlternatives(
             subject=subject,
             body="",
-            from_email=get_from_email(),
+            from_email=enforce_noreply_from_email(get_from_email()),
             to=[recipient.email],
         )
         email.attach_alternative(html_content, "text/html")
