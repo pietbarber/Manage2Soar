@@ -23,9 +23,18 @@ from members.decorators import active_member_required
 from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 
 from .forms import GliderReservationCancelForm, GliderReservationForm
-from .models import GliderReservation
+from .models import GliderReservation, OpsIntent
 
 logger = logging.getLogger("duty_roster.reservations")
+
+
+def _reservation_default_available_as(reservation):
+    """Map reservation details to a default OpsIntent activity list."""
+    if reservation.reservation_type == "guest":
+        return ["guest"]
+    if reservation.glider and reservation.glider.seats >= 2:
+        return ["club_two"]
+    return ["club_single"]
 
 
 @active_member_required
@@ -184,6 +193,18 @@ def reservation_create(request, year=None, month=None, day=None):
                 reservation = form.save()
                 # Check if save was actually successful (form.save() may add errors without raising)
                 if reservation.pk:
+                    OpsIntent.objects.get_or_create(
+                        member=member,
+                        date=reservation.date,
+                        defaults={
+                            "available_as": _reservation_default_available_as(
+                                reservation
+                            ),
+                            "glider": reservation.glider,
+                            "notes": "Auto-created from glider reservation",
+                        },
+                    )
+
                     expired_deadlines = []
                     if reservation.glider:
                         expired_deadlines = list(
