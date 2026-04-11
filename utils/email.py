@@ -31,8 +31,9 @@ def enforce_noreply_from_email(from_email):
     candidate = parsed_addr or raw
 
     if "@" in candidate:
-        domain = candidate.split("@")[-1]
-        return f"noreply@{domain}"
+        domain = candidate.rsplit("@", 1)[-1].strip()
+        if domain and "." in domain and not any(ch.isspace() for ch in domain):
+            return f"noreply@{domain}"
 
     return "noreply@manage2soar.com"
 

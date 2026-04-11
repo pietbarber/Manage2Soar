@@ -142,9 +142,11 @@ class Command(BaseCommand):
 
         # Normalize sender via shared helper so this direct EmailMultiAlternatives
         # path stays consistent with utils.email.send_mail callers.
+        default_from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "")
         from_email = enforce_noreply_from_email(
-            getattr(settings, "DEFAULT_FROM_EMAIL", "")
-            or (
+            default_from_email
+            if default_from_email and "@" in default_from_email
+            else (
                 f"noreply@{config.domain_name}" if config and config.domain_name else ""
             )
         )

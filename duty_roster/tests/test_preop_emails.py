@@ -597,6 +597,26 @@ class TestSendDutyPreopEmails:
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="invalid-sender",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_from_email_invalid_default_uses_site_domain_fallback(
+        self, site_config, duty_assignment, tomorrow
+    ):
+        """Invalid DEFAULT_FROM_EMAIL should fall back to config domain for sender."""
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        email = mail.outbox[0]
+        assert email.from_email == "noreply@test.manage2soar.com"
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
         DEFAULT_FROM_EMAIL="noreply@test.com",
         SITE_URL="https://test.manage2soar.com",
     )

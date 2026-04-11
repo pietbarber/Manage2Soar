@@ -94,6 +94,22 @@ class DevModeEmailTests(TestCase):
         call_kwargs = mock_send.call_args.kwargs
         self.assertEqual(call_kwargs["from_email"], "noreply@test.com")
 
+    @override_settings(EMAIL_DEV_MODE=False)
+    @patch("utils.email.django_send_mail")
+    def test_send_mail_malformed_domain_falls_back_to_safe_default(self, mock_send):
+        """Malformed sender domains should fall back to safe default sender."""
+        mock_send.return_value = 1
+
+        send_mail(
+            subject="Test Subject",
+            message="Test body",
+            from_email="user@",
+            recipient_list=["user@example.com"],
+        )
+
+        call_kwargs = mock_send.call_args.kwargs
+        self.assertEqual(call_kwargs["from_email"], "noreply@manage2soar.com")
+
     @override_settings(
         EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
     )
