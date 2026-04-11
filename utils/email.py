@@ -10,12 +10,32 @@ them), so dev mode redirection has no practical effect in that case. EMAIL_DEV_M
 is primarily useful for staging/production environments where real SMTP is configured.
 """
 
+from email.utils import parseaddr
+
 from django.conf import settings
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.core.mail import send_mail as django_send_mail
 
 # Maximum recipients to show in subject line before truncating
 MAX_RECIPIENTS_IN_SUBJECT = 3
+
+
+def enforce_noreply_from_email(from_email):
+    """Normalize sender to noreply@{domain}.
+
+    This enforces a consistent outbound sender local-part while preserving
+    tenant/domain routing from the configured sender domain.
+    """
+    raw = (from_email or getattr(settings, "DEFAULT_FROM_EMAIL", "") or "").strip()
+    parsed_addr = parseaddr(raw)[1] if raw else ""
+    candidate = parsed_addr or raw
+
+    if "@" in candidate:
+        domain = candidate.rsplit("@", 1)[-1].strip()
+        if domain and "." in domain and not any(ch.isspace() for ch in domain):
+            return f"noreply@{domain}"
+
+    return "noreply@manage2soar.com"
 
 
 def get_dev_mode_info():
@@ -119,6 +139,7 @@ def send_mail(
     Raises:
         ValueError: If dev mode is enabled but no redirect address is configured
     """
+    from_email = enforce_noreply_from_email(from_email)
     dev_mode, redirect_list = get_dev_mode_info()
 
     if dev_mode and not redirect_list:
@@ -184,6 +205,16 @@ def send_mass_mail(
 
     dev_mode, redirect_list = get_dev_mode_info()
 
+    normalized_datatuple = [
+        (
+            subject,
+            message,
+            enforce_noreply_from_email(from_email),
+            recipient_list,
+        )
+        for subject, message, from_email, recipient_list in datatuple
+    ]
+
     if dev_mode:
         if not redirect_list:
             raise ValueError(
@@ -194,7 +225,7 @@ def send_mass_mail(
         # Redirect all emails
         # Truncate long recipient lists to avoid email server subject line limits
         modified_datatuple = []
-        for subject, message, from_email, recipient_list in datatuple:
+        for subject, message, from_email, recipient_list in normalized_datatuple:
             if not recipient_list:
                 original_recipients = "no recipients"
             elif len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
@@ -208,6 +239,8 @@ def send_mass_mail(
                 (modified_subject, message, from_email, redirect_list)
             )
         datatuple = modified_datatuple
+    else:
+        datatuple = normalized_datatuple
 
     return django_send_mass_mail(
         datatuple,
@@ -242,6 +275,7 @@ class DevModeEmailMessage(EmailMessage):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.from_email = enforce_noreply_from_email(self.from_email)
         self._apply_dev_mode()
 
     def _apply_dev_mode(self):
