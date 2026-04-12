@@ -1095,7 +1095,11 @@ class TestGliderReservationViews:
             "Total signed-up flyers (including students requesting instruction):"
             in content
         )
-        assert "<strong>2</strong>" in content
+        normalized_content = " ".join(content.split())
+        assert (
+            "Total signed-up flyers (including students requesting instruction): "
+            "<strong>2</strong>"
+        ) in normalized_content
         assert "Pilots Planning to Fly (1):" in content
         assert other_member.full_display_name in content
 
@@ -1131,7 +1135,11 @@ class TestGliderReservationViews:
             "Total signed-up flyers (including students requesting instruction):"
             in content
         )
-        assert "<strong>1</strong>" in content
+        normalized_content = " ".join(content.split())
+        assert (
+            "Total signed-up flyers (including students requesting instruction): "
+            "<strong>1</strong>"
+        ) in normalized_content
         assert member.full_display_name in content
 
     def test_calendar_day_modal_shows_no_other_pilots_when_only_instruction_students(
@@ -1160,7 +1168,11 @@ class TestGliderReservationViews:
             "Total signed-up flyers (including students requesting instruction):"
             in content
         )
-        assert "<strong>1</strong>" in content
+        normalized_content = " ".join(content.split())
+        assert (
+            "Total signed-up flyers (including students requesting instruction): "
+            "<strong>1</strong>"
+        ) in normalized_content
         assert "No additional pilots beyond students requesting instruction." in content
 
     def test_reservation_create_shows_warning_for_expired_deadline(
