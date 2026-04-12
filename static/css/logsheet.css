@@ -1700,13 +1700,13 @@
 .summary-card {
     background: white;
     border-radius: 8px;
-    padding: 0.6rem 1rem;
+    padding: 0.75rem 1.1rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     display: flex;
     align-items: center;
     gap: 0.75rem;
     flex: 1;
-    min-width: 130px;
+    min-width: 148px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -2350,6 +2350,7 @@
    Stack label above the field to give the editor the full width.
    ===================================================================== */
 @media (max-width: 575px) {
+
     .closeout-form-table th,
     .closeout-form-table td {
         display: block;

@@ -16,6 +16,8 @@ class TimeOfDayOperationsTestCase(TestCase):
             "landing_points",
             "mean_earliest_takeoff",
             "mean_latest_landing",
+            "start_year",
+            "end_year",
             "total_flight_days",
         ]
         for key in expected_keys:
@@ -26,7 +28,11 @@ class TimeOfDayOperationsTestCase(TestCase):
         self.assertIsInstance(result["landing_points"], list)
         self.assertIsInstance(result["mean_earliest_takeoff"], list)
         self.assertIsInstance(result["mean_latest_landing"], list)
+        self.assertIsInstance(result["start_year"], int)
+        self.assertIsInstance(result["end_year"], int)
         self.assertIsInstance(result["total_flight_days"], int)
+        self.assertEqual(result["start_year"], 2025)
+        self.assertEqual(result["end_year"], 2025)
 
     def test_time_of_day_operations_no_data(self):
         """Test the function works correctly with no flight data."""
@@ -37,4 +43,6 @@ class TimeOfDayOperationsTestCase(TestCase):
         self.assertEqual(result["landing_points"], [])
         self.assertEqual(result["mean_earliest_takeoff"], [])
         self.assertEqual(result["mean_latest_landing"], [])
+        self.assertEqual(result["start_year"], 2025)
+        self.assertEqual(result["end_year"], 2025)
         self.assertEqual(result["total_flight_days"], 0)
