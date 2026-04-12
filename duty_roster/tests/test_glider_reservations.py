@@ -970,8 +970,7 @@ class TestGliderReservationViews:
 
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        assert "Reservations remaining this quarter" in content
-        assert "<strong>1</strong>" in content
+        assert "Reservations remaining this quarter: <strong>1</strong>" in content
 
     def test_calendar_day_modal_uses_quarter_label_when_user_cannot_reserve(
         self, client, site_config, member
