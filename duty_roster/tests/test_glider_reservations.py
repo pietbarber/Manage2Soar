@@ -712,6 +712,44 @@ class TestGliderReservationViews:
         assert intent.available_as == ["private"]
         assert intent.notes == "Keep existing intent details"
 
+    def test_reservation_create_handles_ops_intent_integrity_race(
+        self, client, site_config, member, glider, future_date
+    ):
+        """Reservation creation should succeed if OpsIntent get_or_create races."""
+        from unittest.mock import patch
+
+        from django.db import IntegrityError
+
+        OpsIntent.objects.create(
+            member=member,
+            date=future_date,
+            available_as=["club_single"],
+            notes="Created by concurrent request",
+        )
+
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_create")
+
+        with patch(
+            "duty_roster.views_reservation.OpsIntent.objects.get_or_create",
+            side_effect=IntegrityError(
+                "duplicate key value violates unique constraint"
+            ),
+        ):
+            response = client.post(
+                url,
+                {
+                    "glider": glider.pk,
+                    "date": future_date.isoformat(),
+                    "reservation_type": "solo",
+                    "time_preference": "morning",
+                },
+            )
+
+        assert response.status_code == 302
+        assert GliderReservation.objects.filter(member=member, glider=glider).exists()
+        assert OpsIntent.objects.filter(member=member, date=future_date).count() == 1
+
     def test_reservation_detail_view(
         self, client, site_config, member, glider, future_date
     ):

@@ -941,7 +941,7 @@ def calendar_day_detail(request, year, month, day):
                 )
     instruction_student_ids = set()
     if assignment:
-        for slot in assignment.active_instruction_slots.select_related("student"):
+        for slot in assignment.active_instruction_slots:
             if not slot.student_id:
                 continue
             instruction_student_ids.add(slot.student_id)
