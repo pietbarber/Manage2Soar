@@ -11,7 +11,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import Count, Max, Q, Sum, Value
+from django.db.models.functions import Coalesce, Trim
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -2033,10 +2034,11 @@ def member_logbook(request, member_id=None):
 
     opening_balance = None
     if selected_year is not None:
+        opening_balance_cutoff = datetime.date(selected_year, 1, 1)
         instructor_present_filter = (
             Q(instructor__isnull=False)
-            | (Q(guest_instructor_name__isnull=False) & ~Q(guest_instructor_name=""))
-            | (Q(legacy_instructor_name__isnull=False) & ~Q(legacy_instructor_name=""))
+            | Q(guest_instructor_name_trimmed__gt="")
+            | Q(legacy_instructor_name_trimmed__gt="")
         )
         pilot_non_instruction_filter = Q(pilot=member) & ~instructor_present_filter
         dual_received_filter = Q(pilot=member) & instructor_present_filter
@@ -2053,9 +2055,16 @@ def member_logbook(request, member_id=None):
                 logsheet__log_date__gte=rating_date
             )
 
-        prior_flights = Flight.objects.filter(
+        prior_flights = Flight.objects.alias(
+            guest_instructor_name_trimmed=Trim(
+                Coalesce("guest_instructor_name", Value(""))
+            ),
+            legacy_instructor_name_trimmed=Trim(
+                Coalesce("legacy_instructor_name", Value(""))
+            ),
+        ).filter(
             Q(pilot=member) | Q(instructor=member) | Q(passenger=member),
-            logsheet__log_date__year__lt=selected_year,
+            logsheet__log_date__lt=opening_balance_cutoff,
         )
         prior_agg = prior_flights.aggregate(
             dual_received_dur=Sum("duration", filter=dual_received_filter),
@@ -2098,7 +2107,7 @@ def member_logbook(request, member_id=None):
 
         prior_ground = GroundInstruction.objects.filter(
             student=member,
-            date__year__lt=selected_year,
+            date__lt=opening_balance_cutoff,
         ).aggregate(total_dur=Sum("duration"))
         opening_m["ground_inst_m"] = duration_to_minutes(prior_ground.get("total_dur"))
 
