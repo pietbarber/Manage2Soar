@@ -460,6 +460,86 @@ class TestMemberLogbookPerformance:
         total_rows = sum(len(page["rows"]) for page in pages)
         assert total_rows == 2  # Only 2021 and 2023 flights
 
+    def test_logbook_single_year_sets_selected_year_and_opening_balance(
+        self, setup_logbook_data
+    ):
+        """Single-year mode should expose selected_year and opening balance context."""
+        data = setup_logbook_data
+        student = data["student"]
+        glider = data["glider"]
+        airfield = data["airfield"]
+
+        # Prior-year flight contributes to opening balance.
+        ls_prior = create_logsheet(datetime.date(2025, 6, 15), airfield, student)
+        Flight.objects.create(
+            logsheet=ls_prior,
+            pilot=student,
+            glider=glider,
+            launch_method="tow",
+            launch_time=datetime.time(10, 0),
+            landing_time=datetime.time(10, 30),
+            release_altitude=3000,
+        )
+
+        # Target-year flight should appear in rows.
+        ls_target = create_logsheet(datetime.date(2026, 6, 15), airfield, student)
+        Flight.objects.create(
+            logsheet=ls_target,
+            pilot=student,
+            glider=glider,
+            launch_method="tow",
+            launch_time=datetime.time(11, 0),
+            landing_time=datetime.time(11, 20),
+            release_altitude=2800,
+        )
+
+        client = Client()
+        client.force_login(student)
+
+        response = client.get(reverse("instructors:member_logbook") + "?year=2026")
+
+        assert response.status_code == 200
+        assert response.context["selected_year"] == 2026
+        opening_balance = response.context["opening_balance"]
+        assert opening_balance is not None
+        assert opening_balance["year"] == 2026
+        assert opening_balance["total"] == "0:30"
+
+        pages = response.context["pages"]
+        total_rows = sum(len(page["rows"]) for page in pages)
+        assert total_rows == 1
+
+    def test_logbook_multi_year_query_does_not_set_single_year_context(
+        self, setup_logbook_data
+    ):
+        """Multi-year query should keep opening balance disabled."""
+        data = setup_logbook_data
+        student = data["student"]
+        instructor = data["instructor"]
+        glider = data["glider"]
+        airfield = data["airfield"]
+
+        for year in [2025, 2026]:
+            ls = create_logsheet(datetime.date(year, 1, 10), airfield, student)
+            Flight.objects.create(
+                logsheet=ls,
+                pilot=student,
+                instructor=instructor,
+                glider=glider,
+                launch_method="tow",
+                duration=datetime.timedelta(minutes=25),
+            )
+
+        client = Client()
+        client.force_login(student)
+        response = client.get(
+            reverse("instructors:member_logbook") + "?year=2025&year=2026"
+        )
+
+        assert response.status_code == 200
+        assert response.context["selected_year"] is None
+        assert response.context["opening_balance"] is None
+
     def test_logbook_cumulative_totals(self, setup_logbook_data):
         """Test that cumulative totals are correctly calculated."""
         data = setup_logbook_data

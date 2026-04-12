@@ -258,6 +258,8 @@ def dashboard(request):
         "timeops_landing_points": time_ops.get("landing_points", []),
         "timeops_mean_earliest_takeoff": time_ops.get("mean_earliest_takeoff", []),
         "timeops_mean_latest_landing": time_ops.get("mean_latest_landing", []),
+        "timeops_start_year": time_ops.get("start_year", start),
+        "timeops_end_year": time_ops.get("end_year", end),
         "timeops_total_flight_days": time_ops.get("total_flight_days", 0),
     }
 
@@ -360,6 +362,8 @@ def dashboard(request):
             "landing_points": ctx.get("timeops_landing_points", []),
             "mean_earliest_takeoff": ctx.get("timeops_mean_earliest_takeoff", []),
             "mean_latest_landing": ctx.get("timeops_mean_latest_landing", []),
+            "start_year": ctx.get("timeops_start_year", start),
+            "end_year": ctx.get("timeops_end_year", end),
             "total_flight_days": ctx.get("timeops_total_flight_days", 0),
         },
     }

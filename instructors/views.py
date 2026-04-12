@@ -1641,11 +1641,14 @@ def member_logbook(request, member_id=None):
 
     # Years requested to load
     show_all_years = request.GET.get("show_all_years")
-    show_years = request.GET.getlist("year")
+    show_years = [int(y) for y in request.GET.getlist("year") if y.isdigit()]
+    selected_year = None
     if show_all_years:
         years_to_load = all_years
     elif show_years:
-        years_to_load = [int(y) for y in show_years if y.isdigit()]
+        years_to_load = show_years
+        if len(show_years) == 1:
+            selected_year = show_years[0]
     else:
         # Default: last 12 months
         years_to_load = [today.year, today.year - 1]
@@ -2028,6 +2031,74 @@ def member_logbook(request, member_id=None):
         else:
             page["is_first_for_year"] = False
 
+    opening_balance = None
+    if selected_year is not None:
+        opening_m = {
+            "ground_inst_m": 0,
+            "dual_received_m": 0,
+            "solo_m": 0,
+            "pic_m": 0,
+            "inst_given_m": 0,
+            "total_m": 0,
+            "A": 0,
+            "G": 0,
+            "S": 0,
+        }
+
+        prior_flights = Flight.objects.filter(
+            Q(pilot=member) | Q(instructor=member) | Q(passenger=member),
+            logsheet__log_date__year__lt=selected_year,
+        ).select_related("logsheet")
+
+        for f in prior_flights:
+            classification = classify_logbook_flight_minutes(
+                f,
+                member.id,
+                rating_date,
+            )
+            if classification["is_passenger"]:
+                continue
+
+            opening_m["dual_received_m"] += classification["dual_m"]
+            opening_m["solo_m"] += classification["solo_m"]
+            opening_m["pic_m"] += classification["pic_m"]
+            opening_m["inst_given_m"] += classification["inst_m"]
+            opening_m["total_m"] += classification["duration_m"]
+            opening_m["A"] += 1 if f.launch_method == "tow" else 0
+            opening_m["G"] += 1 if f.launch_method == "winch" else 0
+            opening_m["S"] += 1 if f.launch_method == "self" else 0
+
+        prior_ground = GroundInstruction.objects.filter(
+            student=member,
+            date__year__lt=selected_year,
+        )
+        opening_m["ground_inst_m"] = sum(
+            int(g.duration.total_seconds() // 60) if g.duration else 0
+            for g in prior_ground
+        )
+
+        opening_balance = {
+            "year": selected_year,
+            "ground_inst": format_hhmm(timedelta(minutes=opening_m["ground_inst_m"])),
+            "dual_received": format_hhmm(
+                timedelta(minutes=opening_m["dual_received_m"])
+            ),
+            "solo": format_hhmm(timedelta(minutes=opening_m["solo_m"])),
+            "pic": format_hhmm(timedelta(minutes=opening_m["pic_m"])),
+            "inst_given": format_hhmm(timedelta(minutes=opening_m["inst_given_m"])),
+            "total": format_hhmm(timedelta(minutes=opening_m["total_m"])),
+            "A": opening_m["A"],
+            "G": opening_m["G"],
+            "S": opening_m["S"],
+        }
+
+    is_single_year_scope = selected_year is not None
+    totals_scope_label = (
+        f"Running totals for {selected_year}"
+        if is_single_year_scope
+        else "Running totals across loaded years"
+    )
+
     return render(
         request,
         "instructors/logbook.html",
@@ -2037,6 +2108,10 @@ def member_logbook(request, member_id=None):
             "years": years,
             "year_page_map": year_page_map,
             "all_years": all_years,
+            "selected_year": selected_year,
+            "opening_balance": opening_balance,
+            "is_single_year_scope": is_single_year_scope,
+            "totals_scope_label": totals_scope_label,
             "glider_time_summary": glider_time_summary,
         },
     )

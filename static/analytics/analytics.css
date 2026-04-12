@@ -2,10 +2,10 @@
 
 /* ========= Design tokens ========= */
 :root{
-  --chart-h-short: 380px;
-  --chart-h:       440px;
-  --chart-h-tall:  520px;
-  --chart-h-xl:    560px;
+  --chart-h-short: 360px;
+  --chart-h:       420px;
+  --chart-h-tall:  500px;
+  --chart-h-xl:    540px;
 
   --chart-title-pr: 5rem;          /* padding-right so title doesn't sit under tool buttons */
   --chart-text: #212529;           /* bootstrap body color */

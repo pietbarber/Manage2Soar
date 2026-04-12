@@ -748,6 +748,10 @@ function initTimeOps(d) {
   const meanEarliestTakeoff = d.mean_earliest_takeoff || [];
   const meanLatestLanding = d.mean_latest_landing || [];
   const totalFlightDays = d.total_flight_days || 0;
+  const startYear = Number(d.start_year || new Date().getFullYear());
+  const endYear = Number(d.end_year || startYear);
+  const yearLabel = startYear === endYear ? `${startYear}` : `${startYear}-${endYear}`;
+  const referenceYear = endYear;
   const status = document.getElementById("timeOpsStatus");
 
   if (!takeoffPoints.length && !landingPoints.length) {
@@ -824,11 +828,11 @@ function initTimeOps(d) {
             title: (items) => {
               if (!items.length) return "";
               const day = items[0].parsed.x;
-              // Convert Julian day to approximate date for context
-              const date = new Date(2024, 0, day); // Using 2024 as reference year
+              // Convert Julian day to approximate date and include selected year context.
+              const date = new Date(referenceYear, 0, day);
               const month = date.toLocaleDateString(undefined, { month: "short" });
               const dayOfMonth = date.getDate();
-              return `Day ${day} (≈${month} ${dayOfMonth})`;
+              return `Day ${day} (${yearLabel} • ≈${month} ${dayOfMonth})`;
             },
             label: (item) => {
               const time = formatTime(item.parsed.y);

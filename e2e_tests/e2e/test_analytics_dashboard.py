@@ -158,3 +158,56 @@ class TestAnalyticsDashboardE2E(DjangoPlaywrightTestCase):
             f"Horizontal overflow at 412px: scrollWidth={scroll_width}px "
             f"> viewportWidth={viewport_width}px"
         )
+
+    def test_time_ops_tooltip_title_includes_year_context(self):
+        """Time of day tooltip title includes selected year range context."""
+        from datetime import date, time
+
+        from logsheet.models import Airfield, Flight, Glider, Logsheet
+
+        analyst = self.create_test_member(username="analyst")
+        self.login(username="analyst")
+
+        airfield = Airfield.objects.create(identifier="KFRR", name="Front Royal")
+        glider = Glider.objects.create(
+            make="Schleicher",
+            model="ASK-21",
+            n_number="N839UX",
+            competition_number="21",
+            seats=2,
+            is_active=True,
+            club_owned=True,
+        )
+        logsheet = Logsheet.objects.create(
+            log_date=date.today(),
+            airfield=airfield,
+            created_by=analyst,
+            finalized=True,
+        )
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=analyst,
+            glider=glider,
+            launch_time=time(10, 0),
+            landing_time=time(10, 35),
+            launch_method="tow",
+            release_altitude=3000,
+        )
+
+        self._go_to_analytics()
+
+        start_year = self.page.input_value("#annual-range input[name='start']")
+        end_year = self.page.input_value("#annual-range input[name='end']")
+
+        tooltip_title = self.page.evaluate(
+            """() => {
+              const cb = window.timeOpsChart?.options?.plugins?.tooltip?.callbacks?.title;
+              if (!cb) return "";
+              return cb([{ parsed: { x: 32 } }]);
+            }"""
+        )
+
+        assert tooltip_title, "Expected tooltip title callback output"
+        assert start_year in tooltip_title
+        if start_year != end_year:
+            assert end_year in tooltip_title
