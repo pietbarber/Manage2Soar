@@ -2350,6 +2350,7 @@
    Stack label above the field to give the editor the full width.
    ===================================================================== */
 @media (max-width: 575px) {
+
     .closeout-form-table th,
     .closeout-form-table td {
         display: block;
