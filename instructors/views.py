@@ -1642,7 +1642,12 @@ def member_logbook(request, member_id=None):
 
     # Years requested to load
     show_all_years = request.GET.get("show_all_years")
-    show_years = [int(y) for y in request.GET.getlist("year") if y.isdigit()]
+    valid_years = set(all_years)
+    show_years = [
+        int(y)
+        for y in request.GET.getlist("year")
+        if y.isdigit() and int(y) in valid_years
+    ]
     selected_year = None
     if show_all_years:
         years_to_load = all_years

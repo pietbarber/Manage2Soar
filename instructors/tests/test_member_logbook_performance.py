@@ -540,6 +540,33 @@ class TestMemberLogbookPerformance:
         assert response.context["selected_year"] is None
         assert response.context["opening_balance"] is None
 
+    def test_logbook_invalid_year_query_is_ignored(self, setup_logbook_data):
+        """Invalid year query values should be ignored and not crash the view."""
+        data = setup_logbook_data
+        student = data["student"]
+        glider = data["glider"]
+        airfield = data["airfield"]
+
+        ls = create_logsheet(datetime.date(2026, 6, 15), airfield, student)
+        Flight.objects.create(
+            logsheet=ls,
+            pilot=student,
+            glider=glider,
+            launch_method="tow",
+            launch_time=datetime.time(11, 0),
+            landing_time=datetime.time(11, 20),
+            release_altitude=2800,
+        )
+
+        client = Client()
+        client.force_login(student)
+
+        response = client.get(reverse("instructors:member_logbook") + "?year=0")
+
+        assert response.status_code == 200
+        assert response.context["selected_year"] is None
+        assert response.context["opening_balance"] is None
+
     def test_logbook_cumulative_totals(self, setup_logbook_data):
         """Test that cumulative totals are correctly calculated."""
         data = setup_logbook_data
