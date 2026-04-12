@@ -853,7 +853,7 @@ function initTimeOps(d) {
             callback: function (value) {
               // Show month labels at key points
               if ([1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335].includes(value)) {
-                const date = new Date(2024, 0, value);
+                const date = new Date(referenceYear, 0, value);
                 return date.toLocaleDateString(undefined, { month: "short" });
               }
               return value;

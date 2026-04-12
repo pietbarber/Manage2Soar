@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q, Sum
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -2033,49 +2033,74 @@ def member_logbook(request, member_id=None):
 
     opening_balance = None
     if selected_year is not None:
-        opening_m = {
-            "ground_inst_m": 0,
-            "dual_received_m": 0,
-            "solo_m": 0,
-            "pic_m": 0,
-            "inst_given_m": 0,
-            "total_m": 0,
-            "A": 0,
-            "G": 0,
-            "S": 0,
-        }
+        instructor_present_filter = (
+            Q(instructor__isnull=False)
+            | (Q(guest_instructor_name__isnull=False) & ~Q(guest_instructor_name=""))
+            | (Q(legacy_instructor_name__isnull=False) & ~Q(legacy_instructor_name=""))
+        )
+        pilot_non_instruction_filter = Q(pilot=member) & ~instructor_present_filter
+        dual_received_filter = Q(pilot=member) & instructor_present_filter
+        solo_filter = (
+            pilot_non_instruction_filter
+            & Q(passenger__isnull=True)
+            & Q(passenger_name="")
+        )
+        instructor_given_filter = Q(instructor=member)
+        member_non_passenger_filter = Q(pilot=member) | Q(instructor=member)
+        rated_dual_pic_filter = Q(pk__in=[])
+        if rating_date:
+            rated_dual_pic_filter = dual_received_filter & Q(
+                logsheet__log_date__gte=rating_date
+            )
 
         prior_flights = Flight.objects.filter(
             Q(pilot=member) | Q(instructor=member) | Q(passenger=member),
             logsheet__log_date__year__lt=selected_year,
-        ).select_related("logsheet")
+        )
+        prior_agg = prior_flights.aggregate(
+            dual_received_dur=Sum("duration", filter=dual_received_filter),
+            solo_dur=Sum("duration", filter=solo_filter),
+            pilot_non_instruction_pic_dur=Sum(
+                "duration", filter=pilot_non_instruction_filter
+            ),
+            instructor_given_dur=Sum("duration", filter=instructor_given_filter),
+            rated_dual_pic_dur=Sum("duration", filter=rated_dual_pic_filter),
+            total_dur=Sum("duration", filter=member_non_passenger_filter),
+            tow_count=Count(
+                "id", filter=member_non_passenger_filter & Q(launch_method="tow")
+            ),
+            winch_count=Count(
+                "id", filter=member_non_passenger_filter & Q(launch_method="winch")
+            ),
+            self_count=Count(
+                "id", filter=member_non_passenger_filter & Q(launch_method="self")
+            ),
+        )
 
-        for f in prior_flights:
-            classification = classify_logbook_flight_minutes(
-                f,
-                member.id,
-                rating_date,
-            )
-            if classification["is_passenger"]:
-                continue
+        def duration_to_minutes(value):
+            return int(value.total_seconds() // 60) if value else 0
 
-            opening_m["dual_received_m"] += classification["dual_m"]
-            opening_m["solo_m"] += classification["solo_m"]
-            opening_m["pic_m"] += classification["pic_m"]
-            opening_m["inst_given_m"] += classification["inst_m"]
-            opening_m["total_m"] += classification["duration_m"]
-            opening_m["A"] += 1 if f.launch_method == "tow" else 0
-            opening_m["G"] += 1 if f.launch_method == "winch" else 0
-            opening_m["S"] += 1 if f.launch_method == "self" else 0
+        opening_m = {
+            "ground_inst_m": 0,
+            "dual_received_m": duration_to_minutes(prior_agg.get("dual_received_dur")),
+            "solo_m": duration_to_minutes(prior_agg.get("solo_dur")),
+            "pic_m": (
+                duration_to_minutes(prior_agg.get("pilot_non_instruction_pic_dur"))
+                + duration_to_minutes(prior_agg.get("rated_dual_pic_dur"))
+                + duration_to_minutes(prior_agg.get("instructor_given_dur"))
+            ),
+            "inst_given_m": duration_to_minutes(prior_agg.get("instructor_given_dur")),
+            "total_m": duration_to_minutes(prior_agg.get("total_dur")),
+            "A": prior_agg.get("tow_count") or 0,
+            "G": prior_agg.get("winch_count") or 0,
+            "S": prior_agg.get("self_count") or 0,
+        }
 
         prior_ground = GroundInstruction.objects.filter(
             student=member,
             date__year__lt=selected_year,
-        )
-        opening_m["ground_inst_m"] = sum(
-            int(g.duration.total_seconds() // 60) if g.duration else 0
-            for g in prior_ground
-        )
+        ).aggregate(total_dur=Sum("duration"))
+        opening_m["ground_inst_m"] = duration_to_minutes(prior_ground.get("total_dur"))
 
         opening_balance = {
             "year": selected_year,
