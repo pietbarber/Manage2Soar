@@ -1063,7 +1063,7 @@ class TestGliderReservationViews:
         assert other_member.full_display_name in content
 
     def test_calendar_day_modal_shows_no_other_pilots_when_only_instruction_students(
-        self, client, site_config, member, glider
+        self, client, site_config, member
     ):
         """When only instruction students are signed up, show informational empty state."""
         target_date = timezone.now().date() + timedelta(days=14)
@@ -1074,14 +1074,6 @@ class TestGliderReservationViews:
             student=member,
             status="confirmed",
         )
-        GliderReservation.objects.create(
-            member=member,
-            glider=glider,
-            date=target_date,
-            reservation_type="solo",
-            time_preference="morning",
-        )
-
         client.force_login(member)
         response = client.get(
             reverse(

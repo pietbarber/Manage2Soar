@@ -939,6 +939,13 @@ def calendar_day_detail(request, year, month, day):
                     reservation.member_id,
                     reservation.member,
                 )
+    instruction_student_ids = set()
+    if assignment:
+        for slot in assignment.active_instruction_slots.select_related("student"):
+            if not slot.student_id:
+                continue
+            instruction_student_ids.add(slot.student_id)
+            signed_up_members_by_id.setdefault(slot.student_id, slot.student)
     signed_up_flyers = sorted(
         signed_up_members_by_id.values(),
         key=lambda member: (
@@ -947,11 +954,6 @@ def calendar_day_detail(request, year, month, day):
             member.username.lower() if member.username else "",
         ),
     )
-    instruction_student_ids = set()
-    if assignment:
-        instruction_student_ids = set(
-            assignment.active_instruction_slots.values_list("student_id", flat=True)
-        )
     signed_up_non_instruction_flyers = [
         member
         for member in signed_up_flyers
