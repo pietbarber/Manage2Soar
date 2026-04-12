@@ -18,7 +18,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from duty_roster.forms import GliderReservationForm
-from duty_roster.models import GliderReservation
+from duty_roster.models import (
+    DutyAssignment,
+    GliderReservation,
+    InstructionSlot,
+    OpsIntent,
+)
 from logsheet.models import Glider, MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
 
@@ -676,6 +681,74 @@ class TestGliderReservationViews:
 
         # Verify reservation was created
         assert GliderReservation.objects.filter(member=member, glider=glider).exists()
+        # Reservation creation should also surface member in plan-to-fly via OpsIntent.
+        assert OpsIntent.objects.filter(member=member, date=future_date).exists()
+
+    def test_reservation_create_does_not_overwrite_existing_ops_intent(
+        self, client, site_config, member, glider, future_date
+    ):
+        """Existing OpsIntent values should be preserved when reservation is created."""
+        OpsIntent.objects.create(
+            member=member,
+            date=future_date,
+            available_as=["private"],
+            notes="Keep existing intent details",
+        )
+
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_create")
+        response = client.post(
+            url,
+            {
+                "glider": glider.pk,
+                "date": future_date.isoformat(),
+                "reservation_type": "solo",
+                "time_preference": "morning",
+            },
+        )
+
+        assert response.status_code == 302
+        intent = OpsIntent.objects.get(member=member, date=future_date)
+        assert intent.available_as == ["private"]
+        assert intent.notes == "Keep existing intent details"
+
+    def test_reservation_create_handles_ops_intent_integrity_race(
+        self, client, site_config, member, glider, future_date
+    ):
+        """Reservation creation should succeed if OpsIntent get_or_create races."""
+        from unittest.mock import patch
+
+        from django.db import IntegrityError
+
+        OpsIntent.objects.create(
+            member=member,
+            date=future_date,
+            available_as=["club_single"],
+            notes="Created by concurrent request",
+        )
+
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_create")
+
+        with patch(
+            "duty_roster.views_reservation.OpsIntent.objects.get_or_create",
+            side_effect=IntegrityError(
+                "duplicate key value violates unique constraint"
+            ),
+        ):
+            response = client.post(
+                url,
+                {
+                    "glider": glider.pk,
+                    "date": future_date.isoformat(),
+                    "reservation_type": "solo",
+                    "time_preference": "morning",
+                },
+            )
+
+        assert response.status_code == 302
+        assert GliderReservation.objects.filter(member=member, glider=glider).exists()
+        assert OpsIntent.objects.filter(member=member, date=future_date).count() == 1
 
     def test_reservation_detail_view(
         self, client, site_config, member, glider, future_date
@@ -865,6 +938,242 @@ class TestGliderReservationViews:
 
         assert response.status_code == 200
         assert "Reserve a Glider" in response.content.decode("utf-8")
+
+    def test_calendar_day_modal_uses_period_aware_remaining_label_and_value(
+        self, client, site_config, member, glider
+    ):
+        """Day modal should show remaining reservations for configured period."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.max_reservations_per_year = 2
+        site_config.max_reservations_per_month = 0
+        site_config.save()
+
+        target_date = timezone.now().date() + timedelta(days=10)
+        DutyAssignment.objects.create(date=target_date)
+
+        # One reservation in same quarter leaves one remaining.
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=target_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Reservations remaining this quarter: <strong>1</strong>" in content
+
+    def test_calendar_day_modal_uses_quarter_label_when_user_cannot_reserve(
+        self, client, site_config, member
+    ):
+        """Requirements copy should still reflect configured quarter period."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.save()
+
+        target_date = timezone.now().date() + timedelta(days=11)
+        DutyAssignment.objects.create(date=target_date)
+
+        member.is_active = False
+        member.save(update_fields=["is_active"])
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "You must have reservations remaining for this quarter." in content
+
+    def test_calendar_day_modal_signed_up_flyers_count_uses_deduped_union(
+        self, client, site_config, member, glider, django_user_model
+    ):
+        """Signed-up flyer list/count should be union of intents and reservations."""
+        target_date = timezone.now().date() + timedelta(days=12)
+        DutyAssignment.objects.create(date=target_date)
+
+        other_member = django_user_model.objects.create_user(
+            username="unionmember",
+            email="union@example.com",
+            password="testpass123",
+            first_name="Union",
+            last_name="Member",
+            membership_status="Full Member",
+        )
+
+        OpsIntent.objects.create(
+            member=member,
+            date=target_date,
+            available_as=["club_single"],
+        )
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=target_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        GliderReservation.objects.create(
+            member=other_member,
+            glider=glider,
+            date=target_date,
+            reservation_type="guest",
+            time_preference="afternoon",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Pilots Planning to Fly (2):" in content
+        assert member.full_display_name in content
+        assert other_member.full_display_name in content
+
+    def test_calendar_day_modal_other_pilots_excludes_instruction_students(
+        self, client, site_config, member, glider, django_user_model
+    ):
+        """Instruction students are excluded from the 'other pilots' list."""
+        target_date = timezone.now().date() + timedelta(days=13)
+        assignment = DutyAssignment.objects.create(date=target_date)
+
+        other_member = django_user_model.objects.create_user(
+            username="otherpilot",
+            email="otherpilot@example.com",
+            password="testpass123",
+            first_name="Other",
+            last_name="Pilot",
+            membership_status="Full Member",
+        )
+
+        InstructionSlot.objects.create(
+            assignment=assignment,
+            student=member,
+            status="confirmed",
+        )
+        OpsIntent.objects.create(
+            member=member,
+            date=target_date,
+            available_as=["club_single"],
+        )
+        GliderReservation.objects.create(
+            member=other_member,
+            glider=glider,
+            date=target_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert (
+            "Total signed-up flyers (including students requesting instruction):"
+            in content
+        )
+        normalized_content = " ".join(content.split())
+        assert (
+            "Total signed-up flyers (including students requesting instruction): "
+            "<strong>2</strong>"
+        ) in normalized_content
+        assert "Pilots Planning to Fly (1):" in content
+        assert other_member.full_display_name in content
+
+    def test_calendar_day_modal_includes_reservations_when_feature_disabled(
+        self, client, site_config, member, glider
+    ):
+        """Confirmed reservations still count as signed-up flyers when feature is off."""
+        site_config.allow_glider_reservations = False
+        site_config.save()
+
+        target_date = timezone.now().date() + timedelta(days=15)
+        DutyAssignment.objects.create(date=target_date)
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=target_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert (
+            "Total signed-up flyers (including students requesting instruction):"
+            in content
+        )
+        normalized_content = " ".join(content.split())
+        assert (
+            "Total signed-up flyers (including students requesting instruction): "
+            "<strong>1</strong>"
+        ) in normalized_content
+        assert member.full_display_name in content
+
+    def test_calendar_day_modal_shows_no_other_pilots_when_only_instruction_students(
+        self, client, site_config, member
+    ):
+        """When only instruction students are signed up, show informational empty state."""
+        target_date = timezone.now().date() + timedelta(days=14)
+        assignment = DutyAssignment.objects.create(date=target_date)
+
+        InstructionSlot.objects.create(
+            assignment=assignment,
+            student=member,
+            status="confirmed",
+        )
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert (
+            "Total signed-up flyers (including students requesting instruction):"
+            in content
+        )
+        normalized_content = " ".join(content.split())
+        assert (
+            "Total signed-up flyers (including students requesting instruction): "
+            "<strong>1</strong>"
+        ) in normalized_content
+        assert "No additional pilots beyond students requesting instruction." in content
 
     def test_reservation_create_shows_warning_for_expired_deadline(
         self, client, site_config, member, glider, future_date

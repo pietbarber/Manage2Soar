@@ -832,6 +832,41 @@ class TestSendDutyPreopEmails:
         DEFAULT_FROM_EMAIL="noreply@test.com",
         SITE_URL="https://test.manage2soar.com",
     )
+    def test_participant_email_dedupes_member_in_ops_intent_and_reservation(
+        self, site_config, duty_assignment, members, glider, tomorrow
+    ):
+        """Signed-up flyer appearing in both sources should get one participant email."""
+        OpsIntent.objects.create(
+            member=members["private_owner"],
+            date=tomorrow,
+            available_as=["private"],
+            glider=glider,
+        )
+        GliderReservation.objects.create(
+            member=members["private_owner"],
+            glider=glider,
+            date=tomorrow,
+            status="confirmed",
+            reservation_type="guest",
+            time_preference="afternoon",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        all_recipients = [email.to[0] for email in mail.outbox]
+        assert all_recipients.count(members["private_owner"].email) == 1
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
     def test_participant_email_uses_participant_wording(
         self, site_config, duty_assignment, members, tomorrow
     ):
