@@ -880,7 +880,18 @@ def calendar_day_detail(request, year, month, day):
     can_reserve_glider = False
     reserve_message = ""
     reservations_remaining = None
-    reservation_period_label = "year"
+    reservation_limit_period = ReservationLimitPeriod.YEARLY
+    if reservation_config is not None:
+        reservation_limit_period = getattr(
+            reservation_config,
+            "reservation_limit_period",
+            ReservationLimitPeriod.YEARLY,
+        )
+    reservation_period_label = (
+        "quarter"
+        if reservation_limit_period == ReservationLimitPeriod.QUARTERLY
+        else "year"
+    )
 
     if request.user.is_authenticated and reservation_enabled:
         day_reservations = GliderReservation.get_reservations_for_date(day_date)
@@ -895,24 +906,16 @@ def calendar_day_detail(request, year, month, day):
         # guard so static type-checkers can narrow away Optional.
         if reservation_config is None:
             max_per_period = 0
-            reservation_limit_period = ReservationLimitPeriod.YEARLY
         else:
             max_per_period = reservation_config.max_reservations_per_year
-            reservation_limit_period = getattr(
-                reservation_config,
-                "reservation_limit_period",
-                ReservationLimitPeriod.YEARLY,
-            )
 
         if reservation_limit_period == ReservationLimitPeriod.QUARTERLY:
-            reservation_period_label = "quarter"
             current_period_count = GliderReservation.get_member_quarterly_count(
                 request.user,
                 year=day_date.year,
                 month=day_date.month,
             )
         else:
-            reservation_period_label = "year"
             current_period_count = GliderReservation.get_member_yearly_count(
                 request.user,
                 year=day_date.year,

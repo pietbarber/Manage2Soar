@@ -935,6 +935,31 @@ class TestGliderReservationViews:
         assert "Reservations remaining this quarter" in content
         assert "<strong>1</strong>" in content
 
+    def test_calendar_day_modal_uses_quarter_label_when_user_cannot_reserve(
+        self, client, site_config, member
+    ):
+        """Requirements copy should still reflect configured quarter period."""
+        site_config.reservation_limit_period = "quarterly"
+        site_config.save()
+
+        target_date = timezone.now().date() + timedelta(days=11)
+        DutyAssignment.objects.create(date=target_date)
+
+        member.is_active = False
+        member.save(update_fields=["is_active"])
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "You must have reservations remaining for this quarter." in content
+
     def test_calendar_day_modal_signed_up_flyers_count_uses_deduped_union(
         self, client, site_config, member, glider, django_user_model
     ):
