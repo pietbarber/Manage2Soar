@@ -1,86 +1,140 @@
 /* Analytics layout & theming */
 
 /* ========= Design tokens ========= */
-:root{
-  --chart-h-short: 380px;
-  --chart-h:       440px;
-  --chart-h-tall:  520px;
-  --chart-h-xl:    560px;
+:root {
+  --chart-h-short: 360px;
+  --chart-h: 420px;
+  --chart-h-tall: 500px;
+  --chart-h-xl: 540px;
 
-  --chart-title-pr: 5rem;          /* padding-right so title doesn't sit under tool buttons */
-  --chart-text: #212529;           /* bootstrap body color */
-  --chart-grid: rgba(0,0,0,.1);    /* grid/axis default */
+  --chart-title-pr: 5rem;
+  /* padding-right so title doesn't sit under tool buttons */
+  --chart-text: #212529;
+  /* bootstrap body color */
+  --chart-grid: rgba(0, 0, 0, .1);
+  /* grid/axis default */
 }
 
-@media (prefers-color-scheme: dark){
-  :root{
+@media (prefers-color-scheme: dark) {
+  :root {
     --chart-text: #e9ecef;
-    --chart-grid: rgba(255,255,255,.16);
+    --chart-grid: rgba(255, 255, 255, .16);
   }
 }
 
 /* ========= Chart containers ========= */
-.chart-card{ position: relative; }
+.chart-card {
+  position: relative;
+}
 
-.chart-box{
+.chart-box {
   height: var(--chart-h);
   position: relative;
 }
-.chart-box--short{ height: var(--chart-h-short); }
-.chart-box--tall { height: var(--chart-h-tall); }
-.chart-box--xl   { height: var(--chart-h-xl);   }
+
+.chart-box--short {
+  height: var(--chart-h-short);
+}
+
+.chart-box--tall {
+  height: var(--chart-h-tall);
+}
+
+.chart-box--xl {
+  height: var(--chart-h-xl);
+}
 
 /* Make canvas stretch to the box */
-.chart-box > canvas{
+.chart-box>canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
 }
 
 /* ========= Title padding so it doesn’t overlap the tools ========= */
-.chart-title-pad{ padding-right: var(--chart-title-pr) !important; }
+.chart-title-pad {
+  padding-right: var(--chart-title-pr) !important;
+}
 
 /* ========= Tool buttons (PNG/SVG/CSV) ========= */
-.chart-tools{
+.chart-tools {
   position: absolute;
   top: .5rem;
   right: .5rem;
   z-index: 3;
 }
-.chart-tools .btn{
+
+.chart-tools .btn {
   padding: .2rem .5rem;
   line-height: 1.1;
 }
 
 /* ========= Responsive tweaks ========= */
-@media (max-width: 576px){
+@media (max-width: 576px) {
   :root {
     --chart-title-pr: 4rem;
   }
-  .chart-box        { height: 280px; }
-  .chart-box--short { height: 220px; }
-  .chart-box--tall  { height: 340px; }
-  .chart-box--xl    { height: 380px; }
+
+  .chart-box {
+    height: 280px;
+  }
+
+  .chart-box--short {
+    height: 220px;
+  }
+
+  .chart-box--tall {
+    height: 340px;
+  }
+
+  .chart-box--xl {
+    height: 380px;
+  }
 }
 
 /* Very narrow phones (≤430px) */
-@media (max-width: 430px){
+@media (max-width: 430px) {
   :root {
     --chart-title-pr: 3.5rem;
   }
-  .chart-box        { height: 240px; }
-  .chart-box--short { height: 190px; }
-  .chart-box--tall  { height: 300px; }
-  .chart-box--xl    { height: 340px; }
+
+  .chart-box {
+    height: 240px;
+  }
+
+  .chart-box--short {
+    height: 190px;
+  }
+
+  .chart-box--tall {
+    height: 300px;
+  }
+
+  .chart-box--xl {
+    height: 340px;
+  }
+
   /* Keep tool buttons compact on very small screens */
-  .chart-tools .btn { padding: .15rem .35rem; font-size: .75rem; }
+  .chart-tools .btn {
+    padding: .15rem .35rem;
+    font-size: .75rem;
+  }
 }
 
 /* ========= Print: hide controls, compress heights ========= */
-@media print{
+@media print {
+
   .chart-tools,
   form,
-  .alert{ display: none !important; }
-  .card{ break-inside: avoid; }
-  .chart-box{ height: 320px; }
+  .alert {
+    display: none !important;
+  }
+
+  .card {
+    break-inside: avoid;
+  }
+
+  .chart-box {
+    height: 320px;
+  }
 }

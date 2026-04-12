@@ -11,7 +11,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q, Sum, Value
+from django.db.models.functions import Coalesce, Trim
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -1641,11 +1642,19 @@ def member_logbook(request, member_id=None):
 
     # Years requested to load
     show_all_years = request.GET.get("show_all_years")
-    show_years = request.GET.getlist("year")
+    valid_years = set(all_years)
+    show_years = [
+        int(y)
+        for y in request.GET.getlist("year")
+        if y.isdigit() and int(y) in valid_years
+    ]
+    selected_year = None
     if show_all_years:
         years_to_load = all_years
     elif show_years:
-        years_to_load = [int(y) for y in show_years if y.isdigit()]
+        years_to_load = show_years
+        if len(show_years) == 1:
+            selected_year = show_years[0]
     else:
         # Default: last 12 months
         years_to_load = [today.year, today.year - 1]
@@ -2028,6 +2037,107 @@ def member_logbook(request, member_id=None):
         else:
             page["is_first_for_year"] = False
 
+    opening_balance = None
+    if selected_year is not None:
+        opening_balance_cutoff = datetime.date(selected_year, 1, 1)
+        instructor_present_filter = (
+            Q(instructor__isnull=False)
+            | Q(guest_instructor_name_trimmed__gt="")
+            | Q(legacy_instructor_name_trimmed__gt="")
+        )
+        pilot_non_instruction_filter = Q(pilot=member) & ~instructor_present_filter
+        dual_received_filter = Q(pilot=member) & instructor_present_filter
+        solo_filter = (
+            pilot_non_instruction_filter
+            & Q(passenger__isnull=True)
+            & Q(passenger_name="")
+        )
+        instructor_given_filter = Q(instructor=member)
+        member_non_passenger_filter = Q(pilot=member) | Q(instructor=member)
+        rated_dual_pic_filter = Q(pk__in=[])
+        if rating_date:
+            rated_dual_pic_filter = dual_received_filter & Q(
+                logsheet__log_date__gte=rating_date
+            )
+
+        prior_flights = Flight.objects.alias(
+            guest_instructor_name_trimmed=Trim(
+                Coalesce("guest_instructor_name", Value(""))
+            ),
+            legacy_instructor_name_trimmed=Trim(
+                Coalesce("legacy_instructor_name", Value(""))
+            ),
+        ).filter(
+            Q(pilot=member) | Q(instructor=member),
+            logsheet__log_date__lt=opening_balance_cutoff,
+        )
+        prior_agg = prior_flights.aggregate(
+            dual_received_dur=Sum("duration", filter=dual_received_filter),
+            solo_dur=Sum("duration", filter=solo_filter),
+            pilot_non_instruction_pic_dur=Sum(
+                "duration", filter=pilot_non_instruction_filter
+            ),
+            instructor_given_dur=Sum("duration", filter=instructor_given_filter),
+            rated_dual_pic_dur=Sum("duration", filter=rated_dual_pic_filter),
+            total_dur=Sum("duration", filter=member_non_passenger_filter),
+            tow_count=Count(
+                "id", filter=member_non_passenger_filter & Q(launch_method="tow")
+            ),
+            winch_count=Count(
+                "id", filter=member_non_passenger_filter & Q(launch_method="winch")
+            ),
+            self_count=Count(
+                "id", filter=member_non_passenger_filter & Q(launch_method="self")
+            ),
+        )
+
+        def duration_to_minutes(value):
+            return int(value.total_seconds() // 60) if value else 0
+
+        opening_m = {
+            "ground_inst_m": 0,
+            "dual_received_m": duration_to_minutes(prior_agg.get("dual_received_dur")),
+            "solo_m": duration_to_minutes(prior_agg.get("solo_dur")),
+            "pic_m": (
+                duration_to_minutes(prior_agg.get("pilot_non_instruction_pic_dur"))
+                + duration_to_minutes(prior_agg.get("rated_dual_pic_dur"))
+                + duration_to_minutes(prior_agg.get("instructor_given_dur"))
+            ),
+            "inst_given_m": duration_to_minutes(prior_agg.get("instructor_given_dur")),
+            "total_m": duration_to_minutes(prior_agg.get("total_dur")),
+            "A": prior_agg.get("tow_count") or 0,
+            "G": prior_agg.get("winch_count") or 0,
+            "S": prior_agg.get("self_count") or 0,
+        }
+
+        prior_ground = GroundInstruction.objects.filter(
+            student=member,
+            date__lt=opening_balance_cutoff,
+        ).aggregate(total_dur=Sum("duration"))
+        opening_m["ground_inst_m"] = duration_to_minutes(prior_ground.get("total_dur"))
+
+        opening_balance = {
+            "year": selected_year,
+            "ground_inst": format_hhmm(timedelta(minutes=opening_m["ground_inst_m"])),
+            "dual_received": format_hhmm(
+                timedelta(minutes=opening_m["dual_received_m"])
+            ),
+            "solo": format_hhmm(timedelta(minutes=opening_m["solo_m"])),
+            "pic": format_hhmm(timedelta(minutes=opening_m["pic_m"])),
+            "inst_given": format_hhmm(timedelta(minutes=opening_m["inst_given_m"])),
+            "total": format_hhmm(timedelta(minutes=opening_m["total_m"])),
+            "A": opening_m["A"],
+            "G": opening_m["G"],
+            "S": opening_m["S"],
+        }
+
+    is_single_year_scope = selected_year is not None
+    totals_scope_label = (
+        f"Running totals for {selected_year}"
+        if is_single_year_scope
+        else "Running totals across loaded years"
+    )
+
     return render(
         request,
         "instructors/logbook.html",
@@ -2037,6 +2147,10 @@ def member_logbook(request, member_id=None):
             "years": years,
             "year_page_map": year_page_map,
             "all_years": all_years,
+            "selected_year": selected_year,
+            "opening_balance": opening_balance,
+            "is_single_year_scope": is_single_year_scope,
+            "totals_scope_label": totals_scope_label,
             "glider_time_summary": glider_time_summary,
         },
     )

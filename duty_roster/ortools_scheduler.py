@@ -11,7 +11,7 @@ Phase 2 Implementation: Full production constraints matching legacy scheduler be
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
@@ -45,6 +45,9 @@ FAIRNESS_PENALTY_WEIGHT = (
 MAX_ASSIGNMENT_CONCENTRATION_WEIGHT = (
     120  # Extra penalty for high single-member assignment concentration
 )
+ROLE_SPLIT_BALANCE_WEIGHT = (
+    1  # Penalty weight for drifting away from preferred multi-role split
+)
 WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS = {
     1: 60,
     2: 20,
@@ -77,6 +80,7 @@ class SchedulingData:
     role_scarcity: dict[str, dict[str, Any]]
     earliest_duty_day: date
     month_span: int = 1
+    prior_assignments: dict[str, int | None] = field(default_factory=dict)
 
 
 class DutyRosterScheduler:
@@ -260,6 +264,9 @@ class DutyRosterScheduler:
         # Constraint 6: Max assignments per month
         self._add_max_assignments_constraints()
 
+        # Constraint 7: Carry-over anti-repeat from prior duty day
+        self._add_carryover_anti_repeat_constraints()
+
         logger.info("Hard constraints added successfully")
 
     def _add_one_assignment_per_slot(self):
@@ -341,10 +348,11 @@ class DutyRosterScheduler:
 
     def _add_anti_repeat_constraints(self):
         """
-        Constraint: Members cannot do the same role on consecutive days.
+        Constraint: Members cannot do the same role on consecutive duty days.
 
-        Only applies to calendar-consecutive days (e.g., Saturday->Sunday),
-        not across week gaps (e.g., Sunday->next Saturday).
+        Applies to adjacent entries in the duty day sequence, which preserves
+        historical behavior for weekend rosters where the next duty day may be
+        several calendar days later (for example Sunday -> next Saturday).
         """
         for member in self.data.members:
             for role in self.data.roles:
@@ -352,15 +360,13 @@ class DutyRosterScheduler:
                     day1 = self.data.duty_days[i]
                     day2 = self.data.duty_days[i + 1]
 
-                    # Check if days are calendar-consecutive (not week-separated)
-                    if (day2 - day1).days == 1:
-                        # Check if both variables exist in our sparse set
-                        key1 = (member.id, role, day1)
-                        key2 = (member.id, role, day2)
+                    # Check if both variables exist in our sparse set
+                    key1 = (member.id, role, day1)
+                    key2 = (member.id, role, day2)
 
-                        if key1 in self.x and key2 in self.x:
-                            # Constraint: can't do same role on both days
-                            self.model.Add(self.x[key1] + self.x[key2] <= 1)
+                    if key1 in self.x and key2 in self.x:
+                        # Constraint: can't do same role on consecutive duty days
+                        self.model.Add(self.x[key1] + self.x[key2] <= 1)
 
     def _has_adjacent_weekday_pairs(self) -> bool:
         """Return True when any duty day has a matching day exactly 7 days later."""
@@ -447,6 +453,29 @@ class DutyRosterScheduler:
             if total_assignments:
                 self.model.Add(sum(total_assignments) <= max_assignments)
 
+    def _add_carryover_anti_repeat_constraints(self):
+        """Block same-role repeats from prior duty day into first scheduled day."""
+        if not self.data.duty_days:
+            return
+
+        first_day = self.data.duty_days[0]
+        for role in self.data.roles:
+            prior_member_id = self.data.prior_assignments.get(role)
+            if not prior_member_id:
+                continue
+
+            key = (prior_member_id, role, first_day)
+            alternative_candidates = [
+                self.x[m.id, role, first_day]
+                for m in self.data.members
+                if m.id != prior_member_id and (m.id, role, first_day) in self.x
+            ]
+
+            # Only enforce carry-over hard-block when at least one alternative
+            # candidate can satisfy the slot on the first generated day.
+            if key in self.x and alternative_candidates:
+                self.model.Add(self.x[key] == 0)
+
     def _add_objective_function(self):
         """
         Add objective function to maximize member satisfaction and fairness.
@@ -456,7 +485,8 @@ class DutyRosterScheduler:
         2. Pairing affinity bonus (members who prefer to work together)
         3. Last duty date balancing (prioritize members who haven't worked recently)
         4. Balanced assignment distribution (minimize variance across members)
-        5. Weekend spacing preference (favor wider, more consistent repeat gaps)
+        5. Multi-role split balancing (reduce drift from configured role split)
+        6. Weekend spacing preference (favor wider, more consistent repeat gaps)
 
         The solver will maximize the sum of these weighted terms while respecting
         all hard constraints.
@@ -608,7 +638,10 @@ class DutyRosterScheduler:
                     -MAX_ASSIGNMENT_CONCENTRATION_WEIGHT * max_member_load
                 )
 
-            # Soft constraint 5: Weekend spacing preference and consistency
+            # Soft constraint 5: Multi-role split balancing per member
+            self._add_role_split_balance_soft_constraints(objective_terms)
+
+            # Soft constraint 6: Weekend spacing preference and consistency
             self._add_weekend_spacing_soft_constraints(
                 objective_terms, member_assigned_on_day
             )
@@ -616,6 +649,94 @@ class DutyRosterScheduler:
         # Set objective: maximize total weighted satisfaction
         self.model.Maximize(sum(objective_terms))
         logger.info(f"Objective function built with {len(objective_terms)} terms")
+
+    def _add_role_split_balance_soft_constraints(self, objective_terms):
+        """Penalize drift from preferred role split for multi-role members."""
+        if not self.data.duty_days:
+            return
+
+        max_days = len(self.data.duty_days)
+
+        for member in self.data.members:
+            pref = self.data.preferences.get(member.id)
+            if not pref:
+                continue
+
+            eligible_roles = [
+                role
+                for role in self.data.roles
+                if getattr(member, role, False)
+                and any((member.id, role, day) in self.x for day in self.data.duty_days)
+            ]
+            if len(eligible_roles) < 2:
+                continue
+
+            role_percentages = {
+                role: self._get_role_percent(pref, role) for role in eligible_roles
+            }
+            if all(percent == 0 for percent in role_percentages.values()):
+                role_targets = {role: 1 for role in eligible_roles}
+            else:
+                role_targets = {
+                    role: percent
+                    for role, percent in role_percentages.items()
+                    if percent > 0
+                }
+                if len(role_targets) < 2:
+                    continue
+
+            denominator = sum(role_targets.values())
+            role_count_vars = {}
+
+            for role in role_targets:
+                role_vars = [
+                    self.x[member.id, role, day]
+                    for day in self.data.duty_days
+                    if (member.id, role, day) in self.x
+                ]
+                if not role_vars:
+                    continue
+
+                count_var = self.model.NewIntVar(
+                    0,
+                    max_days,
+                    f"role_count_{member.id}_{role}",
+                )
+                self.model.Add(count_var == sum(role_vars))
+                role_count_vars[role] = count_var
+
+            if len(role_count_vars) < 2:
+                continue
+
+            total_var = self.model.NewIntVar(
+                0,
+                max_days,
+                f"role_count_total_{member.id}",
+            )
+            self.model.Add(total_var == sum(role_count_vars.values()))
+
+            abs_bound = denominator * max_days
+            for role, target in role_targets.items():
+                count_var = role_count_vars.get(role)
+                if count_var is None:
+                    continue
+
+                deviation = self.model.NewIntVar(
+                    -abs_bound,
+                    abs_bound,
+                    f"role_split_dev_{member.id}_{role}",
+                )
+                self.model.Add(
+                    deviation == denominator * count_var - target * total_var
+                )
+
+                abs_deviation = self.model.NewIntVar(
+                    0,
+                    abs_bound,
+                    f"role_split_abs_dev_{member.id}_{role}",
+                )
+                self.model.AddAbsEquality(abs_deviation, deviation)
+                objective_terms.append(-ROLE_SPLIT_BALANCE_WEIGHT * abs_deviation)
 
     def _add_weekend_spacing_soft_constraints(
         self, objective_terms, member_assigned_on_day
@@ -886,7 +1007,9 @@ def extract_scheduling_data(
     from django.utils.timezone import now
 
     from duty_roster.roster_generator import (
+        DUTY_ROLE_TO_ASSIGNMENT_FIELD,
         count_calendar_months_inclusive,
+        get_previous_scheduled_assignment,
         get_weekend_dates_in_range,
         resolve_roster_date_range,
     )
@@ -955,6 +1078,15 @@ def extract_scheduling_data(
     # Determine earliest duty day for staleness calculation
     earliest_duty_day = min(duty_days) if duty_days else today
 
+    prior_assignments = {}
+    if duty_days:
+        previous_assignment = get_previous_scheduled_assignment(duty_days[0])
+        if previous_assignment:
+            for role in roles:
+                field_name = DUTY_ROLE_TO_ASSIGNMENT_FIELD.get(role)
+                if field_name:
+                    prior_assignments[role] = getattr(previous_assignment, field_name)
+
     return SchedulingData(
         members=members,
         duty_days=duty_days,
@@ -966,6 +1098,7 @@ def extract_scheduling_data(
         role_scarcity=role_scarcity,
         earliest_duty_day=earliest_duty_day,
         month_span=month_span,
+        prior_assignments=prior_assignments,
     )
 
 

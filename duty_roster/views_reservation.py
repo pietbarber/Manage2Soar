@@ -14,7 +14,7 @@ import logging
 from datetime import date, timedelta
 
 from django.contrib import messages
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -23,9 +23,18 @@ from members.decorators import active_member_required
 from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 
 from .forms import GliderReservationCancelForm, GliderReservationForm
-from .models import GliderReservation
+from .models import GliderReservation, OpsIntent
 
 logger = logging.getLogger("duty_roster.reservations")
+
+
+def _reservation_default_available_as(reservation):
+    """Map reservation details to a default OpsIntent activity list."""
+    if reservation.reservation_type == "guest":
+        return ["guest"]
+    if reservation.glider and reservation.glider.seats >= 2:
+        return ["club_two"]
+    return ["club_single"]
 
 
 @active_member_required
@@ -184,6 +193,28 @@ def reservation_create(request, year=None, month=None, day=None):
                 reservation = form.save()
                 # Check if save was actually successful (form.save() may add errors without raising)
                 if reservation.pk:
+                    try:
+                        # Isolate potential unique-key races so the outer reservation
+                        # transaction remains valid and can still commit.
+                        with transaction.atomic():
+                            OpsIntent.objects.get_or_create(
+                                member=member,
+                                date=reservation.date,
+                                defaults={
+                                    "available_as": _reservation_default_available_as(
+                                        reservation
+                                    ),
+                                    "glider": reservation.glider,
+                                    "notes": "Auto-created from glider reservation",
+                                },
+                            )
+                    except IntegrityError:
+                        if not OpsIntent.objects.filter(
+                            member=member,
+                            date=reservation.date,
+                        ).exists():
+                            raise
+
                     expired_deadlines = []
                     if reservation.glider:
                         expired_deadlines = list(

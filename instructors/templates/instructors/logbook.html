@@ -22,10 +22,53 @@
   </button>
 </form>
 
+{% if all_years %}
+<div class="year-filter-panel mb-3">
+  <h5 class="mb-2">Year Scope for Totals</h5>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    {% for year in all_years %}
+      <form method="get" style="display:inline">
+        <input type="hidden" name="year" value="{{ year }}">
+        <button
+          type="submit"
+          class="btn {% if selected_year == year %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm"
+        >
+          {{ year }}
+        </button>
+      </form>
+    {% endfor %}
+  </div>
+  {% if selected_year %}
+    <small class="text-muted d-block mt-2">
+      Showing year-scoped rows and running totals for {{ selected_year }}. Use "Show All Years"
+      above if you need full-history carry-over context.
+    </small>
+  {% else %}
+    <small class="text-muted d-block mt-2">
+      Select a single year to focus totals and compare against the opening balance context.
+    </small>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if opening_balance %}
+<div class="alert alert-info mb-3" role="alert">
+  <div class="fw-semibold mb-1">Opening balance before {{ opening_balance.year }}</div>
+  <div class="small">
+    Total: <strong>{{ opening_balance.total }}</strong> |
+    PIC: <strong>{{ opening_balance.pic }}</strong> |
+    Dual Received: <strong>{{ opening_balance.dual_received }}</strong> |
+    Solo: <strong>{{ opening_balance.solo }}</strong> |
+    Instruction Given: <strong>{{ opening_balance.inst_given }}</strong> |
+    Ground: <strong>{{ opening_balance.ground_inst }}</strong>
+  </div>
+</div>
+{% endif %}
+
 <!-- Year Navigation -->
 {% if years %}
 <div class="year-navigation">
-  <h5 class="mb-3">📅 Jump to Year:</h5>
+  <h5 class="mb-3">📅 {% if selected_year %}Jump Within Loaded Sections:{% else %}Jump to Year:{% endif %}</h5>
   <div class="year-links">
     {% for year in all_years %}
       {% if year in years %}
@@ -39,7 +82,7 @@
     {% endfor %}
   </div>
   <small class="text-muted mt-2 d-block">
-    Click on any year to jump to that section. Years with no flights are not shown.
+    Click on any loaded year to jump to that section. Years with no flights are not shown.
   </small>
 </div>
 {% endif %}
@@ -192,7 +235,7 @@
 
       {# Running Totals #}
       <tr class="table-info fw-bold">
-        <td colspan="3" class="text-end">Running Totals:</td>
+        <td colspan="3" class="text-end">{{ totals_scope_label }}:</td>
         <td></td>
         <td class="text-end">{{ page.cumulative.A }}</td>
         <td class="text-end">{{ page.cumulative.G }}</td>
@@ -249,26 +292,28 @@
 </div>
 
 
-{% endblock %}
-document.addEventListener('DOMContentLoaded', function() {
-
 <script>
 // Show loading modal on "Show All Years" form submit
 document.addEventListener('DOMContentLoaded', function() {
   var form = document.getElementById('show-all-years-form');
-  var modal = new bootstrap.Modal(document.getElementById('loadingModal'));
+  var modalElement = document.getElementById('loadingModal');
+  var modal = modalElement ? new bootstrap.Modal(modalElement) : null;
   if (form) {
     form.addEventListener('submit', function() {
-      setTimeout(function() { modal.show(); }, 10);
+      if (modal) {
+        setTimeout(function() { modal.show(); }, 10);
+      }
     });
   }
   // Hide modal when page is loaded
   window.addEventListener('load', function() {
     var modalEl = document.getElementById('loadingModal');
-    if (modalEl.classList.contains('show')) {
+    if (modalEl && modalEl.classList.contains('show')) {
       var modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
     }
   });
 });
 </script>
+
+{% endblock %}

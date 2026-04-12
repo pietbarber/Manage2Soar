@@ -35,6 +35,10 @@ def test_training_grid_shows_member_profile_icon_link(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert reverse("members:member_view", kwargs={"member_id": student.pk}) in content
+    assert "css/print_training_grid.css" in content
+    assert 'media="print"' in content
+    assert "training-grid-max-col" in content
+    assert "print-score-text" in content
 
 
 @pytest.mark.django_db

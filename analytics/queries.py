@@ -1264,6 +1264,8 @@ def time_of_day_operations(
         "landing_points": landing_points,
         "mean_earliest_takeoff": mean_earliest_takeoff,
         "mean_latest_landing": mean_latest_landing,
+        "start_year": start_year,
+        "end_year": end_year,
         "total_flight_days": len(
             [day for day in daily_data.values() if day["takeoffs"] or day["landings"]]
         ),

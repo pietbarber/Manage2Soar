@@ -15,6 +15,7 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from duty_roster.models import (
+    DutyAssignment,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
@@ -22,6 +23,7 @@ from duty_roster.models import (
 )
 from duty_roster.ortools_scheduler import (
     MAX_ASSIGNMENT_CONCENTRATION_WEIGHT,
+    ROLE_SPLIT_BALANCE_WEIGHT,
     WEEKEND_SPACING_PENALTY_BY_LAG_WEEKS,
     DutyRosterScheduler,
     SchedulingData,
@@ -477,6 +479,116 @@ class ORToolsHardConstraintsTests(TestCase):
                     f"Member {day1_slots[role]} assigned to {role} on consecutive days",
                 )
 
+    def test_anti_repeat_constraint_applies_to_adjacent_duty_days(self):
+        """Test anti-repeat across adjacent duty days with a calendar gap."""
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[date(2026, 3, 1), date(2026, 3, 7)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: DutyPreference.objects.get(member=self.member1),
+                self.member2.id: DutyPreference.objects.get(member=self.member2),
+            },
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 1),
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        slots_day1 = result["schedule"][0]["slots"]["instructor"]
+        slots_day2 = result["schedule"][1]["slots"]["instructor"]
+        self.assertNotEqual(
+            slots_day1,
+            slots_day2,
+            "Instructor should not repeat on adjacent duty days even across week gaps.",
+        )
+
+    def test_carryover_anti_repeat_blocks_first_day_repeat(self):
+        """First generated day should respect prior published duty-day assignment."""
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 28),
+            instructor=self.member1,
+        )
+
+        data = extract_scheduling_data(
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 1),
+            roles=["instructor"],
+        )
+
+        self.assertEqual(data.prior_assignments.get("instructor"), self.member1.id)
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned = result["schedule"][0]["slots"]["instructor"]
+        self.assertNotEqual(
+            assigned,
+            self.member1.id,
+            "Carry-over anti-repeat should prevent first-day same-role repeat.",
+        )
+
+    def test_carryover_uses_latest_scheduled_assignment_only(self):
+        """Carry-over source should skip ad-hoc days and use latest scheduled day."""
+        # Last published/scheduled roster day before anchor
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 21),
+            instructor=self.member1,
+            is_scheduled=True,
+        )
+        # Later ad-hoc day should be ignored for carry-over sourcing
+        DutyAssignment.objects.create(
+            date=date(2026, 2, 28),
+            instructor=self.member2,
+            is_scheduled=False,
+        )
+
+        data = extract_scheduling_data(
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 1),
+            roles=["instructor"],
+        )
+
+        self.assertEqual(
+            data.prior_assignments.get("instructor"),
+            self.member1.id,
+            "Expected latest scheduled assignment to be used for carry-over.",
+        )
+
+    def test_carryover_hard_block_skips_when_no_alternative_candidate(self):
+        """Carry-over should not make model infeasible when first day has one option."""
+        data = SchedulingData(
+            members=[self.member1],
+            duty_days=[date(2026, 3, 1)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: DutyPreference.objects.get(member=self.member1),
+            },
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 1),
+            prior_assignments={"instructor": self.member1.id},
+        )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned = result["schedule"][0]["slots"]["instructor"]
+        self.assertEqual(
+            assigned,
+            self.member1.id,
+            "Expected first day to remain assignable when no alternative exists.",
+        )
+
     def test_max_assignments_constraint(self):
         """Test that members don't exceed max_assignments_per_month."""
         # Set low max for member1
@@ -692,6 +804,128 @@ class ORToolsHardConstraintsTests(TestCase):
             tuned_peak,
             baseline_peak,
             f"Expected tuned objective to reduce or match peak load; baseline={baseline_peak}, tuned={tuned_peak}",
+        )
+
+    def test_role_split_penalty_reduces_dual_role_drift(self):
+        """Role-split penalty should not worsen dual-role split drift."""
+        dual_member = Member.objects.create(
+            username="dual_split_member",
+            email="dual_split_member@test.com",
+            first_name="Dual",
+            last_name="Split",
+            membership_status="Full Member",
+            instructor=True,
+            towpilot=True,
+            is_active=True,
+        )
+        dual_pref = DutyPreference.objects.create(member=dual_member)
+        dual_pref.instructor_percent = 50
+        dual_pref.towpilot_percent = 50
+        dual_pref.max_assignments_per_month = 8
+        dual_pref.allow_weekend_double = True
+        dual_pref.last_duty_date = date(2019, 1, 1)
+        dual_pref.save()
+
+        instructor_only = Member.objects.create(
+            username="instructor_only_split",
+            email="instructor_only_split@test.com",
+            first_name="Instructor",
+            last_name="Only",
+            membership_status="Full Member",
+            instructor=True,
+            is_active=True,
+        )
+        DutyPreference.objects.create(
+            member=instructor_only,
+            instructor_percent=100,
+            max_assignments_per_month=8,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 3, 20),
+        )
+
+        tow_only = Member.objects.create(
+            username="tow_only_split",
+            email="tow_only_split@test.com",
+            first_name="Tow",
+            last_name="Only",
+            membership_status="Full Member",
+            towpilot=True,
+            is_active=True,
+        )
+        DutyPreference.objects.create(
+            member=tow_only,
+            towpilot_percent=100,
+            max_assignments_per_month=8,
+            allow_weekend_double=True,
+            last_duty_date=date(2026, 3, 20),
+        )
+
+        duty_days = [
+            date(2026, 4, 4),
+            date(2026, 4, 5),
+            date(2026, 4, 11),
+            date(2026, 4, 12),
+            date(2026, 4, 18),
+            date(2026, 4, 19),
+        ]
+
+        data = SchedulingData(
+            members=[dual_member, instructor_only, tow_only],
+            duty_days=duty_days,
+            roles=["instructor", "towpilot"],
+            preferences={
+                dual_member.id: dual_pref,
+                instructor_only.id: DutyPreference.objects.get(member=instructor_only),
+                tow_only.id: DutyPreference.objects.get(member=tow_only),
+            },
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={
+                "instructor": {"scarcity_score": 1.0},
+                "towpilot": {"scarcity_score": 1.0},
+            },
+            earliest_duty_day=duty_days[0],
+            month_span=1,
+        )
+
+        deterministic_seed = 12345
+
+        baseline_scheduler = DutyRosterScheduler(data)
+        baseline_scheduler.solver.parameters.num_search_workers = 1
+        baseline_scheduler.solver.parameters.random_seed = deterministic_seed
+        with patch("duty_roster.ortools_scheduler.ROLE_SPLIT_BALANCE_WEIGHT", 0):
+            baseline = baseline_scheduler.solve(timeout_seconds=10.0)
+
+        tuned_scheduler = DutyRosterScheduler(data)
+        tuned_scheduler.solver.parameters.num_search_workers = 1
+        tuned_scheduler.solver.parameters.random_seed = deterministic_seed
+        tuned = tuned_scheduler.solve(timeout_seconds=10.0)
+
+        self.assertIn(baseline["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertIn(tuned["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertGreater(ROLE_SPLIT_BALANCE_WEIGHT, 0)
+
+        def _dual_counts(result):
+            instructor_count = 0
+            tow_count = 0
+            for day in result["schedule"]:
+                if day["slots"].get("instructor") == dual_member.id:
+                    instructor_count += 1
+                if day["slots"].get("towpilot") == dual_member.id:
+                    tow_count += 1
+            return instructor_count, tow_count
+
+        baseline_inst, baseline_tow = _dual_counts(baseline)
+        tuned_inst, tuned_tow = _dual_counts(tuned)
+
+        baseline_drift = abs(baseline_inst - baseline_tow)
+        tuned_drift = abs(tuned_inst - tuned_tow)
+
+        self.assertLessEqual(
+            tuned_drift,
+            baseline_drift,
+            f"Expected role split penalty to reduce or match drift; baseline={baseline_drift}, tuned={tuned_drift}",
         )
 
     def test_adjacent_weekend_spacing_can_make_schedule_infeasible(self):

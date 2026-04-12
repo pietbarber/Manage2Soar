@@ -37,7 +37,7 @@ from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 from siteconfig.utils import get_role_title
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
@@ -900,6 +900,18 @@ def calendar_day_detail(request, year, month, day):
     can_reserve_glider = False
     reserve_message = ""
     reservations_remaining = None
+    reservation_limit_period = ReservationLimitPeriod.YEARLY
+    if reservation_config is not None:
+        reservation_limit_period = getattr(
+            reservation_config,
+            "reservation_limit_period",
+            ReservationLimitPeriod.YEARLY,
+        )
+    reservation_period_label = (
+        "quarter"
+        if reservation_limit_period == ReservationLimitPeriod.QUARTERLY
+        else "year"
+    )
 
     if request.user.is_authenticated and reservation_enabled:
         day_reservations = GliderReservation.get_reservations_for_date(day_date)
@@ -913,15 +925,59 @@ def calendar_day_detail(request, year, month, day):
         # reservation_enabled implies reservation_config exists; keep explicit
         # guard so static type-checkers can narrow away Optional.
         if reservation_config is None:
-            max_per_year = 0
+            max_per_period = 0
         else:
-            max_per_year = reservation_config.max_reservations_per_year
-        if max_per_year > 0:
-            current_year_count = GliderReservation.get_member_yearly_count(
+            max_per_period = reservation_config.max_reservations_per_year
+
+        if reservation_limit_period == ReservationLimitPeriod.QUARTERLY:
+            current_period_count = GliderReservation.get_member_quarterly_count(
+                request.user,
+                year=day_date.year,
+                month=day_date.month,
+            )
+        else:
+            current_period_count = GliderReservation.get_member_yearly_count(
                 request.user,
                 year=day_date.year,
             )
-            reservations_remaining = max(0, max_per_year - current_year_count)
+
+        if max_per_period > 0:
+            reservations_remaining = max(0, max_per_period - current_period_count)
+
+    signed_up_members_by_id = {
+        intent.member_id: intent.member for intent in intents if intent.member_id
+    }
+    signed_up_day_reservations = (
+        day_reservations
+        if reservation_enabled
+        else GliderReservation.get_reservations_for_date(day_date)
+    )
+    for reservation in signed_up_day_reservations:
+        if reservation.member_id:
+            signed_up_members_by_id.setdefault(
+                reservation.member_id,
+                reservation.member,
+            )
+    instruction_student_ids = set()
+    if assignment:
+        for slot in assignment.active_instruction_slots:
+            if not slot.student_id:
+                continue
+            instruction_student_ids.add(slot.student_id)
+            signed_up_members_by_id.setdefault(slot.student_id, slot.student)
+    signed_up_flyers = sorted(
+        signed_up_members_by_id.values(),
+        key=lambda member: (
+            member.last_name.lower() if member.last_name else "",
+            member.first_name.lower() if member.first_name else "",
+            member.username.lower() if member.username else "",
+        ),
+    )
+    signed_up_non_instruction_flyers = [
+        member
+        for member in signed_up_flyers
+        if member.id not in instruction_student_ids
+    ]
 
     # Determine scheduled but empty roles (visible to all users as an "unfilled" indicator)
     # and the subset the current user is qualified to volunteer for (Issue #679).
@@ -1011,6 +1067,13 @@ def calendar_day_detail(request, year, month, day):
             "can_reserve_glider": can_reserve_glider,
             "reserve_message": reserve_message,
             "reservations_remaining": reservations_remaining,
+            "reservation_period_label": reservation_period_label,
+            "signed_up_flyers": signed_up_flyers,
+            "signed_up_flyer_count": len(signed_up_flyers),
+            "signed_up_non_instruction_flyers": signed_up_non_instruction_flyers,
+            "signed_up_non_instruction_flyer_count": len(
+                signed_up_non_instruction_flyers
+            ),
             "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
             "open_panel": open_panel,
         },

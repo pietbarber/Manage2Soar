@@ -10,8 +10,9 @@ with information about:
 - Upcoming maintenance deadlines
 
 Each duty crew member receives an individual email with an ICS calendar attachment
-for their specific duty role. Students requesting instruction and members with ops
-intent are CC'd on each email to keep them informed.
+for their specific duty role. Signed-up flyers (students requesting instruction,
+members with ops intent, and confirmed reservation participants) receive their own
+dedicated participant email with a generic Flying Day ICS.
 """
 
 from datetime import datetime, timedelta
@@ -33,7 +34,7 @@ from duty_roster.utils.ics import generate_ops_day_ics, generate_preop_ics
 from logsheet.models import MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
-from utils.email import get_dev_mode_info
+from utils.email import enforce_noreply_from_email, get_dev_mode_info
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
 
@@ -111,17 +112,21 @@ class Command(BaseCommand):
         # Build context for templates
         context = self._build_context(assignment, target_date, config, site_url)
 
-        # Collect CC emails from students and ops intent members
+        # Collect participant recipient emails from students, ops intent members,
+        # and confirmed glider reservations.
         crew_emails = [member.email for member, _ in crew_with_roles]
-        cc_emails = []
+        participant_emails = []
         for slot in context.get("instruction_requests", []):
             if slot.student and slot.student.email:
-                cc_emails.append(slot.student.email)
+                participant_emails.append(slot.student.email)
         for intent in context.get("ops_intents", []):
             if intent.member and intent.member.email:
-                cc_emails.append(intent.member.email)
+                participant_emails.append(intent.member.email)
+        for reservation in context.get("reservations", []):
+            if reservation.member and reservation.member.email:
+                participant_emails.append(reservation.member.email)
         # Remove duplicates and any emails already in crew_emails
-        cc_emails = list(set(cc_emails) - set(crew_emails))
+        participant_emails = sorted(set(participant_emails) - set(crew_emails))
 
         # Render templates — two variants: crew (default) and participant.
         # Participant emails use the same template but with is_participant=True
@@ -136,16 +141,16 @@ class Command(BaseCommand):
             "duty_roster/emails/preop_email.txt", participant_context
         )
 
-        # Send email - use noreply@ with domain extracted from DEFAULT_FROM_EMAIL
-        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-        if "@" in default_from:
-            # Extract domain from email like "members@skylinesoaring.org"
-            domain = default_from.split("@")[-1]
-            from_email = f"noreply@{domain}"
-        elif config and config.domain_name:
-            from_email = f"noreply@{config.domain_name}"
-        else:
-            from_email = "noreply@manage2soar.com"
+        # Normalize sender via shared helper so this direct EmailMultiAlternatives
+        # path stays consistent with utils.email.send_mail callers.
+        default_from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "")
+        from_email = enforce_noreply_from_email(
+            default_from_email
+            if default_from_email and "@" in default_from_email
+            else (
+                f"noreply@{config.domain_name}" if config and config.domain_name else ""
+            )
+        )
 
         subject = f"Pre-Ops Report for {target_date}"
 
@@ -194,12 +199,12 @@ class Command(BaseCommand):
                     )
                 )
 
-            # Send a dedicated email to each CC recipient (students, ops intent
+            # Send a dedicated email to each participant recipient (students, ops intent
             # members) with a generic "Flying Day" ICS rather than a crew-role
             # ICS that would show someone else's name.
             ics_flying_day = generate_ops_day_ics(target_date)
             ics_flying_filename = f"flying-day-{target_date.isoformat()}.ics"
-            for participant_email in cc_emails:
+            for participant_email in participant_emails:
                 participant_email_obj = EmailMultiAlternatives(
                     subject=subject,
                     body=participant_text_message,
