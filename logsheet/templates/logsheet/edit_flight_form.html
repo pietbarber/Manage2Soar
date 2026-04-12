@@ -315,7 +315,7 @@
             {{ form.available_ticket }}
           </div>
              <div class="form-text mb-2">Select an available ticket or enter manually below.</div>
-             <div class="form-text mb-2">If this pending flight is aborted or reassigned, edit this flight and change/clear the ticket before relaunch.</div>
+             <div class="form-text mb-2">Pending commercial flights can be reassigned or converted back before launch by editing this form.</div>
           <input type="text"
                  name="ticket_number"
                  id="id_ticket_number"
@@ -425,7 +425,7 @@
 
     const syncCommercialUi = () => {
       const isCommercial = commercialToggle.checked;
-      ticketGroup.style.opacity = isCommercial ? '1' : '0.6';
+      ticketGroup.style.display = isCommercial ? '' : 'none';
       ticketInput.required = isCommercial;
       ticketInput.disabled = !isCommercial;
       ticketSelect.disabled = !isCommercial;

@@ -64,15 +64,6 @@
     </div>
   </div>
 
-  {% if issued_ticket %}
-  <div class="alert alert-success">
-    <strong>Issued:</strong> {{ issued_ticket.ticket_number }}
-    {% if issued_ticket.amount_paid != None %}
-      for ${{ issued_ticket.amount_paid }}
-    {% endif %}
-  </div>
-  {% endif %}
-
   <div class="card">
     <div class="card-header">
       <strong>Recent Tickets</strong>

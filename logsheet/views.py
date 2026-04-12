@@ -82,7 +82,6 @@ def issue_commercial_ticket(request):
     if not _can_issue_commercial_ticket(request.user):
         return render(request, "403.html", status=403)
 
-    issued_ticket = None
     if request.method == "POST":
         form = CommercialTicketIssueForm(request.POST)
         if form.is_valid():
@@ -121,7 +120,6 @@ def issue_commercial_ticket(request):
         "logsheet/issue_commercial_ticket.html",
         {
             "form": form,
-            "issued_ticket": issued_ticket,
             "recent_tickets": recent_tickets,
         },
     )
@@ -418,6 +416,20 @@ def _link_commercial_ticket_to_flight(*, flight, ticket_number):
             "revenue_amount": ticket.amount_paid,
         },
     )
+
+
+def _release_pending_ticket_assignment(*, ticket, flight):
+    """Release a pending ticket soft-lock from a flight when reassigned/removed."""
+    if not ticket:
+        return
+    if ticket.status != CommercialTicket.Status.AVAILABLE:
+        return
+    if flight.launch_time is not None:
+        return
+    if ticket.flight_id != flight.pk:
+        return
+    ticket.flight = None
+    ticket.save(update_fields=["flight"])
 
 
 def _tow_logbook_estimates(total_tows):
@@ -1189,7 +1201,12 @@ def manage_logsheet(request, pk):
     # Base queryset for all flights in the logsheet
     all_flights = (
         Flight.objects.select_related(
-            "pilot", "instructor", "glider", "towplane", "tow_pilot"
+            "pilot",
+            "instructor",
+            "glider",
+            "towplane",
+            "tow_pilot",
+            "commercial_ride_record__ticket",
         )
         .filter(logsheet=logsheet)
         .order_by("-landing_time", "-launch_time")
@@ -1576,6 +1593,14 @@ def list_logsheets(request):
             form = CreateLogsheetForm()
     else:
         form = CreateLogsheetForm()
+    from members.utils.membership import get_active_membership_statuses
+
+    active_status_names = set(get_active_membership_statuses())
+    is_active_member = bool(
+        request.user.is_authenticated
+        and request.user.membership_status in active_status_names
+    )
+
     return render(
         request,
         "logsheet/logsheet_list.html",
@@ -1587,7 +1612,8 @@ def list_logsheets(request):
             "paginator": paginator,
             "available_years": available_years,
             "form": form,
-            "can_issue_commercial_ticket": _can_issue_commercial_ticket(request.user)
+            "can_issue_commercial_ticket": is_active_member
+            and _can_issue_commercial_ticket(request.user)
             and bool(site_config and site_config.commercial_rides_enabled),
         },
     )
@@ -1660,6 +1686,12 @@ def edit_flight(request, logsheet_pk, flight_pk):
         if form.is_valid():
             ticket_link_error = None
             with transaction.atomic():
+                try:
+                    existing_ride = flight.commercial_ride_record
+                except CommercialRide.DoesNotExist:
+                    existing_ride = None
+                previous_ticket = existing_ride.ticket if existing_ride else None
+
                 flight = form.save(commit=False)
                 flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
                 if flight.commercial_ride:
@@ -1677,6 +1709,26 @@ def edit_flight(request, logsheet_pk, flight_pk):
                     except ValidationError as exc:
                         ticket_link_error = get_validation_message(exc)
                         transaction.set_rollback(True)
+                    else:
+                        if previous_ticket:
+                            try:
+                                updated_ride = flight.commercial_ride_record
+                            except CommercialRide.DoesNotExist:
+                                updated_ride = None
+                            if (
+                                updated_ride
+                                and updated_ride.ticket_id != previous_ticket.pk
+                            ):
+                                _release_pending_ticket_assignment(
+                                    ticket=previous_ticket,
+                                    flight=flight,
+                                )
+                elif existing_ride and flight.launch_time is None:
+                    _release_pending_ticket_assignment(
+                        ticket=previous_ticket,
+                        flight=flight,
+                    )
+                    existing_ride.delete()
             if ticket_link_error:
                 form.add_error("ticket_number", ticket_link_error)
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":

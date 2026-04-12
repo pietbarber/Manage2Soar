@@ -284,13 +284,17 @@ class FlightForm(forms.ModelForm):
                 except ObjectDoesNotExist:
                     existing_ride = None
 
+                is_launched = bool(
+                    cleaned_data.get("launch_time") or self.instance.launch_time
+                )
                 if (
                     existing_ride
                     and resolved_ticket_number != existing_ride.ticket.ticket_number
+                    and is_launched
                 ):
                     self.add_error(
                         "ticket_number",
-                        "Changing ticket number for an existing commercial ride is not allowed.",
+                        "Launched commercial flights cannot change ticket number.",
                     )
         else:
             if resolved_ticket_number:
@@ -303,10 +307,13 @@ class FlightForm(forms.ModelForm):
                     existing_ride = self.instance.commercial_ride_record
                 except ObjectDoesNotExist:
                     existing_ride = None
-                if existing_ride:
+                is_launched = bool(
+                    cleaned_data.get("launch_time") or self.instance.launch_time
+                )
+                if existing_ride and is_launched:
                     self.add_error(
                         "commercial_ride",
-                        "Existing commercial rides cannot be converted to regular flights.",
+                        "Launched commercial flights cannot be converted to regular flights.",
                     )
 
         return cleaned_data
