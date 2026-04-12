@@ -308,15 +308,20 @@
         </div>
 
         <div class="col-md-6" id="ticket-number-group">
-          <label for="id_ticket_number" class="form-label fw-semibold">
+          <label for="id_available_ticket" class="form-label fw-semibold">
             <i class="bi bi-ticket-perforated me-1"></i>Ticket Number
           </label>
+          <div class="mb-2">
+            {{ form.available_ticket }}
+          </div>
+             <div class="form-text mb-2">Select an available ticket or enter manually below.</div>
+             <div class="form-text mb-2">If this pending flight is aborted or reassigned, edit this flight and change/clear the ticket before relaunch.</div>
           <input type="text"
                  name="ticket_number"
                  id="id_ticket_number"
                  class="form-control{% if form.ticket_number.errors %} is-invalid{% endif %}"
                  value="{{ form.ticket_number.value|default_if_none:'' }}"
-                 placeholder="Enter paid ticket number">
+                 placeholder="Manual fallback ticket number">
           {% if form.ticket_number.errors %}
             <div class="invalid-feedback d-block">
               {% for error in form.ticket_number.errors %}{{ error }}{% endfor %}
@@ -392,12 +397,13 @@
     const commercialToggle = document.getElementById('id_commercial_ride');
     const ticketGroup = document.getElementById('ticket-number-group');
     const ticketInput = document.getElementById('id_ticket_number');
+    const ticketSelect = document.getElementById('id_available_ticket');
     const passengerMemberInput = document.getElementById('{{ form.passenger.id_for_label }}');
     const passengerNameInput = document.getElementById('{{ form.passenger_name.id_for_label }}');
     const passengerMemberGroup = document.querySelector('label[for="{{ form.passenger.id_for_label }}"]')?.closest('.col-md-6');
     const passengerNameGroup = document.querySelector('label[for="{{ form.passenger_name.id_for_label }}"]')?.closest('.col-md-6');
 
-    if (!commercialToggle || !ticketGroup || !ticketInput) {
+    if (!commercialToggle || !ticketGroup || !ticketInput || !ticketSelect) {
       return;
     }
 
@@ -419,8 +425,14 @@
 
     const syncCommercialUi = () => {
       const isCommercial = commercialToggle.checked;
-      ticketGroup.style.display = isCommercial ? '' : 'none';
+      ticketGroup.style.opacity = isCommercial ? '1' : '0.6';
       ticketInput.required = isCommercial;
+      ticketInput.disabled = !isCommercial;
+      ticketSelect.disabled = !isCommercial;
+      if (!isCommercial) {
+        ticketInput.value = '';
+        ticketSelect.selectedIndex = 0;
+      }
       setPassengerFieldState(passengerMemberInput, passengerMemberGroup, isCommercial);
       setPassengerFieldState(passengerNameInput, passengerNameGroup, isCommercial);
     };

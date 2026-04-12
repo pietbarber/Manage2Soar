@@ -1,5 +1,6 @@
 import pytest
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from logsheet.models import CommercialRide, CommercialTicket, Flight
 
@@ -79,7 +80,10 @@ def test_transition_redeemed_to_refunded_with_override_clears_flight(commercial_
 @pytest.mark.django_db
 def test_commercial_ride_save_redeems_available_ticket(logsheet, active_member):
     flight = Flight.objects.create(
-        logsheet=logsheet, flight_type="intro", pilot=active_member
+        logsheet=logsheet,
+        flight_type="intro",
+        pilot=active_member,
+        launch_time=timezone.now().time(),
     )
     ticket = CommercialTicket.objects.create(ticket_number="T-106")
 
@@ -104,7 +108,7 @@ def test_commercial_ride_rejects_refunded_ticket(logsheet, active_member):
     ticket = CommercialTicket.objects.create(ticket_number="T-107")
     ticket.transition_to(CommercialTicket.Status.REFUNDED, allow_admin_override=True)
 
-    with pytest.raises(ValidationError, match="must be in redeemed status"):
+    with pytest.raises(ValidationError, match="cannot be refunded"):
         CommercialRide.objects.create(
             flight=flight,
             ticket=ticket,

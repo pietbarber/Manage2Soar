@@ -246,6 +246,23 @@
                                 </label>
                                 <input type="text" name="passenger_name" id="id_passenger_name" class="form-control" placeholder="If not a member" value="${escapeHtml(prefillData?.passengerNameText)}">
                             </div>
+
+                            <div class="col-12 mt-2">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="commercial_ride" id="id_commercial_ride" class="form-check-input" ${prefillData?.commercialRide ? 'checked' : ''}>
+                                    <label for="id_commercial_ride" class="form-check-label">
+                                        <i class="bi bi-cash-coin me-1"></i>Commercial Ride
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6" id="offline-ticket-group">
+                                <label for="id_ticket_number" class="form-label fw-semibold">
+                                    <i class="bi bi-ticket-perforated me-1"></i>Ticket Number
+                                </label>
+                                <input type="text" name="ticket_number" id="id_ticket_number" class="form-control" value="${escapeHtml(prefillData?.ticketNumber)}" placeholder="Enter ticket number">
+                                <div class="form-text">Offline entries are queued and validated when back online.</div>
+                            </div>
                         </div>
                     </div>
 
@@ -355,6 +372,11 @@
         const landingNowBtn = document.getElementById('now-landing-btn');
         const launchInput = document.getElementById('id_launch_time');
         const landingInput = document.getElementById('id_landing_time');
+        const commercialToggle = document.getElementById('id_commercial_ride');
+        const ticketInput = document.getElementById('id_ticket_number');
+        const ticketGroup = document.getElementById('offline-ticket-group');
+        const passengerMemberInput = document.getElementById('id_passenger');
+        const passengerNameInput = document.getElementById('id_passenger_name');
 
         if (launchNowBtn && launchInput) {
             launchNowBtn.addEventListener('click', () => {
@@ -383,6 +405,40 @@
             alt3kBtn.addEventListener('click', () => {
                 altSelect.value = '3000';
             });
+        }
+
+        const syncCommercialUi = () => {
+            if (!commercialToggle || !ticketInput || !ticketGroup) {
+                return;
+            }
+
+            const isCommercial = commercialToggle.checked;
+            ticketInput.required = isCommercial;
+            ticketInput.disabled = !isCommercial;
+            ticketGroup.style.opacity = isCommercial ? '1' : '0.6';
+
+            if (!isCommercial) {
+                ticketInput.value = '';
+            }
+
+            if (passengerMemberInput) {
+                passengerMemberInput.disabled = isCommercial;
+                if (isCommercial) {
+                    passengerMemberInput.value = '';
+                }
+            }
+
+            if (passengerNameInput) {
+                passengerNameInput.disabled = isCommercial;
+                if (isCommercial) {
+                    passengerNameInput.value = '';
+                }
+            }
+        };
+
+        if (commercialToggle) {
+            syncCommercialUi();
+            commercialToggle.addEventListener('change', syncCommercialUi);
         }
 
         // Save button
@@ -425,6 +481,15 @@
             return;
         }
 
+        const commercialToggle = document.getElementById('id_commercial_ride');
+        const ticketInput = document.getElementById('id_ticket_number');
+        const isCommercialRide = commercialToggle && commercialToggle.checked;
+        if (isCommercialRide && ticketInput && !ticketInput.value.trim()) {
+            alert('Ticket number is required for commercial rides.');
+            ticketInput.focus();
+            return;
+        }
+
         // Collect form data
         const flightData = {
             pilot: parseInt(pilotSelect.value, 10) || null,
@@ -437,6 +502,8 @@
             launch_time: document.getElementById('id_launch_time').value || null,
             landing_time: document.getElementById('id_landing_time').value || null,
             release_altitude: parseInt(document.getElementById('id_release_altitude').value, 10) || null,
+            commercial_ride: isCommercialRide ? 'on' : '',
+            ticket_number: ticketInput ? ticketInput.value.trim() : '',
         };
 
         try {

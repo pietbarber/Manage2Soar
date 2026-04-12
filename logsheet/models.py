@@ -573,9 +573,16 @@ class CommercialTicket(models.Model):
             )
 
         if self.status == self.Status.AVAILABLE and self.flight:
-            raise ValidationError(
-                {"flight": "Available tickets cannot be linked to a flight."}
-            )
+            # Pending flights may soft-lock an available ticket before launch.
+            if self.flight.launch_time is not None:
+                raise ValidationError(
+                    {
+                        "flight": (
+                            "Available tickets can only be linked to pending flights. "
+                            "Launched flights must use redeemed tickets."
+                        )
+                    }
+                )
 
     def transition_to(self, new_status, *, flight=None, allow_admin_override=False):
         current = str(self.status)
@@ -664,25 +671,54 @@ class CommercialRide(models.Model):
         ordering = ["-created_at"]
 
     def clean(self):
-        if self.ticket.status != CommercialTicket.Status.REDEEMED:
+        if self.ticket.status == CommercialTicket.Status.REFUNDED:
             raise ValidationError(
-                {"ticket": "Commercial ride ticket must be in redeemed status."}
+                {"ticket": "Commercial ride ticket cannot be refunded."}
             )
+
+        if self.ticket.status == CommercialTicket.Status.AVAILABLE:
+            if self.flight.launch_time is not None:
+                raise ValidationError(
+                    {
+                        "ticket": (
+                            "Launched commercial flights must use redeemed tickets."
+                        )
+                    }
+                )
+            if self.ticket.flight_id not in {None, self.flight_id}:
+                raise ValidationError(
+                    {"ticket": "Ticket is already linked to a different flight."}
+                )
+
+        if (
+            self.ticket.status == CommercialTicket.Status.REDEEMED
+            and self.ticket.flight_id
+            not in {
+                None,
+                self.flight_id,
+            }
+        ):
+            raise ValidationError(
+                {"ticket": "Ticket is already linked to a different flight."}
+            )
+
         if self.ticket.flight_id and self.ticket.flight_id != self.flight_id:
             raise ValidationError(
                 {"ticket": "Ticket is already linked to a different flight."}
             )
 
     def save(self, *args, **kwargs):
-        if (
-            self.ticket.status == CommercialTicket.Status.AVAILABLE
-            and not self.ticket.flight_id
-        ):
-            self.ticket.transition_to(
-                CommercialTicket.Status.REDEEMED,
-                flight=self.flight,
-                allow_admin_override=True,
-            )
+        if self.ticket.status == CommercialTicket.Status.AVAILABLE:
+            if self.flight.launch_time is None:
+                if self.ticket.flight_id != self.flight_id:
+                    self.ticket.flight = self.flight
+                    self.ticket.save()
+            else:
+                self.ticket.transition_to(
+                    CommercialTicket.Status.REDEEMED,
+                    flight=self.flight,
+                    allow_admin_override=True,
+                )
         self.full_clean()
         super().save(*args, **kwargs)
 

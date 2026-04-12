@@ -9,7 +9,10 @@
       <h1 class="h3 mb-1">Issue Commercial Ticket</h1>
       <p class="text-muted mb-0">Create an available commercial ride ticket for same-day operations.</p>
     </div>
-    <a href="{% url 'logsheet:index' %}" class="btn btn-outline-secondary">Back to Logsheets</a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'logsheet:commercial_ticket_register' %}" class="btn btn-outline-primary">Open Register</a>
+      <a href="{% url 'logsheet:index' %}" class="btn btn-outline-secondary">Back to Logsheets</a>
+    </div>
   </div>
 
   {% if messages %}
@@ -82,6 +85,7 @@
             <th>Status</th>
             <th>Ride Type</th>
             <th>Amount Paid</th>
+            <th>Gift Cert</th>
             <th>Entered By</th>
             <th>Issued At</th>
           </tr>
@@ -89,16 +93,35 @@
         <tbody>
           {% for ticket in recent_tickets %}
           <tr>
-            <td>{{ ticket.ticket_number }}</td>
-            <td>{{ ticket.get_status_display }}</td>
+            <td>
+              <a href="{% url 'logsheet:commercial_ticket_detail' ticket.pk %}">{{ ticket.ticket_number }}</a>
+            </td>
+            <td>
+              {% if ticket.status == 'refunded' %}
+                <span class="badge bg-danger">Refunded</span>
+              {% elif ticket.status == 'redeemed' %}
+                <span class="badge bg-success">Redeemed</span>
+              {% elif ticket.flight %}
+                <span class="badge bg-warning text-dark">Reserved (Pending Flight)</span>
+              {% else %}
+                <span class="badge bg-secondary">Available</span>
+              {% endif %}
+            </td>
             <td>{{ ticket.get_ride_type_display }}</td>
             <td>{% if ticket.amount_paid != None %}${{ ticket.amount_paid }}{% else %}-{% endif %}</td>
+            <td>
+              {% if ticket.gift_certificate_number %}
+                <span class="badge bg-info text-dark">{{ ticket.gift_certificate_number }}</span>
+              {% else %}
+                -
+              {% endif %}
+            </td>
             <td>{% if ticket.entered_by %}{{ ticket.entered_by.full_display_name }}{% else %}-{% endif %}</td>
             <td>{{ ticket.entered_at|date:"Y-m-d H:i" }}</td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="text-muted">No commercial tickets issued yet.</td>
+            <td colspan="7" class="text-muted">No commercial tickets issued yet.</td>
           </tr>
           {% endfor %}
         </tbody>

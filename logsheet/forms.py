@@ -121,6 +121,11 @@ def get_active_members():
 # Additionally, if the form is for a new instance, the "launch_time" field is pre-filled with the current local time.
 class FlightForm(forms.ModelForm):
     commercial_ride = forms.BooleanField(required=False)
+    available_ticket = forms.ChoiceField(
+        required=False,
+        choices=[("", "Select available ticket")],
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
     ticket_number = forms.CharField(max_length=50, required=False)
 
     def clean(self):
@@ -142,6 +147,7 @@ class FlightForm(forms.ModelForm):
         pilot = cleaned_data.get("pilot")
         instructor = cleaned_data.get("instructor")
         passenger = cleaned_data.get("passenger")
+        tow_pilot = cleaned_data.get("tow_pilot")
 
         if pilot and instructor and pilot == instructor:
             raise forms.ValidationError(
@@ -158,6 +164,11 @@ class FlightForm(forms.ModelForm):
                 "The same member cannot be both instructor and passenger on the same flight."
             )
 
+        if pilot and tow_pilot and pilot == tow_pilot:
+            raise forms.ValidationError(
+                "The same member cannot be both pilot and tow pilot on the same flight."
+            )
+
         # Validate glider availability using the utility function
         # Set the logsheet on the instance for the validation function
         if self.instance and not getattr(self.instance, "logsheet", None) and logsheet:
@@ -165,7 +176,6 @@ class FlightForm(forms.ModelForm):
         validate_glider_availability(self.instance, glider, launch_time, landing_time)
 
         # Business Rule: Check if tow pilot is scheduled for this day (Issue #110)
-        tow_pilot = cleaned_data.get("tow_pilot")
         if tow_pilot and logsheet:
             scheduled_tow_pilots = []
             if logsheet.tow_pilot:
@@ -190,6 +200,20 @@ class FlightForm(forms.ModelForm):
 
         commercial_ride = cleaned_data.get("commercial_ride")
         ticket_number = (cleaned_data.get("ticket_number") or "").strip()
+        selected_ticket_number = (cleaned_data.get("available_ticket") or "").strip()
+
+        if (
+            selected_ticket_number
+            and ticket_number
+            and selected_ticket_number != ticket_number
+        ):
+            self.add_error(
+                "ticket_number",
+                "Choose either the available ticket dropdown or manual ticket number, not both.",
+            )
+
+        resolved_ticket_number = selected_ticket_number or ticket_number
+        cleaned_data["ticket_number"] = resolved_ticket_number
 
         if commercial_ride:
             config = getattr(self, "site_config", None)
@@ -199,7 +223,7 @@ class FlightForm(forms.ModelForm):
                     "Commercial rides are disabled in site configuration.",
                 )
 
-            if not ticket_number:
+            if not resolved_ticket_number:
                 self.add_error(
                     "ticket_number",
                     "Ticket number is required for commercial rides.",
@@ -223,9 +247,9 @@ class FlightForm(forms.ModelForm):
                     "Commercial rides use ticket IDs and cannot have passenger name text.",
                 )
 
-            if ticket_number:
+            if resolved_ticket_number:
                 ticket = CommercialTicket.objects.filter(
-                    ticket_number=ticket_number
+                    ticket_number=resolved_ticket_number
                 ).first()
                 if not ticket:
                     self.add_error(
@@ -245,6 +269,14 @@ class FlightForm(forms.ModelForm):
                         "ticket_number",
                         "Ticket is already redeemed by a different flight.",
                     )
+                elif (
+                    ticket.status == CommercialTicket.Status.AVAILABLE
+                    and ticket.flight_id not in {None, self.instance.pk}
+                ):
+                    self.add_error(
+                        "ticket_number",
+                        "Ticket is already reserved by a different pending flight.",
+                    )
 
             if self.instance.pk:
                 try:
@@ -254,13 +286,18 @@ class FlightForm(forms.ModelForm):
 
                 if (
                     existing_ride
-                    and ticket_number != existing_ride.ticket.ticket_number
+                    and resolved_ticket_number != existing_ride.ticket.ticket_number
                 ):
                     self.add_error(
                         "ticket_number",
                         "Changing ticket number for an existing commercial ride is not allowed.",
                     )
         else:
+            if resolved_ticket_number:
+                self.add_error(
+                    "ticket_number",
+                    "Enable Commercial Ride before entering a ticket number.",
+                )
             if self.instance.pk:
                 try:
                     existing_ride = self.instance.commercial_ride_record
@@ -626,6 +663,32 @@ class FlightForm(forms.ModelForm):
                 self.fields["ticket_number"].initial = (
                     existing_ride.ticket.ticket_number
                 )
+                self.fields["available_ticket"].initial = (
+                    existing_ride.ticket.ticket_number
+                )
+
+        existing_ticket_number = (
+            self.fields["ticket_number"].initial
+            if self.fields["ticket_number"].initial
+            else ""
+        )
+        available_choices = [("", "Select available ticket")]
+        available_tickets = CommercialTicket.objects.filter(
+            status=CommercialTicket.Status.AVAILABLE,
+            flight__isnull=True,
+        ).order_by("ticket_number")
+        available_choices.extend(
+            (ticket.ticket_number, ticket.ticket_number) for ticket in available_tickets
+        )
+
+        if existing_ticket_number and existing_ticket_number not in {
+            choice[0] for choice in available_choices
+        }:
+            available_choices.append(
+                (existing_ticket_number, f"{existing_ticket_number} (current)")
+            )
+
+        self.fields["available_ticket"].choices = available_choices
 
 
 # CreateLogsheetForm
@@ -1274,3 +1337,26 @@ class CommercialTicketIssueForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
     )
+
+
+class CommercialTicketEditForm(forms.ModelForm):
+    class Meta:
+        model = CommercialTicket
+        fields = [
+            "ride_type",
+            "amount_paid",
+            "gift_certificate_number",
+            "gift_certificate_expires_on",
+            "remarks",
+        ]
+        widgets = {
+            "ride_type": forms.Select(attrs={"class": "form-select"}),
+            "amount_paid": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01"}
+            ),
+            "gift_certificate_number": forms.TextInput(attrs={"class": "form-control"}),
+            "gift_certificate_expires_on": forms.DateInput(
+                attrs={"class": "form-control", "type": "date"}
+            ),
+            "remarks": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }

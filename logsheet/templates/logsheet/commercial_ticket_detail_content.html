@@ -1,0 +1,50 @@
+<div class="card-body">
+  <h5 class="card-title mb-3">Ticket {{ ticket.ticket_number }}</h5>
+  <dl class="row mb-0">
+    <dt class="col-sm-4">Status</dt>
+    <dd class="col-sm-8">
+      {% if ticket.status == 'refunded' %}
+        <span class="badge bg-danger">Refunded</span>
+      {% elif ticket.status == 'redeemed' %}
+        <span class="badge bg-success">Redeemed</span>
+      {% elif ticket.flight %}
+        <span class="badge bg-warning text-dark">Reserved (Pending Flight)</span>
+      {% else %}
+        <span class="badge bg-secondary">Available</span>
+      {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Ride Type</dt>
+    <dd class="col-sm-8">{{ ticket.get_ride_type_display }}</dd>
+
+    <dt class="col-sm-4">Amount Paid</dt>
+    <dd class="col-sm-8">{% if ticket.amount_paid != None %}${{ ticket.amount_paid }}{% else %}-{% endif %}</dd>
+
+    <dt class="col-sm-4">Gift Certificate</dt>
+    <dd class="col-sm-8">{{ ticket.gift_certificate_number|default:"-" }}</dd>
+
+    <dt class="col-sm-4">Gift Cert Expiry</dt>
+    <dd class="col-sm-8">{% if ticket.gift_certificate_expires_on %}{{ ticket.gift_certificate_expires_on|date:"Y-m-d" }}{% else %}-{% endif %}</dd>
+
+    <dt class="col-sm-4">Remarks</dt>
+    <dd class="col-sm-8">{{ ticket.remarks|default:"-" }}</dd>
+
+    <dt class="col-sm-4">Entered By</dt>
+    <dd class="col-sm-8">{% if ticket.entered_by %}{{ ticket.entered_by.full_display_name }}{% else %}-{% endif %}</dd>
+
+    <dt class="col-sm-4">Issued At</dt>
+    <dd class="col-sm-8">{{ ticket.entered_at|date:"Y-m-d H:i" }}</dd>
+
+    <dt class="col-sm-4">Linked Flight</dt>
+    <dd class="col-sm-8">
+      {% if ticket.flight %}
+        <a href="{% url 'logsheet:manage' ticket.flight.logsheet.pk %}">Logsheet {{ ticket.flight.logsheet.pk }}</a>
+        {% if ticket.status == 'available' %}
+          <div class="text-muted small mt-1">Pending-flight reservation. Edit the pending flight to reassign or abort.</div>
+        {% endif %}
+      {% else %}
+        -
+      {% endif %}
+    </dd>
+  </dl>
+</div>

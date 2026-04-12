@@ -424,3 +424,208 @@ def test_issue_next_available_retries_on_ticket_uniqueness_validation_error(
 
     assert state["attempts"] == 2
     assert ticket.ticket_number == "T-000002"
+
+
+@pytest.mark.django_db
+def test_commercial_ticket_detail_view_requires_role(client, django_user_model):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    ticket = CommercialTicket.objects.create(ticket_number="T-300001")
+    user = django_user_model.objects.create_user(
+        username="detail_regular_member",
+        password="testpass123",
+        email="detail-regular@example.com",
+        membership_status="Full Member",
+    )
+
+    client.force_login(user)
+    response = client.get(
+        reverse("logsheet:commercial_ticket_detail", args=[ticket.pk])
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_commercial_ticket_detail_view_renders_ticket_fields(client, django_user_model):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="detail_treasurer",
+        password="testpass123",
+        email="detail-treasurer@example.com",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+    ticket = CommercialTicket.objects.create(
+        ticket_number="T-300002",
+        gift_certificate_number="GC-DET",
+        remarks="Customer requested morning slot",
+    )
+
+    client.force_login(user)
+    response = client.get(
+        reverse("logsheet:commercial_ticket_detail", args=[ticket.pk])
+    )
+
+    assert response.status_code == 200
+    assert b"T-300002" in response.content
+    assert b"GC-DET" in response.content
+    assert b"Customer requested morning slot" in response.content
+
+
+@pytest.mark.django_db
+def test_edit_commercial_ticket_allows_available_only(client, django_user_model):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="edit_treasurer",
+        password="testpass123",
+        email="edit-treasurer@example.com",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+    available_ticket = CommercialTicket.objects.create(ticket_number="T-300003")
+    redeemed_ticket = CommercialTicket.objects.create(ticket_number="T-300004")
+    redeemed_ticket.transition_to(
+        CommercialTicket.Status.REDEEMED,
+        flight=Flight.objects.create(
+            logsheet=Logsheet.objects.create(
+                airfield=Airfield.objects.create(
+                    identifier="KDET", name="Detail Field"
+                ),
+                log_date="2026-04-12",
+                created_by=user,
+            ),
+            pilot=user,
+            glider=Glider.objects.create(
+                make="Schleicher",
+                model="ASK-21",
+                n_number="N30003",
+                competition_number="D3",
+                seats=2,
+                is_active=True,
+            ),
+        ),
+    )
+
+    client.force_login(user)
+
+    edit_url = reverse("logsheet:edit_commercial_ticket", args=[available_ticket.pk])
+    response = client.post(
+        edit_url,
+        data={
+            "ride_type": CommercialTicket.RideType.EXTENDED,
+            "amount_paid": "175.00",
+            "gift_certificate_number": "GC-EDIT",
+            "gift_certificate_expires_on": "2031-01-01",
+            "remarks": "Updated at front desk",
+        },
+    )
+    assert response.status_code == 302
+
+    available_ticket.refresh_from_db()
+    assert available_ticket.ride_type == CommercialTicket.RideType.EXTENDED
+    assert str(available_ticket.amount_paid) == "175.00"
+    assert available_ticket.gift_certificate_number == "GC-EDIT"
+
+    redeemed_edit_url = reverse(
+        "logsheet:edit_commercial_ticket", args=[redeemed_ticket.pk]
+    )
+    redeemed_response = client.get(redeemed_edit_url)
+    assert redeemed_response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_register_and_issue_tables_show_gift_certificate_indicator(
+    client, django_user_model
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="gift_treasurer",
+        password="testpass123",
+        email="gift-treasurer@example.com",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+    CommercialTicket.objects.create(
+        ticket_number="T-300005",
+        gift_certificate_number="GC-TABLE",
+    )
+
+    client.force_login(user)
+    register_response = client.get(reverse("logsheet:commercial_ticket_register"))
+    issue_response = client.get(reverse("logsheet:issue_commercial_ticket"))
+
+    assert register_response.status_code == 200
+    assert issue_response.status_code == 200
+    assert b"Gift Cert" in register_response.content
+    assert b"GC-TABLE" in register_response.content
+    assert b"Gift Cert" in issue_response.content
+    assert b"GC-TABLE" in issue_response.content
+
+
+@pytest.mark.django_db
+def test_register_and_detail_show_reserved_pending_label(client, django_user_model):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="pending_label_treasurer",
+        password="testpass123",
+        email="pending-label@example.com",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+
+    airfield = Airfield.objects.create(identifier="KPND", name="Pending Field")
+    glider = Glider.objects.create(
+        make="Schleicher",
+        model="ASK-21",
+        n_number="N30006",
+        competition_number="PD",
+        seats=2,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        airfield=airfield,
+        log_date="2026-04-12",
+        created_by=user,
+    )
+    pending_flight = Flight.objects.create(logsheet=logsheet, pilot=user, glider=glider)
+    ticket = CommercialTicket.objects.create(
+        ticket_number="T-300006",
+        status=CommercialTicket.Status.AVAILABLE,
+        flight=pending_flight,
+    )
+
+    client.force_login(user)
+    register_response = client.get(reverse("logsheet:commercial_ticket_register"))
+    detail_response = client.get(
+        reverse("logsheet:commercial_ticket_detail", args=[ticket.pk])
+    )
+
+    assert register_response.status_code == 200
+    assert detail_response.status_code == 200
+    assert b"Reserved (Pending Flight)" in register_response.content
+    assert b"Reserved (Pending Flight)" in detail_response.content

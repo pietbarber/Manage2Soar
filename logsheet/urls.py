@@ -12,6 +12,16 @@ urlpatterns = [
         name="commercial_ticket_register",
     ),
     path(
+        "commercial-tickets/<int:pk>/",
+        views.commercial_ticket_detail,
+        name="commercial_ticket_detail",
+    ),
+    path(
+        "commercial-tickets/<int:pk>/edit/",
+        views.edit_commercial_ticket,
+        name="edit_commercial_ticket",
+    ),
+    path(
         "commercial-tickets/issue/",
         views.issue_commercial_ticket,
         name="issue_commercial_ticket",

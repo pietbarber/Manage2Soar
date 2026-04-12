@@ -30,6 +30,7 @@ from members.models import Member
 from siteconfig.models import SiteConfiguration
 
 from .forms import (
+    CommercialTicketEditForm,
     CommercialTicketIssueForm,
     CreateLogsheetForm,
     FlightForm,
@@ -148,6 +149,73 @@ def commercial_ticket_register(request):
         {
             "tickets": page_obj.object_list,
             "page_obj": page_obj,
+        },
+    )
+
+
+@active_member_required
+def commercial_ticket_detail(request, pk):
+    config = SiteConfiguration.objects.first()
+    if not (config and config.commercial_rides_enabled):
+        messages.error(request, "Commercial rides are currently disabled.")
+        return redirect("logsheet:index")
+
+    if not _can_issue_commercial_ticket(request.user):
+        return render(request, "403.html", status=403)
+
+    ticket = get_object_or_404(
+        CommercialTicket.objects.select_related(
+            "entered_by", "flight", "flight__logsheet"
+        ),
+        pk=pk,
+    )
+    is_modal = request.headers.get("HX-Request") == "true"
+    template_name = (
+        "logsheet/commercial_ticket_detail_content.html"
+        if is_modal
+        else "logsheet/commercial_ticket_detail.html"
+    )
+    return render(
+        request,
+        template_name,
+        {
+            "ticket": ticket,
+            "is_modal": is_modal,
+        },
+    )
+
+
+@active_member_required
+def edit_commercial_ticket(request, pk):
+    config = SiteConfiguration.objects.first()
+    if not (config and config.commercial_rides_enabled):
+        messages.error(request, "Commercial rides are currently disabled.")
+        return redirect("logsheet:index")
+
+    if not _can_issue_commercial_ticket(request.user):
+        return render(request, "403.html", status=403)
+
+    ticket = get_object_or_404(CommercialTicket, pk=pk)
+    if ticket.status != CommercialTicket.Status.AVAILABLE:
+        return HttpResponseForbidden("Only available tickets can be edited.")
+
+    if request.method == "POST":
+        form = CommercialTicketEditForm(request.POST, instance=ticket)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request, f"Commercial ticket {ticket.ticket_number} updated."
+            )
+            return redirect("logsheet:commercial_ticket_register")
+    else:
+        form = CommercialTicketEditForm(instance=ticket)
+
+    return render(
+        request,
+        "logsheet/edit_commercial_ticket.html",
+        {
+            "form": form,
+            "ticket": ticket,
         },
     )
 
@@ -315,7 +383,7 @@ def _get_personal_charge_data(member, start_date):
 
 
 def _link_commercial_ticket_to_flight(*, flight, ticket_number):
-    """Redeem and attach ticket data to a commercial flight."""
+    """Attach commercial ticket to flight, redeeming only once flight is launched."""
     ticket = (
         CommercialTicket.objects.select_for_update()
         .filter(ticket_number=ticket_number)
@@ -327,14 +395,20 @@ def _link_commercial_ticket_to_flight(*, flight, ticket_number):
     if ticket.status == CommercialTicket.Status.REFUNDED:
         raise ValidationError("Refunded tickets cannot be used for flights.")
 
-    if ticket.status == CommercialTicket.Status.REDEEMED and ticket.flight_id not in {
-        None,
-        flight.pk,
-    }:
-        raise ValidationError("Ticket is already redeemed by a different flight.")
+    if ticket.flight_id not in {None, flight.pk}:
+        if ticket.status == CommercialTicket.Status.REDEEMED:
+            raise ValidationError("Ticket is already redeemed by a different flight.")
+        raise ValidationError(
+            "Ticket is already reserved by a different pending flight."
+        )
 
     if ticket.status == CommercialTicket.Status.AVAILABLE:
-        ticket.transition_to(CommercialTicket.Status.REDEEMED, flight=flight)
+        if flight.launch_time is None:
+            if ticket.flight_id is None:
+                ticket.flight = flight
+                ticket.save()
+        else:
+            ticket.transition_to(CommercialTicket.Status.REDEEMED, flight=flight)
 
     CommercialRide.objects.update_or_create(
         flight=flight,
@@ -956,6 +1030,24 @@ def launch_flight_now(request, flight_id):
         flight.launch_time = launch_time
         # Persist duration reset/compute together with launch_time updates.
         flight.save(update_fields=["launch_time", "duration"])
+
+        if flight.commercial_ride:
+            try:
+                existing_ride = flight.commercial_ride_record
+            except CommercialRide.DoesNotExist:
+                existing_ride = None
+            if existing_ride:
+                try:
+                    _link_commercial_ticket_to_flight(
+                        flight=flight,
+                        ticket_number=existing_ride.ticket.ticket_number,
+                    )
+                except ValidationError as e:
+                    return JsonResponse(
+                        {"success": False, "error": get_validation_message(e)},
+                        status=400,
+                    )
+
         return JsonResponse({"success": True})
     except Exception as e:
         logger.exception("Error launching flight %s", flight_id)

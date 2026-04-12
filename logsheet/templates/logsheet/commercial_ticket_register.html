@@ -12,6 +12,12 @@
     </div>
   </div>
 
+  <div class="alert alert-light border mb-3" role="status">
+    <strong>Pending-flight workflow:</strong>
+    An <strong>Available</strong> ticket linked to a flight is a reserved pending assignment.
+    To abort or reassign, edit that pending flight and choose a different ticket (or turn off Commercial Ride).
+  </div>
+
   <div class="table-responsive">
     <table class="table table-striped table-hover align-middle">
       <thead>
@@ -20,31 +26,61 @@
           <th>Status</th>
           <th>Ride Type</th>
           <th>Amount</th>
+          <th>Gift Cert</th>
           <th>Issued By</th>
           <th>Issued At</th>
           <th>Flight</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for ticket in tickets %}
         <tr>
-          <td>{{ ticket.ticket_number }}</td>
-          <td>{{ ticket.get_status_display }}</td>
+          <td>
+            <a href="{% url 'logsheet:commercial_ticket_detail' ticket.pk %}">{{ ticket.ticket_number }}</a>
+          </td>
+          <td>
+            {% if ticket.status == 'refunded' %}
+              <span class="badge bg-danger">Refunded</span>
+            {% elif ticket.status == 'redeemed' %}
+              <span class="badge bg-success">Redeemed</span>
+            {% elif ticket.flight %}
+              <span class="badge bg-warning text-dark">Reserved (Pending Flight)</span>
+            {% else %}
+              <span class="badge bg-secondary">Available</span>
+            {% endif %}
+          </td>
           <td>{{ ticket.get_ride_type_display }}</td>
           <td>{% if ticket.amount_paid != None %}${{ ticket.amount_paid }}{% else %}-{% endif %}</td>
+          <td>
+            {% if ticket.gift_certificate_number %}
+              <span class="badge bg-info text-dark">{{ ticket.gift_certificate_number }}</span>
+            {% else %}
+              -
+            {% endif %}
+          </td>
           <td>{% if ticket.entered_by %}{{ ticket.entered_by.get_full_name|default:ticket.entered_by.username }}{% else %}-{% endif %}</td>
           <td>{{ ticket.entered_at|date:"Y-m-d H:i" }}</td>
           <td>
             {% if ticket.flight %}
               <a href="{% url 'logsheet:manage' ticket.flight.logsheet.pk %}">Logsheet {{ ticket.flight.logsheet.pk }}</a>
+              {% if ticket.status == 'available' %}
+                <div><small class="text-muted">Pending assignment</small></div>
+              {% endif %}
             {% else %}
               -
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'logsheet:commercial_ticket_detail' ticket.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
+            {% if ticket.status == 'available' %}
+              <a href="{% url 'logsheet:edit_commercial_ticket' ticket.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
             {% endif %}
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-muted">No commercial tickets found.</td>
+          <td colspan="9" class="text-center text-muted">No commercial tickets found.</td>
         </tr>
         {% endfor %}
       </tbody>
