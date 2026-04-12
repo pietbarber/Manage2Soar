@@ -2068,7 +2068,7 @@ def member_logbook(request, member_id=None):
                 Coalesce("legacy_instructor_name", Value(""))
             ),
         ).filter(
-            Q(pilot=member) | Q(instructor=member) | Q(passenger=member),
+            Q(pilot=member) | Q(instructor=member),
             logsheet__log_date__lt=opening_balance_cutoff,
         )
         prior_agg = prior_flights.aggregate(
