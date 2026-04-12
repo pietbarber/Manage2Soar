@@ -10,8 +10,9 @@ with information about:
 - Upcoming maintenance deadlines
 
 Each duty crew member receives an individual email with an ICS calendar attachment
-for their specific duty role. Students requesting instruction and members with ops
-intent are CC'd on each email to keep them informed.
+for their specific duty role. Signed-up flyers (students requesting instruction,
+members with ops intent, and confirmed reservation participants) receive their own
+dedicated participant email with a generic Flying Day ICS.
 """
 
 from datetime import datetime, timedelta

@@ -944,6 +944,16 @@ def calendar_day_detail(request, year, month, day):
             member.username.lower() if member.username else "",
         ),
     )
+    instruction_student_ids = set()
+    if assignment:
+        instruction_student_ids = set(
+            assignment.active_instruction_slots.values_list("student_id", flat=True)
+        )
+    signed_up_non_instruction_flyers = [
+        member
+        for member in signed_up_flyers
+        if member.id not in instruction_student_ids
+    ]
 
     # Determine scheduled but empty roles (visible to all users as an "unfilled" indicator)
     # and the subset the current user is qualified to volunteer for (Issue #679).
@@ -1026,6 +1036,10 @@ def calendar_day_detail(request, year, month, day):
             "reservation_period_label": reservation_period_label,
             "signed_up_flyers": signed_up_flyers,
             "signed_up_flyer_count": len(signed_up_flyers),
+            "signed_up_non_instruction_flyers": signed_up_non_instruction_flyers,
+            "signed_up_non_instruction_flyer_count": len(
+                signed_up_non_instruction_flyers
+            ),
             "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
             "open_panel": open_panel,
         },

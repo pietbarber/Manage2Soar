@@ -484,20 +484,30 @@
       {# List of pilots planning to fly #}
       {% if signed_up_flyers %}
       <hr class="my-3">
+      <p class="text-muted small mb-2">
+        Total signed-up flyers (including students requesting instruction):
+        <strong>{{ signed_up_flyer_count }}</strong>
+      </p>
+      {% if signed_up_non_instruction_flyers %}
       <h6 class="fw-semibold text-primary mb-2">
-        <i class="bi bi-people me-2" aria-hidden="true"></i>Pilots Planning to Fly ({{ signed_up_flyer_count }}):
+        <i class="bi bi-people me-2" aria-hidden="true"></i>Other Pilots Planning to Fly ({{ signed_up_non_instruction_flyer_count }}):
       </h6>
       <ul class="list-group list-group-flush">
-        {% for member in signed_up_flyers %}
+        {% for member in signed_up_non_instruction_flyers %}
         <li class="list-group-item px-0 py-1">
           <i class="bi bi-person me-2 text-muted" aria-hidden="true"></i>{{ member.full_display_name }}
         </li>
         {% endfor %}
       </ul>
       {% else %}
+      <p class="text-muted mb-0">
+        <i class="bi bi-info-circle me-2" aria-hidden="true"></i>No additional pilots beyond students requesting instruction.
+      </p>
+      {% endif %}
+      {% else %}
       <hr class="my-3">
       <p class="text-muted mb-0">
-        <i class="bi bi-info-circle me-2" aria-hidden="true"></i>No one has declared intent yet.
+        <i class="bi bi-info-circle me-2" aria-hidden="true"></i>No one has signed up to fly yet.
       </p>
       {% endif %}
     </div>

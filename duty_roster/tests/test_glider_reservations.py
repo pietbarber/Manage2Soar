@@ -18,7 +18,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from duty_roster.forms import GliderReservationForm
-from duty_roster.models import DutyAssignment, GliderReservation, OpsIntent
+from duty_roster.models import (
+    DutyAssignment,
+    GliderReservation,
+    InstructionSlot,
+    OpsIntent,
+)
 from logsheet.models import Glider, MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
 
@@ -976,9 +981,98 @@ class TestGliderReservationViews:
 
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        assert "Pilots Planning to Fly (2):" in content
+        assert "Other Pilots Planning to Fly (2):" in content
         assert member.full_display_name in content
         assert other_member.full_display_name in content
+
+    def test_calendar_day_modal_other_pilots_excludes_instruction_students(
+        self, client, site_config, member, glider, django_user_model
+    ):
+        """Instruction students are excluded from the 'other pilots' list."""
+        target_date = timezone.now().date() + timedelta(days=13)
+        assignment = DutyAssignment.objects.create(date=target_date)
+
+        other_member = django_user_model.objects.create_user(
+            username="otherpilot",
+            email="otherpilot@example.com",
+            password="testpass123",
+            first_name="Other",
+            last_name="Pilot",
+            membership_status="Full Member",
+        )
+
+        InstructionSlot.objects.create(
+            assignment=assignment,
+            student=member,
+            status="confirmed",
+        )
+        OpsIntent.objects.create(
+            member=member,
+            date=target_date,
+            available_as=["club_single"],
+        )
+        GliderReservation.objects.create(
+            member=other_member,
+            glider=glider,
+            date=target_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert (
+            "Total signed-up flyers (including students requesting instruction):"
+            in content
+        )
+        assert "<strong>2</strong>" in content
+        assert "Other Pilots Planning to Fly (1):" in content
+        assert other_member.full_display_name in content
+
+    def test_calendar_day_modal_shows_no_other_pilots_when_only_instruction_students(
+        self, client, site_config, member, glider
+    ):
+        """When only instruction students are signed up, show informational empty state."""
+        target_date = timezone.now().date() + timedelta(days=14)
+        assignment = DutyAssignment.objects.create(date=target_date)
+
+        InstructionSlot.objects.create(
+            assignment=assignment,
+            student=member,
+            status="confirmed",
+        )
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=target_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert (
+            "Total signed-up flyers (including students requesting instruction):"
+            in content
+        )
+        assert "<strong>1</strong>" in content
+        assert "No additional pilots beyond students requesting instruction." in content
 
     def test_reservation_create_shows_warning_for_expired_deadline(
         self, client, site_config, member, glider, future_date
