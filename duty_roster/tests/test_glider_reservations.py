@@ -1043,7 +1043,7 @@ class TestGliderReservationViews:
 
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        assert "Other Pilots Planning to Fly (2):" in content
+        assert "Pilots Planning to Fly (2):" in content
         assert member.full_display_name in content
         assert other_member.full_display_name in content
 
@@ -1096,8 +1096,43 @@ class TestGliderReservationViews:
             in content
         )
         assert "<strong>2</strong>" in content
-        assert "Other Pilots Planning to Fly (1):" in content
+        assert "Pilots Planning to Fly (1):" in content
         assert other_member.full_display_name in content
+
+    def test_calendar_day_modal_includes_reservations_when_feature_disabled(
+        self, client, site_config, member, glider
+    ):
+        """Confirmed reservations still count as signed-up flyers when feature is off."""
+        site_config.allow_glider_reservations = False
+        site_config.save()
+
+        target_date = timezone.now().date() + timedelta(days=15)
+        DutyAssignment.objects.create(date=target_date)
+
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=target_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[target_date.year, target_date.month, target_date.day],
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert (
+            "Total signed-up flyers (including students requesting instruction):"
+            in content
+        )
+        assert "<strong>1</strong>" in content
+        assert member.full_display_name in content
 
     def test_calendar_day_modal_shows_no_other_pilots_when_only_instruction_students(
         self, client, site_config, member

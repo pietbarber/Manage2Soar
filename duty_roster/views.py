@@ -927,18 +927,17 @@ def calendar_day_detail(request, year, month, day):
     signed_up_members_by_id = {
         intent.member_id: intent.member for intent in intents if intent.member_id
     }
-    if reservation_feature_enabled:
-        signed_up_day_reservations = (
-            day_reservations
-            if reservation_enabled
-            else GliderReservation.get_reservations_for_date(day_date)
-        )
-        for reservation in signed_up_day_reservations:
-            if reservation.member_id:
-                signed_up_members_by_id.setdefault(
-                    reservation.member_id,
-                    reservation.member,
-                )
+    signed_up_day_reservations = (
+        day_reservations
+        if reservation_enabled
+        else GliderReservation.get_reservations_for_date(day_date)
+    )
+    for reservation in signed_up_day_reservations:
+        if reservation.member_id:
+            signed_up_members_by_id.setdefault(
+                reservation.member_id,
+                reservation.member,
+            )
     instruction_student_ids = set()
     if assignment:
         for slot in assignment.active_instruction_slots:
