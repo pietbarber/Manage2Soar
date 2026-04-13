@@ -1494,6 +1494,9 @@ def manage_logsheet(request, pk):
     if config and config.visiting_pilot_enabled:
         config.visiting_pilot_daily_token = config.get_or_create_daily_token()
     context["visiting_pilot_config"] = config
+    context["commercial_rides_enabled"] = bool(
+        config and config.commercial_rides_enabled
+    )
 
     return render(request, "logsheet/logsheet_manage.html", context)
 

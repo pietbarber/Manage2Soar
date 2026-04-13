@@ -216,7 +216,7 @@
 {% endif %}
 
 <!-- Flights Section -->
-<div class="flights-section" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}">
+<div class="flights-section" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}" data-commercial-rides-enabled="{% if commercial_rides_enabled %}true{% else %}false{% endif %}">
   <div class="flights-header">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-airplane text-primary" style="font-size: 1.5rem;"></i>
@@ -1950,6 +1950,8 @@ document.addEventListener("click", async function(e) {
 <script>
   const flightModal = document.getElementById("flightModal");
   const LOGSHEET_ID = parseInt(flightModal.dataset.logsheetId, 10);
+  const LOGSHEET_CONTAINER = document.getElementById("logsheetContainer");
+  const COMMERCIAL_RIDES_ENABLED = LOGSHEET_CONTAINER?.dataset.commercialRidesEnabled === 'true';
 
   // Helper function to extract pre-fill data from Edit button's data attributes (DRY)
   function extractPrefillDataFromButton(button, flightId) {
@@ -2021,7 +2023,9 @@ document.addEventListener("click", async function(e) {
           if (refData) {
             // For edit, extract pre-fill data from button's data attributes
             const prefillData = isEditFlight ? extractPrefillDataFromButton(button, flightId) : null;
-            const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData);
+            const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData, {
+              commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
+            });
             document.getElementById("flightModalContent").innerHTML = html;
             window.M2SOffline.initOfflineFormHandlers(() => {
               // Callback after save - update UI
@@ -2351,7 +2355,9 @@ document.addEventListener("click", async function(e) {
             if (refData) {
               // For edit, extract pre-fill data from button's data attributes
               const prefillData = isEditFlight ? extractPrefillDataFromButton(button, flightId) : null;
-              const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData);
+              const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData, {
+                commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
+              });
               modalContent.innerHTML = html;
               window.M2SOffline.initOfflineFormHandlers(() => {
                 window.M2SOffline.updatePendingIndicator();

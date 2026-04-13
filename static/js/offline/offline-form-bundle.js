@@ -136,8 +136,9 @@
      * @param {object} prefillData - Optional data to pre-fill (for editing existing flights)
      * @returns {string} HTML string
      */
-    function renderOfflineFlightForm(refData, logsheetId, prefillData = null) {
+    function renderOfflineFlightForm(refData, logsheetId, prefillData = null, options = {}) {
         const { members, gliders, towplanes } = refData;
+        const commercialRidesEnabled = options.commercialRidesEnabled !== false;
 
         // Separate members by role hints (if available)
         const allMembers = members;
@@ -247,6 +248,7 @@
                                 <input type="text" name="passenger_name" id="id_passenger_name" class="form-control" placeholder="If not a member" value="${escapeHtml(prefillData?.passengerNameText)}">
                             </div>
 
+                            ${commercialRidesEnabled ? `
                             <div class="col-12 mt-2">
                                 <div class="form-check form-switch">
                                     <input type="checkbox" name="commercial_ride" id="id_commercial_ride" class="form-check-input" ${prefillData?.commercialRide ? 'checked' : ''}>
@@ -263,6 +265,7 @@
                                 <input type="text" name="ticket_number" id="id_ticket_number" class="form-control" value="${escapeHtml(prefillData?.ticketNumber)}" placeholder="Enter ticket number">
                                 <div class="form-text">Offline entries are queued and validated when back online.</div>
                             </div>
+                            ` : ''}
                         </div>
                     </div>
 
@@ -415,7 +418,7 @@
             const isCommercial = commercialToggle.checked;
             ticketInput.required = isCommercial;
             ticketInput.disabled = !isCommercial;
-            ticketGroup.style.opacity = isCommercial ? '1' : '0.6';
+            ticketGroup.style.display = isCommercial ? '' : 'none';
 
             if (!isCommercial) {
                 ticketInput.value = '';
