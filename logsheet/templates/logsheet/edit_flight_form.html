@@ -423,22 +423,30 @@
       }
     };
 
+    const syncTicketValidation = () => {
+      const isCommercial = commercialToggle.checked;
+      const hasSelectedTicket = ticketSelect.value !== '';
+      ticketInput.required = isCommercial && !hasSelectedTicket;
+    };
+
     const syncCommercialUi = () => {
       const isCommercial = commercialToggle.checked;
       ticketGroup.style.display = isCommercial ? '' : 'none';
-      ticketInput.required = isCommercial;
       ticketInput.disabled = !isCommercial;
       ticketSelect.disabled = !isCommercial;
       if (!isCommercial) {
         ticketInput.value = '';
         ticketSelect.selectedIndex = 0;
       }
+      syncTicketValidation();
       setPassengerFieldState(passengerMemberInput, passengerMemberGroup, isCommercial);
       setPassengerFieldState(passengerNameInput, passengerNameGroup, isCommercial);
     };
 
     syncCommercialUi();
     commercialToggle.addEventListener('change', syncCommercialUi);
+    ticketSelect.addEventListener('change', syncTicketValidation);
+    ticketInput.addEventListener('input', syncTicketValidation);
   })();
 </script>
 
