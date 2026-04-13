@@ -1150,7 +1150,7 @@ document.addEventListener("click", async function(e) {
             const refData = await window.M2SOffline.getReferenceData();
             if (refData) {
               const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
-              const html = window.M2SOffline.renderOfflineFlightForm(refData, logsheetId, {
+              const html = window.M2SOffline.renderOfflineFlightForm(refData, logsheetId, null, {
                 commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
               });
               document.getElementById('flightModalContent').innerHTML = html;
