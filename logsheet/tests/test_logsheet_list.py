@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from logsheet.models import Airfield, Logsheet, Towplane, TowplaneCloseout
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -109,3 +110,42 @@ def test_year_selector_works_with_no_logsheets_at_all(client, active_member):
     # Current year should be in available_years
     assert current_year in available_years
     assert len(available_years) == 1
+
+
+@pytest.mark.django_db
+def test_can_issue_ticket_context_allows_superuser_with_non_active_membership(
+    client, django_user_model
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+
+    airfield = Airfield.objects.create(name="Test Field")
+    Logsheet.objects.create(
+        log_date="2024-01-03",
+        airfield=airfield,
+        created_by=django_user_model.objects.create_user(
+            username="creator_member",
+            password="testpass123",
+            membership_status="Full Member",
+        ),
+    )
+
+    super_treasurer = django_user_model.objects.create_user(
+        username="super_treasurer_inactive",
+        password="testpass123",
+        membership_status="Inactive",
+        is_superuser=True,
+        is_staff=True,
+        treasurer=True,
+    )
+
+    client.force_login(super_treasurer)
+    response = client.get(reverse("logsheet:index"))
+
+    assert response.status_code == 200
+    assert response.context["can_issue_commercial_ticket"] is True
+    assert reverse("logsheet:issue_commercial_ticket") in response.content.decode()

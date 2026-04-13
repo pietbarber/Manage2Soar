@@ -1602,12 +1602,10 @@ def list_logsheets(request):
             form = CreateLogsheetForm()
     else:
         form = CreateLogsheetForm()
-    from members.utils.membership import get_active_membership_statuses
+    from members.utils.membership import is_active_member
 
-    active_status_names = set(get_active_membership_statuses())
-    is_active_member = bool(
-        request.user.is_authenticated
-        and request.user.membership_status in active_status_names
+    has_active_member_access = bool(
+        request.user.is_authenticated and is_active_member(request.user)
     )
 
     return render(
@@ -1621,7 +1619,7 @@ def list_logsheets(request):
             "paginator": paginator,
             "available_years": available_years,
             "form": form,
-            "can_issue_commercial_ticket": is_active_member
+            "can_issue_commercial_ticket": has_active_member_access
             and _can_issue_commercial_ticket(request.user)
             and bool(site_config and site_config.commercial_rides_enabled),
         },
