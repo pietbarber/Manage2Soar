@@ -1006,8 +1006,6 @@ def land_flight_now(request, flight_id):
 def launch_flight_now(request, flight_id):
     import json
 
-    from django.core.exceptions import ValidationError
-
     from .forms import validate_glider_availability
 
     try:
@@ -1039,26 +1037,34 @@ def launch_flight_now(request, flight_id):
                 {"success": False, "error": get_validation_message(e)}, status=400
             )
 
-        flight.launch_time = launch_time
-        # Persist duration reset/compute together with launch_time updates.
-        flight.save(update_fields=["launch_time", "duration"])
-
-        if flight.commercial_ride:
-            try:
-                existing_ride = flight.commercial_ride_record
-            except CommercialRide.DoesNotExist:
-                existing_ride = None
-            if existing_ride:
-                try:
-                    _link_commercial_ticket_to_flight(
-                        flight=flight,
-                        ticket_number=existing_ride.ticket.ticket_number,
-                    )
-                except ValidationError as e:
+        try:
+            with transaction.atomic():
+                locked_flight = Flight.objects.select_for_update().get(pk=flight.pk)
+                if locked_flight.launch_time:
                     return JsonResponse(
-                        {"success": False, "error": get_validation_message(e)},
+                        {"success": False, "error": "Flight already launched."},
                         status=400,
                     )
+
+                locked_flight.launch_time = launch_time
+                # Persist duration reset/compute together with launch_time updates.
+                locked_flight.save(update_fields=["launch_time", "duration"])
+
+                if locked_flight.commercial_ride:
+                    try:
+                        existing_ride = locked_flight.commercial_ride_record
+                    except CommercialRide.DoesNotExist:
+                        existing_ride = None
+                    if existing_ride:
+                        _link_commercial_ticket_to_flight(
+                            flight=locked_flight,
+                            ticket_number=existing_ride.ticket.ticket_number,
+                        )
+        except ValidationError as e:
+            return JsonResponse(
+                {"success": False, "error": get_validation_message(e)},
+                status=400,
+            )
 
         return JsonResponse({"success": True})
     except Exception as e:

@@ -313,3 +313,61 @@ def test_launch_now_redeems_soft_locked_ticket(client, active_member, glider, ai
     ticket.refresh_from_db()
     assert ticket.status == CommercialTicket.Status.REDEEMED
     assert ticket.flight == flight
+
+
+@pytest.mark.django_db
+def test_launch_now_rolls_back_launch_time_when_ticket_link_fails(
+    client, active_member, glider, airfield, monkeypatch
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+
+    active_member.glider_rating = "commercial"
+    active_member.save(update_fields=["glider_rating"])
+
+    from logsheet.models import Logsheet
+
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=airfield,
+        created_by=active_member,
+    )
+    ticket = CommercialTicket.objects.create(ticket_number="T-702")
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        commercial_ride=True,
+        release_altitude=3000,
+    )
+    CommercialRide.objects.create(
+        flight=flight,
+        ticket=ticket,
+        commercial_pilot=active_member,
+        revenue_amount=ticket.amount_paid,
+    )
+
+    def _raise_link_error(*, flight, ticket_number):
+        raise ValidationError("Ticket is already redeemed by a different flight.")
+
+    monkeypatch.setattr(
+        "logsheet.views._link_commercial_ticket_to_flight", _raise_link_error
+    )
+
+    client.force_login(active_member)
+    url = reverse("logsheet:launch_flight_now", args=[flight.pk])
+    response = client.post(
+        url,
+        data='{"launch_time":"10:45"}',
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    flight.refresh_from_db()
+    ticket.refresh_from_db()
+    assert flight.launch_time is None
+    assert ticket.status == CommercialTicket.Status.AVAILABLE
