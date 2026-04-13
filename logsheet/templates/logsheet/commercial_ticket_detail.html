@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Commercial Ticket {{ ticket.ticket_number }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Commercial Ticket {{ ticket.ticket_number }}</h1>
+    <a href="{% url 'logsheet:commercial_ticket_register' %}" class="btn btn-outline-secondary">Back to Register</a>
+  </div>
+
+  <div class="card">
+    {% include "logsheet/commercial_ticket_detail_content.html" %}
+    <div class="card-footer">
+      {% if ticket.status == 'available' %}
+        <a href="{% url 'logsheet:edit_commercial_ticket' ticket.pk %}" class="btn btn-primary">Edit Ticket</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

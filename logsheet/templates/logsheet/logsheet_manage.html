@@ -216,7 +216,7 @@
 {% endif %}
 
 <!-- Flights Section -->
-<div class="flights-section" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}">
+<div class="flights-section" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}" data-commercial-rides-enabled="{% if commercial_rides_enabled %}true{% else %}false{% endif %}">
   <div class="flights-header">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-airplane text-primary" style="font-size: 1.5rem;"></i>
@@ -385,6 +385,8 @@
                          {% if flight.launch_time %}data-launch-time="{{ flight.launch_time|time:'H:i' }}"{% endif %}
                          {% if flight.landing_time %}data-landing-time="{{ flight.landing_time|time:'H:i' }}"{% endif %}
                          {% if flight.flight_type %}data-flight-type="{{ flight.flight_type }}"{% endif %}
+                         data-commercial-ride="{% if flight.commercial_ride %}1{% else %}0{% endif %}"
+                         {% if flight.commercial_ride_record and flight.commercial_ride_record.ticket %}data-ticket-number="{{ flight.commercial_ride_record.ticket.ticket_number }}"{% endif %}
                          {% if flight.passenger %}data-passenger="{{ flight.passenger.pk }}" data-passenger-name="{{ flight.passenger|full_display_name|escapejs }}"{% endif %}
                          {% if flight.passenger_name %}data-passenger-name-text="{{ flight.passenger_name|escapejs }}"{% endif %}
                          {% if flight.notes %}data-notes="{{ flight.notes|escapejs }}"{% endif %}>
@@ -1148,7 +1150,9 @@ document.addEventListener("click", async function(e) {
             const refData = await window.M2SOffline.getReferenceData();
             if (refData) {
               const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
-              const html = window.M2SOffline.renderOfflineFlightForm(refData, logsheetId);
+              const html = window.M2SOffline.renderOfflineFlightForm(refData, logsheetId, null, {
+                commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
+              });
               document.getElementById('flightModalContent').innerHTML = html;
 
               // Add visual indication that this is a cloned flight
@@ -1493,6 +1497,44 @@ document.addEventListener("click", async function(e) {
     }
 
     // Sync pending flights to the server
+    function isTicketSyncConflict(message) {
+      const normalized = String(message || '').toLowerCase();
+      if (!normalized) {
+        return false;
+      }
+      return (
+        normalized.includes('ticket')
+        || normalized.includes('redeemed')
+        || normalized.includes('reserved')
+        || normalized.includes('refunded')
+      );
+    }
+
+    async function getSyncErrorMessage(response) {
+      const fallback = `HTTP ${response.status}`;
+      const contentType = response.headers.get('content-type') || '';
+
+      try {
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          return data.error || data.message || fallback;
+        }
+
+        const text = await response.text();
+        if (!text) {
+          return fallback;
+        }
+
+        // Keep this lightweight because some responses are full HTML forms.
+        if (text.toLowerCase().includes('ticket')) {
+          return 'Ticket validation failed while syncing offline changes.';
+        }
+        return fallback;
+      } catch (e) {
+        return fallback;
+      }
+    }
+
     async function syncPendingFlights() {
       if (!navigator.onLine) {
         console.log('[Offline] Cannot sync - offline');
@@ -1506,6 +1548,13 @@ document.addEventListener("click", async function(e) {
           return;
         }
 
+        const syncStats = {
+          synced: 0,
+          conflicts: 0,
+          errors: 0,
+          ticketConflicts: []
+        };
+
         console.log('[Offline] Syncing', pendingFlights.length, 'pending item(s)...');
 
         for (const flight of pendingFlights) {
@@ -1515,7 +1564,19 @@ document.addEventListener("click", async function(e) {
 
             // Check if this is a launch/landing/delete operation
             if (flight.editType === 'operation') {
-              await syncOperation(flight);
+              const operationResult = await syncOperation(flight);
+              if (operationResult && operationResult.ok) {
+                syncStats.synced += 1;
+              } else if (operationResult && operationResult.ticketConflict) {
+                syncStats.conflicts += 1;
+                syncStats.ticketConflicts.push({
+                  message: operationResult.message,
+                  serverId: operationResult.serverId || flight.serverId,
+                  localId: operationResult.localId || flight.localId,
+                });
+              } else {
+                syncStats.errors += 1;
+              }
               continue;
             }
 
@@ -1550,6 +1611,8 @@ document.addEventListener("click", async function(e) {
               'release_altitude': 'release_altitude',
               'flight_type': 'flight_type',
               'passenger_name': 'passenger_name',
+              'commercial_ride': 'commercial_ride',
+              'ticket_number': 'ticket_number',
               'notes': 'notes'
             };
 
@@ -1577,6 +1640,7 @@ document.addEventListener("click", async function(e) {
                 // Mark as synced
                 await db.markFlightSynced(flight.localId, result.flight_id || flight.serverId);
                 console.log('[Offline] Flight synced:', flight.localId, '->', result.flight_id || flight.serverId);
+                syncStats.synced += 1;
               } else {
                 throw new Error(result.error || 'Sync failed');
               }
@@ -1585,24 +1649,66 @@ document.addEventListener("click", async function(e) {
               const result = await response.json();
               await db.markFlightConflict(flight.localId, result);
               console.warn('[Offline] Flight conflict:', flight.localId);
+              syncStats.conflicts += 1;
+              if (result && result.error && isTicketSyncConflict(result.error)) {
+                syncStats.ticketConflicts.push({
+                  message: result.error,
+                  serverId: flight.serverId,
+                  localId: flight.localId,
+                });
+              }
             } else {
-              throw new Error(`HTTP ${response.status}`);
+              const serverMessage = await getSyncErrorMessage(response);
+              if (isTicketSyncConflict(serverMessage)) {
+                await db.markFlightConflict(flight.localId, {
+                  error: serverMessage,
+                  status: response.status,
+                });
+                syncStats.conflicts += 1;
+                syncStats.ticketConflicts.push({
+                  message: serverMessage,
+                  serverId: flight.serverId,
+                  localId: flight.localId,
+                });
+                console.warn('[Offline] Ticket conflict while syncing flight:', flight.localId, serverMessage);
+              } else {
+                throw new Error(serverMessage);
+              }
             }
 
           } catch (e) {
             console.error('[Offline] Failed to sync flight:', flight.localId, e);
-            await db.markFlightError(flight.localId, e.message);
+            if (isTicketSyncConflict(e.message)) {
+              await db.markFlightConflict(flight.localId, {
+                error: e.message,
+                status: 400,
+              });
+              syncStats.conflicts += 1;
+              syncStats.ticketConflicts.push({
+                message: e.message,
+                serverId: flight.serverId,
+                localId: flight.localId,
+              });
+            } else {
+              await db.markFlightError(flight.localId, e.message);
+              syncStats.errors += 1;
+            }
           }
         }
 
         // Update UI
         window.M2SOffline.updatePendingIndicator();
 
-        // Show sync complete notification
-        showSyncCompleteToast();
+        // Show ticket conflicts directly on all affected rows for faster resolution.
+        const firstTicketConflictRowAnchor = renderTicketConflictsOnRows(syncStats.ticketConflicts);
 
-        // Reload page to show updated data
-        setTimeout(() => location.reload(), 2000);
+        // Show sync complete notification
+        showSyncCompleteToast(syncStats, firstTicketConflictRowAnchor);
+
+        // Reload only for fully successful syncs.
+        if (syncStats.conflicts === 0 && syncStats.errors === 0) {
+          setTimeout(() => location.reload(), 2000);
+        }
 
       } catch (e) {
         console.error('[Offline] Sync process failed:', e);
@@ -1658,22 +1764,107 @@ document.addEventListener("click", async function(e) {
         if (operation.operationType === 'delete') {
           await db.markFlightSynced(operation.localId, operation.serverId);
           console.log(`[Offline] delete synced for flight ${operation.serverId}`);
+          return { ok: true };
         } else {
           const result = await response.json();
           if (result.success) {
             await db.markFlightSynced(operation.localId, operation.serverId);
             console.log(`[Offline] ${operation.operationType} synced for flight ${operation.serverId}`);
+            return { ok: true };
           } else {
             throw new Error(result.error || 'Operation sync failed');
           }
         }
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        const serverMessage = await getSyncErrorMessage(response);
+        if (isTicketSyncConflict(serverMessage)) {
+          await db.markFlightConflict(operation.localId, {
+            error: serverMessage,
+            status: response.status,
+          });
+          return {
+            ok: false,
+            ticketConflict: true,
+            message: serverMessage,
+            serverId: operation.serverId,
+            localId: operation.localId,
+          };
+        }
+        throw new Error(serverMessage);
       }
     }
 
+    function renderTicketConflictsOnRows(ticketConflicts = []) {
+      if (!Array.isArray(ticketConflicts) || ticketConflicts.length === 0) {
+        return null;
+      }
+
+      const conflictsByServerId = new Map();
+      for (const item of ticketConflicts) {
+        if (!item || !item.serverId) {
+          continue;
+        }
+        const key = String(item.serverId);
+        if (!conflictsByServerId.has(key)) {
+          conflictsByServerId.set(key, []);
+        }
+        conflictsByServerId.get(key).push(item.message || 'Ticket validation conflict.');
+      }
+
+      let firstAnchorId = null;
+
+      for (const [serverId, messages] of conflictsByServerId.entries()) {
+        const editButton = document.querySelector(`.edit-flight-btn[data-flight-id="${serverId}"]`);
+        const row = editButton ? editButton.closest('tr') : null;
+        if (!row) {
+          continue;
+        }
+
+        const anchorId = row.id || `ticket-conflict-row-${serverId}`;
+        row.id = anchorId;
+        row.setAttribute('data-ticket-conflict-anchor', 'true');
+
+        if (!firstAnchorId) {
+          firstAnchorId = anchorId;
+        }
+
+        row.classList.add('table-warning');
+
+        const statusCell = row.querySelector('td.status-col');
+        if (statusCell && !statusCell.querySelector('.offline-ticket-conflict-badge')) {
+          const badge = document.createElement('span');
+          badge.className = 'badge bg-warning text-dark offline-ticket-conflict-badge';
+          badge.textContent = 'Ticket Conflict';
+          statusCell.innerHTML = '';
+          statusCell.appendChild(badge);
+        }
+
+        const actionsContainer = row.querySelector('td.actions-col .action-buttons');
+        if (!actionsContainer) {
+          continue;
+        }
+
+        const uniqueMessages = [...new Set(messages)];
+        for (const message of uniqueMessages) {
+          const hintText = `Ticket conflict: ${message}`;
+          const alreadyPresent = Array.from(actionsContainer.querySelectorAll('.ticket-conflict-inline'))
+            .some((el) => el.textContent === hintText);
+          if (alreadyPresent) {
+            continue;
+          }
+
+          const inlineHint = document.createElement('div');
+          inlineHint.className = 'small text-warning-emphasis mt-1 ticket-conflict-inline';
+          inlineHint.textContent = hintText;
+          actionsContainer.appendChild(inlineHint);
+        }
+      }
+
+      return firstAnchorId;
+    }
+
     // Show sync complete toast
-    function showSyncCompleteToast() {
+    function showSyncCompleteToast(syncStats = null, firstConflictAnchorId = null) {
       let toastContainer = document.getElementById('offline-toast-container');
       if (!toastContainer) {
         toastContainer = document.createElement('div');
@@ -1684,21 +1875,54 @@ document.addEventListener("click", async function(e) {
       }
 
       const toastId = 'sync-complete-toast-' + Date.now();
+      const hasIssues = !!(syncStats && (syncStats.conflicts > 0 || syncStats.errors > 0));
+      const bgClass = hasIssues ? 'bg-warning text-dark' : 'text-white bg-success';
+      const iconClass = hasIssues ? 'bi-exclamation-triangle' : 'bi-cloud-check';
+      const summaryLine = hasIssues
+        ? `<strong>Sync finished with issues.</strong> ${syncStats.synced} synced, ${syncStats.conflicts} conflict(s), ${syncStats.errors} error(s).`
+        : '<strong>Flights synced!</strong> Refreshing page...';
+      const ticketHint = syncStats && syncStats.ticketConflicts && syncStats.ticketConflicts.length > 0
+        ? `<div class="small mt-1">Ticket conflicts detected. Open affected flights and choose a different ticket or clear Commercial Ride.</div>`
+        : '';
+      const canJumpToConflict = Boolean(firstConflictAnchorId && hasIssues);
+      const conflictJumpAction = canJumpToConflict
+        ? `<div class="mt-2"><button type="button" class="btn btn-sm btn-outline-dark offline-conflict-jump" data-target-anchor="${firstConflictAnchorId}">Jump to first conflict</button></div>`
+        : '';
+
       const toastHtml = `
-        <div id="${toastId}" class="toast align-items-center text-white bg-success border-0" role="alert">
+        <div id="${toastId}" class="toast align-items-center ${bgClass} border-0" role="alert">
           <div class="d-flex">
             <div class="toast-body">
-              <i class="bi bi-cloud-check me-2"></i>
-              <strong>Flights synced!</strong>
-              Refreshing page...
+              <i class="bi ${iconClass} me-2"></i>
+              ${summaryLine}
+              ${ticketHint}
+              ${conflictJumpAction}
             </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            <button type="button" class="btn-close ${hasIssues ? '' : 'btn-close-white'} me-2 m-auto" data-bs-dismiss="toast"></button>
           </div>
         </div>
       `;
 
       toastContainer.insertAdjacentHTML('beforeend', toastHtml);
       const toastEl = document.getElementById(toastId);
+
+      if (canJumpToConflict) {
+        const jumpButton = toastEl.querySelector('.offline-conflict-jump');
+        if (jumpButton) {
+          jumpButton.addEventListener('click', () => {
+            const targetAnchor = jumpButton.getAttribute('data-target-anchor');
+            const targetRow = targetAnchor ? document.getElementById(targetAnchor) : null;
+            if (!targetRow) {
+              return;
+            }
+
+            targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetRow.classList.add('table-active');
+            setTimeout(() => targetRow.classList.remove('table-active'), 1500);
+          });
+        }
+      }
+
       const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
       toast.show();
     }
@@ -1728,6 +1952,8 @@ document.addEventListener("click", async function(e) {
 <script>
   const flightModal = document.getElementById("flightModal");
   const LOGSHEET_ID = parseInt(flightModal.dataset.logsheetId, 10);
+  const LOGSHEET_CONTAINER = document.getElementById("logsheetContainer");
+  const COMMERCIAL_RIDES_ENABLED = LOGSHEET_CONTAINER?.dataset.commercialRidesEnabled === 'true';
 
   // Helper function to extract pre-fill data from Edit button's data attributes (DRY)
   function extractPrefillDataFromButton(button, flightId) {
@@ -1751,6 +1977,8 @@ document.addEventListener("click", async function(e) {
       passenger: button.getAttribute('data-passenger'),
       passengerName: button.getAttribute('data-passenger-name'),
       passengerNameText: button.getAttribute('data-passenger-name-text'),
+      commercialRide: button.getAttribute('data-commercial-ride') === '1',
+      ticketNumber: button.getAttribute('data-ticket-number'),
       notes: button.getAttribute('data-notes')
     };
   }
@@ -1797,7 +2025,9 @@ document.addEventListener("click", async function(e) {
           if (refData) {
             // For edit, extract pre-fill data from button's data attributes
             const prefillData = isEditFlight ? extractPrefillDataFromButton(button, flightId) : null;
-            const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData);
+            const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData, {
+              commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
+            });
             document.getElementById("flightModalContent").innerHTML = html;
             window.M2SOffline.initOfflineFormHandlers(() => {
               // Callback after save - update UI
@@ -2127,7 +2357,9 @@ document.addEventListener("click", async function(e) {
             if (refData) {
               // For edit, extract pre-fill data from button's data attributes
               const prefillData = isEditFlight ? extractPrefillDataFromButton(button, flightId) : null;
-              const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData);
+              const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData, {
+                commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
+              });
               modalContent.innerHTML = html;
               window.M2SOffline.initOfflineFormHandlers(() => {
                 window.M2SOffline.updatePendingIndicator();

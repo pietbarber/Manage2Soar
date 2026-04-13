@@ -408,7 +408,7 @@ def test_flight_form_warns_unscheduled_tow_pilot(
     # Try to create flight with different tow pilot
     form = FlightForm(
         data={
-            "pilot": member_towpilot2.id,
+            "pilot": member_towpilot.id,
             "glider": glider.id,
             "tow_pilot": member_towpilot2.id,  # Not on scheduled list
             "launch_time": "14:00",
@@ -427,7 +427,9 @@ def test_flight_form_warns_unscheduled_tow_pilot(
 
 
 @pytest.mark.django_db
-def test_flight_form_no_warning_scheduled_tow_pilot(member_towpilot, glider, logsheet):
+def test_flight_form_no_warning_scheduled_tow_pilot(
+    member_towpilot, member_towpilot2, glider, logsheet
+):
     """Test that FlightForm does not warn when tow pilot is on scheduled list"""
     from logsheet.forms import FlightForm
     from siteconfig.models import SiteConfiguration
@@ -444,7 +446,7 @@ def test_flight_form_no_warning_scheduled_tow_pilot(member_towpilot, glider, log
     # Create flight with scheduled tow pilot
     form = FlightForm(
         data={
-            "pilot": member_towpilot.id,
+            "pilot": member_towpilot2.id,
             "glider": glider.id,
             "tow_pilot": member_towpilot.id,  # On scheduled list
             "launch_time": "14:00",
@@ -478,7 +480,7 @@ def test_flight_form_warns_unscheduled_with_surge_pilot(
     # Try to create flight with unscheduled tow pilot (different from both scheduled)
     form = FlightForm(
         data={
-            "pilot": member_instructor_towpilot.id,
+            "pilot": member_towpilot.id,
             "glider": glider.id,
             "tow_pilot": member_instructor_towpilot.id,  # Not on either scheduled list
             "launch_time": "14:00",
@@ -499,7 +501,9 @@ def test_flight_form_warns_unscheduled_with_surge_pilot(
 
 
 @pytest.mark.django_db
-def test_flight_form_no_warning_no_scheduled_pilots(member_towpilot, glider, logsheet):
+def test_flight_form_no_warning_no_scheduled_pilots(
+    member_towpilot, member_towpilot2, glider, logsheet
+):
     """Test that FlightForm does not warn when no tow pilots are scheduled"""
     from logsheet.forms import FlightForm
     from siteconfig.models import SiteConfiguration
@@ -516,7 +520,7 @@ def test_flight_form_no_warning_no_scheduled_pilots(member_towpilot, glider, log
     # Create flight with any tow pilot
     form = FlightForm(
         data={
-            "pilot": member_towpilot.id,
+            "pilot": member_towpilot2.id,
             "glider": glider.id,
             "tow_pilot": member_towpilot.id,
             "launch_time": "14:00",
@@ -561,3 +565,149 @@ def test_flight_form_release_altitude_sequential_ordering(
         f"Release altitude choices should be sequential 0-7000. "
         f"Got first 10: {altitude_choices[:10]}"
     )
+
+
+@pytest.mark.django_db
+def test_flight_form_commercial_requires_ticket(active_member, glider, logsheet):
+    from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    active_member.glider_rating = "commercial"
+    active_member.save(update_fields=["glider_rating"])
+
+    form = FlightForm(
+        data={
+            "pilot": active_member.id,
+            "glider": glider.id,
+            "launch_time": "14:00",
+            "commercial_ride": "on",
+        },
+        logsheet=logsheet,
+    )
+
+    assert not form.is_valid()
+    assert "ticket_number" in form.errors
+
+
+@pytest.mark.django_db
+def test_flight_form_commercial_requires_commercial_rating(
+    active_member, glider, logsheet
+):
+    from logsheet.forms import FlightForm
+    from logsheet.models import CommercialTicket
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    CommercialTicket.objects.create(ticket_number="T-200")
+
+    form = FlightForm(
+        data={
+            "pilot": active_member.id,
+            "glider": glider.id,
+            "launch_time": "14:00",
+            "commercial_ride": "on",
+            "ticket_number": "T-200",
+        },
+        logsheet=logsheet,
+    )
+
+    assert not form.is_valid()
+    assert "pilot" in form.errors
+
+
+@pytest.mark.django_db
+def test_flight_form_commercial_valid_with_ticket_and_rating(
+    active_member, glider, logsheet
+):
+    from logsheet.forms import FlightForm
+    from logsheet.models import CommercialTicket
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    CommercialTicket.objects.create(ticket_number="T-201")
+    active_member.glider_rating = "commercial"
+    active_member.save(update_fields=["glider_rating"])
+
+    form = FlightForm(
+        data={
+            "pilot": active_member.id,
+            "glider": glider.id,
+            "launch_time": "14:00",
+            "commercial_ride": "on",
+            "ticket_number": "T-201",
+        },
+        logsheet=logsheet,
+    )
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+
+
+@pytest.mark.django_db
+def test_flight_form_blocks_same_pilot_and_tow_pilot(member_towpilot, glider, logsheet):
+    from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.example.com", club_abbreviation="TC"
+    )
+
+    form = FlightForm(
+        data={
+            "pilot": member_towpilot.id,
+            "glider": glider.id,
+            "tow_pilot": member_towpilot.id,
+            "launch_time": "14:00",
+            "release_altitude": 3000,
+        },
+        logsheet=logsheet,
+    )
+
+    assert not form.is_valid()
+    assert "pilot and tow pilot" in str(form.errors).lower()
+
+
+@pytest.mark.django_db
+def test_flight_form_accepts_available_ticket_dropdown(active_member, glider, logsheet):
+    from logsheet.forms import FlightForm
+    from logsheet.models import CommercialTicket
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    active_member.glider_rating = "commercial"
+    active_member.save(update_fields=["glider_rating"])
+    CommercialTicket.objects.create(ticket_number="T-220")
+
+    form = FlightForm(
+        data={
+            "pilot": active_member.id,
+            "glider": glider.id,
+            "launch_time": "14:00",
+            "commercial_ride": "on",
+            "available_ticket": "T-220",
+        },
+        logsheet=logsheet,
+    )
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert form.cleaned_data["ticket_number"] == "T-220"

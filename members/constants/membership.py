@@ -156,4 +156,5 @@ ROLE_FIELD_MAP = {
     "duty_officer": "duty_officer",
     "assistant_duty_officer": "assistant_duty_officer",
     "towpilot": "tow_pilot",
+    "commercial_pilot": "commercial_pilot",
 }

@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Value
@@ -16,6 +17,7 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_time
 from django.utils.timezone import now
@@ -28,6 +30,8 @@ from members.models import Member
 from siteconfig.models import SiteConfiguration
 
 from .forms import (
+    CommercialTicketEditForm,
+    CommercialTicketIssueForm,
     CreateLogsheetForm,
     FlightForm,
     LogsheetCloseoutForm,
@@ -38,6 +42,8 @@ from .forms import (
 )
 from .models import (
     AircraftMeister,
+    CommercialRide,
+    CommercialTicket,
     Flight,
     Glider,
     Logsheet,
@@ -58,6 +64,158 @@ logger = logging.getLogger(__name__)
 
 TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW = Decimal("0.1")
 TOW_LOGBOOK_ESTIMATED_HOBBS_PER_TOW = Decimal("0.2")
+
+
+def _can_issue_commercial_ticket(user):
+    return bool(
+        getattr(user, "duty_officer", False) or getattr(user, "treasurer", False)
+    )
+
+
+@active_member_required
+def issue_commercial_ticket(request):
+    config = SiteConfiguration.objects.first()
+    if not (config and config.commercial_rides_enabled):
+        messages.error(request, "Commercial rides are currently disabled.")
+        return redirect("logsheet:index")
+
+    if not _can_issue_commercial_ticket(request.user):
+        return render(request, "403.html", status=403)
+
+    if request.method == "POST":
+        form = CommercialTicketIssueForm(request.POST)
+        if form.is_valid():
+            try:
+                issued_ticket = CommercialTicket.issue_next_available(
+                    entered_by=request.user,
+                    ride_type=form.cleaned_data["ride_type"],
+                    amount_paid=form.cleaned_data["amount_paid"],
+                    gift_certificate_number=form.cleaned_data[
+                        "gift_certificate_number"
+                    ],
+                    gift_certificate_expires_on=form.cleaned_data[
+                        "gift_certificate_expires_on"
+                    ],
+                    remarks=form.cleaned_data["remarks"],
+                )
+            except ValidationError as exc:
+                message = get_validation_message(exc)
+                form.add_error(None, message)
+                messages.error(request, message)
+            else:
+                messages.success(
+                    request,
+                    f"Commercial ticket {issued_ticket.ticket_number} issued successfully.",
+                )
+                return redirect(reverse("logsheet:issue_commercial_ticket"))
+    else:
+        form = CommercialTicketIssueForm()
+
+    recent_tickets = CommercialTicket.objects.select_related("entered_by", "flight")[
+        :20
+    ]
+
+    return render(
+        request,
+        "logsheet/issue_commercial_ticket.html",
+        {
+            "form": form,
+            "recent_tickets": recent_tickets,
+        },
+    )
+
+
+@active_member_required
+def commercial_ticket_register(request):
+    config = SiteConfiguration.objects.first()
+    if not (config and config.commercial_rides_enabled):
+        messages.error(request, "Commercial rides are currently disabled.")
+        return redirect("logsheet:index")
+
+    if not _can_issue_commercial_ticket(request.user):
+        return render(request, "403.html", status=403)
+
+    tickets_qs = CommercialTicket.objects.select_related(
+        "entered_by", "flight", "flight__logsheet"
+    )
+    paginator = Paginator(tickets_qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(
+        request,
+        "logsheet/commercial_ticket_register.html",
+        {
+            "tickets": page_obj.object_list,
+            "page_obj": page_obj,
+        },
+    )
+
+
+@active_member_required
+def commercial_ticket_detail(request, pk):
+    config = SiteConfiguration.objects.first()
+    if not (config and config.commercial_rides_enabled):
+        messages.error(request, "Commercial rides are currently disabled.")
+        return redirect("logsheet:index")
+
+    if not _can_issue_commercial_ticket(request.user):
+        return render(request, "403.html", status=403)
+
+    ticket = get_object_or_404(
+        CommercialTicket.objects.select_related(
+            "entered_by", "flight", "flight__logsheet"
+        ),
+        pk=pk,
+    )
+    is_modal = request.headers.get("HX-Request") == "true"
+    template_name = (
+        "logsheet/commercial_ticket_detail_content.html"
+        if is_modal
+        else "logsheet/commercial_ticket_detail.html"
+    )
+    return render(
+        request,
+        template_name,
+        {
+            "ticket": ticket,
+            "is_modal": is_modal,
+        },
+    )
+
+
+@active_member_required
+def edit_commercial_ticket(request, pk):
+    config = SiteConfiguration.objects.first()
+    if not (config and config.commercial_rides_enabled):
+        messages.error(request, "Commercial rides are currently disabled.")
+        return redirect("logsheet:index")
+
+    if not _can_issue_commercial_ticket(request.user):
+        return render(request, "403.html", status=403)
+
+    ticket = get_object_or_404(CommercialTicket, pk=pk)
+    if ticket.status != CommercialTicket.Status.AVAILABLE:
+        return HttpResponseForbidden("Only available tickets can be edited.")
+
+    if request.method == "POST":
+        form = CommercialTicketEditForm(request.POST, instance=ticket)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request, f"Commercial ticket {ticket.ticket_number} updated."
+            )
+            return redirect("logsheet:commercial_ticket_register")
+    else:
+        form = CommercialTicketEditForm(instance=ticket)
+
+    return render(
+        request,
+        "logsheet/edit_commercial_ticket.html",
+        {
+            "form": form,
+            "ticket": ticket,
+        },
+    )
 
 
 def _sanitize_csv_cell(value):
@@ -123,6 +281,9 @@ def _csv_towplane_product_name(towplane):
 
 def _member_flight_charge_breakdown(flight, member):
     """Return (tow, rental, total) owed by `member` for a single flight."""
+    if flight.commercial_ride:
+        return Decimal("0.00"), Decimal("0.00"), Decimal("0.00")
+
     # Prefer locked-in actual values for finalized logsheets, but fall back to
     # calculated values when legacy rows have NULL actuals.
     if flight.logsheet.finalized and flight.tow_cost_actual is not None:
@@ -157,6 +318,7 @@ def _get_personal_charge_data(member, start_date):
     """Build per-flight and misc-charge rows for a member from start_date onward."""
     flights = (
         Flight.objects.filter(logsheet__log_date__gte=start_date)
+        .exclude(commercial_ride=True)
         .filter(Q(pilot=member) | Q(split_with=member))
         .select_related(
             "logsheet",
@@ -216,6 +378,58 @@ def _get_personal_charge_data(member, start_date):
     )
 
     return flight_rows, misc_charges
+
+
+def _link_commercial_ticket_to_flight(*, flight, ticket_number):
+    """Attach commercial ticket to flight, redeeming only once flight is launched."""
+    ticket = (
+        CommercialTicket.objects.select_for_update()
+        .filter(ticket_number=ticket_number)
+        .first()
+    )
+    if not ticket:
+        raise ValidationError("Ticket number does not exist.")
+
+    if ticket.status == CommercialTicket.Status.REFUNDED:
+        raise ValidationError("Refunded tickets cannot be used for flights.")
+
+    if ticket.flight_id not in {None, flight.pk}:
+        if ticket.status == CommercialTicket.Status.REDEEMED:
+            raise ValidationError("Ticket is already redeemed by a different flight.")
+        raise ValidationError(
+            "Ticket is already reserved by a different pending flight."
+        )
+
+    if ticket.status == CommercialTicket.Status.AVAILABLE:
+        if flight.launch_time is None:
+            if ticket.flight_id is None:
+                ticket.flight = flight
+                ticket.save()
+        else:
+            ticket.transition_to(CommercialTicket.Status.REDEEMED, flight=flight)
+
+    CommercialRide.objects.update_or_create(
+        flight=flight,
+        defaults={
+            "ticket": ticket,
+            "commercial_pilot": flight.pilot,
+            "revenue_amount": ticket.amount_paid,
+        },
+    )
+
+
+def _release_pending_ticket_assignment(*, ticket, flight):
+    """Release a pending ticket soft-lock from a flight when reassigned/removed."""
+    if not ticket:
+        return
+    if ticket.status != CommercialTicket.Status.AVAILABLE:
+        return
+    if flight.launch_time is not None:
+        return
+    if ticket.flight_id != flight.pk:
+        return
+    ticket.flight = None
+    ticket.save(update_fields=["flight"])
 
 
 def _tow_logbook_estimates(total_tows):
@@ -538,7 +752,9 @@ def export_logsheet_finances_csv(request, pk):
             "split_with",
             "glider",
             "towplane",
-        ).order_by("launch_time", "pk")
+        )
+        .exclude(commercial_ride=True)
+        .order_by("launch_time", "pk")
     )
 
     # Avoid per-flight SiteConfiguration lookups when legacy finalized flights
@@ -790,8 +1006,6 @@ def land_flight_now(request, flight_id):
 def launch_flight_now(request, flight_id):
     import json
 
-    from django.core.exceptions import ValidationError
-
     from .forms import validate_glider_availability
 
     try:
@@ -823,9 +1037,35 @@ def launch_flight_now(request, flight_id):
                 {"success": False, "error": get_validation_message(e)}, status=400
             )
 
-        flight.launch_time = launch_time
-        # Persist duration reset/compute together with launch_time updates.
-        flight.save(update_fields=["launch_time", "duration"])
+        try:
+            with transaction.atomic():
+                locked_flight = Flight.objects.select_for_update().get(pk=flight.pk)
+                if locked_flight.launch_time:
+                    return JsonResponse(
+                        {"success": False, "error": "Flight already launched."},
+                        status=400,
+                    )
+
+                locked_flight.launch_time = launch_time
+                # Persist duration reset/compute together with launch_time updates.
+                locked_flight.save(update_fields=["launch_time", "duration"])
+
+                if locked_flight.commercial_ride:
+                    try:
+                        existing_ride = locked_flight.commercial_ride_record
+                    except CommercialRide.DoesNotExist:
+                        existing_ride = None
+                    if existing_ride:
+                        _link_commercial_ticket_to_flight(
+                            flight=locked_flight,
+                            ticket_number=existing_ride.ticket.ticket_number,
+                        )
+        except ValidationError as e:
+            return JsonResponse(
+                {"success": False, "error": get_validation_message(e)},
+                status=400,
+            )
+
         return JsonResponse({"success": True})
     except Exception as e:
         logger.exception("Error launching flight %s", flight_id)
@@ -967,7 +1207,12 @@ def manage_logsheet(request, pk):
     # Base queryset for all flights in the logsheet
     all_flights = (
         Flight.objects.select_related(
-            "pilot", "instructor", "glider", "towplane", "tow_pilot"
+            "pilot",
+            "instructor",
+            "glider",
+            "towplane",
+            "tow_pilot",
+            "commercial_ride_record__ticket",
         )
         .filter(logsheet=logsheet)
         .order_by("-landing_time", "-launch_time")
@@ -1004,12 +1249,13 @@ def manage_logsheet(request, pk):
             split = flight.split_type
 
             # Ensure that the flight has a valid pilot
-            if partner and split == "full":
-                responsible_members.add(partner)
-            elif partner and split in ("even", "tow", "rental"):
-                responsible_members.update([pilot, partner])
-            elif pilot:
-                responsible_members.add(pilot)
+            if not flight.commercial_ride:
+                if partner and split == "full":
+                    responsible_members.add(partner)
+                elif partner and split in ("even", "tow", "rental"):
+                    responsible_members.update([pilot, partner])
+                elif pilot:
+                    responsible_members.add(pilot)
 
             # Validate required fields before finalization
             if flight.landing_time is None:
@@ -1254,6 +1500,9 @@ def manage_logsheet(request, pk):
     if config and config.visiting_pilot_enabled:
         config.visiting_pilot_daily_token = config.get_or_create_daily_token()
     context["visiting_pilot_config"] = config
+    context["commercial_rides_enabled"] = bool(
+        config and config.commercial_rides_enabled
+    )
 
     return render(request, "logsheet/logsheet_manage.html", context)
 
@@ -1337,6 +1586,8 @@ def list_logsheets(request):
 
     from .forms import CreateLogsheetForm
 
+    site_config = SiteConfiguration.objects.first()
+
     # If a log_date is provided in GET, use it to prepopulate from duty roster
     log_date = request.GET.get("log_date")
     form = None
@@ -1351,6 +1602,12 @@ def list_logsheets(request):
             form = CreateLogsheetForm()
     else:
         form = CreateLogsheetForm()
+    from members.utils.membership import is_active_member
+
+    has_active_member_access = bool(
+        request.user.is_authenticated and is_active_member(request.user)
+    )
+
     return render(
         request,
         "logsheet/logsheet_list.html",
@@ -1362,6 +1619,9 @@ def list_logsheets(request):
             "paginator": paginator,
             "available_years": available_years,
             "form": form,
+            "can_issue_commercial_ticket": has_active_member_access
+            and _can_issue_commercial_ticket(request.user)
+            and bool(site_config and site_config.commercial_rides_enabled),
         },
     )
 
@@ -1425,11 +1685,88 @@ def edit_flight(request, logsheet_pk, flight_pk):
     club_gliders = [g for g in gliders_sorted if g.club_owned and g.is_active]
     club_private = [g for g in gliders_sorted if not g.club_owned and g.is_active]
     inactive_gliders = [g for g in gliders_sorted if not g.is_active]
+    config = SiteConfiguration.objects.first()
+    commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
     if request.method == "POST":
         form = FlightForm(request.POST, instance=flight, logsheet=logsheet)
         if form.is_valid():
-            form.save()
+            ticket_link_error = None
+            with transaction.atomic():
+                try:
+                    existing_ride = flight.commercial_ride_record
+                except CommercialRide.DoesNotExist:
+                    existing_ride = None
+                previous_ticket = existing_ride.ticket if existing_ride else None
+
+                flight = form.save(commit=False)
+                flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
+                if flight.commercial_ride:
+                    flight.passenger = None
+                    flight.passenger_name = ""
+                flight.save()
+
+                if flight.commercial_ride:
+                    ticket_number = form.cleaned_data.get("ticket_number")
+                    try:
+                        _link_commercial_ticket_to_flight(
+                            flight=flight,
+                            ticket_number=ticket_number,
+                        )
+                    except ValidationError as exc:
+                        ticket_link_error = get_validation_message(exc)
+                        transaction.set_rollback(True)
+                    else:
+                        if previous_ticket:
+                            try:
+                                updated_ride = flight.commercial_ride_record
+                            except CommercialRide.DoesNotExist:
+                                updated_ride = None
+                            if (
+                                updated_ride
+                                and updated_ride.ticket_id != previous_ticket.pk
+                            ):
+                                _release_pending_ticket_assignment(
+                                    ticket=previous_ticket,
+                                    flight=flight,
+                                )
+                elif existing_ride and flight.launch_time is None:
+                    _release_pending_ticket_assignment(
+                        ticket=previous_ticket,
+                        flight=flight,
+                    )
+                    existing_ride.delete()
+            if ticket_link_error:
+                form.add_error("ticket_number", ticket_link_error)
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return render(
+                        request,
+                        "logsheet/edit_flight_form.html",
+                        {
+                            "form": form,
+                            "flight": flight,
+                            "logsheet": logsheet,
+                            "club_gliders": club_gliders,
+                            "club_private": club_private,
+                            "inactive_gliders": inactive_gliders,
+                            "commercial_rides_enabled": commercial_rides_enabled,
+                        },
+                        status=400,
+                    )
+                return render(
+                    request,
+                    "logsheet/edit_flight_form.html",
+                    {
+                        "form": form,
+                        "flight": flight,
+                        "logsheet": logsheet,
+                        "club_gliders": club_gliders,
+                        "club_private": club_private,
+                        "inactive_gliders": inactive_gliders,
+                        "commercial_rides_enabled": commercial_rides_enabled,
+                    },
+                    status=400,
+                )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"success": True})
             messages.success(request, "Flight updated.")
@@ -1446,6 +1783,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
                     "club_gliders": club_gliders,
                     "club_private": club_private,
                     "inactive_gliders": inactive_gliders,
+                    "commercial_rides_enabled": commercial_rides_enabled,
                 },
                 status=400,
             )
@@ -1462,6 +1800,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
             "club_gliders": club_gliders,
             "club_private": club_private,
             "inactive_gliders": inactive_gliders,
+            "commercial_rides_enabled": commercial_rides_enabled,
         },
     )
 
@@ -1514,13 +1853,63 @@ def add_flight(request, logsheet_pk):
     club_gliders = [g for g in gliders_sorted if g.club_owned and g.is_active]
     club_private = [g for g in gliders_sorted if not g.club_owned and g.is_active]
     inactive_gliders = [g for g in gliders_sorted if not g.is_active]
+    config = SiteConfiguration.objects.first()
+    commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
     if request.method == "POST":
         form = FlightForm(request.POST, logsheet=logsheet)
         if form.is_valid():
-            flight = form.save(commit=False)
-            flight.logsheet = logsheet
-            flight.save()
+            ticket_link_error = None
+            with transaction.atomic():
+                flight = form.save(commit=False)
+                flight.logsheet = logsheet
+                flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
+                if flight.commercial_ride:
+                    flight.passenger = None
+                    flight.passenger_name = ""
+                flight.save()
+
+                if flight.commercial_ride:
+                    ticket_number = form.cleaned_data.get("ticket_number")
+                    try:
+                        _link_commercial_ticket_to_flight(
+                            flight=flight,
+                            ticket_number=ticket_number,
+                        )
+                    except ValidationError as exc:
+                        ticket_link_error = get_validation_message(exc)
+                        transaction.set_rollback(True)
+            if ticket_link_error:
+                form.add_error("ticket_number", ticket_link_error)
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return render(
+                        request,
+                        "logsheet/edit_flight_form.html",
+                        {
+                            "form": form,
+                            "logsheet": logsheet,
+                            "mode": "add",
+                            "club_gliders": club_gliders,
+                            "club_private": club_private,
+                            "inactive_gliders": inactive_gliders,
+                            "commercial_rides_enabled": commercial_rides_enabled,
+                        },
+                        status=400,
+                    )
+                return render(
+                    request,
+                    "logsheet/edit_flight_form.html",
+                    {
+                        "form": form,
+                        "logsheet": logsheet,
+                        "mode": "add",
+                        "club_gliders": club_gliders,
+                        "club_private": club_private,
+                        "inactive_gliders": inactive_gliders,
+                        "commercial_rides_enabled": commercial_rides_enabled,
+                    },
+                    status=400,
+                )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"success": True})
             return redirect("logsheet:manage", pk=logsheet.pk)
@@ -1536,6 +1925,7 @@ def add_flight(request, logsheet_pk):
                     "club_gliders": club_gliders,
                     "club_private": club_private,
                     "inactive_gliders": inactive_gliders,
+                    "commercial_rides_enabled": commercial_rides_enabled,
                 },
                 status=400,
             )
@@ -1545,7 +1935,7 @@ def add_flight(request, logsheet_pk):
             initial["tow_pilot"] = logsheet.tow_pilot_id
         if logsheet.default_towplane_id:
             initial["towplane"] = logsheet.default_towplane_id
-        form = FlightForm(initial=initial)
+        form = FlightForm(initial=initial, logsheet=logsheet)
 
     return render(
         request,
@@ -1557,6 +1947,7 @@ def add_flight(request, logsheet_pk):
             "club_gliders": club_gliders,
             "club_private": club_private,
             "inactive_gliders": inactive_gliders,
+            "commercial_rides_enabled": commercial_rides_enabled,
         },
     )
 
@@ -1734,7 +2125,7 @@ def manage_logsheet_finances(request, pk):
     # OPTIMIZATION: Use select_related to avoid N+1 queries for pilot, glider, towplane
     flights = logsheet.flights.select_related(
         "pilot", "instructor", "glider", "towplane", "split_with"
-    ).all()
+    ).exclude(commercial_ride=True)
 
     # Get towplane rental costs for this logsheet
     # OPTIMIZATION: Already optimized with select_related
@@ -1902,6 +2293,8 @@ def manage_logsheet_finances(request, pk):
             responsible_members = set()
 
             for flight in flights:
+                if flight.commercial_ride:
+                    continue
                 pilot = flight.pilot
                 partner = flight.split_with
                 split = flight.split_type

@@ -20,6 +20,7 @@ from .models import (
     InstructionSlot,
     MemberBlackout,
 )
+from .utils.roles import member_has_role
 
 # Maps member role attributes to their corresponding form field names
 DUTY_ROLE_FIELDS = [
@@ -27,6 +28,7 @@ DUTY_ROLE_FIELDS = [
     ("duty_officer", "duty_officer_percent"),
     ("assistant_duty_officer", "ado_percent"),
     ("towpilot", "towpilot_percent"),
+    ("commercial_pilot", "commercial_pilot_percent"),
 ]
 
 
@@ -95,6 +97,7 @@ class DutyPreferenceForm(forms.ModelForm):
             "duty_officer_percent",
             "ado_percent",
             "towpilot_percent",
+            "commercial_pilot_percent",
             "max_assignments_per_month",
             "allow_weekend_double",
         ]
@@ -102,12 +105,17 @@ class DutyPreferenceForm(forms.ModelForm):
             "suspended_reason": forms.TextInput(attrs={"placeholder": "Optional"}),
         }
 
+    @staticmethod
+    def _member_has_role(member, role_attr):
+        return member_has_role(member, role_attr)
+
     def _count_member_roles(self, member):
         """Count how many duty roles the member has."""
         if not member:
             return 0
         return sum(
-            getattr(member, role_attr, False) for role_attr, _ in DUTY_ROLE_FIELDS
+            self._member_has_role(member, role_attr)
+            for role_attr, _ in DUTY_ROLE_FIELDS
         )
 
     def _get_single_role_field(self, member):
@@ -116,7 +124,7 @@ class DutyPreferenceForm(forms.ModelForm):
             return None
 
         for role_attr, field_name in DUTY_ROLE_FIELDS:
-            if getattr(member, role_attr, False):
+            if self._member_has_role(member, role_attr):
                 return field_name
 
         return None
@@ -142,7 +150,7 @@ class DutyPreferenceForm(forms.ModelForm):
 
             # If member has only one role, default it to 100%
             for role_attr, field_name in DUTY_ROLE_FIELDS:
-                has_role = getattr(member, role_attr, False)
+                has_role = self._member_has_role(member, role_attr)
                 if not has_role:
                     self.fields[field_name].required = False
                     self.fields[field_name].initial = 0
@@ -175,6 +183,7 @@ class DutyPreferenceForm(forms.ModelForm):
             + (cleaned_data.get("duty_officer_percent") or 0)
             + (cleaned_data.get("ado_percent") or 0)
             + (cleaned_data.get("towpilot_percent") or 0)
+            + (cleaned_data.get("commercial_pilot_percent") or 0)
         )
         # Accept 99-100% to handle rounding (e.g., 33% + 66% = 99%)
         if total != 0 and not (99 <= total <= 100):
@@ -195,6 +204,7 @@ class DutyAssignmentForm(forms.ModelForm):
             "surge_instructor",
             "tow_pilot",
             "surge_tow_pilot",
+            "commercial_pilot",
             "duty_officer",
             "assistant_duty_officer",
         ]
@@ -216,6 +226,9 @@ class DutyAssignmentForm(forms.ModelForm):
         ).order_by("last_name", "first_name")
         self.fields["surge_tow_pilot"].queryset = active_members.filter(
             towpilot=True
+        ).order_by("last_name", "first_name")
+        self.fields["commercial_pilot"].queryset = active_members.filter(
+            glider_rating="commercial"
         ).order_by("last_name", "first_name")
         self.fields["duty_officer"].queryset = active_members.filter(
             duty_officer=True

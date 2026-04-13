@@ -16,6 +16,7 @@ from duty_roster.models import (
     MemberBlackout,
 )
 from duty_roster.operational_calendar import get_operational_weekend
+from duty_roster.utils.roles import member_has_role
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -29,6 +30,18 @@ DUTY_ROLE_TO_ASSIGNMENT_FIELD = {
 DEFAULT_MAX_ASSIGNMENTS = 8
 DEFAULT_MAX_ASSIGNMENTS_CACHE_KEY = "duty_default_max_assignments_per_month"
 DEFAULT_MAX_ASSIGNMENTS_CACHE_TTL_SECONDS = 300
+
+PERCENT_FIELDS = {
+    "instructor": "instructor_percent",
+    "duty_officer": "duty_officer_percent",
+    "assistant_duty_officer": "ado_percent",
+    "towpilot": "towpilot_percent",
+    "commercial_pilot": "commercial_pilot_percent",
+}
+
+
+def _member_has_role(member: Member, role: str) -> bool:
+    return member_has_role(member, role)
 
 
 # Cache for operational season boundaries
@@ -258,7 +271,7 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
         }
 
     # Count total members with this role
-    total_with_role = sum(1 for m in members if getattr(m, role, False))
+    total_with_role = sum(1 for m in members if _member_has_role(m, role))
 
     # Count available members for each day
     availability_by_day = []
@@ -266,7 +279,7 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
         available_count = 0
         for m in members:
             # Check if member has the role flag
-            if not getattr(m, role, False):
+            if not _member_has_role(m, role):
                 continue
 
             # Check DutyPreference constraints
@@ -284,16 +297,11 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
             # Check role-specific percentage (skip if 0)
             # Only check percentages if member has DutyPreference
             if p:
-                percent_fields = {
-                    "instructor": "instructor_percent",
-                    "duty_officer": "duty_officer_percent",
-                    "assistant_duty_officer": "ado_percent",
-                    "towpilot": "towpilot_percent",
-                }
-
                 # Get all eligible role fields for this member
                 eligible_role_fields = [
-                    field for r, field in percent_fields.items() if getattr(m, r, False)
+                    field
+                    for r, field in PERCENT_FIELDS.items()
+                    if _member_has_role(m, r)
                 ]
 
                 # Determine if percentage is blocking
@@ -306,10 +314,11 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
                 else:
                     # Multiple roles - check if all are zero
                     all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-                    if role == "assistant_duty_officer":
-                        pct = p.ado_percent if not all_zero else 100
-                    else:
-                        pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+                    pct = (
+                        getattr(p, PERCENT_FIELDS.get(role, f"{role}_percent"), 0)
+                        if not all_zero
+                        else 100
+                    )
 
                 if pct == 0:
                     continue  # Skip if percentage explicitly set to 0
@@ -386,7 +395,7 @@ def diagnose_empty_slot(
 
     for m in members:
         # Check if member has the role flag
-        has_role = getattr(m, role, False)
+        has_role = _member_has_role(m, role)
         if not has_role:
             continue
 
@@ -472,14 +481,8 @@ def diagnose_empty_slot(
             continue
 
         # Check percentage
-        percent_fields = [
-            ("instructor", "instructor_percent"),
-            ("duty_officer", "duty_officer_percent"),
-            ("assistant_duty_officer", "ado_percent"),
-            ("towpilot", "towpilot_percent"),
-        ]
         eligible_role_fields = [
-            field for r, field in percent_fields if getattr(m, r, False)
+            field for r, field in PERCENT_FIELDS.items() if _member_has_role(m, r)
         ]
 
         if len(eligible_role_fields) == 1:
@@ -489,10 +492,11 @@ def diagnose_empty_slot(
                 pct = 100  # Single role, treat 0 as 100
         else:
             all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-            if role == "assistant_duty_officer":
-                pct = p.ado_percent if not all_zero else 100
-            else:
-                pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+            pct = (
+                getattr(p, PERCENT_FIELDS.get(role, f"{role}_percent"), 0)
+                if not all_zero
+                else 100
+            )
 
         if pct == 0:
             reasons["percent_zero"].append(m.full_display_name)
@@ -649,7 +653,7 @@ def _generate_roster_legacy(
             if m in assigned:
                 logger.debug(f"{m.full_display_name}: Already assigned today.")
                 return False
-            flag = getattr(m, role, False)
+            flag = _member_has_role(m, role)
             if not flag:
                 logger.debug(
                     f"{m.full_display_name}: Not eligible for role {role} (flag is False)."
@@ -682,15 +686,9 @@ def _generate_roster_legacy(
         if m in assigned:
             logger.debug(f"{m.full_display_name}: Already assigned today.")
             return False
-        flag = getattr(m, role, False)
-        percent_fields = [
-            ("instructor", "instructor_percent"),
-            ("duty_officer", "duty_officer_percent"),
-            ("assistant_duty_officer", "ado_percent"),
-            ("towpilot", "towpilot_percent"),
-        ]
+        flag = _member_has_role(m, role)
         eligible_role_fields = [
-            field for r, field in percent_fields if getattr(m, r, False)
+            field for r, field in PERCENT_FIELDS.items() if _member_has_role(m, r)
         ]
         if len(eligible_role_fields) == 1:
             field = eligible_role_fields[0]
@@ -702,10 +700,11 @@ def _generate_roster_legacy(
                 pct = 100
         else:
             all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-            if role == "assistant_duty_officer":
-                pct = p.ado_percent if not all_zero else 100
-            else:
-                pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+            pct = (
+                getattr(p, PERCENT_FIELDS.get(role, f"{role}_percent"), 0)
+                if not all_zero
+                else 100
+            )
             if all_zero:
                 logger.debug(
                     f"{m.full_display_name}: All eligible role percents are zero, treating {role} as 100%."
@@ -733,14 +732,8 @@ def _generate_roster_legacy(
         weights = []
         for m in cands:
             p = prefs.get(m.id)
-            percent_fields = [
-                ("instructor", "instructor_percent"),
-                ("duty_officer", "duty_officer_percent"),
-                ("assistant_duty_officer", "ado_percent"),
-                ("towpilot", "towpilot_percent"),
-            ]
             eligible_role_fields = [
-                field for r, field in percent_fields if getattr(m, r, False)
+                field for r, field in PERCENT_FIELDS.items() if _member_has_role(m, r)
             ]
             if not p:
                 # Member has no preference - treat as 100% available
@@ -752,10 +745,11 @@ def _generate_roster_legacy(
                     base = 100
             else:
                 all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-                if role == "assistant_duty_officer":
-                    base = getattr(p, "ado_percent", 0) if not all_zero else 100
-                else:
-                    base = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+                base = (
+                    getattr(p, PERCENT_FIELDS.get(role, f"{role}_percent"), 0)
+                    if not all_zero
+                    else 100
+                )
             w = base
             for o in assigned:
                 if o.id in pairings.get(m.id, set()) or m.id in pairings.get(

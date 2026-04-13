@@ -3,8 +3,10 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import IntegrityError, models
+from django.db.models.functions import Length
 from django.utils import timezone
 from tinymce.models import HTMLField
 
@@ -140,6 +142,10 @@ class Flight(models.Model):
     airfield = models.ForeignKey("Airfield", on_delete=models.PROTECT, null=True)
 
     flight_type = models.CharField(max_length=50)  # dual, solo, intro, etc.
+    commercial_ride = models.BooleanField(
+        default=False,
+        help_text="Marks this flight as a commercial ride tracked by ticket.",
+    )
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -421,6 +427,303 @@ class Flight(models.Model):
 
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"
+
+
+class CommercialTicket(models.Model):
+    class Status(models.TextChoices):
+        AVAILABLE = "available", "Available"
+        REDEEMED = "redeemed", "Redeemed"
+        REFUNDED = "refunded", "Refunded"
+
+    class RideType(models.TextChoices):
+        STANDARD = "standard", "Standard"
+        EXTENDED = "extended", "Extended"
+
+    ticket_number = models.CharField(max_length=50, unique=True, db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.AVAILABLE,
+        db_index=True,
+    )
+    ride_type = models.CharField(
+        max_length=20,
+        choices=RideType.choices,
+        default=RideType.STANDARD,
+    )
+    amount_paid = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    gift_certificate_number = models.CharField(max_length=100, blank=True)
+    gift_certificate_expires_on = models.DateField(null=True, blank=True)
+    remarks = models.TextField(blank=True)
+    flight = models.OneToOneField(
+        "Flight",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="commercial_ticket",
+    )
+    entered_by = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="commercial_tickets_entered",
+    )
+    entered_at = models.DateTimeField(auto_now_add=True)
+    redeemed_at = models.DateTimeField(null=True, blank=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-entered_at"]
+        indexes = [
+            models.Index(fields=["status", "entered_at"]),
+        ]
+
+    @classmethod
+    def _next_ticket_sequence(cls, prefix="T-", pad=6):
+        """Return next numeric sequence for ticket numbers matching prefix.
+
+        Fast path uses DB ordering over fixed-width ticket numbers (for example,
+        ``T-000123``) so issuance does not scan the full table each time.
+        Falls back to a one-time legacy scan when older variable-width numbers
+        are present.
+        """
+        prefixed = cls.objects.filter(ticket_number__startswith=prefix)
+
+        standard_length = len(prefix) + pad
+        latest_standard = (
+            prefixed.annotate(ticket_len=Length("ticket_number"))
+            .filter(ticket_len=standard_length)
+            .order_by("-ticket_number")
+            .values_list("ticket_number", flat=True)
+            .first()
+        )
+        if latest_standard:
+            return int(latest_standard[len(prefix) :]) + 1
+
+        max_value = 0
+        for ticket_number in prefixed.values_list("ticket_number", flat=True):
+            suffix = ticket_number[len(prefix) :]
+            if suffix.isdigit():
+                max_value = max(max_value, int(suffix))
+        return max_value + 1
+
+    @classmethod
+    def issue_next_available(
+        cls,
+        *,
+        entered_by=None,
+        ride_type=RideType.STANDARD,
+        amount_paid=None,
+        gift_certificate_number="",
+        gift_certificate_expires_on=None,
+        remarks="",
+        prefix="T-",
+        pad=6,
+        max_attempts=25,
+    ):
+        """Create an AVAILABLE ticket with a unique sequential ticket number."""
+        base_seq = cls._next_ticket_sequence(prefix=prefix, pad=pad)
+
+        for attempt in range(max_attempts):
+            ticket_number = f"{prefix}{base_seq + attempt:0{pad}d}"
+            try:
+                return cls.objects.create(
+                    ticket_number=ticket_number,
+                    entered_by=entered_by,
+                    ride_type=ride_type,
+                    amount_paid=amount_paid,
+                    gift_certificate_number=gift_certificate_number,
+                    gift_certificate_expires_on=gift_certificate_expires_on,
+                    remarks=remarks,
+                )
+            except IntegrityError:
+                continue
+            except ValidationError as exc:
+                ticket_number_errors = []
+                if hasattr(exc, "message_dict"):
+                    ticket_number_errors = exc.message_dict.get("ticket_number", [])
+
+                if ticket_number_errors and any(
+                    "unique" in str(error).lower()
+                    or "already exists" in str(error).lower()
+                    for error in ticket_number_errors
+                ):
+                    continue
+                raise
+
+        raise ValidationError(
+            "Could not allocate a unique commercial ticket number. Please try again."
+        )
+
+    def clean(self):
+        if self.status == self.Status.REDEEMED and not self.flight:
+            raise ValidationError(
+                {"flight": "Redeemed tickets must be linked to a flight."}
+            )
+
+        if self.status == self.Status.REFUNDED and self.flight:
+            raise ValidationError(
+                {"flight": "Refunded tickets cannot be linked to a flight."}
+            )
+
+        if self.status == self.Status.AVAILABLE and self.flight:
+            # Pending flights may soft-lock an available ticket before launch.
+            if self.flight.launch_time is not None:
+                raise ValidationError(
+                    {
+                        "flight": (
+                            "Available tickets can only be linked to pending flights. "
+                            "Launched flights must use redeemed tickets."
+                        )
+                    }
+                )
+
+    def transition_to(self, new_status, *, flight=None, allow_admin_override=False):
+        current = str(self.status)
+        new_status_value = str(new_status)
+
+        if not allow_admin_override:
+            allowed: dict[str, set[str]] = {
+                self.Status.AVAILABLE.value: {
+                    self.Status.REDEEMED.value,
+                    self.Status.REFUNDED.value,
+                },
+                self.Status.REDEEMED.value: set(),
+                self.Status.REFUNDED.value: set(),
+            }
+            if new_status_value not in allowed.get(current, set()):
+                raise ValidationError(
+                    f"Invalid ticket transition: {current} -> {new_status_value}."
+                )
+
+        self.status = new_status_value
+        self.flight = flight
+        self.save()
+
+    def save(self, *args, **kwargs):
+        now = timezone.now()
+
+        if self.status == self.Status.REDEEMED:
+            self.redeemed_at = self.redeemed_at or now
+            self.refunded_at = None
+        elif self.status == self.Status.REFUNDED:
+            self.refunded_at = self.refunded_at or now
+            self.redeemed_at = None
+        else:
+            self.redeemed_at = None
+            self.refunded_at = None
+
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Ticket {self.ticket_number} ({self.status})"
+
+
+class CommercialPassenger(models.Model):
+    ticket = models.OneToOneField(
+        CommercialTicket,
+        on_delete=models.CASCADE,
+        related_name="passenger",
+    )
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    waiver_signed = models.BooleanField(default=False)
+
+    def __str__(self):
+        full_name = f"{self.first_name} {self.last_name}".strip()
+        return full_name or f"Passenger for {self.ticket.ticket_number}"
+
+
+class CommercialRide(models.Model):
+    flight = models.OneToOneField(
+        Flight,
+        on_delete=models.CASCADE,
+        related_name="commercial_ride_record",
+    )
+    ticket = models.OneToOneField(
+        CommercialTicket,
+        on_delete=models.PROTECT,
+        related_name="ride_record",
+    )
+    commercial_pilot = models.ForeignKey(
+        Member,
+        on_delete=models.PROTECT,
+        related_name="commercial_rides_as_pilot",
+    )
+    revenue_amount = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def clean(self):
+        if self.ticket.status == CommercialTicket.Status.REFUNDED:
+            raise ValidationError(
+                {"ticket": "Commercial ride ticket cannot be refunded."}
+            )
+
+        if self.ticket.status == CommercialTicket.Status.AVAILABLE:
+            if self.flight.launch_time is not None:
+                raise ValidationError(
+                    {
+                        "ticket": (
+                            "Launched commercial flights must use redeemed tickets."
+                        )
+                    }
+                )
+            if self.ticket.flight_id not in {None, self.flight_id}:
+                raise ValidationError(
+                    {"ticket": "Ticket is already linked to a different flight."}
+                )
+
+        if (
+            self.ticket.status == CommercialTicket.Status.REDEEMED
+            and self.ticket.flight_id
+            not in {
+                None,
+                self.flight_id,
+            }
+        ):
+            raise ValidationError(
+                {"ticket": "Ticket is already linked to a different flight."}
+            )
+
+        if self.ticket.flight_id and self.ticket.flight_id != self.flight_id:
+            raise ValidationError(
+                {"ticket": "Ticket is already linked to a different flight."}
+            )
+
+    def save(self, *args, **kwargs):
+        if self.ticket.status == CommercialTicket.Status.AVAILABLE:
+            if self.flight.launch_time is None:
+                if self.ticket.flight_id != self.flight_id:
+                    self.ticket.flight = self.flight
+                    self.ticket.save()
+            else:
+                self.ticket.transition_to(
+                    CommercialTicket.Status.REDEEMED,
+                    flight=self.flight,
+                    allow_admin_override=True,
+                )
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Commercial ride {self.ticket.ticket_number} ({self.flight_id})"
 
 
 ####################################################

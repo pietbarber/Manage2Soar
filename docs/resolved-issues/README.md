@@ -8,6 +8,23 @@ Each document provides detailed technical analysis, implementation details, test
 
 ## Resolved Issues
 
+### [Issue #808 - Commercial Rides Workflow (Phase 1, PR #860)](issue-808-commercial-rides-phase1-pr860.md)
+**Status**: Implemented on branch, in PR review ✅ | **Date**: April 2026 | **Branch**: `feature/issue-808-commercial-rides-phase1` | **PR**: #860
+
+Comprehensive end-to-end commercial rides delivery covering ticket lifecycle, pending-flight reservation behavior, launch-time redemption, register/detail/edit management surfaces, offline queue payload completion, reconnect conflict UX, and row-level operator guidance.
+
+**Key Achievements**:
+- ✅ Implemented pending-flight ticket soft-lock and launch-time redemption behavior
+- ✅ Added commercial ticket detail/edit views and improved register/issue UX
+- ✅ Completed offline commercial fields and reconnect mapping (`commercial_ride`, `ticket_number`)
+- ✅ Added ticket-aware reconnect conflict classification, summaries, and row-level inline messaging
+- ✅ Incorporated substantial mid-PR customer feedback with direct implementation updates
+- ✅ Expanded targeted tests for ticketing, forms, and commercial flight workflows
+
+**Technologies**: Django models/forms/views, Bootstrap templates, offline sync JavaScript, pytest
+
+---
+
 ### [Dual-Role Balance Weighting (Duty Roster)](issue-dual-role-balance-weighting.md)
 **Status**: Complete ✅ | **Date**: April 9, 2026 | **Branch**: `feature/fix-dual-role-balance-weighting`
 

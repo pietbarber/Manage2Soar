@@ -2,6 +2,7 @@ import pytest
 from django.urls import reverse
 
 from cms.models import HomePageContent, Page
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -154,3 +155,96 @@ def test_safety_officer_links_are_in_resources_not_top_level_safety(
     assert b"Safety Dashboard" in response.content
     assert b"Suggestion Box Reports" in response.content
     assert b'id="safetyDropdown"' not in response.content
+
+
+@pytest.mark.django_db
+def test_logsheet_drawer_shows_commercial_ticket_link_for_duty_officer_when_enabled(
+    client, django_user_model
+):
+    HomePageContent.objects.create(title="Home", slug="home", content="<p>Public</p>")
+    HomePageContent.objects.create(
+        title="Member Home",
+        slug="member-home",
+        audience="member",
+        content="<p>Member</p>",
+    )
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="donav",
+        password="testpass123",
+        membership_status="Full Member",
+        duty_officer=True,
+    )
+
+    client.login(username="donav", password="testpass123")
+    response = client.get(reverse("home"))
+
+    assert response.status_code == 200
+    assert b"Commercial Ticket Register" in response.content
+    assert b"Issue Commercial Ticket" in response.content
+
+
+@pytest.mark.django_db
+def test_logsheet_drawer_hides_commercial_ticket_link_when_feature_disabled(
+    client, django_user_model
+):
+    HomePageContent.objects.create(title="Home", slug="home", content="<p>Public</p>")
+    HomePageContent.objects.create(
+        title="Member Home",
+        slug="member-home",
+        audience="member",
+        content="<p>Member</p>",
+    )
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=False,
+    )
+    user = django_user_model.objects.create_user(
+        username="treasnav",
+        password="testpass123",
+        membership_status="Full Member",
+        treasurer=True,
+    )
+
+    client.login(username="treasnav", password="testpass123")
+    response = client.get(reverse("home"))
+
+    assert response.status_code == 200
+    assert b"Issue Commercial Ticket" not in response.content
+
+
+@pytest.mark.django_db
+def test_logsheet_drawer_hides_commercial_ticket_link_without_required_role(
+    client, django_user_model
+):
+    HomePageContent.objects.create(title="Home", slug="home", content="<p>Public</p>")
+    HomePageContent.objects.create(
+        title="Member Home",
+        slug="member-home",
+        audience="member",
+        content="<p>Member</p>",
+    )
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+    user = django_user_model.objects.create_user(
+        username="normalnav",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+
+    client.login(username="normalnav", password="testpass123")
+    response = client.get(reverse("home"))
+
+    assert response.status_code == 200
+    assert b"Issue Commercial Ticket" not in response.content

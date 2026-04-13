@@ -288,6 +288,48 @@
       </p>
 
       <div class="row g-3">
+        {% if commercial_rides_enabled %}
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input type="checkbox"
+                   name="commercial_ride"
+                   id="id_commercial_ride"
+                   class="form-check-input"
+                   {% if form.commercial_ride.value %}checked{% endif %}>
+            <label for="id_commercial_ride" class="form-check-label">
+              <i class="bi bi-cash-coin me-1"></i>Commercial Ride
+            </label>
+          </div>
+          {% if form.commercial_ride.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.commercial_ride.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-6" id="ticket-number-group">
+          <label for="id_available_ticket" class="form-label fw-semibold">
+            <i class="bi bi-ticket-perforated me-1"></i>Ticket Number
+          </label>
+          <div class="mb-2">
+            {{ form.available_ticket }}
+          </div>
+             <div class="form-text mb-2">Select an available ticket or enter manually below.</div>
+             <div class="form-text mb-2">Pending commercial flights can be reassigned or converted back before launch by editing this form.</div>
+          <input type="text"
+                 name="ticket_number"
+                 id="id_ticket_number"
+                 class="form-control{% if form.ticket_number.errors %} is-invalid{% endif %}"
+                 value="{{ form.ticket_number.value|default_if_none:'' }}"
+                 placeholder="Manual fallback ticket number">
+          {% if form.ticket_number.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.ticket_number.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
         <!-- Is Retrieve -->
         <div class="col-md-4">
           <div class="form-check">
@@ -349,6 +391,64 @@
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
   </div>
 </form>
+
+<script>
+  (function () {
+    const commercialToggle = document.getElementById('id_commercial_ride');
+    const ticketGroup = document.getElementById('ticket-number-group');
+    const ticketInput = document.getElementById('id_ticket_number');
+    const ticketSelect = document.getElementById('id_available_ticket');
+    const passengerMemberInput = document.getElementById('{{ form.passenger.id_for_label }}');
+    const passengerNameInput = document.getElementById('{{ form.passenger_name.id_for_label }}');
+    const passengerMemberGroup = document.querySelector('label[for="{{ form.passenger.id_for_label }}"]')?.closest('.col-md-6');
+    const passengerNameGroup = document.querySelector('label[for="{{ form.passenger_name.id_for_label }}"]')?.closest('.col-md-6');
+
+    if (!commercialToggle || !ticketGroup || !ticketInput || !ticketSelect) {
+      return;
+    }
+
+    const setPassengerFieldState = (input, group, shouldHide) => {
+      if (group) {
+        group.style.display = shouldHide ? 'none' : '';
+      }
+      if (input) {
+        if (shouldHide) {
+          if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+          } else {
+            input.value = '';
+          }
+        }
+        input.disabled = shouldHide;
+      }
+    };
+
+    const syncTicketValidation = () => {
+      const isCommercial = commercialToggle.checked;
+      const hasSelectedTicket = ticketSelect.value !== '';
+      ticketInput.required = isCommercial && !hasSelectedTicket;
+    };
+
+    const syncCommercialUi = () => {
+      const isCommercial = commercialToggle.checked;
+      ticketGroup.style.display = isCommercial ? '' : 'none';
+      ticketInput.disabled = !isCommercial;
+      ticketSelect.disabled = !isCommercial;
+      if (!isCommercial) {
+        ticketInput.value = '';
+        ticketSelect.selectedIndex = 0;
+      }
+      syncTicketValidation();
+      setPassengerFieldState(passengerMemberInput, passengerMemberGroup, isCommercial);
+      setPassengerFieldState(passengerNameInput, passengerNameGroup, isCommercial);
+    };
+
+    syncCommercialUi();
+    commercialToggle.addEventListener('change', syncCommercialUi);
+    ticketSelect.addEventListener('change', syncTicketValidation);
+    ticketInput.addEventListener('input', syncTicketValidation);
+  })();
+</script>
 
 
 

@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 
 from django import forms
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.db.models import Case, IntegerField, Q, When
 from django.forms import modelformset_factory
@@ -15,6 +15,7 @@ from siteconfig.models import SiteConfiguration
 
 from .models import (
     Airfield,
+    CommercialTicket,
     Flight,
     Logsheet,
     LogsheetCloseout,
@@ -119,6 +120,14 @@ def get_active_members():
 # - Filters active members for "split_with", ordered by last name.
 # Additionally, if the form is for a new instance, the "launch_time" field is pre-filled with the current local time.
 class FlightForm(forms.ModelForm):
+    commercial_ride = forms.BooleanField(required=False)
+    available_ticket = forms.ChoiceField(
+        required=False,
+        choices=[("", "Select available ticket")],
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    ticket_number = forms.CharField(max_length=50, required=False)
+
     def clean(self):
         cleaned_data = super().clean()
         glider = cleaned_data.get("glider")
@@ -138,6 +147,7 @@ class FlightForm(forms.ModelForm):
         pilot = cleaned_data.get("pilot")
         instructor = cleaned_data.get("instructor")
         passenger = cleaned_data.get("passenger")
+        tow_pilot = cleaned_data.get("tow_pilot")
 
         if pilot and instructor and pilot == instructor:
             raise forms.ValidationError(
@@ -154,6 +164,11 @@ class FlightForm(forms.ModelForm):
                 "The same member cannot be both instructor and passenger on the same flight."
             )
 
+        if pilot and tow_pilot and pilot == tow_pilot:
+            raise forms.ValidationError(
+                "The same member cannot be both pilot and tow pilot on the same flight."
+            )
+
         # Validate glider availability using the utility function
         # Set the logsheet on the instance for the validation function
         if self.instance and not getattr(self.instance, "logsheet", None) and logsheet:
@@ -161,7 +176,6 @@ class FlightForm(forms.ModelForm):
         validate_glider_availability(self.instance, glider, launch_time, landing_time)
 
         # Business Rule: Check if tow pilot is scheduled for this day (Issue #110)
-        tow_pilot = cleaned_data.get("tow_pilot")
         if tow_pilot and logsheet:
             scheduled_tow_pilots = []
             if logsheet.tow_pilot:
@@ -184,11 +198,130 @@ class FlightForm(forms.ModelForm):
                     f"but please verify this is correct."
                 )
 
+        commercial_ride = cleaned_data.get("commercial_ride")
+        ticket_number = (cleaned_data.get("ticket_number") or "").strip()
+        selected_ticket_number = (cleaned_data.get("available_ticket") or "").strip()
+
+        if (
+            selected_ticket_number
+            and ticket_number
+            and selected_ticket_number != ticket_number
+        ):
+            self.add_error(
+                "ticket_number",
+                "Choose either the available ticket dropdown or manual ticket number, not both.",
+            )
+
+        resolved_ticket_number = selected_ticket_number or ticket_number
+        cleaned_data["ticket_number"] = resolved_ticket_number
+
+        if commercial_ride:
+            config = getattr(self, "site_config", None)
+            if not config or not config.commercial_rides_enabled:
+                self.add_error(
+                    "commercial_ride",
+                    "Commercial rides are disabled in site configuration.",
+                )
+
+            if not resolved_ticket_number:
+                self.add_error(
+                    "ticket_number",
+                    "Ticket number is required for commercial rides.",
+                )
+
+            if pilot and pilot.glider_rating != "commercial":
+                self.add_error(
+                    "pilot",
+                    "Commercial rides require a pilot with a commercial glider rating.",
+                )
+
+            if passenger:
+                self.add_error(
+                    "passenger",
+                    "Commercial rides use ticket IDs and cannot have a member passenger.",
+                )
+
+            if (cleaned_data.get("passenger_name") or "").strip():
+                self.add_error(
+                    "passenger_name",
+                    "Commercial rides use ticket IDs and cannot have passenger name text.",
+                )
+
+            if resolved_ticket_number:
+                ticket = CommercialTicket.objects.filter(
+                    ticket_number=resolved_ticket_number
+                ).first()
+                if not ticket:
+                    self.add_error(
+                        "ticket_number",
+                        "Ticket number does not exist.",
+                    )
+                elif ticket.status == CommercialTicket.Status.REFUNDED:
+                    self.add_error(
+                        "ticket_number",
+                        "Refunded tickets cannot be used for flights.",
+                    )
+                elif (
+                    ticket.status == CommercialTicket.Status.REDEEMED
+                    and ticket.flight_id not in {None, self.instance.pk}
+                ):
+                    self.add_error(
+                        "ticket_number",
+                        "Ticket is already redeemed by a different flight.",
+                    )
+                elif (
+                    ticket.status == CommercialTicket.Status.AVAILABLE
+                    and ticket.flight_id not in {None, self.instance.pk}
+                ):
+                    self.add_error(
+                        "ticket_number",
+                        "Ticket is already reserved by a different pending flight.",
+                    )
+
+            if self.instance.pk:
+                try:
+                    existing_ride = self.instance.commercial_ride_record
+                except ObjectDoesNotExist:
+                    existing_ride = None
+
+                is_launched = bool(
+                    cleaned_data.get("launch_time") or self.instance.launch_time
+                )
+                if (
+                    existing_ride
+                    and resolved_ticket_number != existing_ride.ticket.ticket_number
+                    and is_launched
+                ):
+                    self.add_error(
+                        "ticket_number",
+                        "Launched commercial flights cannot change ticket number.",
+                    )
+        else:
+            if resolved_ticket_number:
+                self.add_error(
+                    "ticket_number",
+                    "Enable Commercial Ride before entering a ticket number.",
+                )
+            if self.instance.pk:
+                try:
+                    existing_ride = self.instance.commercial_ride_record
+                except ObjectDoesNotExist:
+                    existing_ride = None
+                is_launched = bool(
+                    cleaned_data.get("launch_time") or self.instance.launch_time
+                )
+                if existing_ride and is_launched:
+                    self.add_error(
+                        "commercial_ride",
+                        "Launched commercial flights cannot be converted to regular flights.",
+                    )
+
         return cleaned_data
 
     class Meta:
         model = Flight
         fields = [
+            "commercial_ride",
             "launch_time",
             "landing_time",
             "pilot",
@@ -251,6 +384,7 @@ class FlightForm(forms.ModelForm):
         # Always fetch configuration from database for security-sensitive flags
         # The visiting_pilot_enabled flag is security-critical and should not be cached
         config = SiteConfiguration.objects.first()
+        self.site_config = config
         if config is None:
             from django.core.exceptions import ImproperlyConfigured
 
@@ -525,6 +659,43 @@ class FlightForm(forms.ModelForm):
         )
 
         # Removed glider_obj pilot auto-selection logic for clarity and to avoid undefined variable
+
+        if self.instance and self.instance.pk:
+            self.fields["commercial_ride"].initial = bool(self.instance.commercial_ride)
+            try:
+                existing_ride = self.instance.commercial_ride_record
+            except ObjectDoesNotExist:
+                existing_ride = None
+            if existing_ride:
+                self.fields["ticket_number"].initial = (
+                    existing_ride.ticket.ticket_number
+                )
+                self.fields["available_ticket"].initial = (
+                    existing_ride.ticket.ticket_number
+                )
+
+        existing_ticket_number = (
+            self.fields["ticket_number"].initial
+            if self.fields["ticket_number"].initial
+            else ""
+        )
+        available_choices = [("", "Select available ticket")]
+        available_tickets = CommercialTicket.objects.filter(
+            status=CommercialTicket.Status.AVAILABLE,
+            flight__isnull=True,
+        ).order_by("ticket_number")
+        available_choices.extend(
+            (ticket.ticket_number, ticket.ticket_number) for ticket in available_tickets
+        )
+
+        if existing_ticket_number and existing_ticket_number not in {
+            choice[0] for choice in available_choices
+        }:
+            available_choices.append(
+                (existing_ticket_number, f"{existing_ticket_number} (current)")
+            )
+
+        self.fields["available_ticket"].choices = available_choices
 
 
 # CreateLogsheetForm
@@ -1145,3 +1316,54 @@ class MemberChargeForm(forms.ModelForm):
                     )
 
         return cleaned_data
+
+
+class CommercialTicketIssueForm(forms.Form):
+    ride_type = forms.ChoiceField(
+        choices=CommercialTicket.RideType.choices,
+        initial=CommercialTicket.RideType.STANDARD,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    amount_paid = forms.DecimalField(
+        required=False,
+        max_digits=8,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    gift_certificate_number = forms.CharField(
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    gift_certificate_expires_on = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    remarks = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+    )
+
+
+class CommercialTicketEditForm(forms.ModelForm):
+    class Meta:
+        model = CommercialTicket
+        fields = [
+            "ride_type",
+            "amount_paid",
+            "gift_certificate_number",
+            "gift_certificate_expires_on",
+            "remarks",
+        ]
+        widgets = {
+            "ride_type": forms.Select(attrs={"class": "form-select"}),
+            "amount_paid": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01"}
+            ),
+            "gift_certificate_number": forms.TextInput(attrs={"class": "form-control"}),
+            "gift_certificate_expires_on": forms.DateInput(
+                attrs={"class": "form-control", "type": "date"}
+            ),
+            "remarks": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }

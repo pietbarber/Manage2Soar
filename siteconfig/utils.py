@@ -10,6 +10,7 @@ def get_role_title(role):
             "assistant_duty_officer": "Assistant Duty Officer",
             "towpilot": "Tow Pilot",
             "instructor": "Instructor",
+            "commercial_pilot": "Commercial Pilot",
             "surge_towpilot": "Surge Tow Pilot",
             "surge_instructor": "Surge Instructor",
         }.get(role, role.replace("_", " ").title())
@@ -18,6 +19,7 @@ def get_role_title(role):
         "assistant_duty_officer": config.assistant_duty_officer_title,
         "towpilot": config.towpilot_title,
         "instructor": config.instructor_title,
+        "commercial_pilot": config.commercial_pilot_title,
         "surge_towpilot": config.surge_towpilot_title or "Surge Tow Pilot",
         "surge_instructor": config.surge_instructor_title or "Surge Instructor",
     }

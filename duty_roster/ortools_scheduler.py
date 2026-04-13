@@ -27,9 +27,14 @@ from duty_roster.roster_generator import (
     calculate_assignment_cap,
     get_default_max_assignments_per_month,
 )
+from duty_roster.utils.roles import member_has_role
 from members.models import Member
 
 logger = logging.getLogger("duty_roster.ortools_scheduler")
+
+
+def _member_has_role(member: Member, role: str) -> bool:
+    return member_has_role(member, role)
 
 
 # Constants
@@ -132,7 +137,7 @@ class DutyRosterScheduler:
 
             for role in self.data.roles:
                 # Check role qualification
-                if not getattr(member, role, False):
+                if not _member_has_role(member, role):
                     continue  # Member not qualified for this role
 
                 # Check role percentage (hard constraint if 0% and not overridden)
@@ -187,7 +192,7 @@ class DutyRosterScheduler:
         percent = self._get_role_percent(pref, role)
 
         # Determine eligible roles for member
-        eligible_roles = [r for r in self.data.roles if getattr(member, r, False)]
+        eligible_roles = [r for r in self.data.roles if _member_has_role(member, r)]
 
         if len(eligible_roles) == 1:
             # Single role: treat 0% as 100% (override logic)
@@ -218,6 +223,7 @@ class DutyRosterScheduler:
             "towpilot": "towpilot_percent",
             "duty_officer": "duty_officer_percent",
             "assistant_duty_officer": "ado_percent",
+            "commercial_pilot": "commercial_pilot_percent",
         }
         field_name = field_map.get(role, f"{role}_percent")
         return getattr(pref, field_name, 0)
@@ -844,7 +850,7 @@ class DutyRosterScheduler:
         percent = self._get_role_percent(pref, role)
 
         # Determine eligible roles for member
-        eligible_roles = [r for r in self.data.roles if getattr(member, r, False)]
+        eligible_roles = [r for r in self.data.roles if _member_has_role(member, r)]
 
         if len(eligible_roles) == 1:
             # Single role: use 100 if percent is 0

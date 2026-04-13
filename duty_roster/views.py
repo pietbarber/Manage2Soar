@@ -65,15 +65,26 @@ from .roster_generator import (
     is_within_operational_season,
     resolve_roster_date_range,
 )
+from .utils.roles import member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views")
 
 # Allowed roles for roster slot editing/assignment endpoints
-ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
+ALLOWED_ROLES = [
+    "instructor",
+    "duty_officer",
+    "assistant_duty_officer",
+    "towpilot",
+    "commercial_pilot",
+]
 MAX_PROPOSAL_RANGE_MONTHS = 12
 
 # OpsIntent activity keys that contribute to tow demand/surge calculations.
 TOW_INTENT_KEYS = {"club", "club_single", "club_two", "guest", "private"}
+
+
+def _is_commercial_pilot_qualified(member):
+    return member_is_commercial_pilot(member)
 
 
 def calendar_refresh_response(year, month):
@@ -139,6 +150,13 @@ def blackout_manage(request):
         )
     if member.towpilot:
         role_choices.append(("towpilot", "Tow Pilot"))
+    if _is_commercial_pilot_qualified(member):
+        role_choices.append(
+            (
+                "commercial_pilot",
+                get_role_title("commercial_pilot") or "Commercial Pilot",
+            )
+        )
 
     pair_with = list(
         Member.objects.filter(pairing_target__member=member).order_by(
@@ -226,6 +244,7 @@ def blackout_manage(request):
                     "duty_officer_percent": data["duty_officer_percent"] or 0,
                     "ado_percent": data["ado_percent"] or 0,
                     "towpilot_percent": data["towpilot_percent"] or 0,
+                    "commercial_pilot_percent": data["commercial_pilot_percent"] or 0,
                     "max_assignments_per_month": data["max_assignments_per_month"],
                     "allow_weekend_double": data.get("allow_weekend_double", False),
                     "comment": data["comment"],
@@ -252,6 +271,7 @@ def blackout_manage(request):
             "duty_officer_percent": preference.duty_officer_percent,
             "ado_percent": preference.ado_percent,
             "towpilot_percent": preference.towpilot_percent,
+            "commercial_pilot_percent": preference.commercial_pilot_percent,
             "max_assignments_per_month": preference.max_assignments_per_month,
             "allow_weekend_double": preference.allow_weekend_double,
             "comment": preference.comment,
@@ -976,11 +996,21 @@ def calendar_day_detail(request, year, month, day):
                 and not assignment.assistant_duty_officer
             ):
                 scheduled_holes["assistant_duty_officer"] = True
+            if (
+                site_config.schedule_commercial_pilots
+                and not assignment.commercial_pilot
+            ):
+                scheduled_holes["commercial_pilot"] = True
 
         if request.user.is_authenticated and scheduled_holes:
             for hole_role in scheduled_holes:
                 qual_attr = _HOLE_FILL_ROLE_MAP[hole_role][0]
-                if getattr(request.user, qual_attr, False):
+                is_qualified = (
+                    _is_commercial_pilot_qualified(request.user)
+                    if qual_attr == "__commercial_rating__"
+                    else bool(getattr(request.user, qual_attr, False))
+                )
+                if is_qualified:
                     volunteerable_holes[hole_role] = True
 
     return render(
@@ -1961,7 +1991,12 @@ def get_eligible_members_for_slot(request):
         eligible_members = []
         for m in members:
             # Check if member has the role flag
-            if not getattr(m, role, False):
+            has_role = (
+                _is_commercial_pilot_qualified(m)
+                if role == "commercial_pilot"
+                else bool(getattr(m, role, False))
+            )
+            if not has_role:
                 continue
 
             p = prefs.get(m.id)
@@ -2023,9 +2058,16 @@ def get_eligible_members_for_slot(request):
                 ("duty_officer", "duty_officer_percent"),
                 ("assistant_duty_officer", "ado_percent"),
                 ("towpilot", "towpilot_percent"),
+                ("commercial_pilot", "commercial_pilot_percent"),
             ]
             eligible_role_fields = [
-                field for r, field in percent_fields if getattr(m, r, False)
+                field
+                for r, field in percent_fields
+                if (
+                    _is_commercial_pilot_qualified(m)
+                    if r == "commercial_pilot"
+                    else getattr(m, r, False)
+                )
             ]
 
             if len(eligible_role_fields) == 1:
@@ -2112,7 +2154,12 @@ def update_roster_slot(request):
         # Enforce that the selected member is actually eligible for this role.
         # For the allowed roles, the Member capability flag matches the role name
         # (e.g., member.instructor, member.duty_officer, member.towpilot).
-        if not getattr(member, role, False):
+        has_role = (
+            _is_commercial_pilot_qualified(member)
+            if role == "commercial_pilot"
+            else bool(getattr(member, role, False))
+        )
+        if not has_role:
             return JsonResponse(
                 {"error": "Member not eligible for this role"},
                 status=400,
@@ -2151,9 +2198,16 @@ def update_roster_slot(request):
                 ("duty_officer", "duty_officer_percent"),
                 ("assistant_duty_officer", "ado_percent"),
                 ("towpilot", "towpilot_percent"),
+                ("commercial_pilot", "commercial_pilot_percent"),
             ]
             eligible_role_fields = [
-                field for r, field in percent_fields if getattr(member, r, False)
+                field
+                for r, field in percent_fields
+                if (
+                    _is_commercial_pilot_qualified(member)
+                    if r == "commercial_pilot"
+                    else getattr(member, r, False)
+                )
             ]
 
             if len(eligible_role_fields) == 1:
@@ -2422,6 +2476,8 @@ def propose_roster(request):
             enabled_roles.append("assistant_duty_officer")
         if getattr(siteconfig, "schedule_tow_pilots", False):
             enabled_roles.append("towpilot")
+        if getattr(siteconfig, "schedule_commercial_pilots", False):
+            enabled_roles.append("commercial_pilot")
     else:
         enabled_roles = DEFAULT_ROLES.copy()
 
@@ -4654,6 +4710,13 @@ _HOLE_FILL_ROLE_MAP = {
         "Assistant Duty Officer",
         "schedule_assistant_duty_officers",
     ),
+    "commercial_pilot": (
+        "__commercial_rating__",
+        "commercial_pilot",
+        "commercial_pilot_title",
+        "Commercial Pilot",
+        "schedule_commercial_pilots",
+    ),
 }
 
 
@@ -4669,7 +4732,7 @@ def volunteer_fill_role(request, assignment_id, role):
            redirects to the duty calendar with a success message.
 
     Accepts ``role`` as one of: instructor, tow_pilot, duty_officer,
-    assistant_duty_officer.
+    assistant_duty_officer, commercial_pilot.
 
     Guards:
     * The ``role`` parameter must be one of the known fillable roles.
@@ -4709,7 +4772,12 @@ def volunteer_fill_role(request, assignment_id, role):
         return redirect("duty_roster:duty_calendar")
 
     # Check qualification.
-    if not getattr(member, qual_attr, False):
+    is_qualified = (
+        _is_commercial_pilot_qualified(member)
+        if qual_attr == "__commercial_rating__"
+        else bool(getattr(member, qual_attr, False))
+    )
+    if not is_qualified:
         messages.error(
             request,
             f"You are not qualified to fill the {role_label} role.",
