@@ -53,6 +53,18 @@ def maintenance_officer(glider):
 
 
 @pytest.fixture
+def towplane_meister(towplane):
+    """Create a maintenance officer (Aircraft Meister) for the towplane."""
+    meister = Member.objects.create(
+        username="towplane_meister",
+        email="towplane_meister@example.com",
+        membership_status="Full Member",
+    )
+    AircraftMeister.objects.create(towplane=towplane, member=meister)
+    return meister
+
+
+@pytest.fixture
 def webmaster(webmaster_group):
     """Create a webmaster."""
     webmaster = Member.objects.create(
@@ -468,3 +480,175 @@ def test_maintenance_deadline_constraint_requires_aircraft():
 
     # Verify the error is from our constraint
     assert "maintenance_deadline_must_have_aircraft" in str(exc_info.value)
+
+
+@pytest.mark.django_db
+class TestTowplaneOilDeadlineUpdate:
+    """Test permission checks and validation for towplane oil deadline updates."""
+
+    def test_towplane_meister_can_update_oil_deadline(
+        self, client, towplane_meister, towplane
+    ):
+        """Towplane meisters can update oil deadlines for assigned towplanes."""
+        client.force_login(towplane_meister)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "1234.5"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["new_due"] == "1234.5"
+
+        towplane.refresh_from_db()
+        assert str(towplane.next_oil_change_due) == "1234.5"
+
+    def test_glider_meister_cannot_update_towplane_oil_deadline(
+        self, client, maintenance_officer, towplane
+    ):
+        """Glider meisters cannot update towplane oil deadlines."""
+        client.force_login(maintenance_officer)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "1234.5"},
+        )
+
+        assert response.status_code == 403
+        payload = response.json()
+        assert payload["success"] is False
+        assert "not authorized" in payload["error"].lower()
+
+    def test_webmaster_can_update_towplane_oil_deadline(
+        self, client, webmaster, towplane
+    ):
+        """Webmasters can update towplane oil deadlines."""
+        client.force_login(webmaster)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "4321.1"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["new_due"] == "4321.1"
+
+    def test_regular_member_cannot_update_towplane_oil_deadline(
+        self, client, regular_member, towplane
+    ):
+        """Regular members cannot update towplane oil deadlines."""
+        client.force_login(regular_member)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "99.9"},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["success"] is False
+
+    def test_missing_tach_value_returns_error(self, client, webmaster, towplane):
+        """Missing next_oil_change_due returns 400."""
+        client.force_login(webmaster)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={},
+        )
+
+        assert response.status_code == 400
+        payload = response.json()
+        assert payload["success"] is False
+        assert "required" in payload["error"].lower()
+
+    def test_invalid_tach_value_returns_error(self, client, webmaster, towplane):
+        """Invalid tach value returns 400."""
+        client.force_login(webmaster)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "not-a-number"},
+        )
+
+        assert response.status_code == 400
+        payload = response.json()
+        assert payload["success"] is False
+        assert "invalid tach value" in payload["error"].lower()
+
+    def test_negative_tach_value_returns_error(self, client, webmaster, towplane):
+        """Negative tach value returns 400."""
+        client.force_login(webmaster)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "-1.0"},
+        )
+
+        assert response.status_code == 400
+        payload = response.json()
+        assert payload["success"] is False
+        assert "zero or greater" in payload["error"].lower()
+
+    def test_get_request_rejected_for_oil_update(self, client, webmaster, towplane):
+        """GET requests are rejected for oil deadline updates."""
+        client.force_login(webmaster)
+
+        response = client.get(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            )
+        )
+
+        assert response.status_code == 405
+
+    def test_towplane_meister_sees_oil_update_button(
+        self, client, towplane_meister, towplane
+    ):
+        """Towplane meisters see oil update controls in maintenance deadlines view."""
+        towplane.next_oil_change_due = 1200.0
+        towplane.save(update_fields=["next_oil_change_due"])
+
+        client.force_login(towplane_meister)
+        response = client.get(reverse("logsheet:maintenance_deadlines"))
+
+        assert response.status_code == 200
+        assert b"update-oil-deadline-btn" in response.content
+
+    def test_regular_member_does_not_see_oil_update_button(
+        self, client, regular_member, towplane
+    ):
+        """Regular members do not see oil update controls."""
+        towplane.next_oil_change_due = 1200.0
+        towplane.save(update_fields=["next_oil_change_due"])
+
+        client.force_login(regular_member)
+        response = client.get(reverse("logsheet:maintenance_deadlines"))
+
+        assert response.status_code == 200
+        assert b"update-oil-deadline-btn" not in response.content

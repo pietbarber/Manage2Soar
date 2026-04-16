@@ -2,7 +2,7 @@
 import csv
 import logging
 from datetime import date, datetime, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -3240,6 +3240,10 @@ def maintenance_deadlines(request):
         is_webmaster or bool(meister_gliders) or bool(meister_towplanes)
     )
 
+    # Towplane oil deadlines are managed by towplane meisters or webmasters.
+    towplanes = Towplane.objects.filter(is_active=True).order_by("n_number")
+    can_update_oil_deadlines = is_webmaster or bool(meister_towplanes)
+
     return render(
         request,
         "logsheet/maintenance_deadlines.html",
@@ -3251,6 +3255,8 @@ def maintenance_deadlines(request):
             "meister_gliders": meister_gliders,
             "meister_towplanes": meister_towplanes,
             "can_update_deadlines": can_update_deadlines,
+            "towplanes": towplanes,
+            "can_update_oil_deadlines": can_update_oil_deadlines,
         },
     )
 
@@ -3349,6 +3355,85 @@ def update_maintenance_deadline(request, deadline_id):
             "success": True,
             "message": f"Deadline updated successfully to {new_due_date}.",
             "new_due_date": new_due_date.strftime("%Y-%m-%d"),
+        }
+    )
+
+
+@require_POST
+@active_member_required
+def update_towplane_oil_deadline(request, towplane_id):
+    towplane = get_object_or_404(Towplane, pk=towplane_id)
+    member = request.user
+
+    is_webmaster = (
+        member.is_superuser or member.groups.filter(name="Webmasters").exists()
+    )
+    is_meister = AircraftMeister.objects.filter(
+        towplane=towplane, member=member
+    ).exists()
+
+    if not (is_webmaster or is_meister):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "You are not authorized to update this oil deadline.",
+            },
+            status=403,
+        )
+
+    new_due_str = request.POST.get("next_oil_change_due")
+    if not new_due_str:
+        return JsonResponse(
+            {"success": False, "error": "Next oil change due value is required."},
+            status=400,
+        )
+
+    try:
+        new_due = Decimal(new_due_str).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError, TypeError):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Invalid tach value. Use a numeric value like 1234.5.",
+            },
+            status=400,
+        )
+
+    if new_due < 0:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Next oil change due must be zero or greater.",
+            },
+            status=400,
+        )
+
+    if new_due > Decimal("9999999.9"):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Value exceeds maximum supported tach value (9999999.9).",
+            },
+            status=400,
+        )
+
+    old_due = towplane.next_oil_change_due
+    towplane.next_oil_change_due = new_due
+    towplane.save(update_fields=["next_oil_change_due"])
+
+    logger.info(
+        "Towplane oil deadline updated by %s: %s changed from %s to %s",
+        member.username,
+        towplane,
+        old_due,
+        new_due,
+    )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "message": f"Oil deadline updated successfully to {new_due:.1f}.",
+            "new_due": f"{new_due:.1f}",
         }
     )
 

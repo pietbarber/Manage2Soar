@@ -10,7 +10,7 @@ from datetime import date
 from django.contrib.auth.models import Group
 
 from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
-from logsheet.models import AircraftMeister, Glider, MaintenanceDeadline
+from logsheet.models import AircraftMeister, Glider, MaintenanceDeadline, Towplane
 
 
 class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
@@ -31,6 +31,15 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
             glider=self.glider,
             description="annual",
             due_date=date(2026, 6, 30),
+        )
+
+        # Create towplane for oil deadline editing workflow
+        self.towplane = Towplane.objects.create(
+            name="Pawnee",
+            make="Piper",
+            model="PA-25",
+            n_number="N456CD",
+            next_oil_change_due="1234.5",
         )
 
         # Create webmaster group
@@ -241,3 +250,31 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
         # Should see update buttons for both aircraft
         update_buttons = self.page.locator(".update-deadline-btn")
         assert update_buttons.count() == 2
+
+    def test_towplane_oil_deadline_can_be_updated_via_modal(self):
+        """Superuser can update towplane oil deadline from maintenance page."""
+        self.create_test_member(username="superuser", is_superuser=True)
+        self.login(username="superuser")
+
+        self.page.goto(f"{self.live_server_url}/logsheet/maintenance-deadlines/")
+        self.page.wait_for_load_state("networkidle")
+
+        oil_button = self.page.locator(".update-oil-deadline-btn").first
+        assert oil_button.is_visible()
+        oil_button.click()
+
+        modal = self.page.locator("#updateOilDeadlineModal.show")
+        modal.wait_for(state="visible", timeout=5000)
+        assert modal.is_visible()
+
+        tach_input = self.page.locator("#new-oil-due")
+        tach_input.fill("1300.5")
+        self.page.locator("#save-oil-deadline-btn").click()
+
+        modal.wait_for(state="hidden", timeout=5000)
+
+        # Inline cell should update immediately without full-page reload.
+        self.page.wait_for_timeout(300)
+        assert "1300.5" in (
+            self.page.locator(f"#oil-due-{self.towplane.id}").text_content() or ""
+        )
