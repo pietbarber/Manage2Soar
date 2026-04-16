@@ -3364,6 +3364,15 @@ def update_maintenance_deadline(request, deadline_id):
 def update_towplane_oil_deadline(request, towplane_id):
     towplane = get_object_or_404(Towplane, pk=towplane_id)
     member = request.user
+    next_oil_change_due_field = Towplane._meta.get_field("next_oil_change_due")
+    quantizer = Decimal(10) ** (-next_oil_change_due_field.decimal_places)
+    max_supported_due = (
+        Decimal(10)
+        ** (
+            next_oil_change_due_field.max_digits
+            - next_oil_change_due_field.decimal_places
+        )
+    ) - quantizer
 
     is_webmaster = (
         member.is_superuser or member.groups.filter(name="Webmasters").exists()
@@ -3389,7 +3398,7 @@ def update_towplane_oil_deadline(request, towplane_id):
         )
 
     try:
-        new_due = Decimal(new_due_str).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+        new_due = Decimal(new_due_str).quantize(quantizer, rounding=ROUND_HALF_UP)
     except (InvalidOperation, ValueError, TypeError):
         return JsonResponse(
             {
@@ -3408,11 +3417,14 @@ def update_towplane_oil_deadline(request, towplane_id):
             status=400,
         )
 
-    if new_due > Decimal("9999999.9"):
+    if new_due > max_supported_due:
         return JsonResponse(
             {
                 "success": False,
-                "error": "Value exceeds maximum supported tach value (9999999.9).",
+                "error": (
+                    "Value exceeds maximum supported tach value "
+                    f"({max_supported_due})."
+                ),
             },
             status=400,
         )
@@ -3429,11 +3441,13 @@ def update_towplane_oil_deadline(request, towplane_id):
         new_due,
     )
 
+    formatted_due = f"{new_due:.{next_oil_change_due_field.decimal_places}f}"
+
     return JsonResponse(
         {
             "success": True,
-            "message": f"Oil deadline updated successfully to {new_due:.1f}.",
-            "new_due": f"{new_due:.1f}",
+            "message": f"Oil deadline updated successfully to {formatted_due}.",
+            "new_due": formatted_due,
         }
     )
 

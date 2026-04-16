@@ -6,6 +6,7 @@ maintenance deadlines via the web interface.
 """
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from django.contrib.auth.models import Group
@@ -613,6 +614,53 @@ class TestTowplaneOilDeadlineUpdate:
         payload = response.json()
         assert payload["success"] is False
         assert "zero or greater" in payload["error"].lower()
+
+    def test_tach_value_above_field_max_returns_error(
+        self, client, webmaster, towplane
+    ):
+        """Values above the DecimalField max are rejected."""
+        client.force_login(webmaster)
+        field = Towplane._meta.get_field("next_oil_change_due")
+        step = Decimal(10) ** (-field.decimal_places)
+        max_supported_due = (
+            Decimal(10) ** (field.max_digits - field.decimal_places)
+        ) - step
+        above_max = max_supported_due + step
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": str(above_max)},
+        )
+
+        assert response.status_code == 400
+        payload = response.json()
+        assert payload["success"] is False
+        assert "exceeds maximum supported tach value" in payload["error"].lower()
+
+    def test_tach_value_with_extra_decimal_places_is_quantized(
+        self, client, webmaster, towplane
+    ):
+        """Values with extra precision are rounded/quantized before saving."""
+        client.force_login(webmaster)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "1234.56"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["new_due"] == "1234.6"
+
+        towplane.refresh_from_db()
+        assert str(towplane.next_oil_change_due) == "1234.6"
 
     def test_get_request_rejected_for_oil_update(self, client, webmaster, towplane):
         """GET requests are rejected for oil deadline updates."""
