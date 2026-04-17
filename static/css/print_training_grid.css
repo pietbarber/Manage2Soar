@@ -4,9 +4,15 @@
 }
 
 @media print {
+  html,
+  body {
+    overflow: visible !important;
+  }
+
   .training-grid-scroll {
     max-height: none !important;
     min-height: 0 !important;
+    height: auto !important;
     overflow: visible !important;
   }
 
@@ -15,7 +21,16 @@
     min-width: 0 !important;
     table-layout: fixed;
     border-collapse: collapse;
+    border-spacing: 0;
     page-break-inside: auto;
+  }
+
+  .training-grid-print-head {
+    display: table-header-group;
+  }
+
+  .training-grid tbody {
+    display: table-row-group;
   }
 
   .training-grid th,
@@ -65,6 +80,11 @@
   .training-grid tr {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  .training-grid tbody tr.table-secondary {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   .btn,
