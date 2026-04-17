@@ -121,6 +121,11 @@ urlpatterns = [
         name="update_maintenance_deadline",
     ),
     path(
+        "maintenance-deadlines/towplane/<int:towplane_id>/update-oil/",
+        views.update_towplane_oil_deadline,
+        name="update_towplane_oil_deadline",
+    ),
+    path(
         "equipment/glider/<int:pk>/logbook/",
         views.glider_logbook,
         name="glider_logbook",
