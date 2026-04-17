@@ -13,6 +13,7 @@ from duty_roster.views import (
 )
 from logsheet.models import Airfield, Flight, Glider, Logsheet
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 User = get_user_model()
 
@@ -1195,6 +1196,17 @@ class DutyPreferenceFormTests(TestCase):
 
     def setUp(self):
         """Set up test data."""
+        self.site_config = SiteConfiguration.objects.create(
+            club_name="Test Soaring Club",
+            domain_name="test.example.com",
+            club_abbreviation="TSC",
+            schedule_instructors=True,
+            schedule_tow_pilots=True,
+            schedule_duty_officers=True,
+            schedule_assistant_duty_officers=True,
+            schedule_commercial_pilots=True,
+        )
+
         # Create a member with only some duty roles (not all)
         self.partial_role_member = Member.objects.create(
             username="towpilot",
@@ -1430,6 +1442,109 @@ class DutyPreferenceFormTests(TestCase):
         self.assertEqual(pref.duty_officer_percent, 0)
         self.assertEqual(pref.ado_percent, 0)
         self.assertEqual(pref.towpilot_percent, 100)
+
+    def test_blackout_manage_hides_all_roles_when_all_schedule_flags_false(self):
+        """No role balancing options should show when all scheduling flags are off."""
+        self.site_config.schedule_instructors = False
+        self.site_config.schedule_tow_pilots = False
+        self.site_config.schedule_duty_officers = False
+        self.site_config.schedule_assistant_duty_officers = False
+        self.site_config.schedule_commercial_pilots = False
+        self.site_config.save()
+
+        self.client.login(username="fullrole", password="testpass123")
+        response = self.client.get(reverse("duty_roster:blackout_manage"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["role_percent_choices"], [])
+
+    def test_blackout_manage_shows_only_roles_enabled_by_schedule_flags(self):
+        """Role options should be shown only for roles enabled in site config."""
+        self.site_config.schedule_instructors = True
+        self.site_config.schedule_tow_pilots = True
+        self.site_config.schedule_duty_officers = False
+        self.site_config.schedule_assistant_duty_officers = False
+        self.site_config.schedule_commercial_pilots = False
+        self.site_config.save()
+
+        self.client.login(username="fullrole", password="testpass123")
+        response = self.client.get(reverse("duty_roster:blackout_manage"))
+
+        self.assertEqual(response.status_code, 200)
+        shown_roles = {role for role, _ in response.context["role_percent_choices"]}
+        self.assertEqual(shown_roles, {"instructor", "towpilot"})
+
+    def test_blackout_manage_hides_commercial_role_when_scheduling_disabled(self):
+        """Qualified commercial pilots should not see commercial balancing when disabled."""
+        member = Member.objects.create(
+            username="commercial_instructor",
+            email="commercial_instructor@test.com",
+            first_name="Commercial",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+            glider_rating="Commercial",
+        )
+        member.set_password("testpass123")
+        member.save()
+
+        self.site_config.schedule_instructors = True
+        self.site_config.schedule_commercial_pilots = False
+        self.site_config.save()
+
+        self.client.login(username="commercial_instructor", password="testpass123")
+        response = self.client.get(reverse("duty_roster:blackout_manage"))
+
+        self.assertEqual(response.status_code, 200)
+        shown_roles = {role for role, _ in response.context["role_percent_choices"]}
+        self.assertIn("instructor", shown_roles)
+        self.assertNotIn("commercial_pilot", shown_roles)
+
+    def test_blackout_manage_post_saves_with_hidden_roles_as_zero(self):
+        """Preference save should still succeed when config hides some role options."""
+        member = Member.objects.create(
+            username="commercial_post",
+            email="commercial_post@test.com",
+            first_name="Commercial",
+            last_name="Post",
+            membership_status="Full Member",
+            instructor=True,
+            glider_rating="Commercial",
+        )
+        member.set_password("testpass123")
+        member.save()
+
+        self.site_config.schedule_instructors = True
+        self.site_config.schedule_commercial_pilots = False
+        self.site_config.schedule_tow_pilots = False
+        self.site_config.schedule_duty_officers = False
+        self.site_config.schedule_assistant_duty_officers = False
+        self.site_config.save()
+
+        self.client.login(username="commercial_post", password="testpass123")
+        response = self.client.post(
+            reverse("duty_roster:blackout_manage"),
+            data={
+                "preferred_day": "",
+                "dont_schedule": "",
+                "scheduling_suspended": "",
+                "suspended_reason": "",
+                "comment": "",
+                "instructor_percent": "100",
+                "duty_officer_percent": "0",
+                "ado_percent": "0",
+                "towpilot_percent": "0",
+                "commercial_pilot_percent": "0",
+                "max_assignments_per_month": "4",
+                "allow_weekend_double": "",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        pref = DutyPreference.objects.get(member=member)
+        self.assertEqual(pref.instructor_percent, 100)
+        self.assertEqual(pref.commercial_pilot_percent, 0)
 
 
 class PairingPreferencesDisplayTests(TestCase):
