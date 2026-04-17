@@ -39,6 +39,8 @@ def test_training_grid_shows_member_profile_icon_link(client):
     assert 'media="print"' in content
     assert "training-grid-max-col" in content
     assert "print-score-text" in content
+    assert "training-grid-print-head" in content
+    assert "@media screen" in content
 
 
 @pytest.mark.django_db

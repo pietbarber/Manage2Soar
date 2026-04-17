@@ -6,40 +6,43 @@
 {% endblock %}
 {% block content %}
 <style>
-/* Scrollable grid container and sticky columns */
-.training-grid-scroll {
-  overflow-x: auto;
-  overflow-y: visible;
-  width: 100%;
-  max-height: 80vh;
-  min-height: 400px;
-  position: relative;
-  background: #fff;
-}
-table.training-grid {
-  min-width: 1200px;
-  width: max-content;
-}
-th.sticky-col, td.sticky-col {
-  position: sticky;
-  left: 0;
-  background: #fff;
-  z-index: 2;
-}
-th.sticky-max, td.sticky-max {
-  position: sticky;
-  right: 0;
-  background: #fff;
-  z-index: 2;
-}
-
 @media screen {
+  /* Scrollable grid container and sticky columns */
+  .training-grid-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
+    width: 100%;
+    max-height: 80vh;
+    min-height: 400px;
+    position: relative;
+    background: #fff;
+  }
+
+  table.training-grid {
+    min-width: 1200px;
+    width: max-content;
+  }
+
+  th.sticky-col,
+  td.sticky-col {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    z-index: 2;
+  }
+
+  th.sticky-max,
+  td.sticky-max {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    z-index: 2;
+  }
+
   .print-score-text {
     display: none;
   }
 }
-
-
 </style>
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h2 class="mb-0">Training Progress for {{ member.full_display_name }}</h2>
@@ -64,7 +67,7 @@ th.sticky-max, td.sticky-max {
 
 <div class="training-grid-scroll" id="training-grid-scroll">
 <table class="table table-bordered table-sm border-dark-subtle training-grid">
-  <thead>
+  <thead class="training-grid-print-head">
     <tr>
   <th rowspan="3" class="sticky-col training-grid-lesson-col">Lesson</th>
       {% for meta in column_metadata %}
