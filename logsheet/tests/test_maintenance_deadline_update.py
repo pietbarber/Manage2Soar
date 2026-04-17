@@ -581,6 +581,25 @@ class TestTowplaneOilDeadlineUpdate:
         assert payload["success"] is False
         assert "required" in payload["error"].lower()
 
+    def test_whitespace_tach_value_returns_required_error(
+        self, client, webmaster, towplane
+    ):
+        """Whitespace-only next_oil_change_due returns required 400."""
+        client.force_login(webmaster)
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "   "},
+        )
+
+        assert response.status_code == 400
+        payload = response.json()
+        assert payload["success"] is False
+        assert "required" in payload["error"].lower()
+
     def test_invalid_tach_value_returns_error(self, client, webmaster, towplane):
         """Invalid tach value returns 400."""
         client.force_login(webmaster)
@@ -674,6 +693,22 @@ class TestTowplaneOilDeadlineUpdate:
         )
 
         assert response.status_code == 405
+
+    def test_inactive_towplane_cannot_be_updated(self, client, webmaster, towplane):
+        """Inactive towplanes are not updatable via endpoint."""
+        client.force_login(webmaster)
+        towplane.is_active = False
+        towplane.save(update_fields=["is_active"])
+
+        response = client.post(
+            reverse(
+                "logsheet:update_towplane_oil_deadline",
+                kwargs={"towplane_id": towplane.id},
+            ),
+            data={"next_oil_change_due": "1234.5"},
+        )
+
+        assert response.status_code == 404
 
     def test_towplane_meister_sees_oil_update_button(
         self, client, towplane_meister, towplane

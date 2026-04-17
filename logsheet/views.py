@@ -3362,7 +3362,9 @@ def update_maintenance_deadline(request, deadline_id):
 @require_POST
 @active_member_required
 def update_towplane_oil_deadline(request, towplane_id):
-    towplane = get_object_or_404(Towplane, pk=towplane_id)
+    towplane = get_object_or_404(
+        Towplane.objects.filter(is_active=True), pk=towplane_id
+    )
     member = request.user
     next_oil_change_due_field = Towplane._meta.get_field("next_oil_change_due")
     quantizer = Decimal(10) ** (-next_oil_change_due_field.decimal_places)
@@ -3390,7 +3392,7 @@ def update_towplane_oil_deadline(request, towplane_id):
             status=403,
         )
 
-    new_due_str = request.POST.get("next_oil_change_due")
+    new_due_str = (request.POST.get("next_oil_change_due") or "").strip()
     if not new_due_str:
         return JsonResponse(
             {"success": False, "error": "Next oil change due value is required."},
