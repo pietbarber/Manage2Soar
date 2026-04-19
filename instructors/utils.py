@@ -49,7 +49,7 @@ def get_overdue_sprs(max_days=30, as_of_date=None, instructor=None):
     A flight is considered overdue when it is at least 7 days old and no
     InstructionReport exists for the same instructor, student and flight date.
     """
-    as_of = as_of_date or timezone.now().date()
+    as_of = as_of_date or timezone.localdate()
     cutoff_date = as_of - timedelta(days=max_days)
 
     flights_qs = Flight.objects.filter(
@@ -132,7 +132,7 @@ def get_instructor_has_overdue_sprs(instructor, max_days=30, as_of_date=None):
     if not instructor:
         return False
 
-    as_of = as_of_date or timezone.now().date()
+    as_of = as_of_date or timezone.localdate()
     cutoff_date = as_of - timedelta(days=max_days)
     overdue_cutoff = as_of - timedelta(days=7)
 

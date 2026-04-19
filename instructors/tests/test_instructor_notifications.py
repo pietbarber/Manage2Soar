@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 from django.test import RequestFactory
+from django.utils import timezone
 
 from instructors.models import (
     ClubQualificationType,
@@ -128,7 +129,7 @@ def test_overdue_reminder_dismissed_when_final_spr_completed(django_user_model):
     student = django_user_model.objects.create_user(
         username="stud_cleanup1", password="pw"
     )
-    flight_date = date.today() - timedelta(days=8)
+    flight_date = timezone.localdate() - timedelta(days=8)
 
     _create_finalized_instructional_flight(
         instructor=instructor,
@@ -165,8 +166,8 @@ def test_overdue_reminder_not_dismissed_when_other_overdue_remains(django_user_m
         username="stud_cleanup2b", password="pw"
     )
 
-    first_date = date.today() - timedelta(days=8)
-    second_date = date.today() - timedelta(days=9)
+    first_date = timezone.localdate() - timedelta(days=8)
+    second_date = timezone.localdate() - timedelta(days=9)
 
     _create_finalized_instructional_flight(
         instructor=instructor,
@@ -212,8 +213,8 @@ def test_overdue_cleanup_is_instructor_scoped(django_user_model):
         username="stud_cleanup3b", password="pw"
     )
 
-    first_date = date.today() - timedelta(days=8)
-    second_date = date.today() - timedelta(days=9)
+    first_date = timezone.localdate() - timedelta(days=8)
+    second_date = timezone.localdate() - timedelta(days=9)
 
     _create_finalized_instructional_flight(
         instructor=instructor_one,

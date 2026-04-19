@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.template.loader import render_to_string
-from django.utils.timezone import now
+from django.utils import timezone
 
 from instructors.utils import get_overdue_sprs
 from notifications.models import Notification
@@ -29,7 +29,7 @@ class Command(BaseCronJobCommand):
 
     def execute_job(self, *args, **options):
         max_days = options.get("max_days", 30)
-        as_of_date = now().date()
+        as_of_date = timezone.localdate()
         cutoff_date = as_of_date - timedelta(days=max_days)
 
         self.log_info(f"Checking for overdue SPRs from flights since {cutoff_date}")
