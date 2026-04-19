@@ -12,7 +12,7 @@ from notifications.models import Notification
 from .models import GroundInstruction, InstructionReport, MemberQualification
 from .utils import (
     OVERDUE_SPR_NOTIFICATION_FRAGMENT,
-    get_instructor_overdue_spr_count,
+    get_instructor_has_overdue_sprs,
     update_student_progress_snapshot,
 )
 
@@ -99,7 +99,7 @@ def dismiss_stale_overdue_spr_notifications(sender, instance, **kwargs):
         ):
             return
 
-        if get_instructor_overdue_spr_count(instructor) > 0:
+        if get_instructor_has_overdue_sprs(instructor):
             return
 
         Notification.objects.filter(
