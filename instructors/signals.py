@@ -1,5 +1,6 @@
 import logging
 import sys
+from datetime import date
 
 from django.apps import apps
 from django.db.models.signals import post_save
@@ -89,6 +90,10 @@ def dismiss_stale_overdue_spr_notifications(sender, instance, **kwargs):
     try:
         instructor = instance.instructor
         if not instructor:
+            return
+
+        # Overdue reminders only concern reports that are at least 7 days old.
+        if not instance.report_date or (date.today() - instance.report_date).days < 7:
             return
 
         if get_instructor_overdue_spr_count(instructor) > 0:

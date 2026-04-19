@@ -5,7 +5,6 @@ from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from instructors.utils import get_overdue_sprs, get_spr_escalation_level
-from logsheet.models import Flight
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
@@ -30,27 +29,11 @@ class Command(BaseCronJobCommand):
 
     def execute_job(self, *args, **options):
         max_days = options.get("max_days", 30)
-        cutoff_date = now().date() - timedelta(days=max_days)
+        as_of_date = now().date()
+        cutoff_date = as_of_date - timedelta(days=max_days)
 
         self.log_info(f"Checking for overdue SPRs from flights since {cutoff_date}")
-
-        # Find instructional flights that might need SPRs
-        instructional_flights = Flight.objects.filter(
-            instructor__isnull=False,  # Has an instructor
-            logsheet__finalized=True,  # From finalized logsheets only
-            logsheet__log_date__gte=cutoff_date,  # Within our time window
-            logsheet__log_date__lt=now().date(),  # Not today's flights
-        )
-
-        if not instructional_flights.exists():
-            self.log_info("No instructional flights found requiring SPR check")
-            return
-
-        self.log_info(
-            f"Checking {instructional_flights.count()} instructional flights for missing SPRs"
-        )
-
-        overdue_sprs = get_overdue_sprs(max_days=max_days, as_of_date=now().date())
+        overdue_sprs = get_overdue_sprs(max_days=max_days, as_of_date=as_of_date)
 
         if not overdue_sprs:
             self.log_info("No overdue SPRs found")

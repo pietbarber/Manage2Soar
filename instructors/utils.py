@@ -120,9 +120,7 @@ def get_instructor_overdue_spr_count(instructor, max_days=30, as_of_date=None):
         as_of_date=as_of_date,
         instructor=instructor,
     )
-    if not overdue:
-        return 0
-    return len(next(iter(overdue.values())))
+    return len(overdue.get(instructor, []))
 
 
 def is_overdue_spr_notification_message(message):
