@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
+from django.test import RequestFactory
 
 from instructors.models import (
     ClubQualificationType,
@@ -8,8 +9,33 @@ from instructors.models import (
     InstructionReport,
     MemberQualification,
 )
+from instructors.utils import OVERDUE_SPR_NOTIFICATION_FRAGMENT
+from logsheet.models import Airfield, Flight, Glider, Logsheet
 from members.models import Badge, MemberBadge
+from notifications.context_processors import notifications as notifications_context
 from notifications.models import Notification
+
+
+def _create_finalized_instructional_flight(
+    *, instructor, student, flight_date, suffix="001"
+):
+    airfield = Airfield.objects.create(identifier=f"T{suffix}", name=f"Test {suffix}")
+    glider = Glider.objects.create(
+        make="Schweizer", model="2-33", n_number=f"N{suffix}"
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=flight_date,
+        airfield=airfield,
+        created_by=instructor,
+        finalized=True,
+    )
+    return Flight.objects.create(
+        logsheet=logsheet,
+        pilot=student,
+        instructor=instructor,
+        glider=glider,
+        flight_type="dual",
+    )
 
 
 @pytest.mark.django_db
@@ -92,3 +118,161 @@ def test_member_badge_creates_notification(django_user_model):
     assert Notification.objects.filter(
         user=member, message__contains=badge.name
     ).exists()
+
+
+@pytest.mark.django_db
+def test_overdue_reminder_dismissed_when_final_spr_completed(django_user_model):
+    instructor = django_user_model.objects.create_user(
+        username="inst_cleanup1", password="pw"
+    )
+    student = django_user_model.objects.create_user(
+        username="stud_cleanup1", password="pw"
+    )
+    flight_date = date.today() - timedelta(days=8)
+
+    _create_finalized_instructional_flight(
+        instructor=instructor,
+        student=student,
+        flight_date=flight_date,
+        suffix="101",
+    )
+
+    reminder = Notification.objects.create(
+        user=instructor,
+        message="📝 You have 1 overdue Student Progress Report(s)",
+    )
+
+    InstructionReport.objects.create(
+        student=student,
+        instructor=instructor,
+        report_date=flight_date,
+        report_text="completed",
+    )
+
+    reminder.refresh_from_db()
+    assert reminder.dismissed is True
+
+
+@pytest.mark.django_db
+def test_overdue_reminder_not_dismissed_when_other_overdue_remains(django_user_model):
+    instructor = django_user_model.objects.create_user(
+        username="inst_cleanup2", password="pw"
+    )
+    student_one = django_user_model.objects.create_user(
+        username="stud_cleanup2a", password="pw"
+    )
+    student_two = django_user_model.objects.create_user(
+        username="stud_cleanup2b", password="pw"
+    )
+
+    first_date = date.today() - timedelta(days=8)
+    second_date = date.today() - timedelta(days=9)
+
+    _create_finalized_instructional_flight(
+        instructor=instructor,
+        student=student_one,
+        flight_date=first_date,
+        suffix="102",
+    )
+    _create_finalized_instructional_flight(
+        instructor=instructor,
+        student=student_two,
+        flight_date=second_date,
+        suffix="103",
+    )
+
+    reminder = Notification.objects.create(
+        user=instructor,
+        message="📝 You have 2 overdue Student Progress Report(s)",
+    )
+
+    InstructionReport.objects.create(
+        student=student_one,
+        instructor=instructor,
+        report_date=first_date,
+        report_text="completed one",
+    )
+
+    reminder.refresh_from_db()
+    assert reminder.dismissed is False
+
+
+@pytest.mark.django_db
+def test_overdue_cleanup_is_instructor_scoped(django_user_model):
+    instructor_one = django_user_model.objects.create_user(
+        username="inst_cleanup3a", password="pw"
+    )
+    instructor_two = django_user_model.objects.create_user(
+        username="inst_cleanup3b", password="pw"
+    )
+    student_one = django_user_model.objects.create_user(
+        username="stud_cleanup3a", password="pw"
+    )
+    student_two = django_user_model.objects.create_user(
+        username="stud_cleanup3b", password="pw"
+    )
+
+    first_date = date.today() - timedelta(days=8)
+    second_date = date.today() - timedelta(days=9)
+
+    _create_finalized_instructional_flight(
+        instructor=instructor_one,
+        student=student_one,
+        flight_date=first_date,
+        suffix="104",
+    )
+    _create_finalized_instructional_flight(
+        instructor=instructor_two,
+        student=student_two,
+        flight_date=second_date,
+        suffix="105",
+    )
+
+    reminder_one = Notification.objects.create(
+        user=instructor_one,
+        message="📝 You have 1 overdue Student Progress Report(s)",
+    )
+    reminder_two = Notification.objects.create(
+        user=instructor_two,
+        message="📝 You have 1 overdue Student Progress Report(s)",
+    )
+
+    InstructionReport.objects.create(
+        student=student_one,
+        instructor=instructor_one,
+        report_date=first_date,
+        report_text="completed",
+    )
+
+    reminder_one.refresh_from_db()
+    reminder_two.refresh_from_db()
+
+    assert reminder_one.dismissed is True
+    assert reminder_two.dismissed is False
+
+
+@pytest.mark.django_db
+def test_context_processor_hides_stale_overdue_notification(django_user_model):
+    instructor = django_user_model.objects.create_user(
+        username="inst_cleanup4", password="pw"
+    )
+
+    stale = Notification.objects.create(
+        user=instructor,
+        message=f"📌 You have 1 {OVERDUE_SPR_NOTIFICATION_FRAGMENT}(s)",
+        dismissed=False,
+    )
+    keep = Notification.objects.create(
+        user=instructor,
+        message="General notification",
+        dismissed=False,
+    )
+
+    request = RequestFactory().get("/")
+    request.user = instructor
+
+    context = notifications_context(request)
+    rendered_notifications = context["notifications"]
+
+    assert stale not in rendered_notifications
+    assert keep in rendered_notifications

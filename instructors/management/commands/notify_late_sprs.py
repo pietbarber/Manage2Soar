@@ -1,13 +1,11 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
-from instructors.models import InstructionReport
+from instructors.utils import get_overdue_sprs, get_spr_escalation_level
 from logsheet.models import Flight
-from members.models import Member
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
@@ -37,15 +35,11 @@ class Command(BaseCronJobCommand):
         self.log_info(f"Checking for overdue SPRs from flights since {cutoff_date}")
 
         # Find instructional flights that might need SPRs
-        instructional_flights = (
-            Flight.objects.filter(
-                instructor__isnull=False,  # Has an instructor
-                logsheet__finalized=True,  # From finalized logsheets only
-                logsheet__log_date__gte=cutoff_date,  # Within our time window
-                logsheet__log_date__lt=now().date(),  # Not today's flights
-            )
-            .select_related("instructor", "pilot", "logsheet")
-            .order_by("logsheet__log_date", "instructor")
+        instructional_flights = Flight.objects.filter(
+            instructor__isnull=False,  # Has an instructor
+            logsheet__finalized=True,  # From finalized logsheets only
+            logsheet__log_date__gte=cutoff_date,  # Within our time window
+            logsheet__log_date__lt=now().date(),  # Not today's flights
         )
 
         if not instructional_flights.exists():
@@ -56,51 +50,7 @@ class Command(BaseCronJobCommand):
             f"Checking {instructional_flights.count()} instructional flights for missing SPRs"
         )
 
-        # Group flights by instructor and student combination
-        instructor_student_flights = {}
-
-        for flight in instructional_flights:
-            if not flight.instructor or not flight.pilot:
-                continue
-
-            key = (flight.instructor, flight.pilot)
-            if key not in instructor_student_flights:
-                instructor_student_flights[key] = []
-
-            instructor_student_flights[key].append(flight)
-
-        # Check each instructor-student combination for missing SPRs
-        overdue_sprs = {}
-
-        for (instructor, student), flights in instructor_student_flights.items():
-            # Sort flights by date to process chronologically
-            flights.sort(key=lambda f: f.logsheet.log_date)
-
-            for flight in flights:
-                flight_date = flight.logsheet.log_date
-                days_since_flight = (now().date() - flight_date).days
-
-                # Check if there's an SPR for this flight
-                spr_exists = InstructionReport.objects.filter(
-                    instructor=instructor, student=student, report_date=flight_date
-                ).exists()
-
-                if not spr_exists and days_since_flight >= 7:  # Overdue threshold
-                    # Determine escalation level
-                    escalation_level = self._get_escalation_level(days_since_flight)
-
-                    if instructor not in overdue_sprs:
-                        overdue_sprs[instructor] = []
-
-                    overdue_sprs[instructor].append(
-                        {
-                            "flight": flight,
-                            "student": student,
-                            "days_overdue": days_since_flight,
-                            "escalation_level": escalation_level,
-                            "flight_date": flight_date,
-                        }
-                    )
+        overdue_sprs = get_overdue_sprs(max_days=max_days, as_of_date=now().date())
 
         if not overdue_sprs:
             self.log_info("No overdue SPRs found")
@@ -141,16 +91,7 @@ class Command(BaseCronJobCommand):
 
     def _get_escalation_level(self, days_overdue):
         """Determine escalation level based on days overdue"""
-        if days_overdue >= 30:
-            return "FINAL"  # 30+ days: Final notice
-        elif days_overdue >= 25:
-            return "URGENT"  # 25+ days: Urgent
-        elif days_overdue >= 21:
-            return "WARNING"  # 21+ days: Strong warning
-        elif days_overdue >= 14:
-            return "REMINDER"  # 14+ days: Escalated reminder
-        else:  # 7+ days
-            return "NOTICE"  # 7+ days: Initial notice
+        return get_spr_escalation_level(days_overdue)
 
     def _send_notification(self, instructor, spr_data):
         """Send email and in-app notification to instructor about overdue SPRs"""

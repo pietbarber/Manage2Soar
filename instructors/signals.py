@@ -9,7 +9,11 @@ from django.urls import NoReverseMatch, reverse
 from notifications.models import Notification
 
 from .models import GroundInstruction, InstructionReport, MemberQualification
-from .utils import update_student_progress_snapshot
+from .utils import (
+    OVERDUE_SPR_NOTIFICATION_FRAGMENT,
+    get_instructor_overdue_spr_count,
+    update_student_progress_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +80,27 @@ def notify_student_on_instruction_report(sender, instance, created, **kwargs):
         logger.exception("notify_student_on_instruction_report failed")
         # Don't re-raise from signal handlers; swallowing prevents breaking
         # the main save operation (tests and production rely on this pattern).
+        return
+
+
+@receiver(post_save, sender=InstructionReport)
+def dismiss_stale_overdue_spr_notifications(sender, instance, **kwargs):
+    """Dismiss overdue SPR reminders once an instructor has no overdue SPRs left."""
+    try:
+        instructor = instance.instructor
+        if not instructor:
+            return
+
+        if get_instructor_overdue_spr_count(instructor) > 0:
+            return
+
+        Notification.objects.filter(
+            user=instructor,
+            dismissed=False,
+            message__contains=OVERDUE_SPR_NOTIFICATION_FRAGMENT,
+        ).update(dismissed=True)
+    except Exception:
+        logger.exception("dismiss_stale_overdue_spr_notifications failed")
         return
 
 

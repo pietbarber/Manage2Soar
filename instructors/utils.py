@@ -27,6 +27,108 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
+OVERDUE_SPR_NOTIFICATION_FRAGMENT = "overdue Student Progress Report"
+
+
+def get_spr_escalation_level(days_overdue):
+    """Determine escalation level for an overdue SPR based on age in days."""
+    if days_overdue >= 30:
+        return "FINAL"
+    if days_overdue >= 25:
+        return "URGENT"
+    if days_overdue >= 21:
+        return "WARNING"
+    if days_overdue >= 14:
+        return "REMINDER"
+    return "NOTICE"
+
+
+def get_overdue_sprs(max_days=30, as_of_date=None, instructor=None):
+    """Return overdue SPR data grouped by instructor.
+
+    A flight is considered overdue when it is at least 7 days old and no
+    InstructionReport exists for the same instructor, student and flight date.
+    """
+    as_of = as_of_date or timezone.now().date()
+    cutoff_date = as_of - timedelta(days=max_days)
+
+    flights_qs = Flight.objects.filter(
+        instructor__isnull=False,
+        pilot__isnull=False,
+        logsheet__finalized=True,
+        logsheet__log_date__gte=cutoff_date,
+        logsheet__log_date__lt=as_of,
+    )
+
+    if instructor is not None:
+        flights_qs = flights_qs.filter(instructor=instructor)
+
+    flights = list(
+        flights_qs.select_related("instructor", "pilot", "logsheet").order_by(
+            "logsheet__log_date", "instructor", "pilot"
+        )
+    )
+
+    if not flights:
+        return {}
+
+    report_qs = InstructionReport.objects.filter(
+        report_date__gte=cutoff_date,
+        report_date__lt=as_of,
+    )
+
+    if instructor is not None:
+        report_qs = report_qs.filter(instructor=instructor)
+    else:
+        report_qs = report_qs.filter(
+            instructor_id__in={flight.instructor_id for flight in flights}
+        )
+
+    existing_reports = set(
+        report_qs.values_list("instructor_id", "student_id", "report_date")
+    )
+
+    overdue_by_instructor = {}
+    for flight in flights:
+        flight_date = flight.logsheet.log_date
+        days_since_flight = (as_of - flight_date).days
+
+        if days_since_flight < 7:
+            continue
+
+        report_key = (flight.instructor_id, flight.pilot_id, flight_date)
+        if report_key in existing_reports:
+            continue
+
+        overdue_by_instructor.setdefault(flight.instructor, []).append(
+            {
+                "flight": flight,
+                "student": flight.pilot,
+                "days_overdue": days_since_flight,
+                "escalation_level": get_spr_escalation_level(days_since_flight),
+                "flight_date": flight_date,
+            }
+        )
+
+    return overdue_by_instructor
+
+
+def get_instructor_overdue_spr_count(instructor, max_days=30, as_of_date=None):
+    """Return overdue SPR count for a single instructor."""
+    overdue = get_overdue_sprs(
+        max_days=max_days,
+        as_of_date=as_of_date,
+        instructor=instructor,
+    )
+    if not overdue:
+        return 0
+    return len(next(iter(overdue.values())))
+
+
+def is_overdue_spr_notification_message(message):
+    """Return True when a notification message is an overdue SPR reminder."""
+    return OVERDUE_SPR_NOTIFICATION_FRAGMENT in (message or "")
+
 
 ####################################################
 # get_flight_summary_for_member
