@@ -9,13 +9,13 @@ def _is_stale_overdue_spr_notification(notification, overdue_spr_count):
     if not is_overdue_spr_notification_message(notification.message):
         return False
 
-    return overdue_spr_count == 0
+    return not overdue_spr_count
 
 
 def notifications(request):
     if request.user.is_authenticated:
         from instructors.utils import (
-            get_instructor_overdue_spr_count,
+            get_instructor_has_overdue_sprs,
             is_overdue_spr_notification_message,
         )
 
@@ -29,10 +29,10 @@ def notifications(request):
                 is_overdue_spr_notification_message(notification.message)
                 for notification in notifications
             )
-            overdue_spr_count = (
-                get_instructor_overdue_spr_count(request.user)
+            overdue_spr_exists = (
+                get_instructor_has_overdue_sprs(request.user)
                 if has_overdue_spr_notifications
-                else None
+                else False
             )
 
             notifications = [
@@ -40,7 +40,7 @@ def notifications(request):
                 for notification in notifications
                 if not _is_stale_overdue_spr_notification(
                     notification,
-                    overdue_spr_count,
+                    overdue_spr_exists,
                 )
             ]
     else:

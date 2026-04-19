@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Count, F, Max, Q, Sum, Value
+from django.db.models import Count, Exists, F, Max, OuterRef, Q, Sum, Value
 from django.db.models.fields import DurationField
 from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
@@ -121,6 +121,42 @@ def get_instructor_overdue_spr_count(instructor, max_days=30, as_of_date=None):
         instructor=instructor,
     )
     return len(overdue.get(instructor, []))
+
+
+def get_instructor_has_overdue_sprs(instructor, max_days=30, as_of_date=None):
+    """Return True when instructor has at least one overdue SPR.
+
+    This uses a DB-side EXISTS check and avoids materializing full overdue
+    flight/report datasets in Python for request-time checks.
+    """
+    if not instructor:
+        return False
+
+    as_of = as_of_date or timezone.now().date()
+    cutoff_date = as_of - timedelta(days=max_days)
+    overdue_cutoff = as_of - timedelta(days=7)
+
+    if overdue_cutoff < cutoff_date:
+        return False
+
+    report_exists = InstructionReport.objects.filter(
+        instructor_id=OuterRef("instructor_id"),
+        student_id=OuterRef("pilot_id"),
+        report_date=OuterRef("logsheet__log_date"),
+    )
+
+    return (
+        Flight.objects.filter(
+            instructor=instructor,
+            pilot__isnull=False,
+            logsheet__finalized=True,
+            logsheet__log_date__gte=cutoff_date,
+            logsheet__log_date__lte=overdue_cutoff,
+        )
+        .annotate(has_report=Exists(report_exists))
+        .filter(has_report=False)
+        .exists()
+    )
 
 
 def is_overdue_spr_notification_message(message):
