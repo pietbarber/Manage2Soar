@@ -4,7 +4,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
-from instructors.utils import get_overdue_sprs, get_spr_escalation_level
+from instructors.utils import get_overdue_sprs
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
@@ -71,10 +71,6 @@ class Command(BaseCronJobCommand):
             )
         else:
             self.log_info("No notifications sent (dry run mode)")
-
-    def _get_escalation_level(self, days_overdue):
-        """Determine escalation level based on days overdue"""
-        return get_spr_escalation_level(days_overdue)
 
     def _send_notification(self, instructor, spr_data):
         """Send email and in-app notification to instructor about overdue SPRs"""

@@ -14,7 +14,10 @@ def _is_stale_overdue_spr_notification(notification, overdue_spr_count):
 
 def notifications(request):
     if request.user.is_authenticated:
-        from instructors.utils import get_instructor_overdue_spr_count
+        from instructors.utils import (
+            get_instructor_overdue_spr_count,
+            is_overdue_spr_notification_message,
+        )
 
         notifications_qs = Notification.objects.filter(
             user=request.user, dismissed=False
@@ -23,7 +26,7 @@ def notifications(request):
         notifications = list(notifications_qs)
         if notifications:
             has_overdue_spr_notifications = any(
-                "overdue Student Progress Report" in (notification.message or "")
+                is_overdue_spr_notification_message(notification.message)
                 for notification in notifications
             )
             overdue_spr_count = (
