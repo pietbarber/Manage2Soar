@@ -5,11 +5,16 @@ from django.apps import apps
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 
 from notifications.models import Notification
 
 from .models import GroundInstruction, InstructionReport, MemberQualification
-from .utils import update_student_progress_snapshot
+from .utils import (
+    OVERDUE_SPR_NOTIFICATION_FRAGMENT,
+    get_instructor_has_overdue_sprs,
+    update_student_progress_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +81,38 @@ def notify_student_on_instruction_report(sender, instance, created, **kwargs):
         logger.exception("notify_student_on_instruction_report failed")
         # Don't re-raise from signal handlers; swallowing prevents breaking
         # the main save operation (tests and production rely on this pattern).
+        return
+
+
+@receiver(post_save, sender=InstructionReport)
+def dismiss_stale_overdue_spr_notifications(sender, instance, **kwargs):
+    """Dismiss overdue SPR reminders once an instructor has no overdue SPRs left."""
+    try:
+        instructor = instance.instructor
+        if not instructor:
+            return
+
+        # Overdue reminders only concern reports that are at least 7 days old.
+        if (
+            not instance.report_date
+            or (timezone.localdate() - instance.report_date).days < 7
+        ):
+            return
+
+        overdue_notification_qs = Notification.objects.filter(
+            user=instructor,
+            dismissed=False,
+            message__contains=OVERDUE_SPR_NOTIFICATION_FRAGMENT,
+        )
+        if not overdue_notification_qs.exists():
+            return
+
+        if get_instructor_has_overdue_sprs(instructor):
+            return
+
+        overdue_notification_qs.update(dismissed=True)
+    except Exception:
+        logger.exception("dismiss_stale_overdue_spr_notifications failed")
         return
 
 
