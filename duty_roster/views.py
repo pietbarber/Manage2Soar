@@ -134,23 +134,37 @@ def blackout_manage(request):
         )
 
     percent_options = [0, 25, 33, 50, 66, 75, 100]
+    site_config = SiteConfiguration.objects.first()
+    role_schedule_flags = {
+        "instructor": bool(site_config and site_config.schedule_instructors),
+        "duty_officer": bool(site_config and site_config.schedule_duty_officers),
+        "ado": bool(site_config and site_config.schedule_assistant_duty_officers),
+        "towpilot": bool(site_config and site_config.schedule_tow_pilots),
+        "commercial_pilot": bool(
+            site_config and site_config.schedule_commercial_pilots
+        ),
+    }
+
     role_choices = []
-    if member.instructor:
+    if member.instructor and role_schedule_flags["instructor"]:
         role_choices.append(("instructor", "Flight Instructor"))
-    if member.duty_officer:
+    if member.duty_officer and role_schedule_flags["duty_officer"]:
         role_choices.append(
             ("duty_officer", get_role_title("duty_officer") or "Duty Officer")
         )
-    if member.assistant_duty_officer:
+    if member.assistant_duty_officer and role_schedule_flags["ado"]:
         role_choices.append(
             (
                 "ado",
                 get_role_title("assistant_duty_officer") or "Assistant Duty Officer",
             )
         )
-    if member.towpilot:
+    if member.towpilot and role_schedule_flags["towpilot"]:
         role_choices.append(("towpilot", "Tow Pilot"))
-    if _is_commercial_pilot_qualified(member):
+    if (
+        _is_commercial_pilot_qualified(member)
+        and role_schedule_flags["commercial_pilot"]
+    ):
         role_choices.append(
             (
                 "commercial_pilot",
