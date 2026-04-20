@@ -114,6 +114,13 @@ class DutyPreferenceForm(forms.ModelForm):
             return True
         return role_attr in self.scheduled_roles
 
+    def _should_accept_role_percent(self, member, role_attr):
+        return (
+            bool(member)
+            and self._is_role_scheduled(role_attr)
+            and self._member_has_role(member, role_attr)
+        )
+
     def _count_member_roles(self, member):
         """Count how many duty roles the member has."""
         if not member:
@@ -173,6 +180,11 @@ class DutyPreferenceForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+
+        member = self.member
+        for role_attr, field_name in DUTY_ROLE_FIELDS:
+            if not self._should_accept_role_percent(member, role_attr):
+                cleaned_data[field_name] = 0
 
         # Handle single-role members automatically
         single_role_field = (
