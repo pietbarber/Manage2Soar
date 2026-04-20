@@ -270,13 +270,14 @@ def blackout_manage(request):
                 if is_scheduled
             ],
         )
-        if not form.is_valid():
+        form_is_valid = form.is_valid()
+        if not form_is_valid:
             # Add form errors to messages so user can see them
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f"{field}: {error}")
 
-        if form.is_valid():
+        if form_is_valid:
             data = form.cleaned_data
             DutyPreference.objects.update_or_create(
                 member=member,
