@@ -134,6 +134,15 @@ def blackout_manage(request):
         )
 
     percent_options = [0, 25, 33, 50, 66, 75, 100]
+    role_to_percent_field = {
+        "instructor": "instructor_percent",
+        "duty_officer": "duty_officer_percent",
+        "ado": "ado_percent",
+        "towpilot": "towpilot_percent",
+        "commercial_pilot": "commercial_pilot_percent",
+    }
+    all_possible_roles = list(role_to_percent_field.keys())
+
     site_config = SiteConfiguration.objects.first()
     role_schedule_flags = {
         "instructor": bool(site_config and site_config.schedule_instructors),
@@ -171,6 +180,7 @@ def blackout_manage(request):
                 get_role_title("commercial_pilot") or "Commercial Pilot",
             )
         )
+    shown_roles = [role for role, _label in role_choices]
 
     pair_with = list(
         Member.objects.filter(pairing_target__member=member).order_by(
@@ -236,8 +246,15 @@ def blackout_manage(request):
         if to_add or to_remove:
             messages.success(request, "Blackout dates updated successfully.")
 
+        # Ensure percent fields are always present even when hidden by role/config filtering.
+        # This mirrors template hidden inputs and protects direct POST clients.
+        post_data = request.POST.copy()
+        for percent_field in role_to_percent_field.values():
+            if percent_field not in post_data:
+                post_data[percent_field] = "0"
+
         # Try to process duty preferences, but don't let it block blackout updates
-        form = DutyPreferenceForm(request.POST, member=member)
+        form = DutyPreferenceForm(post_data, member=member)
         if not form.is_valid():
             # Add form errors to messages so user can see them
             for field, errors in form.errors.items():
@@ -310,6 +327,8 @@ def blackout_manage(request):
             "avoid_with_ids": avoid_with_ids,
             "all_other_members": all_other,
             "member_optgroups": member_optgroups,
+            "all_possible_roles": all_possible_roles,
+            "shown_roles": shown_roles,
             "form": form,
         },
     )
