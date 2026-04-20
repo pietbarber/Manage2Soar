@@ -43,7 +43,12 @@ from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url
 
-from .forms import DutyAssignmentForm, DutyPreferenceForm, DutyRosterMessageForm
+from .forms import (
+    DUTY_ROLE_FIELDS,
+    DutyAssignmentForm,
+    DutyPreferenceForm,
+    DutyRosterMessageForm,
+)
 from .models import (
     DutyAssignment,
     DutyAvoidance,
@@ -134,29 +139,62 @@ def blackout_manage(request):
         )
 
     percent_options = [0, 25, 33, 50, 66, 75, 100]
+    role_form_key_map = {
+        "assistant_duty_officer": "ado",
+    }
+    all_possible_roles = [
+        role_form_key_map.get(role_attr, role_attr)
+        for role_attr, _field_name in DUTY_ROLE_FIELDS
+    ]
+
+    site_config = SiteConfiguration.objects.first()
+    role_schedule_flags = {
+        "instructor": bool(site_config and site_config.schedule_instructors),
+        "duty_officer": bool(site_config and site_config.schedule_duty_officers),
+        "ado": bool(site_config and site_config.schedule_assistant_duty_officers),
+        "towpilot": bool(site_config and site_config.schedule_tow_pilots),
+        "commercial_pilot": bool(
+            site_config and site_config.schedule_commercial_pilots
+        ),
+    }
+    scheduled_roles_for_form = {
+        "instructor": role_schedule_flags["instructor"],
+        "duty_officer": role_schedule_flags["duty_officer"],
+        "assistant_duty_officer": role_schedule_flags["ado"],
+        "towpilot": role_schedule_flags["towpilot"],
+        "commercial_pilot": role_schedule_flags["commercial_pilot"],
+    }
+    scheduled_roles = [
+        role for role, is_scheduled in scheduled_roles_for_form.items() if is_scheduled
+    ]
+
     role_choices = []
-    if member.instructor:
+    if member.instructor and role_schedule_flags["instructor"]:
         role_choices.append(("instructor", "Flight Instructor"))
-    if member.duty_officer:
+    if member.duty_officer and role_schedule_flags["duty_officer"]:
         role_choices.append(
             ("duty_officer", get_role_title("duty_officer") or "Duty Officer")
         )
-    if member.assistant_duty_officer:
+    if member.assistant_duty_officer and role_schedule_flags["ado"]:
         role_choices.append(
             (
                 "ado",
                 get_role_title("assistant_duty_officer") or "Assistant Duty Officer",
             )
         )
-    if member.towpilot:
+    if member.towpilot and role_schedule_flags["towpilot"]:
         role_choices.append(("towpilot", "Tow Pilot"))
-    if _is_commercial_pilot_qualified(member):
+    if (
+        _is_commercial_pilot_qualified(member)
+        and role_schedule_flags["commercial_pilot"]
+    ):
         role_choices.append(
             (
                 "commercial_pilot",
                 get_role_title("commercial_pilot") or "Commercial Pilot",
             )
         )
+    shown_roles = [role for role, _label in role_choices]
 
     pair_with = list(
         Member.objects.filter(pairing_target__member=member).order_by(
@@ -222,15 +260,27 @@ def blackout_manage(request):
         if to_add or to_remove:
             messages.success(request, "Blackout dates updated successfully.")
 
+        # Ensure percent fields are always present even when hidden by role/config filtering.
+        # This mirrors template hidden inputs and protects direct POST clients.
+        post_data = request.POST.copy()
+        for _role_attr, percent_field in DUTY_ROLE_FIELDS:
+            if percent_field not in post_data:
+                post_data[percent_field] = "0"
+
         # Try to process duty preferences, but don't let it block blackout updates
-        form = DutyPreferenceForm(request.POST, member=member)
-        if not form.is_valid():
+        form = DutyPreferenceForm(
+            post_data,
+            member=member,
+            scheduled_roles=scheduled_roles,
+        )
+        form_is_valid = form.is_valid()
+        if not form_is_valid:
             # Add form errors to messages so user can see them
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f"{field}: {error}")
 
-        if form.is_valid():
+        if form_is_valid:
             data = form.cleaned_data
             DutyPreference.objects.update_or_create(
                 member=member,
@@ -278,7 +328,11 @@ def blackout_manage(request):
             "pair_with": list(pair_with_ids),
             "avoid_with": list(avoid_with_ids),
         }
-        form = DutyPreferenceForm(initial=initial, member=member)
+        form = DutyPreferenceForm(
+            initial=initial,
+            member=member,
+            scheduled_roles=scheduled_roles,
+        )
 
     response = render(
         request,
@@ -296,6 +350,8 @@ def blackout_manage(request):
             "avoid_with_ids": avoid_with_ids,
             "all_other_members": all_other,
             "member_optgroups": member_optgroups,
+            "all_possible_roles": all_possible_roles,
+            "shown_roles": shown_roles,
             "form": form,
         },
     )
