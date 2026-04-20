@@ -43,7 +43,12 @@ from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url
 
-from .forms import DutyAssignmentForm, DutyPreferenceForm, DutyRosterMessageForm
+from .forms import (
+    DUTY_ROLE_FIELDS,
+    DutyAssignmentForm,
+    DutyPreferenceForm,
+    DutyRosterMessageForm,
+)
 from .models import (
     DutyAssignment,
     DutyAvoidance,
@@ -134,14 +139,13 @@ def blackout_manage(request):
         )
 
     percent_options = [0, 25, 33, 50, 66, 75, 100]
-    role_to_percent_field = {
-        "instructor": "instructor_percent",
-        "duty_officer": "duty_officer_percent",
-        "ado": "ado_percent",
-        "towpilot": "towpilot_percent",
-        "commercial_pilot": "commercial_pilot_percent",
+    role_form_key_map = {
+        "assistant_duty_officer": "ado",
     }
-    all_possible_roles = list(role_to_percent_field.keys())
+    all_possible_roles = [
+        role_form_key_map.get(role_attr, role_attr)
+        for role_attr, _field_name in DUTY_ROLE_FIELDS
+    ]
 
     site_config = SiteConfiguration.objects.first()
     role_schedule_flags = {
@@ -256,7 +260,7 @@ def blackout_manage(request):
         # Ensure percent fields are always present even when hidden by role/config filtering.
         # This mirrors template hidden inputs and protects direct POST clients.
         post_data = request.POST.copy()
-        for percent_field in role_to_percent_field.values():
+        for _role_attr, percent_field in DUTY_ROLE_FIELDS:
             if percent_field not in post_data:
                 post_data[percent_field] = "0"
 
