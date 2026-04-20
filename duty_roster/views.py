@@ -164,6 +164,9 @@ def blackout_manage(request):
         "towpilot": role_schedule_flags["towpilot"],
         "commercial_pilot": role_schedule_flags["commercial_pilot"],
     }
+    scheduled_roles = [
+        role for role, is_scheduled in scheduled_roles_for_form.items() if is_scheduled
+    ]
 
     role_choices = []
     if member.instructor and role_schedule_flags["instructor"]:
@@ -268,11 +271,7 @@ def blackout_manage(request):
         form = DutyPreferenceForm(
             post_data,
             member=member,
-            scheduled_roles=[
-                role
-                for role, is_scheduled in scheduled_roles_for_form.items()
-                if is_scheduled
-            ],
+            scheduled_roles=scheduled_roles,
         )
         form_is_valid = form.is_valid()
         if not form_is_valid:
@@ -332,11 +331,7 @@ def blackout_manage(request):
         form = DutyPreferenceForm(
             initial=initial,
             member=member,
-            scheduled_roles=[
-                role
-                for role, is_scheduled in scheduled_roles_for_form.items()
-                if is_scheduled
-            ],
+            scheduled_roles=scheduled_roles,
         )
 
     response = render(
