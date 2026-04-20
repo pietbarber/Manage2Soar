@@ -109,12 +109,18 @@ class DutyPreferenceForm(forms.ModelForm):
     def _member_has_role(member, role_attr):
         return member_has_role(member, role_attr)
 
+    def _is_role_scheduled(self, role_attr):
+        if self.scheduled_roles is None:
+            return True
+        return role_attr in self.scheduled_roles
+
     def _count_member_roles(self, member):
         """Count how many duty roles the member has."""
         if not member:
             return 0
         return sum(
             self._member_has_role(member, role_attr)
+            and self._is_role_scheduled(role_attr)
             for role_attr, _ in DUTY_ROLE_FIELDS
         )
 
@@ -124,14 +130,19 @@ class DutyPreferenceForm(forms.ModelForm):
             return None
 
         for role_attr, field_name in DUTY_ROLE_FIELDS:
-            if self._member_has_role(member, role_attr):
+            if self._member_has_role(member, role_attr) and self._is_role_scheduled(
+                role_attr
+            ):
                 return field_name
 
         return None
 
-    def __init__(self, *args, member=None, **kwargs):
+    def __init__(self, *args, member=None, scheduled_roles=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.member = member
+        self.scheduled_roles = (
+            set(scheduled_roles) if scheduled_roles is not None else None
+        )
 
         if member:
             selectable_members = (
@@ -151,7 +162,8 @@ class DutyPreferenceForm(forms.ModelForm):
             # If member has only one role, default it to 100%
             for role_attr, field_name in DUTY_ROLE_FIELDS:
                 has_role = self._member_has_role(member, role_attr)
-                if not has_role:
+                is_scheduled = self._is_role_scheduled(role_attr)
+                if not has_role or not is_scheduled:
                     self.fields[field_name].required = False
                     self.fields[field_name].initial = 0
                 elif role_count == 1:

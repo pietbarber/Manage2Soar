@@ -1686,3 +1686,45 @@ class BlackoutRoleChoiceSiteConfigTests(TestCase):
         self.assertEqual(pref.commercial_pilot_percent, 0)
         self.assertEqual(pref.towpilot_percent, 0)
         self.assertContains(response, "Duty preferences saved successfully")
+
+    def test_single_role_member_disabled_by_config_stays_zero_percent(self):
+        commercial_only_member = Member.objects.create(
+            username="commercialonly",
+            email="commercialonly@test.com",
+            first_name="Commercial",
+            last_name="Only",
+            membership_status="Full Member",
+            glider_rating="commercial",
+            instructor=False,
+            duty_officer=False,
+            assistant_duty_officer=False,
+            towpilot=False,
+        )
+
+        self.config.schedule_instructors = False
+        self.config.schedule_tow_pilots = False
+        self.config.schedule_duty_officers = False
+        self.config.schedule_assistant_duty_officers = False
+        self.config.schedule_commercial_pilots = False
+        self.config.save()
+
+        self.client.force_login(commercial_only_member)
+        response = self.client.post(
+            reverse("duty_roster:blackout_manage"),
+            data={
+                "preferred_day": "",
+                "dont_schedule": "",
+                "scheduling_suspended": "",
+                "suspended_reason": "",
+                "comment": "",
+                "max_assignments_per_month": "4",
+                "allow_weekend_double": "",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        pref = DutyPreference.objects.get(member=commercial_only_member)
+        self.assertEqual(pref.commercial_pilot_percent, 0)
+        self.assertEqual(pref.instructor_percent, 0)
+        self.assertContains(response, "Duty preferences saved successfully")

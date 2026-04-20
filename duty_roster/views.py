@@ -153,6 +153,13 @@ def blackout_manage(request):
             site_config and site_config.schedule_commercial_pilots
         ),
     }
+    scheduled_roles_for_form = {
+        "instructor": role_schedule_flags["instructor"],
+        "duty_officer": role_schedule_flags["duty_officer"],
+        "assistant_duty_officer": role_schedule_flags["ado"],
+        "towpilot": role_schedule_flags["towpilot"],
+        "commercial_pilot": role_schedule_flags["commercial_pilot"],
+    }
 
     role_choices = []
     if member.instructor and role_schedule_flags["instructor"]:
@@ -254,7 +261,15 @@ def blackout_manage(request):
                 post_data[percent_field] = "0"
 
         # Try to process duty preferences, but don't let it block blackout updates
-        form = DutyPreferenceForm(post_data, member=member)
+        form = DutyPreferenceForm(
+            post_data,
+            member=member,
+            scheduled_roles=[
+                role
+                for role, is_scheduled in scheduled_roles_for_form.items()
+                if is_scheduled
+            ],
+        )
         if not form.is_valid():
             # Add form errors to messages so user can see them
             for field, errors in form.errors.items():
@@ -309,7 +324,15 @@ def blackout_manage(request):
             "pair_with": list(pair_with_ids),
             "avoid_with": list(avoid_with_ids),
         }
-        form = DutyPreferenceForm(initial=initial, member=member)
+        form = DutyPreferenceForm(
+            initial=initial,
+            member=member,
+            scheduled_roles=[
+                role
+                for role, is_scheduled in scheduled_roles_for_form.items()
+                if is_scheduled
+            ],
+        )
 
     response = render(
         request,
