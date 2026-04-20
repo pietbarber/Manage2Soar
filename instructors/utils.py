@@ -51,13 +51,17 @@ def get_overdue_sprs(max_days=30, as_of_date=None, instructor=None):
     """
     as_of = as_of_date or timezone.localdate()
     cutoff_date = as_of - timedelta(days=max_days)
+    overdue_cutoff = as_of - timedelta(days=7)
+
+    if overdue_cutoff < cutoff_date:
+        return {}
 
     flights_qs = Flight.objects.filter(
         instructor__isnull=False,
         pilot__isnull=False,
         logsheet__finalized=True,
         logsheet__log_date__gte=cutoff_date,
-        logsheet__log_date__lt=as_of,
+        logsheet__log_date__lte=overdue_cutoff,
     )
 
     if instructor is not None:
@@ -92,9 +96,6 @@ def get_overdue_sprs(max_days=30, as_of_date=None, instructor=None):
     for flight in flights:
         flight_date = flight.logsheet.log_date
         days_since_flight = (as_of - flight_date).days
-
-        if days_since_flight < 7:
-            continue
 
         report_key = (flight.instructor_id, flight.pilot_id, flight_date)
         if report_key in existing_reports:

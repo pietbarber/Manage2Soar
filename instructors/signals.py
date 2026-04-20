@@ -99,14 +99,18 @@ def dismiss_stale_overdue_spr_notifications(sender, instance, **kwargs):
         ):
             return
 
-        if get_instructor_has_overdue_sprs(instructor):
-            return
-
-        Notification.objects.filter(
+        overdue_notification_qs = Notification.objects.filter(
             user=instructor,
             dismissed=False,
             message__contains=OVERDUE_SPR_NOTIFICATION_FRAGMENT,
-        ).update(dismissed=True)
+        )
+        if not overdue_notification_qs.exists():
+            return
+
+        if get_instructor_has_overdue_sprs(instructor):
+            return
+
+        overdue_notification_qs.update(dismissed=True)
     except Exception:
         logger.exception("dismiss_stale_overdue_spr_notifications failed")
         return
