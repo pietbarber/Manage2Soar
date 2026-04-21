@@ -216,7 +216,7 @@
             PROVISIONING → FAILED_NOT_VISIBLE (DNS issue)
 
           Next steps:
-          1. Verify DNS records point to Gateway IP: {{ gke_gateway_ip | default('34.13.120.184') }}
+          1. Verify DNS records point to Gateway IP: {{ gke_gateway_ip | default('unknown') }}
           2. Wait for all domains to show ACTIVE status
           3. Test each domain with: curl -I https://<your-domain>
           4. Trim Gateway cert annotation to target cert only:
