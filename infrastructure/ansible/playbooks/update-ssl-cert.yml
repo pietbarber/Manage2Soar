@@ -88,6 +88,7 @@
       delegate_to: localhost
       run_once: true
       changed_when: false
+      when: not ansible_check_mode
       tags: [gke-auth]
 
     - name: Read currently attached Gateway certificate annotation
