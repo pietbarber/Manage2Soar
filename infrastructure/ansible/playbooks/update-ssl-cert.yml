@@ -33,7 +33,7 @@
         all_tenant_domains: >-
           {%- set domains = [] -%}
           {%- if gke_multi_tenant | default(false) | bool -%}
-            {%- for tenant in gke_tenants -%}
+            {%- for tenant in (gke_tenants | default([])) -%}
               {%- if tenant.domains is defined -%}
                 {%- for domain in tenant.domains -%}
                   {%- set _ = domains.append(domain) -%}
@@ -44,12 +44,30 @@
             {%- endfor -%}
           {%- else -%}
             {%- if gke_domains is defined -%}
-              {%- set domains = gke_domains -%}
+              {%- if gke_domains is string -%}
+                {%- set _ = domains.append(gke_domains) -%}
+              {%- else -%}
+                {%- for domain in gke_domains -%}
+                  {%- set _ = domains.append(domain) -%}
+                {%- endfor -%}
+              {%- endif -%}
             {%- elif gke_domain is defined -%}
               {%- set _ = domains.append(gke_domain) -%}
             {%- endif -%}
           {%- endif -%}
           {{ domains | unique | list }}
+      run_once: true
+      delegate_to: localhost
+      tags: [always]
+
+    - name: Validate multi-tenant domain source configuration
+      ansible.builtin.assert:
+        that:
+          - (gke_tenants | default([]) | length) > 0
+        fail_msg: |
+          gke_multi_tenant is enabled but gke_tenants is not configured.
+          Define gke_tenants in inventory/group_vars so certificate domains can be collected.
+      when: gke_multi_tenant | default(false) | bool
       run_once: true
       delegate_to: localhost
       tags: [always]
