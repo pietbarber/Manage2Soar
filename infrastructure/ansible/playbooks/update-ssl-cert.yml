@@ -2,12 +2,23 @@
 # Update SSL Certificate with New Domains
 #
 # This playbook updates the Google-managed SSL certificate to include
-# all domains defined in the inventory configuration (gke_tenants.domains).
-# It deletes the existing certificate and creates a new one with all domains.
+# all domains defined in the inventory configuration (gke_tenants/domains).
+#
+# SAFE ROTATION (no delete-first):
+# 1) Create/use a NEW certificate name
+# 2) Attach old+new certs on Gateway during provisioning
+# 3) After new cert is ACTIVE, trim Gateway to new cert only
+# 4) Optionally delete old cert later
 #
 # Usage:
 #   ansible-playbook -i inventory/gcp_app.yml \
 #     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/update-ssl-cert.yml
+#
+#   # Recommended: provide a NEW cert name for rotation
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     -e "ssl_target_cert_name=manage2soar-ssl-cert-v5" \
 #     playbooks/update-ssl-cert.yml
 
 - name: Update SSL Certificate for GKE Cluster
@@ -43,6 +54,25 @@
       delegate_to: localhost
       tags: [confirm]
 
+    - name: Determine target SSL certificate name
+      ansible.builtin.set_fact:
+        target_ssl_cert_name: "{{ ssl_target_cert_name | default(gke_ssl_cert_name) }}"
+      run_once: true
+      delegate_to: localhost
+      tags: [always]
+
+    - name: Read currently attached Gateway certificate annotation
+      ansible.builtin.command:
+        cmd: >
+          kubectl get gateway {{ gke_app_name }}-gateway -n default
+          --output "jsonpath={.spec.listeners[?(@.name=='https')].tls.options['networking.gke.io/pre-shared-certs']}"
+      register: current_gateway_certs
+      changed_when: false
+      failed_when: false
+      delegate_to: localhost
+      run_once: true
+      tags: [confirm]
+
     - name: Confirm SSL certificate update
       ansible.builtin.pause:
         prompt: |
@@ -50,7 +80,8 @@
           ========================================
           SSL Certificate Update Plan
           ========================================
-          Current certificate: {{ gke_ssl_cert_name }}
+          Current certificate annotation: {{ (current_gateway_certs.stdout | default('') | trim) | default('none') }}
+          Target certificate: {{ target_ssl_cert_name }}
 
           Domains to include in new certificate:
           {% for domain in all_tenant_domains %}
@@ -58,13 +89,14 @@
           {% endfor %}
 
           This will:
-          1. Delete existing certificate ({{ gke_ssl_cert_name }})
-          2. Create new certificate with {{ all_tenant_domains | length }} domain(s)
+          1. Create/update target certificate ({{ target_ssl_cert_name }})
+          2. Update Gateway to reference BOTH old and new certs during provisioning
           3. Trigger Google Certificate Manager provisioning (5-10 minutes)
-          4. Update Gateway to reference new certificate
+          4. Keep existing tenants on valid TLS while the new cert provisions
+          5. Leave cleanup as a separate explicit step (cert-cleanup)
 
-          IMPORTANT: Existing sites will continue to work during provisioning.
-          The Gateway will use the old certificate until the new one is ACTIVE.
+          IMPORTANT: This is the safer, non-disruptive path.
+          No delete-first operation is performed.
 
           Press ENTER to continue or Ctrl+C to abort...
 
@@ -83,33 +115,14 @@
       changed_when: false
       tags: [gke-auth]
 
-    - name: Delete old SSL certificate
-      ansible.builtin.command:
-        cmd: >
-          gcloud compute ssl-certificates delete {{ gke_ssl_cert_name }}
-          --global
-          --project={{ gcp_project }}
-          --quiet
-      register: ssl_cert_delete
-      changed_when: ssl_cert_delete.rc == 0
-      failed_when: false  # Don't fail if certificate doesn't exist
-      delegate_to: localhost
-      run_once: true
-      tags: [ssl-cert]
-
-    - name: Display deletion result
-      ansible.builtin.debug:
-        msg: |
-          {{ 'Certificate deleted successfully' if ssl_cert_delete.rc == 0 else 'Certificate did not exist or was already deleted' }}
-      run_once: true
-      tags: [ssl-cert]
-
     # Import SSL certificate and Gateway tasks from gke-deploy role
     - name: Import ingress tasks to recreate SSL certificate and update Gateway
       ansible.builtin.import_role:
         name: gke-deploy
         tasks_from: ingress
       vars:
+        # Rotate to target cert name while preserving existing cert references.
+        gke_ssl_cert_name: "{{ target_ssl_cert_name }}"
         # Skip unnecessary tasks - only run TLS and Gateway
         gke_build_image: false
         gke_push_image: false
@@ -120,7 +133,7 @@
     - name: Wait for certificate provisioning to start
       ansible.builtin.command:
         cmd: >
-          gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }}
+          gcloud compute ssl-certificates describe {{ target_ssl_cert_name }}
           --global
           --project={{ gcp_project }}
           --format="value(managed.status)"
@@ -138,11 +151,11 @@
           ========================================
           SSL Certificate Provisioning Started
           ========================================
-          Certificate: {{ gke_ssl_cert_name }}
+          Target certificate: {{ target_ssl_cert_name }}
           Status: {{ ssl_cert_status.stdout | trim }}
 
           Monitor provisioning with:
-            gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }} \
+            gcloud compute ssl-certificates describe {{ target_ssl_cert_name }} \
               --global --project={{ gcp_project }} \
               --format="yaml(managed.domainStatus)"
 
@@ -156,13 +169,16 @@
           1. Verify DNS records point to Gateway IP: {{ gke_gateway_ip | default('34.13.120.184') }}
           2. Wait for all domains to show ACTIVE status
           3. Test each domain with: curl -I https://<your-domain>
-          4. Update HTTPRoutes to include new domains (see below)
+          4. Trim Gateway cert annotation to target cert only:
+             ansible-playbook -i inventory/gcp_app.yml \
+               --vault-password-file ~/.ansible_vault_pass \
+               -e "gke_ssl_cert_name={{ target_ssl_cert_name }}" \
+               playbooks/gcp-app-deploy.yml --tags cert-cleanup
+          5. After cleanup, optionally delete old cert(s) not in use.
 
-          HTTPRoute Update:
-          Run the full deployment to update HTTPRoutes with new domains:
-            ansible-playbook -i inventory/gcp_app.yml \
-              --vault-password-file ~/.ansible_vault_pass \
-              playbooks/gcp-app-deploy.yml
+          IMPORTANT:
+          Persist the target cert name in your IaC vars for future deploys:
+            group_vars/gcp_app/vars.yml -> gke_ssl_cert_name: "{{ target_ssl_cert_name }}"
           ========================================
       run_once: true
       tags: [verify]

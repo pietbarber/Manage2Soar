@@ -5,12 +5,9 @@
 # DO NOT EDIT MANUALLY - changes will be overwritten
 
 {% for club in club_domains %}
-{# Legacy format: club.prefix.mail_domain #}
-{{ club.prefix }}.{{ mail_domain }}    OK
-{# Additional domains (if configured) #}
-{% if club.domains is defined %}
-{% for domain in club.domains %}
+{# Merge legacy and explicit domains, then deduplicate #}
+{% set tenant_domains = ([club.prefix ~ '.' ~ mail_domain] + (club.domains | default([]))) | unique %}
+{% for domain in tenant_domains %}
 {{ domain }}    OK
 {% endfor %}
-{% endif %}
 {% endfor %}
