@@ -61,6 +61,17 @@
       delegate_to: localhost
       tags: [always]
 
+    - name: Get GKE cluster credentials
+      ansible.builtin.command:
+        cmd: >
+          gcloud container clusters get-credentials {{ gke_cluster_name }}
+          --zone {{ gke_cluster_zone }}
+          --project {{ gcp_project }}
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+      tags: [gke-auth]
+
     - name: Read currently attached Gateway certificate annotation
       ansible.builtin.command:
         cmd: >
@@ -79,7 +90,7 @@
           gcloud compute ssl-certificates describe {{ target_ssl_cert_name }}
           --global
           --project={{ gcp_project }}
-          --format="json(managed.domains)"
+          --format="json"
       register: target_cert_domains_json
       changed_when: false
       failed_when: false
@@ -153,17 +164,6 @@
       delegate_to: localhost
       run_once: true
       tags: [confirm]
-
-    - name: Get GKE cluster credentials
-      ansible.builtin.command:
-        cmd: >
-          gcloud container clusters get-credentials {{ gke_cluster_name }}
-          --zone {{ gke_cluster_zone }}
-          --project {{ gcp_project }}
-      delegate_to: localhost
-      run_once: true
-      changed_when: false
-      tags: [gke-auth]
 
     # Import SSL certificate and Gateway tasks from gke-deploy role
     - name: Import ingress tasks to recreate SSL certificate and update Gateway
