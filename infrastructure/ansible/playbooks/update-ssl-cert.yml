@@ -52,7 +52,7 @@
           {{ domains | unique | list }}
       run_once: true
       delegate_to: localhost
-      tags: [confirm]
+      tags: [always]
 
     - name: Determine target SSL certificate name
       ansible.builtin.set_fact:
@@ -73,6 +73,54 @@
       run_once: true
       tags: [confirm]
 
+    - name: Read existing target cert domains (if cert exists)
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute ssl-certificates describe {{ target_ssl_cert_name }}
+          --global
+          --project={{ gcp_project }}
+          --format="json(managed.domains)"
+      register: target_cert_domains_json
+      changed_when: false
+      failed_when: false
+      delegate_to: localhost
+      run_once: true
+      tags: [always]
+
+    - name: Parse existing target cert domains
+      ansible.builtin.set_fact:
+        target_cert_domains: "{{ ((target_cert_domains_json.stdout | default('{}')) | from_json).managed.domains | default([]) | sort }}"
+      when: target_cert_domains_json.rc == 0
+      run_once: true
+      delegate_to: localhost
+      tags: [always]
+
+    - name: Fail when target cert exists with a different domain set
+      ansible.builtin.fail:
+        msg: |
+          Target certificate {{ target_ssl_cert_name }} already exists, but its managed domains do not match
+          the desired domain set for this rotation.
+
+          Existing domains:
+          {% for d in (target_cert_domains | default([])) %}
+            - {{ d }}
+          {% endfor %}
+
+          Desired domains:
+          {% for d in (all_tenant_domains | default([]) | sort) %}
+            - {{ d }}
+          {% endfor %}
+
+          Compute Engine managed SSL cert domains are immutable.
+          Choose a new cert name via:
+            -e "ssl_target_cert_name={{ target_ssl_cert_name }}-vNEXT"
+      when:
+        - target_cert_domains_json.rc == 0
+        - (target_cert_domains | default([]) | sort) != (all_tenant_domains | default([]) | sort)
+      run_once: true
+      delegate_to: localhost
+      tags: [always]
+
     - name: Confirm SSL certificate update
       ansible.builtin.pause:
         prompt: |
@@ -89,11 +137,13 @@
           {% endfor %}
 
           This will:
-          1. Create/update target certificate ({{ target_ssl_cert_name }})
+          1. Create a new Compute Engine managed SSL cert (or reuse one with identical domains): {{ target_ssl_cert_name }}
           2. Update Gateway to reference BOTH old and new certs during provisioning
-          3. Trigger Google Certificate Manager provisioning (5-10 minutes)
+          3. Trigger Google-managed certificate provisioning (5-10 minutes)
           4. Keep existing tenants on valid TLS while the new cert provisions
           5. Leave cleanup as a separate explicit step (cert-cleanup)
+
+          Note: Managed cert domains are immutable. If domain set changed, use a NEW cert name.
 
           IMPORTANT: This is the safer, non-disruptive path.
           No delete-first operation is performed.
