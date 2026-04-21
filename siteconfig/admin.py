@@ -142,6 +142,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "commercial_rides_enabled",
                     "duty_default_max_assignments_per_month",
                     "use_ortools_scheduler",
+                    "enable_dynamic_duty_roles",
                 ),
                 "classes": ("collapse",),
             },

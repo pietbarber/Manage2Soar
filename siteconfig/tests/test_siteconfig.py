@@ -144,6 +144,28 @@ def test_commercial_configuration_custom_values():
     assert config.commercial_pilot_title == "Ride Pilot"
 
 
+@pytest.mark.django_db
+def test_dynamic_duty_roles_flag_defaults_disabled():
+    """Dynamic duty roles should default to disabled for backward compatibility."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+    assert config.enable_dynamic_duty_roles is False
+
+
+@pytest.mark.django_db
+def test_dynamic_duty_roles_flag_can_be_enabled():
+    """Dynamic duty roles flag should be configurable per club."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+    )
+    config.refresh_from_db()
+    assert config.enable_dynamic_duty_roles is True
+
+
 # MembershipStatus Tests
 @pytest.mark.django_db
 def test_create_membership_status():

@@ -223,6 +223,134 @@ class DutyPreference(models.Model):
         return f"Preferences for {self.member.full_display_name}"
 
 
+class DutyRoleDefinition(models.Model):
+    """Configurable duty role definition for a club/site configuration."""
+
+    LEGACY_ROLE_CHOICES = [
+        ("instructor", "Instructor"),
+        ("towpilot", "Tow Pilot"),
+        ("duty_officer", "Duty Officer"),
+        ("assistant_duty_officer", "Assistant Duty Officer"),
+        ("commercial_pilot", "Commercial Pilot"),
+        ("surge_towpilot", "Surge Tow Pilot"),
+        ("surge_instructor", "Surge Instructor"),
+    ]
+
+    site_configuration = models.ForeignKey(
+        SiteConfiguration,
+        on_delete=models.CASCADE,
+        related_name="duty_role_definitions",
+    )
+    key = models.SlugField(
+        max_length=64,
+        help_text="Stable internal key used in scheduling and integrations.",
+    )
+    display_name = models.CharField(
+        max_length=80,
+        help_text="Human-readable role label used when no legacy terminology override applies.",
+    )
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=100)
+    legacy_role_key = models.CharField(
+        max_length=32,
+        blank=True,
+        null=True,
+        choices=LEGACY_ROLE_CHOICES,
+        help_text=(
+            "Optional mapping to legacy role terminology fields in Site Configuration. "
+            "If set, terminology labels from Site Configuration take precedence."
+        ),
+    )
+    shift_code = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        help_text="Optional shift identifier (e.g. am, pm) for role/slot segmentation.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "display_name"]
+        unique_together = ("site_configuration", "key")
+
+    def __str__(self):
+        return f"{self.display_name} ({self.key})"
+
+
+class DutyQualificationRequirement(models.Model):
+    """Eligibility requirements for a dynamic duty role definition."""
+
+    TYPE_LEGACY_ROLE_FLAG = "legacy_role_flag"
+    TYPE_LEGACY_GLIDER_RATING = "legacy_glider_rating"
+    TYPE_MEMBER_DUTY_QUAL = "member_duty_qualification"
+
+    REQUIREMENT_TYPE_CHOICES = [
+        (TYPE_LEGACY_ROLE_FLAG, "Legacy member role flag"),
+        (TYPE_LEGACY_GLIDER_RATING, "Legacy glider rating"),
+        (TYPE_MEMBER_DUTY_QUAL, "Member duty qualification code"),
+    ]
+
+    role_definition = models.ForeignKey(
+        DutyRoleDefinition,
+        on_delete=models.CASCADE,
+        related_name="qualification_requirements",
+    )
+    requirement_type = models.CharField(max_length=32, choices=REQUIREMENT_TYPE_CHOICES)
+    requirement_value = models.CharField(
+        max_length=64,
+        help_text=(
+            "For legacy role flag, use member field name (e.g. instructor). "
+            "For legacy glider rating, use rating value (e.g. commercial). "
+            "For member duty qualification, use qualification code."
+        ),
+    )
+    is_required = models.BooleanField(default=True)
+    notes = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        unique_together = (
+            "role_definition",
+            "requirement_type",
+            "requirement_value",
+        )
+
+    def __str__(self):
+        return f"{self.role_definition.key}: {self.requirement_type}={self.requirement_value}"
+
+
+class MemberDutyQualification(models.Model):
+    """Per-member duty qualification used by the dynamic role prototype."""
+
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="duty_qualifications",
+    )
+    qualification_code = models.SlugField(max_length=64)
+    is_qualified = models.BooleanField(default=True)
+    awarded_date = models.DateField(blank=True, null=True)
+    expires_on = models.DateField(blank=True, null=True)
+    notes = models.CharField(max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["qualification_code"]
+        unique_together = ("member", "qualification_code")
+
+    def __str__(self):
+        return f"{self.member.full_display_name}: {self.qualification_code}"
+
+    @property
+    def is_current(self) -> bool:
+        if not self.is_qualified:
+            return False
+        if self.expires_on is None:
+            return True
+        return self.expires_on >= timezone.localdate()
+
+
 class DutyPairing(models.Model):
     member = models.ForeignKey(
         Member, on_delete=models.CASCADE, related_name="pairing_source"

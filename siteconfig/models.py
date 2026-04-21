@@ -294,6 +294,14 @@ class SiteConfiguration(models.Model):
             "Disable this flag to instantly roll back to legacy scheduler if needed."
         ),
     )
+    enable_dynamic_duty_roles = models.BooleanField(
+        default=False,
+        verbose_name="Enable Dynamic Duty Roles",
+        help_text=(
+            "Enable the prototype dynamic duty role registry and qualification mapping. "
+            "When disabled, the duty roster uses legacy fixed roles and qualification fields."
+        ),
+    )
 
     # Duty Roster Announcement (Issue #333) - DEPRECATED as of Issue #551
     # Use DutyRosterMessage model in duty_roster app instead for rich HTML support
