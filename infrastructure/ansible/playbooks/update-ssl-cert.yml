@@ -56,7 +56,7 @@
 
     - name: Determine target SSL certificate name
       ansible.builtin.set_fact:
-        target_ssl_cert_name: "{{ ssl_target_cert_name | default(gke_ssl_cert_name) }}"
+        target_ssl_cert_name: "{{ ssl_target_cert_name | default(gke_ssl_cert_name | default(gke_app_name ~ '-ssl-cert')) }}"
       run_once: true
       delegate_to: localhost
       tags: [always]
@@ -80,7 +80,7 @@
           ========================================
           SSL Certificate Update Plan
           ========================================
-          Current certificate annotation: {{ (current_gateway_certs.stdout | default('') | trim) | default('none') }}
+          Current certificate annotation: {{ (current_gateway_certs.stdout | default('', true) | trim) | default('none', true) }}
           Target certificate: {{ target_ssl_cert_name }}
 
           Domains to include in new certificate:
