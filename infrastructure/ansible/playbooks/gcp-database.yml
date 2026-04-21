@@ -12,8 +12,10 @@
 #      - Service account JSON key file
 #
 #   3. Copy and configure inventory/gcp_database.yml from .example
-#   4. Copy and configure group_vars/gcp_database/ with vars.yml and vault.yml
-#   5. Set up vault password file: ~/.ansible_vault_pass
+#   4. Create shared vars file group_vars/all.yml from group_vars/all.yml.example
+#      (required for centralized admin_ssh_ips and related shared settings)
+#   5. Copy and configure group_vars/gcp_database/ with vars.yml and vault.yml
+#   6. Set up vault password file: ~/.ansible_vault_pass
 #
 # Usage:
 #   # Create VM and configure database
@@ -49,6 +51,7 @@
   become: false
   tags: [gcp-provision]
   vars_files:
+    - ../group_vars/all.yml
     - ../group_vars/gcp_provisioner/vars.yml
     - ../group_vars/gcp_provisioner/vault.yml
 
@@ -180,6 +183,7 @@
   gather_facts: true
   tags: [configure]
   vars_files:
+    - ../group_vars/all.yml
     - ../group_vars/gcp_provisioner/vars.yml
     - ../group_vars/gcp_provisioner/vault.yml
 
