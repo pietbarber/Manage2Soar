@@ -376,6 +376,16 @@ class DutyAvoidance(models.Model):
 
 
 class DutyAssignment(models.Model):
+    LEGACY_ROLE_TO_FIELD = {
+        "instructor": "instructor",
+        "duty_officer": "duty_officer",
+        "assistant_duty_officer": "assistant_duty_officer",
+        "towpilot": "tow_pilot",
+        "commercial_pilot": "commercial_pilot",
+        "surge_instructor": "surge_instructor",
+        "surge_towpilot": "surge_tow_pilot",
+    }
+
     date = models.DateField(unique=True)
 
     # Primary duty roles
@@ -455,6 +465,43 @@ class DutyAssignment(models.Model):
         return self.instruction_slots.select_related("student").exclude(
             status="cancelled"
         )
+
+    def get_member_for_role(self, role_key: str):
+        """Dual-read helper: normalized role row first, legacy field fallback."""
+        role_row = (
+            self.role_rows.select_related("member").filter(role_key=role_key).first()
+        )
+        if role_row:
+            return role_row.member
+
+        field_name = self.LEGACY_ROLE_TO_FIELD.get(role_key)
+        if field_name:
+            return getattr(self, field_name, None)
+        return None
+
+    def sync_role_rows_from_legacy_fields(self):
+        """Sync normalized legacy role rows from legacy assignment columns.
+
+        This keeps normalized rows aligned for all legacy role keys without
+        touching dynamic role rows (role keys not in LEGACY_ROLE_TO_FIELD).
+        """
+        for role_key, field_name in self.LEGACY_ROLE_TO_FIELD.items():
+            member = getattr(self, field_name, None)
+            if member:
+                DutyAssignmentRole.objects.update_or_create(
+                    assignment=self,
+                    role_key=role_key,
+                    defaults={
+                        "member": member,
+                        "legacy_role_key": role_key,
+                        "shift_code": "",
+                    },
+                )
+            else:
+                DutyAssignmentRole.objects.filter(
+                    assignment=self,
+                    role_key=role_key,
+                ).delete()
 
 
 class DutyAssignmentRole(models.Model):

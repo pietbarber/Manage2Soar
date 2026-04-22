@@ -233,3 +233,71 @@ def test_publish_dual_writes_legacy_and_normalized_rows(
     )
     assert role_row.member == helper_member
     assert role_row.legacy_role_key == "instructor"
+
+
+@pytest.mark.django_db
+def test_publish_dynamic_role_with_legacy_mapping_writes_both_paths(
+    client, rostermeister, helper_member
+):
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+    )
+    DutyRoleDefinition.objects.create(
+        site_configuration=config,
+        key="am_tow",
+        display_name="AM Tow",
+        legacy_role_key="towpilot",
+        is_active=True,
+        sort_order=10,
+    )
+
+    Airfield.objects.create(
+        id=settings.DEFAULT_AIRFIELD_ID,
+        name="Test Field",
+        identifier="TEST",
+    )
+
+    client.login(username="rm_dynamic", password="testpass123")
+    url = reverse("duty_roster:propose_roster")
+
+    session = client.session
+    session["proposed_roster"] = [
+        {
+            "date": "2026-03-21",
+            "slots": {"am_tow": str(helper_member.id)},
+            "diagnostics": {},
+        }
+    ]
+    session["proposed_roster_range"] = {
+        "start_date": "2026-03-01",
+        "end_date": "2026-03-31",
+    }
+    session.save()
+
+    with patch(
+        "duty_roster.utils.email.send_roster_published_notifications",
+        return_value={"sent_count": 0, "errors": []},
+    ):
+        response = client.post(
+            url,
+            {
+                "year": 2026,
+                "month": 3,
+                "action": "publish",
+            },
+            follow=True,
+        )
+
+    assert response.status_code == 200
+
+    assignment = DutyAssignment.objects.get(date=date(2026, 3, 21))
+    assert assignment.tow_pilot == helper_member
+
+    dynamic_row = DutyAssignmentRole.objects.get(
+        assignment=assignment, role_key="am_tow"
+    )
+    assert dynamic_row.member == helper_member
+    assert dynamic_row.legacy_role_key == "towpilot"

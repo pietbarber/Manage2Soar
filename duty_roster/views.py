@@ -2703,11 +2703,20 @@ def propose_roster(request):
                         }
                         normalized_role_rows = []
                         for role, mem in e["slots"].items():
-                            field_name = ROLE_FIELD_MAP.get(role)
-                            if mem and not field_name:
-                                unsupported_assigned_roles.add(get_role_title(role))
                             if not mem:
                                 continue
+
+                            role_def = role_definitions_by_key.get(role)
+                            legacy_role_key = (
+                                role_def.legacy_role_key
+                                if role_def and role_def.legacy_role_key
+                                else role
+                            )
+                            field_name = ROLE_FIELD_MAP.get(legacy_role_key)
+
+                            if not field_name:
+                                unsupported_assigned_roles.add(get_role_title(role))
+
                             try:
                                 member = members_by_id.get(int(mem))
                             except (TypeError, ValueError):
@@ -2722,7 +2731,6 @@ def propose_roster(request):
                                 )
                                 continue
 
-                            role_def = role_definitions_by_key.get(role)
                             if field_name:
                                 try:
                                     assignment_data[field_name] = member
@@ -2733,22 +2741,23 @@ def propose_roster(request):
                                         edt.isoformat(),
                                     )
 
-                            normalized_role_rows.append(
-                                DutyAssignmentRole(
-                                    assignment=None,
-                                    role_key=role,
-                                    member=member,
-                                    role_definition=role_def,
-                                    legacy_role_key=(
-                                        role_def.legacy_role_key
-                                        if role_def and role_def.legacy_role_key
-                                        else (role if field_name else "")
-                                    ),
-                                    shift_code=(
-                                        role_def.shift_code if role_def else ""
-                                    ),
+                            # Keep dynamic role rows separate from legacy rows.
+                            # Legacy rows are synced from assignment fields post-save.
+                            if role not in DutyAssignment.LEGACY_ROLE_TO_FIELD:
+                                normalized_role_rows.append(
+                                    DutyAssignmentRole(
+                                        assignment=None,
+                                        role_key=role,
+                                        member=member,
+                                        role_definition=role_def,
+                                        legacy_role_key=(
+                                            legacy_role_key if field_name else ""
+                                        ),
+                                        shift_code=(
+                                            role_def.shift_code if role_def else ""
+                                        ),
+                                    )
                                 )
-                            )
 
                         assignment = DutyAssignment.objects.create(**assignment_data)
                         created_assignments.append(assignment)
