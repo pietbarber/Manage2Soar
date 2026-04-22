@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.messages import get_messages
 from django.urls import reverse
 
-from duty_roster.models import DutyAssignment, DutyRoleDefinition
+from duty_roster.models import DutyAssignment, DutyAssignmentRole, DutyRoleDefinition
 from logsheet.models import Airfield
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -159,7 +159,7 @@ def test_publish_warns_and_skips_unmappable_dynamic_roles(
 
     assert response.status_code == 200
     messages = [str(m) for m in get_messages(response.wsgi_request)]
-    assert any("not yet publishable" in message for message in messages)
+    assert any("normalized assignment rows only" in message for message in messages)
 
     assignment = DutyAssignment.objects.get(date=date(2026, 3, 7))
     assert assignment.instructor is None
@@ -167,3 +167,69 @@ def test_publish_warns_and_skips_unmappable_dynamic_roles(
     assert assignment.duty_officer is None
     assert assignment.assistant_duty_officer is None
     assert assignment.commercial_pilot is None
+
+    role_row = DutyAssignmentRole.objects.get(assignment=assignment, role_key="am_tow")
+    assert role_row.member == helper_member
+    assert role_row.role_definition is not None
+
+
+@pytest.mark.django_db
+def test_publish_dual_writes_legacy_and_normalized_rows(
+    client, rostermeister, helper_member
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=False,
+        schedule_instructors=True,
+    )
+
+    Airfield.objects.create(
+        id=settings.DEFAULT_AIRFIELD_ID,
+        name="Test Field",
+        identifier="TEST",
+    )
+
+    client.login(username="rm_dynamic", password="testpass123")
+    url = reverse("duty_roster:propose_roster")
+
+    session = client.session
+    session["proposed_roster"] = [
+        {
+            "date": "2026-03-14",
+            "slots": {"instructor": str(helper_member.id)},
+            "diagnostics": {},
+        }
+    ]
+    session["proposed_roster_range"] = {
+        "start_date": "2026-03-01",
+        "end_date": "2026-03-31",
+    }
+    session.save()
+
+    with patch(
+        "duty_roster.utils.email.send_roster_published_notifications",
+        return_value={"sent_count": 0, "errors": []},
+    ):
+        response = client.post(
+            url,
+            {
+                "year": 2026,
+                "month": 3,
+                "action": "publish",
+            },
+            follow=True,
+        )
+
+    assert response.status_code == 200
+
+    assignment = DutyAssignment.objects.get(date=date(2026, 3, 14))
+    assert assignment.instructor == helper_member
+
+    role_row = DutyAssignmentRole.objects.get(
+        assignment=assignment,
+        role_key="instructor",
+    )
+    assert role_row.member == helper_member
+    assert role_row.legacy_role_key == "instructor"

@@ -457,6 +457,50 @@ class DutyAssignment(models.Model):
         )
 
 
+class DutyAssignmentRole(models.Model):
+    """Normalized assignment rows for legacy and dynamic duty roles."""
+
+    assignment = models.ForeignKey(
+        DutyAssignment,
+        on_delete=models.CASCADE,
+        related_name="role_rows",
+    )
+    role_key = models.SlugField(max_length=64)
+    member = models.ForeignKey(
+        Member,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="duty_assignment_roles",
+    )
+    role_definition = models.ForeignKey(
+        DutyRoleDefinition,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="assignment_rows",
+    )
+    legacy_role_key = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Legacy role mapping used for compatibility with fixed assignment fields.",
+    )
+    shift_code = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+    )
+
+    class Meta:
+        ordering = ["assignment__date", "role_key"]
+        unique_together = ("assignment", "role_key")
+
+    def __str__(self):
+        member_name = self.member.full_display_name if self.member else "Unassigned"
+        return f"{self.assignment.date} {self.role_key}: {member_name}"
+
+
 class InstructionSlot(models.Model):
     """
     Represents a student's request for instruction on a specific duty day.

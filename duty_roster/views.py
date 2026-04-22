@@ -2653,7 +2653,7 @@ def propose_roster(request):
             _set_proposed_roster_range(request, range_start, range_end)
 
         elif action == "publish":
-            from .models import DutyAssignment
+            from .models import DutyAssignment, DutyAssignmentRole, DutyRoleDefinition
             from .utils.email import send_roster_published_notifications
 
             default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
@@ -2669,6 +2669,15 @@ def propose_roster(request):
                             continue
 
             members_by_id = Member.objects.in_bulk(member_ids)
+            role_definitions_by_key = {}
+            if siteconfig and siteconfig.enable_dynamic_duty_roles:
+                role_definitions_by_key = {
+                    role_def.key: role_def
+                    for role_def in DutyRoleDefinition.objects.filter(
+                        site_configuration=siteconfig,
+                        is_active=True,
+                    )
+                }
 
             try:
                 with transaction.atomic():
@@ -2692,35 +2701,69 @@ def propose_roster(request):
                             "date": edt,
                             "location": default_field,
                         }
+                        normalized_role_rows = []
                         for role, mem in e["slots"].items():
                             field_name = ROLE_FIELD_MAP.get(role)
                             if mem and not field_name:
                                 unsupported_assigned_roles.add(get_role_title(role))
+                            if not mem:
                                 continue
-                            if field_name and mem:
+                            try:
+                                member = members_by_id.get(int(mem))
+                            except (TypeError, ValueError):
+                                member = None
+
+                            if not member:
+                                logger.warning(
+                                    "Skipping missing/invalid member id %s for role %s on %s",
+                                    mem,
+                                    role,
+                                    edt.isoformat(),
+                                )
+                                continue
+
+                            role_def = role_definitions_by_key.get(role)
+                            if field_name:
                                 try:
-                                    member = members_by_id.get(int(mem))
-                                except (TypeError, ValueError):
-                                    member = None
-                                if member:
                                     assignment_data[field_name] = member
-                                else:
-                                    logger.warning(
-                                        "Skipping missing/invalid member id %s for role %s on %s",
-                                        mem,
-                                        role,
+                                except Exception:
+                                    logger.exception(
+                                        "Failed assigning legacy field %s for %s",
+                                        field_name,
                                         edt.isoformat(),
                                     )
 
+                            normalized_role_rows.append(
+                                DutyAssignmentRole(
+                                    assignment=None,
+                                    role_key=role,
+                                    member=member,
+                                    role_definition=role_def,
+                                    legacy_role_key=(
+                                        role_def.legacy_role_key
+                                        if role_def and role_def.legacy_role_key
+                                        else (role if field_name else "")
+                                    ),
+                                    shift_code=(
+                                        role_def.shift_code if role_def else ""
+                                    ),
+                                )
+                            )
+
                         assignment = DutyAssignment.objects.create(**assignment_data)
                         created_assignments.append(assignment)
+                        if normalized_role_rows:
+                            for row in normalized_role_rows:
+                                row.assignment = assignment
+                            DutyAssignmentRole.objects.bulk_create(normalized_role_rows)
 
                 if unsupported_assigned_roles:
                     unsupported_list = ", ".join(sorted(unsupported_assigned_roles))
                     messages.warning(
                         request,
-                        "Some configured dynamic roles are not yet publishable to legacy "
-                        f"duty assignment fields and were skipped: {unsupported_list}.",
+                        "Some configured dynamic roles do not map to legacy assignment "
+                        "columns. They were stored in normalized assignment rows only: "
+                        f"{unsupported_list}.",
                     )
             except Exception:
                 logger.exception("Failed publishing proposed roster")
