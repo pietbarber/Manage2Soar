@@ -258,3 +258,65 @@ def test_calendar_day_modal_shows_dynamic_role_assignment_card_for_assigned_memb
     content = response.content.decode("utf-8")
     assert "Your Dynamic Role Assignments" in content
     assert "Wing Runner" in content
+
+
+@pytest.mark.django_db
+def test_calendar_day_modal_mapped_dynamic_role_shows_coverage_link(client):
+    _ensure_full_member_status()
+
+    dynamic_member = _make_member("dynamic_modal_mapped_assigned")
+
+    site_config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+        towpilot_title="Tow Captain",
+    )
+    role_definition = DutyRoleDefinition.objects.create(
+        site_configuration=site_config,
+        key="am_tow",
+        display_name="AM Tow",
+        legacy_role_key="towpilot",
+        is_active=True,
+        sort_order=10,
+    )
+
+    duty_date = date.today() + timedelta(days=12)
+    assignment = DutyAssignment.objects.create(
+        date=duty_date,
+        tow_pilot=dynamic_member,
+    )
+    DutyAssignmentRole.objects.create(
+        assignment=assignment,
+        role_key="am_tow",
+        member=dynamic_member,
+        role_definition=role_definition,
+        legacy_role_key="towpilot",
+    )
+
+    client.force_login(dynamic_member)
+    response = client.get(
+        reverse(
+            "duty_roster:calendar_day_detail",
+            kwargs={
+                "year": duty_date.year,
+                "month": duty_date.month,
+                "day": duty_date.day,
+            },
+        )
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    expected_url = reverse(
+        "duty_roster:create_swap_request",
+        kwargs={
+            "year": duty_date.year,
+            "month": duty_date.month,
+            "day": duty_date.day,
+            "role": "TOW",
+        },
+    )
+    assert "Tow Captain" in content
+    assert expected_url in content

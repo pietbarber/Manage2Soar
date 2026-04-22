@@ -337,10 +337,21 @@
         <p class="text-muted small mb-2">You are assigned on this day under these dynamic roles:</p>
         <ul class="mb-2 ps-3">
           {% for role in user_dynamic_role_assignments %}
-          <li><strong>{{ role.label }}</strong></li>
+          <li>
+            <strong>{{ role.label }}</strong>
+            {% if role.swap_role_code %}
+            <div class="mt-1">
+              <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role=role.swap_role_code %}"
+                 class="btn btn-outline-primary btn-sm"
+                 style="font-size:0.75rem;padding:2px 8px;">
+                <i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Request Coverage
+              </a>
+            </div>
+            {% endif %}
+          </li>
           {% endfor %}
         </ul>
-        <p class="text-muted small mb-0">Self-service swap and volunteer actions for non-legacy dynamic roles are not yet available in this workflow.</p>
+        <p class="text-muted small mb-0">Coverage actions appear for dynamic roles mapped to supported legacy swap workflows. Other dynamic roles remain informational in this workflow.</p>
       </div>
     </div>
     {% endif %}

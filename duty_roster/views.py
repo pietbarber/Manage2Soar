@@ -105,21 +105,54 @@ def _get_dynamic_role_assignments(assignment, site_config):
         return []
 
     role_service = RoleResolutionService(site_configuration=site_config)
+    legacy_to_swap_role = {
+        "instructor": "INSTRUCTOR",
+        "towpilot": "TOW",
+        "duty_officer": "DO",
+        "assistant_duty_officer": "ADO",
+    }
+    role_rows_by_key = {
+        row.role_key: row
+        for row in assignment.role_rows.select_related("role_definition", "member")
+    }
     dynamic_role_assignments = []
     for role_key in role_service.get_enabled_roles():
         # Legacy role keys are rendered from fixed assignment fields.
         if role_key in DutyAssignment.LEGACY_ROLE_TO_FIELD:
             continue
 
-        member = assignment.get_member_for_role(role_key)
+        role_row = role_rows_by_key.get(role_key)
+        member = role_row.member if role_row and role_row.member else None
+        if not member:
+            member = assignment.get_member_for_role(role_key)
         if not member:
             continue
+
+        legacy_role_key = ""
+        if role_row:
+            legacy_role_key = role_row.legacy_role_key or ""
+            if not legacy_role_key and role_row.role_definition:
+                legacy_role_key = role_row.role_definition.legacy_role_key or ""
+
+        swap_role_code = legacy_to_swap_role.get(legacy_role_key)
+        if swap_role_code:
+            # The current swap workflow enforces legacy duty-field assignment ownership.
+            legacy_field_name = ROLE_FIELD_MAP.get(legacy_role_key)
+            assigned_legacy_member = (
+                getattr(assignment, legacy_field_name, None)
+                if legacy_field_name
+                else None
+            )
+            if assigned_legacy_member != member:
+                swap_role_code = None
 
         dynamic_role_assignments.append(
             {
                 "key": role_key,
                 "label": role_service.get_role_label(role_key),
                 "member": member,
+                "legacy_role_key": legacy_role_key,
+                "swap_role_code": swap_role_code,
             }
         )
 
