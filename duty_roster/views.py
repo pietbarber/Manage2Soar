@@ -1103,6 +1103,13 @@ def calendar_day_detail(request, year, month, day):
                     volunteerable_holes[hole_role] = True
 
     dynamic_role_assignments = _get_dynamic_role_assignments(assignment, site_config)
+    user_dynamic_role_assignments = []
+    if request.user.is_authenticated and dynamic_role_assignments:
+        user_dynamic_role_assignments = [
+            role
+            for role in dynamic_role_assignments
+            if role["member"].id == request.user.id
+        ]
 
     return render(
         request,
@@ -1168,6 +1175,7 @@ def calendar_day_detail(request, year, month, day):
             "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
             "open_panel": open_panel,
             "dynamic_role_assignments": dynamic_role_assignments,
+            "user_dynamic_role_assignments": user_dynamic_role_assignments,
         },
     )
 
