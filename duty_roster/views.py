@@ -1070,6 +1070,26 @@ def calendar_day_detail(request, year, month, day):
                 if is_qualified:
                     volunteerable_holes[hole_role] = True
 
+    dynamic_role_assignments = []
+    if assignment and site_config and site_config.enable_dynamic_duty_roles:
+        role_service = RoleResolutionService(site_configuration=site_config)
+        for role_key in role_service.get_enabled_roles():
+            # Legacy role keys are already rendered by fixed assignment blocks.
+            if role_key in DutyAssignment.LEGACY_ROLE_TO_FIELD:
+                continue
+
+            member = assignment.get_member_for_role(role_key)
+            if not member:
+                continue
+
+            dynamic_role_assignments.append(
+                {
+                    "key": role_key,
+                    "label": role_service.get_role_label(role_key),
+                    "member": member,
+                }
+            )
+
     return render(
         request,
         "duty_roster/calendar_day_modal.html",
@@ -1133,6 +1153,7 @@ def calendar_day_detail(request, year, month, day):
             ),
             "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
             "open_panel": open_panel,
+            "dynamic_role_assignments": dynamic_role_assignments,
         },
     )
 

@@ -188,6 +188,18 @@
           </div>
         </div>
         {% endif %}
+
+        {% for dynamic_role in dynamic_role_assignments %}
+        <div class="col-6">
+          <div class="d-flex align-items-start">
+            <span class="badge bg-info text-dark me-2 mt-1"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ dynamic_role.label }}</small>
+              <span class="fw-medium">{{ dynamic_role.member.full_display_name }}</span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
       </div>
     </div>
   </div>
