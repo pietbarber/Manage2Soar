@@ -320,3 +320,59 @@ def test_calendar_day_modal_mapped_dynamic_role_shows_coverage_link(client):
     )
     assert "Tow Captain" in content
     assert expected_url in content
+
+
+@pytest.mark.django_db
+def test_calendar_day_modal_nonlegacy_dynamic_role_shows_dynamic_coverage_link(client):
+    _ensure_full_member_status()
+
+    dynamic_member = _make_member("dynamic_modal_nonlegacy_assigned")
+
+    site_config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+    )
+    role_definition = DutyRoleDefinition.objects.create(
+        site_configuration=site_config,
+        key="launch_coord",
+        display_name="Launch Coordinator",
+        is_active=True,
+        sort_order=10,
+    )
+
+    duty_date = date.today() + timedelta(days=13)
+    assignment = DutyAssignment.objects.create(date=duty_date)
+    DutyAssignmentRole.objects.create(
+        assignment=assignment,
+        role_key="launch_coord",
+        member=dynamic_member,
+        role_definition=role_definition,
+    )
+
+    client.force_login(dynamic_member)
+    response = client.get(
+        reverse(
+            "duty_roster:calendar_day_detail",
+            kwargs={
+                "year": duty_date.year,
+                "month": duty_date.month,
+                "day": duty_date.day,
+            },
+        )
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    expected_dynamic_url = reverse(
+        "duty_roster:create_swap_request",
+        kwargs={
+            "year": duty_date.year,
+            "month": duty_date.month,
+            "day": duty_date.day,
+            "role": "DYNAMIC",
+        },
+    )
+    assert "Launch Coordinator" in content
+    assert f"{expected_dynamic_url}?dynamic_role_key=launch_coord" in content

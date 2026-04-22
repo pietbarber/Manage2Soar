@@ -690,6 +690,7 @@ class DutySwapRequest(models.Model):
         ("ADO", "Assistant Duty Officer"),
         ("INSTRUCTOR", "Instructor"),
         ("TOW", "Tow Pilot"),
+        ("DYNAMIC", "Dynamic Role"),
     ]
 
     REQUEST_TYPE_CHOICES = [
@@ -708,6 +709,18 @@ class DutySwapRequest(models.Model):
         Member, on_delete=models.CASCADE, related_name="swap_requests"
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    dynamic_role_key = models.SlugField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="Non-legacy dynamic role key when role is DYNAMIC.",
+    )
+    dynamic_role_label = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        help_text="Display label snapshot for a dynamic role request.",
+    )
     original_date = models.DateField()
 
     request_type = models.CharField(
@@ -756,6 +769,9 @@ class DutySwapRequest(models.Model):
     def get_role_title(self):
         """Get the display title for this role from site config."""
         from siteconfig.utils import get_role_title
+
+        if self.role == "DYNAMIC":
+            return self.dynamic_role_label or self.dynamic_role_key or "Dynamic Role"
 
         role_map = {
             "DO": "duty_officer",

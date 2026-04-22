@@ -17,6 +17,8 @@ from django.urls import reverse
 from duty_roster.forms import DutySwapOfferForm, DutySwapRequestForm
 from duty_roster.models import (
     DutyAssignment,
+    DutyAssignmentRole,
+    DutyRoleDefinition,
     DutySwapOffer,
     DutySwapRequest,
     MemberBlackout,
@@ -542,6 +544,55 @@ class TestSwapRequestCreation:
             original_date=alice_duty_assignment.date,
         ).exists()
 
+    def test_create_dynamic_request_post_success(
+        self, client, alice, alice_duty_assignment, site_config
+    ):
+        """Posting a valid dynamic-role swap request creates it with role metadata."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=alice_duty_assignment,
+            role_key="launch_coord",
+            member=alice,
+            role_definition=role_definition,
+        )
+
+        client.force_login(alice)
+        url = reverse(
+            "duty_roster:create_swap_request",
+            kwargs={
+                "year": alice_duty_assignment.date.year,
+                "month": alice_duty_assignment.date.month,
+                "day": alice_duty_assignment.date.day,
+                "role": "DYNAMIC",
+            },
+        )
+        resp = client.post(
+            f"{url}?dynamic_role_key=launch_coord",
+            {
+                "dynamic_role_key": "launch_coord",
+                "request_type": "general",
+                "notes": "Need dynamic coverage",
+                "is_emergency": False,
+            },
+        )
+        assert resp.status_code in [200, 302]
+        created_request = DutySwapRequest.objects.get(
+            requester=alice,
+            original_date=alice_duty_assignment.date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+        )
+        assert created_request.dynamic_role_label == "Launch Coordinator"
+
 
 # =============================================================================
 # Swap Offer Tests
@@ -718,6 +769,41 @@ class TestSwapOfferWorkflow:
             exclude_member=ado_swap_request.requester,
         )
         assert eligible.filter(pk=ado_helper_probationary.pk).exists()
+
+    def test_dynamic_role_eligibility_helper_uses_dynamic_requirements(
+        self, site_config, alice, bob
+    ):
+        """Dynamic helper eligibility should include only members who meet role requirements."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="dynamic_instructor",
+            display_name="Dynamic Instructor",
+            is_active=True,
+            sort_order=20,
+        )
+        # Use legacy role mapping by requirement to test resolver path.
+        role_definition.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="instructor",
+            is_required=True,
+        )
+
+        alice.instructor = True
+        alice.save(update_fields=["instructor"])
+        bob.instructor = False
+        bob.save(update_fields=["instructor"])
+
+        eligible = get_eligible_members_for_role(
+            "DYNAMIC",
+            exclude_member=None,
+            dynamic_role_key="dynamic_instructor",
+        )
+
+        assert eligible.filter(pk=alice.pk).exists()
+        assert not eligible.filter(pk=bob.pk).exists()
 
 
 @pytest.mark.django_db

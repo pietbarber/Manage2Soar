@@ -46,6 +46,9 @@
 
                     <form method="post">
                         {% csrf_token %}
+                        {% if role == "DYNAMIC" and dynamic_role_key %}
+                        <input type="hidden" name="dynamic_role_key" value="{{ dynamic_role_key }}">
+                        {% endif %}
 
                         <!-- Request Type -->
                         <div class="mb-4">

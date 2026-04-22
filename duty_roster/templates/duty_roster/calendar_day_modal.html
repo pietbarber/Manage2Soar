@@ -347,11 +347,19 @@
                 <i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Request Coverage
               </a>
             </div>
+            {% else %}
+            <div class="mt-1">
+              <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='DYNAMIC' %}?dynamic_role_key={{ role.key|urlencode }}"
+                 class="btn btn-outline-primary btn-sm"
+                 style="font-size:0.75rem;padding:2px 8px;">
+                <i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Request Coverage
+              </a>
+            </div>
             {% endif %}
           </li>
           {% endfor %}
         </ul>
-        <p class="text-muted small mb-0">Coverage actions appear for dynamic roles mapped to supported legacy swap workflows. Other dynamic roles remain informational in this workflow.</p>
+        <p class="text-muted small mb-0">Coverage actions are available for all your dynamic roles. Legacy-mapped roles use existing swap routing while non-legacy roles use dynamic-role coverage requests.</p>
       </div>
     </div>
     {% endif %}
