@@ -12,6 +12,7 @@ from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 
 from .models import (
     DutyAssignment,
+    DutyAssignmentRole,
     DutyPreference,
     DutyRosterMessage,
     DutySwapOffer,
@@ -648,6 +649,31 @@ class DutySwapOfferForm(forms.ModelForm):
                     "proposed_swap_date",
                     "Swap date must be in the future.",
                 )
+
+        if (
+            offer_type == "swap"
+            and proposed_date
+            and self.swap_request
+            and self.offered_by
+            and self.swap_request.role == "DYNAMIC"
+        ):
+            dynamic_role_key = self.swap_request.dynamic_role_key
+            if not dynamic_role_key:
+                self.add_error(
+                    "proposed_swap_date",
+                    "This dynamic swap request is missing role metadata.",
+                )
+            else:
+                has_assignment = DutyAssignmentRole.objects.filter(
+                    assignment__date=proposed_date,
+                    role_key=dynamic_role_key,
+                    member=self.offered_by,
+                ).exists()
+                if not has_assignment:
+                    self.add_error(
+                        "proposed_swap_date",
+                        "You can only swap with a date where you hold this same dynamic role.",
+                    )
 
         return cleaned_data
 

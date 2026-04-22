@@ -760,6 +760,21 @@ class DutySwapRequest(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(role="DYNAMIC")
+                    & ~models.Q(dynamic_role_key="")
+                    & ~models.Q(dynamic_role_label="")
+                )
+                | (
+                    ~models.Q(role="DYNAMIC")
+                    & models.Q(dynamic_role_key="")
+                    & models.Q(dynamic_role_label="")
+                ),
+                name="swap_request_dynamic_role_metadata_consistency",
+            )
+        ]
 
     # Legacy compatibility
     @property
