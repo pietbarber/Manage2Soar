@@ -2,6 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.utils.html import format_html
 
+from duty_roster.models import DutyRoleDefinition
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -75,9 +76,27 @@ class SiteConfigurationAdminForm(forms.ModelForm):
             )
 
 
+class DutyRoleDefinitionInline(admin.TabularInline):
+    model = DutyRoleDefinition
+    extra = 0
+    fields = (
+        "display_name",
+        "key",
+        "legacy_role_key",
+        "shift_code",
+        "is_active",
+        "sort_order",
+    )
+    show_change_link = True
+    verbose_name = "Dynamic Duty Role"
+    verbose_name_plural = "Dynamic Duty Roles (Prototype)"
+
+
 @admin.register(SiteConfiguration)
 class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
     form = SiteConfigurationAdminForm
+    inlines = [DutyRoleDefinitionInline]
+    search_fields = ("club_name", "domain_name", "club_abbreviation")
 
     def has_add_permission(self, request):
         # Only allow adding if no config exists

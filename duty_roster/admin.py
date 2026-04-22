@@ -8,12 +8,15 @@ from .models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
+    DutyQualificationRequirement,
+    DutyRoleDefinition,
     DutyRosterMessage,
     DutySwapOffer,
     DutySwapRequest,
     GliderReservation,
     InstructionSlot,
     MemberBlackout,
+    MemberDutyQualification,
     OpsIntent,
 )
 
@@ -256,3 +259,71 @@ class GliderReservationAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("member", "glider")
+
+
+class DutyQualificationRequirementInline(admin.TabularInline):
+    model = DutyQualificationRequirement
+    extra = 0
+    fields = ("requirement_type", "requirement_value", "is_required", "notes")
+
+
+@admin.register(DutyRoleDefinition)
+class DutyRoleDefinitionAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "display_name",
+        "key",
+        "site_configuration",
+        "legacy_role_key",
+        "shift_code",
+        "is_active",
+        "sort_order",
+    )
+    list_filter = ("is_active", "legacy_role_key", "site_configuration")
+    search_fields = ("display_name", "key")
+    ordering = ("site_configuration", "sort_order", "display_name")
+    autocomplete_fields = ("site_configuration",)
+    inlines = (DutyQualificationRequirementInline,)
+    admin_helper_message = (
+        "<b>Dynamic Duty Roles (Prototype):</b> Define club-specific roles and optional "
+        "legacy terminology mapping. These are only active when the Site Configuration "
+        "feature flag is enabled."
+    )
+
+
+@admin.register(DutyQualificationRequirement)
+class DutyQualificationRequirementAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "role_definition",
+        "requirement_type",
+        "requirement_value",
+        "is_required",
+    )
+    list_filter = ("requirement_type", "is_required")
+    search_fields = ("role_definition__display_name", "requirement_value")
+    autocomplete_fields = ("role_definition",)
+    admin_helper_message = (
+        "<b>Duty Qualification Requirements:</b> Eligibility rules for dynamic roles."
+    )
+
+
+@admin.register(MemberDutyQualification)
+class MemberDutyQualificationAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "member",
+        "qualification_code",
+        "is_qualified",
+        "awarded_date",
+        "expires_on",
+        "updated_at",
+    )
+    list_filter = ("is_qualified", "qualification_code")
+    search_fields = (
+        "member__first_name",
+        "member__last_name",
+        "qualification_code",
+    )
+    autocomplete_fields = ("member",)
+    admin_helper_message = (
+        "<b>Member Duty Qualifications:</b> Per-member qualification records for "
+        "dynamic duty role eligibility."
+    )

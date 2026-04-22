@@ -27,7 +27,7 @@ def test_update_siteconfiguration():
     )
     c.club_name = "New Name"
     c.save()
-    c.refresh_from_db()
+    c.refresh_from_db(from_queryset=None)
     assert c.club_name == "New Name"
 
 
@@ -61,13 +61,13 @@ def test_manual_whitelist_persists():
         club_abbreviation="TC",
         manual_whitelist="admin@example.com\nwebmaster@example.org",
     )
-    config.refresh_from_db()
+    config.refresh_from_db(from_queryset=None)
     assert config.manual_whitelist == "admin@example.com\nwebmaster@example.org"
 
     # Test updating
     config.manual_whitelist = "new@example.com"
     config.save()
-    config.refresh_from_db()
+    config.refresh_from_db(from_queryset=None)
     assert config.manual_whitelist == "new@example.com"
 
 
@@ -112,7 +112,7 @@ def test_duty_default_max_assignments_per_month_can_be_customized():
         club_abbreviation="TC",
         duty_default_max_assignments_per_month=5,
     )
-    config.refresh_from_db()
+    config.refresh_from_db(from_queryset=None)
     assert config.duty_default_max_assignments_per_month == 5
 
 
@@ -138,7 +138,7 @@ def test_commercial_configuration_custom_values():
         commercial_rides_enabled=True,
         commercial_pilot_title="Ride Pilot",
     )
-    config.refresh_from_db()
+    config.refresh_from_db(from_queryset=None)
     assert config.schedule_commercial_pilots is True
     assert config.commercial_rides_enabled is True
     assert config.commercial_pilot_title == "Ride Pilot"
@@ -162,7 +162,7 @@ def test_dynamic_duty_roles_flag_can_be_enabled():
         club_abbreviation="TC",
         enable_dynamic_duty_roles=True,
     )
-    config.refresh_from_db()
+    config.refresh_from_db(from_queryset=None)
     assert config.enable_dynamic_duty_roles is True
 
 
@@ -363,7 +363,7 @@ def test_surge_threshold_positive_integers():
     config.instruction_surge_threshold = 1
     config.instruction_max_students_per_instructor = 1
     config.save()
-    config.refresh_from_db()
+    config.refresh_from_db(from_queryset=None)
     assert config.tow_surge_threshold == 1
     assert config.instruction_surge_threshold == 1
     assert config.instruction_max_students_per_instructor == 1
@@ -376,7 +376,7 @@ def test_surge_threshold_positive_integers():
         config.full_clean()
 
     # After failed validation, values should remain unchanged in DB
-    config.refresh_from_db()
+    config.refresh_from_db(from_queryset=None)
     assert config.tow_surge_threshold == 1
     assert config.instruction_surge_threshold == 1
     assert config.instruction_max_students_per_instructor == 1
@@ -472,28 +472,28 @@ def test_quick_altitude_validation_positive_integers():
     config.quick_altitude_buttons = "2000,-100,3000"
     with pytest.raises(ValidationError) as exc_info:
         config.full_clean()
-    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "quick_altitude_buttons" in (exc_info.value.error_dict or {})
     assert "positive integers" in str(exc_info.value)
 
     # Non-integer values should fail validation
     config.quick_altitude_buttons = "2000,abc,3000"
     with pytest.raises(ValidationError) as exc_info:
         config.full_clean()
-    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "quick_altitude_buttons" in (exc_info.value.error_dict or {})
     assert "must be integers" in str(exc_info.value)
 
     # Values over 7000 should fail validation
     config.quick_altitude_buttons = "2000,8000,3000"
     with pytest.raises(ValidationError) as exc_info:
         config.full_clean()
-    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "quick_altitude_buttons" in (exc_info.value.error_dict or {})
     assert "7000 feet or less" in str(exc_info.value)
 
     # Valid values should pass
     config.quick_altitude_buttons = "300,1000,2000,3000"
     config.full_clean()  # Should not raise
     config.save()
-    config.refresh_from_db()
+    config.refresh_from_db(from_queryset=None)
     assert config.quick_altitude_buttons == "300,1000,2000,3000"
 
 
@@ -533,7 +533,7 @@ class TestPwaIconBackfill:
         SiteConfiguration.objects.filter(pk=config.pk).update(
             club_logo="logos/fake_logo.png"
         )
-        config.refresh_from_db()
+        config.refresh_from_db(from_queryset=None)
 
         saved_files = {}
 
@@ -576,7 +576,7 @@ class TestPwaIconBackfill:
         SiteConfiguration.objects.filter(pk=config.pk).update(
             club_logo="logos/fake_logo.png"
         )
-        config.refresh_from_db()
+        config.refresh_from_db(from_queryset=None)
 
         saved_files = {}
 
@@ -611,7 +611,7 @@ class TestPwaIconBackfill:
         )
         # Simulate that a logo was previously set so is_new_logo=True on clear
         SiteConfiguration.objects.filter(pk=config.pk).update(club_logo="old_logo.png")
-        config.refresh_from_db()
+        config.refresh_from_db(from_queryset=None)
 
         deleted_files = []
         cache.set("pwa_club_icon_url", "http://example.com/old-icon.png", 300)
