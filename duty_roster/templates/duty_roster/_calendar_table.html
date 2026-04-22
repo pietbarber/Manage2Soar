@@ -128,6 +128,11 @@
                   {% if a.surge_tow_pilot %}
                     <span class="duty-badge badge-tow-pilot"><i class="bi bi-airplane" aria-hidden="true"></i> {{ a.surge_tow_pilot.last_name }} (S)</span>
                   {% endif %}
+                  {% with dynamic_roles=dynamic_role_assignments_by_date|dict_get:day %}
+                    {% for dynamic_role in dynamic_roles %}
+                      <span class="duty-badge badge-info text-dark"><i class="bi bi-diagram-3" aria-hidden="true"></i> {{ dynamic_role.label }}: {{ dynamic_role.member.last_name }}</span>
+                    {% endfor %}
+                  {% endwith %}
                 </div>
               {% endwith %}
             {% endif %}

@@ -99,6 +99,33 @@ def calendar_refresh_response(year, month):
     return HttpResponse(headers={"HX-Trigger": json.dumps(trigger_data)})
 
 
+def _get_dynamic_role_assignments(assignment, site_config):
+    """Return assigned non-legacy dynamic roles for an assignment."""
+    if not assignment or not site_config or not site_config.enable_dynamic_duty_roles:
+        return []
+
+    role_service = RoleResolutionService(site_configuration=site_config)
+    dynamic_role_assignments = []
+    for role_key in role_service.get_enabled_roles():
+        # Legacy role keys are rendered from fixed assignment fields.
+        if role_key in DutyAssignment.LEGACY_ROLE_TO_FIELD:
+            continue
+
+        member = assignment.get_member_for_role(role_key)
+        if not member:
+            continue
+
+        dynamic_role_assignments.append(
+            {
+                "key": role_key,
+                "label": role_service.get_role_label(role_key),
+                "member": member,
+            }
+        )
+
+    return dynamic_role_assignments
+
+
 def roster_home(request):
     return HttpResponse("Duty Roster Home")
 
@@ -724,6 +751,10 @@ def duty_calendar_view(request, year=None, month=None):
     visible_dates = [day for week in weeks for day in week]
 
     assignments_by_date = {a.date: a for a in assignments}
+    dynamic_role_assignments_by_date = {
+        assignment.date: _get_dynamic_role_assignments(assignment, site_config)
+        for assignment in assignments
+    }
 
     active_statuses = set(get_active_membership_statuses())
 
@@ -829,6 +860,7 @@ def duty_calendar_view(request, year=None, month=None):
         "next_month_name": next_month_name,
         "weeks": weeks,
         "assignments_by_date": assignments_by_date,
+        "dynamic_role_assignments_by_date": dynamic_role_assignments_by_date,
         "has_upcoming_assignments": has_upcoming_assignments,
         "prev_year": prev_year,
         "prev_month": prev_month,
@@ -1070,25 +1102,7 @@ def calendar_day_detail(request, year, month, day):
                 if is_qualified:
                     volunteerable_holes[hole_role] = True
 
-    dynamic_role_assignments = []
-    if assignment and site_config and site_config.enable_dynamic_duty_roles:
-        role_service = RoleResolutionService(site_configuration=site_config)
-        for role_key in role_service.get_enabled_roles():
-            # Legacy role keys are already rendered by fixed assignment blocks.
-            if role_key in DutyAssignment.LEGACY_ROLE_TO_FIELD:
-                continue
-
-            member = assignment.get_member_for_role(role_key)
-            if not member:
-                continue
-
-            dynamic_role_assignments.append(
-                {
-                    "key": role_key,
-                    "label": role_service.get_role_label(role_key),
-                    "member": member,
-                }
-            )
+    dynamic_role_assignments = _get_dynamic_role_assignments(assignment, site_config)
 
     return render(
         request,
