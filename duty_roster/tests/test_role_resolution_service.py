@@ -35,7 +35,7 @@ def full_member():
 
 
 @pytest.mark.django_db
-def test_get_enabled_roles_falls_back_to_legacy_defaults_without_dynamic_mode(
+def test_get_enabled_roles_returns_empty_when_all_legacy_schedule_flags_disabled(
     site_config,
 ):
     site_config.schedule_instructors = False
@@ -47,12 +47,7 @@ def test_get_enabled_roles_falls_back_to_legacy_defaults_without_dynamic_mode(
 
     service = RoleResolutionService(site_configuration=site_config)
 
-    assert service.get_enabled_roles() == [
-        "instructor",
-        "duty_officer",
-        "assistant_duty_officer",
-        "towpilot",
-    ]
+    assert service.get_enabled_roles() == []
 
 
 @pytest.mark.django_db

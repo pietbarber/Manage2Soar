@@ -63,8 +63,7 @@ class RoleResolutionService:
                 scheduled_roles.append("assistant_duty_officer")
             if config.schedule_commercial_pilots:
                 scheduled_roles.append("commercial_pilot")
-            if scheduled_roles:
-                return scheduled_roles
+            return scheduled_roles
         return list(DEFAULT_ROLES)
 
     def get_role_label(self, role_key: str) -> str:

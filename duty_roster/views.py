@@ -33,7 +33,7 @@ from duty_roster.utils.email import (
     notify_ops_status,
 )
 from logsheet.models import Airfield
-from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
+from members.constants.membership import ROLE_FIELD_MAP
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -70,6 +70,7 @@ from .roster_generator import (
     is_within_operational_season,
     resolve_roster_date_range,
 )
+from .utils.role_resolution import RoleResolutionService
 from .utils.roles import member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views")
@@ -2522,20 +2523,8 @@ def propose_roster(request):
     # Get site config and determine which roles to schedule
     siteconfig = SiteConfiguration.objects.first()
     use_ortools_scheduler = bool(siteconfig and siteconfig.use_ortools_scheduler)
-    enabled_roles = []
-    if siteconfig:
-        if getattr(siteconfig, "schedule_instructors", False):
-            enabled_roles.append("instructor")
-        if getattr(siteconfig, "schedule_duty_officers", False):
-            enabled_roles.append("duty_officer")
-        if getattr(siteconfig, "schedule_assistant_duty_officers", False):
-            enabled_roles.append("assistant_duty_officer")
-        if getattr(siteconfig, "schedule_tow_pilots", False):
-            enabled_roles.append("towpilot")
-        if getattr(siteconfig, "schedule_commercial_pilots", False):
-            enabled_roles.append("commercial_pilot")
-    else:
-        enabled_roles = DEFAULT_ROLES.copy()
+    role_service = RoleResolutionService(site_configuration=siteconfig)
+    enabled_roles = role_service.get_enabled_roles()
 
     if not enabled_roles:
         # No scheduling for this club
@@ -2690,6 +2679,7 @@ def propose_roster(request):
                         date__lte=active_end,
                     ).delete()
 
+                    unsupported_assigned_roles = set()
                     for e in draft_entries:
                         try:
                             edt = dt_date.fromisoformat(e["date"])
@@ -2704,6 +2694,9 @@ def propose_roster(request):
                         }
                         for role, mem in e["slots"].items():
                             field_name = ROLE_FIELD_MAP.get(role)
+                            if mem and not field_name:
+                                unsupported_assigned_roles.add(get_role_title(role))
+                                continue
                             if field_name and mem:
                                 try:
                                     member = members_by_id.get(int(mem))
@@ -2721,6 +2714,14 @@ def propose_roster(request):
 
                         assignment = DutyAssignment.objects.create(**assignment_data)
                         created_assignments.append(assignment)
+
+                if unsupported_assigned_roles:
+                    unsupported_list = ", ".join(sorted(unsupported_assigned_roles))
+                    messages.warning(
+                        request,
+                        "Some configured dynamic roles are not yet publishable to legacy "
+                        f"duty assignment fields and were skipped: {unsupported_list}.",
+                    )
             except Exception:
                 logger.exception("Failed publishing proposed roster")
                 messages.error(
