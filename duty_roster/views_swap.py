@@ -73,22 +73,17 @@ def get_eligible_members_for_role(role, exclude_member=None, dynamic_role_key=""
     """Get members who are eligible to fill a specific role."""
     if role == "DYNAMIC" and dynamic_role_key:
         active_statuses = get_active_membership_statuses()
-        candidates = list(
-            Member.objects.filter(membership_status__in=active_statuses).order_by(
-                "last_name", "first_name"
-            )
-        )
+        candidates = Member.objects.filter(membership_status__in=active_statuses)
         if exclude_member:
-            candidates = [m for m in candidates if m.pk != exclude_member.pk]
+            candidates = candidates.exclude(pk=exclude_member.pk)
 
         role_service = RoleResolutionService(
             site_configuration=SiteConfiguration.objects.first()
         )
-        eligible_ids = [
-            member.id
-            for member in candidates
-            if role_service.is_member_eligible(member, dynamic_role_key)
-        ]
+        eligible_ids = role_service.get_eligible_member_ids(
+            dynamic_role_key,
+            members_queryset=candidates,
+        )
         return Member.objects.filter(id__in=eligible_ids).order_by(
             "last_name", "first_name"
         )

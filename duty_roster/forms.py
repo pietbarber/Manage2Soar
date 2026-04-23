@@ -534,19 +534,16 @@ class DutySwapRequestForm(forms.ModelForm):
                 self.fields["direct_request_to"].queryset = eligible
             elif role == "DYNAMIC" and self.dynamic_role_key:
                 active_statuses = get_active_membership_statuses()
-                candidates = list(
-                    Member.objects.filter(membership_status__in=active_statuses)
-                    .exclude(pk=requester.pk if requester else None)
-                    .order_by("last_name", "first_name")
-                )
+                candidates = Member.objects.filter(
+                    membership_status__in=active_statuses
+                ).exclude(pk=requester.pk if requester else None)
                 role_service = RoleResolutionService(
                     site_configuration=SiteConfiguration.objects.first()
                 )
-                eligible_ids = [
-                    member.id
-                    for member in candidates
-                    if role_service.is_member_eligible(member, self.dynamic_role_key)
-                ]
+                eligible_ids = role_service.get_eligible_member_ids(
+                    self.dynamic_role_key,
+                    members_queryset=candidates,
+                )
                 self.fields["direct_request_to"].queryset = Member.objects.filter(
                     id__in=eligible_ids
                 ).order_by("last_name", "first_name")

@@ -51,6 +51,7 @@ from .forms import (
 )
 from .models import (
     DutyAssignment,
+    DutyAssignmentRole,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
@@ -99,24 +100,32 @@ def calendar_refresh_response(year, month):
     return HttpResponse(headers={"HX-Trigger": json.dumps(trigger_data)})
 
 
-def _get_dynamic_role_assignments(assignment, site_config):
+def _get_dynamic_role_assignments(
+    assignment,
+    site_config,
+    *,
+    role_service=None,
+    enabled_roles=None,
+    role_labels_by_key=None,
+):
     """Return assigned non-legacy dynamic roles for an assignment."""
     if not assignment or not site_config or not site_config.enable_dynamic_duty_roles:
         return []
 
-    role_service = RoleResolutionService(site_configuration=site_config)
+    role_service = role_service or RoleResolutionService(site_configuration=site_config)
+    enabled_roles = (
+        enabled_roles if enabled_roles is not None else role_service.get_enabled_roles()
+    )
+    role_labels_by_key = role_labels_by_key or {}
     legacy_to_swap_role = {
         "instructor": "INSTRUCTOR",
         "towpilot": "TOW",
         "duty_officer": "DO",
         "assistant_duty_officer": "ADO",
     }
-    role_rows_by_key = {
-        row.role_key: row
-        for row in assignment.role_rows.select_related("role_definition", "member")
-    }
+    role_rows_by_key = {row.role_key: row for row in assignment.role_rows.all()}
     dynamic_role_assignments = []
-    for role_key in role_service.get_enabled_roles():
+    for role_key in enabled_roles:
         # Legacy role keys are rendered from fixed assignment fields.
         if role_key in DutyAssignment.LEGACY_ROLE_TO_FIELD:
             continue
@@ -149,7 +158,10 @@ def _get_dynamic_role_assignments(assignment, site_config):
         dynamic_role_assignments.append(
             {
                 "key": role_key,
-                "label": role_service.get_role_label(role_key),
+                "label": role_labels_by_key.get(
+                    role_key,
+                    role_service.get_role_label(role_key),
+                ),
                 "member": member,
                 "legacy_role_key": legacy_role_key,
                 "swap_role_code": swap_role_code,
@@ -778,14 +790,39 @@ def duty_calendar_view(request, year=None, month=None):
     weeks = cal.monthdatescalendar(year, month)
     first_visible_day = weeks[0][0]
     last_visible_day = weeks[-1][-1]
-    assignments = DutyAssignment.objects.filter(
-        date__range=(first_visible_day, last_visible_day)
-    ).order_by("date")
+    assignments = (
+        DutyAssignment.objects.filter(date__range=(first_visible_day, last_visible_day))
+        .prefetch_related(
+            models.Prefetch(
+                "role_rows",
+                queryset=DutyAssignmentRole.objects.select_related(
+                    "role_definition", "member"
+                ),
+            )
+        )
+        .order_by("date")
+    )
     visible_dates = [day for week in weeks for day in week]
 
     assignments_by_date = {a.date: a for a in assignments}
+    role_service = RoleResolutionService(site_configuration=site_config)
+    enabled_role_keys = (
+        role_service.get_enabled_roles()
+        if site_config and site_config.enable_dynamic_duty_roles
+        else []
+    )
+    role_labels_by_key = {
+        role_key: role_service.get_role_label(role_key)
+        for role_key in enabled_role_keys
+    }
     dynamic_role_assignments_by_date = {
-        assignment.date: _get_dynamic_role_assignments(assignment, site_config)
+        assignment.date: _get_dynamic_role_assignments(
+            assignment,
+            site_config,
+            role_service=role_service,
+            enabled_roles=enabled_role_keys,
+            role_labels_by_key=role_labels_by_key,
+        )
         for assignment in assignments
     }
 

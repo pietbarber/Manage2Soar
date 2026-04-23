@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from django.db.models import Q
 from django.utils import timezone
 
 from duty_roster.models import (
@@ -81,26 +82,96 @@ class RoleResolutionService:
 
     def is_member_eligible(self, member: Member, role_key: str) -> bool:
         """Determine role eligibility, using dynamic requirements when enabled."""
+        return member.pk in self.get_eligible_member_ids(
+            role_key,
+            members_queryset=Member.objects.filter(pk=member.pk),
+        )
+
+    def get_eligible_member_ids(self, role_key: str, members_queryset=None) -> set[int]:
+        """Return eligible member IDs for a role using set-based DB queries where possible."""
+        if members_queryset is None:
+            members_queryset = Member.objects.all()
+
+        candidate_ids = set(members_queryset.values_list("id", flat=True))
+        if not candidate_ids:
+            return set()
+
         if not self._is_dynamic_enabled():
-            return member_has_role(member, role_key)
+            return {
+                m.id for m in members_queryset if m.id and member_has_role(m, role_key)
+            }
 
         role_definition = (
-            self._role_queryset().filter(key=role_key, is_active=True).first()
+            self._role_queryset()
+            .filter(key=role_key, is_active=True)
+            .prefetch_related("qualification_requirements")
+            .first()
         )
         if not role_definition:
-            return member_has_role(member, role_key)
+            return {
+                m.id for m in members_queryset if m.id and member_has_role(m, role_key)
+            }
 
-        requirements = list(
-            role_definition.qualification_requirements.filter(is_required=True)
-        )
+        requirements = [
+            req
+            for req in role_definition.qualification_requirements.all()
+            if req.is_required
+        ]
         if not requirements:
             fallback_role = role_definition.legacy_role_key or role_key
-            return member_has_role(member, fallback_role)
+            return {
+                m.id
+                for m in members_queryset
+                if m.id and member_has_role(m, fallback_role)
+            }
+
+        eligible_ids = set(candidate_ids)
+        today = timezone.localdate()
 
         for requirement in requirements:
-            if not self._meets_requirement(member, requirement):
-                return False
-        return True
+            requirement_type = requirement.requirement_type
+            requirement_value = requirement.requirement_value
+
+            if requirement_type == DutyQualificationRequirement.TYPE_LEGACY_ROLE_FLAG:
+                matching_ids = set(
+                    members_queryset.filter(
+                        id__in=eligible_ids,
+                        **{requirement_value: True},
+                    ).values_list("id", flat=True)
+                )
+            elif (
+                requirement_type
+                == DutyQualificationRequirement.TYPE_LEGACY_GLIDER_RATING
+            ):
+                matching_ids = set(
+                    members_queryset.filter(
+                        id__in=eligible_ids,
+                        glider_rating__iexact=requirement_value,
+                    ).values_list("id", flat=True)
+                )
+            elif requirement_type == DutyQualificationRequirement.TYPE_MEMBER_DUTY_QUAL:
+                matching_ids = set(
+                    MemberDutyQualification.objects.filter(
+                        member_id__in=eligible_ids,
+                        qualification_code=requirement_value,
+                        is_qualified=True,
+                    )
+                    .filter(Q(expires_on__isnull=True) | Q(expires_on__gte=today))
+                    .values_list("member_id", flat=True)
+                    .distinct()
+                )
+            else:
+                matching_ids = {
+                    member.id
+                    for member in members_queryset.filter(id__in=eligible_ids)
+                    if member.id and self._meets_requirement(member, requirement)
+                }
+
+            eligible_ids &= matching_ids
+            if not eligible_ids:
+                break
+
+        return eligible_ids
 
     def _meets_requirement(
         self,
@@ -125,15 +196,9 @@ class RoleResolutionService:
                     is_qualified=True,
                 )
                 .filter(
-                    expires_on__isnull=True,
+                    Q(expires_on__isnull=True) | Q(expires_on__gte=timezone.localdate())
                 )
                 .exists()
-                or MemberDutyQualification.objects.filter(
-                    member=member,
-                    qualification_code=requirement_value,
-                    is_qualified=True,
-                    expires_on__gte=timezone.localdate(),
-                ).exists()
             )
 
         return False
