@@ -33,7 +33,6 @@ from duty_roster.utils.email import (
     notify_ops_status,
 )
 from logsheet.models import Airfield
-from members.constants.membership import ROLE_FIELD_MAP
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -149,7 +148,7 @@ def _get_dynamic_role_assignments(
         swap_role_code = legacy_to_swap_role.get(legacy_role_key)
         if swap_role_code:
             # The current swap workflow enforces legacy duty-field assignment ownership.
-            legacy_field_name = ROLE_FIELD_MAP.get(legacy_role_key)
+            legacy_field_name = DutyAssignment.LEGACY_ROLE_TO_FIELD.get(legacy_role_key)
             assigned_legacy_member = (
                 getattr(assignment, legacy_field_name, None)
                 if legacy_field_name
@@ -967,7 +966,18 @@ def duty_calendar_view(request, year=None, month=None):
 
 def calendar_day_detail(request, year, month, day):
     day_date = date(year, month, day)
-    assignment = DutyAssignment.objects.filter(date=day_date).first()
+    assignment = (
+        DutyAssignment.objects.filter(date=day_date)
+        .prefetch_related(
+            models.Prefetch(
+                "role_rows",
+                queryset=DutyAssignmentRole.objects.select_related(
+                    "member", "role_definition"
+                ),
+            )
+        )
+        .first()
+    )
     open_panel = request.GET.get("open_panel", "")
     if open_panel not in {"plan_to_fly", "request_instruction"}:
         open_panel = ""
@@ -2840,7 +2850,9 @@ def propose_roster(request):
                                 if role_def and role_def.legacy_role_key
                                 else role
                             )
-                            field_name = ROLE_FIELD_MAP.get(legacy_role_key)
+                            field_name = DutyAssignment.LEGACY_ROLE_TO_FIELD.get(
+                                legacy_role_key
+                            )
 
                             if not field_name:
                                 unsupported_assigned_roles.add(get_role_title(role))

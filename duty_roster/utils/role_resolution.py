@@ -8,17 +8,19 @@ from django.db.models import Q
 from django.utils import timezone
 
 from duty_roster.models import (
+    DutyAssignment,
     DutyQualificationRequirement,
     DutyRoleDefinition,
     MemberDutyQualification,
 )
 from duty_roster.utils.roles import member_has_role
-from members.constants.membership import DEFAULT_ROLES
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 
 logger = logging.getLogger("duty_roster.role_resolution")
+
+DEFAULT_ROLES = tuple(DutyAssignment.LEGACY_ROLE_TO_FIELD.keys())
 
 
 class RoleResolutionService:
