@@ -334,15 +334,31 @@ def open_swap_requests(request):
         else open_requests.none()
     )
 
-    dynamic_open_requests = []
-    role_service = RoleResolutionService(
-        site_configuration=SiteConfiguration.objects.first()
-    )
-    for req in open_requests.filter(role="DYNAMIC"):
-        if req.dynamic_role_key and role_service.is_member_eligible(
-            member, req.dynamic_role_key
-        ):
-            dynamic_open_requests.append(req)
+    dynamic_requests = list(open_requests.filter(role="DYNAMIC"))
+    dynamic_role_keys = {
+        req.dynamic_role_key for req in dynamic_requests if req.dynamic_role_key
+    }
+    eligible_dynamic_role_keys = set()
+    if dynamic_role_keys:
+        role_service = RoleResolutionService(
+            site_configuration=SiteConfiguration.objects.first()
+        )
+        member_queryset = Member.objects.filter(pk=member.pk)
+        eligible_dynamic_role_keys = {
+            role_key
+            for role_key in dynamic_role_keys
+            if member.pk
+            in role_service.get_eligible_member_ids(
+                role_key,
+                members_queryset=member_queryset,
+            )
+        }
+
+    dynamic_open_requests = [
+        req
+        for req in dynamic_requests
+        if req.dynamic_role_key in eligible_dynamic_role_keys
+    ]
 
     open_requests = sorted(
         list(static_open_requests) + dynamic_open_requests,

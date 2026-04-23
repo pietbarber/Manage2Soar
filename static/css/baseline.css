@@ -512,6 +512,12 @@ table .duty-badge {
   color: white;
 }
 
+.duty-badge.badge-dynamic-role {
+  background-color: #0d6efd;
+  border: 1px solid #0a58ca;
+  color: white;
+}
+
 .duty-badge.badge-surge {
   background-color: #dc3545;
   border: 1px solid #c82333;
@@ -561,6 +567,14 @@ table .duty-badge.badge-assistant-duty-officer {
   background: linear-gradient(135deg, #6c757d 0%, #545b62 100%) !important;
   /* gray - matches agenda/modal */
   border: 1px solid #545b62 !important;
+  color: white !important;
+}
+
+.calendar-cell .duty-badge.badge-dynamic-role,
+.duty-assignments .duty-badge.badge-dynamic-role,
+table .duty-badge.badge-dynamic-role {
+  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%) !important;
+  border: 1px solid #0a58ca !important;
   color: white !important;
 }
 

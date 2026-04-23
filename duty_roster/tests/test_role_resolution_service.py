@@ -134,3 +134,28 @@ def test_dynamic_role_eligibility_from_legacy_role_requirement(
     full_member.save(update_fields=["instructor"])
 
     assert service.is_member_eligible(full_member, "am_instructor") is False
+
+
+@pytest.mark.django_db
+def test_invalid_legacy_role_requirement_field_is_treated_as_non_matching(
+    site_config, full_member
+):
+    site_config.enable_dynamic_duty_roles = True
+    site_config.save()
+
+    role = DutyRoleDefinition.objects.create(
+        site_configuration=site_config,
+        key="invalid_field_role",
+        display_name="Invalid Field Role",
+        is_active=True,
+        sort_order=2,
+    )
+    DutyQualificationRequirement.objects.create(
+        role_definition=role,
+        requirement_type=DutyQualificationRequirement.TYPE_LEGACY_ROLE_FLAG,
+        requirement_value="not_a_real_member_field",
+    )
+
+    service = RoleResolutionService(site_configuration=site_config)
+
+    assert service.is_member_eligible(full_member, "invalid_field_role") is False

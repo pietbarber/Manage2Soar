@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
+from django.core.exceptions import FieldError
 from django.db.models import Q
 from django.utils import timezone
 
@@ -15,6 +17,8 @@ from members.constants.membership import DEFAULT_ROLES
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
+
+logger = logging.getLogger("duty_roster.role_resolution")
 
 
 class RoleResolutionService:
@@ -133,12 +137,21 @@ class RoleResolutionService:
             requirement_value = requirement.requirement_value
 
             if requirement_type == DutyQualificationRequirement.TYPE_LEGACY_ROLE_FLAG:
-                matching_ids = set(
-                    members_queryset.filter(
-                        id__in=eligible_ids,
-                        **{requirement_value: True},
-                    ).values_list("id", flat=True)
-                )
+                try:
+                    matching_ids = set(
+                        members_queryset.filter(
+                            id__in=eligible_ids,
+                            **{requirement_value: True},
+                        ).values_list("id", flat=True)
+                    )
+                except FieldError:
+                    logger.warning(
+                        "Invalid legacy role flag '%s' for dynamic role '%s'; "
+                        "treating requirement as non-matching",
+                        requirement_value,
+                        role_key,
+                    )
+                    matching_ids = set()
             elif (
                 requirement_type
                 == DutyQualificationRequirement.TYPE_LEGACY_GLIDER_RATING

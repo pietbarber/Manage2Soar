@@ -536,6 +536,69 @@ class TestSwapViewAccess:
         resp = client.get(url)
         assert resp.status_code == 200
 
+    def test_open_requests_shows_only_dynamic_roles_member_is_eligible_for(
+        self, client, alice, bob, site_config
+    ):
+        """Dynamic open requests are filtered by role-key eligibility."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        eligible_role = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="dynamic_tow",
+            display_name="Dynamic Tow",
+            is_active=True,
+            sort_order=10,
+        )
+        eligible_role.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="towpilot",
+            is_required=True,
+        )
+
+        ineligible_role = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="dynamic_instructor",
+            display_name="Dynamic Instructor",
+            is_active=True,
+            sort_order=20,
+        )
+        ineligible_role.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="instructor",
+            is_required=True,
+        )
+
+        tomorrow = date.today() + timedelta(days=1)
+        day_after = date.today() + timedelta(days=2)
+        eligible_request = DutySwapRequest.objects.create(
+            requester=bob,
+            original_date=tomorrow,
+            role="DYNAMIC",
+            dynamic_role_key="dynamic_tow",
+            dynamic_role_label="Dynamic Tow",
+            request_type="general",
+            status="open",
+        )
+        ineligible_request = DutySwapRequest.objects.create(
+            requester=bob,
+            original_date=day_after,
+            role="DYNAMIC",
+            dynamic_role_key="dynamic_instructor",
+            dynamic_role_label="Dynamic Instructor",
+            request_type="general",
+            status="open",
+        )
+
+        client.force_login(alice)
+        url = reverse("duty_roster:open_swap_requests")
+        resp = client.get(url)
+
+        assert resp.status_code == 200
+        open_request_ids = {req.id for req in resp.context["open_requests"]}
+        assert eligible_request.id in open_request_ids
+        assert ineligible_request.id not in open_request_ids
+
 
 @pytest.mark.django_db
 class TestSwapRequestCreation:
