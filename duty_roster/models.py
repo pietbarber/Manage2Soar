@@ -493,22 +493,51 @@ class DutyAssignment(models.Model):
                 role_key__in=legacy_role_keys,
             )
         }
+        rows_to_create = []
+        rows_to_update = []
         rows_to_delete = []
 
         for role_key, field_name in self.LEGACY_ROLE_TO_FIELD.items():
             member = getattr(self, field_name, None)
+            existing_row = existing_rows_by_key.get(role_key)
+
             if member:
-                DutyAssignmentRole.objects.update_or_create(
-                    assignment=self,
-                    role_key=role_key,
-                    defaults={
-                        "member": member,
-                        "legacy_role_key": role_key,
-                        "shift_code": "",
-                    },
-                )
-            elif role_key in existing_rows_by_key:
-                rows_to_delete.append(existing_rows_by_key[role_key].pk)
+                if existing_row is None:
+                    rows_to_create.append(
+                        DutyAssignmentRole(
+                            assignment=self,
+                            role_key=role_key,
+                            member=member,
+                            legacy_role_key=role_key,
+                            shift_code="",
+                        )
+                    )
+                    continue
+
+                row_changed = False
+                if existing_row.member_id != member.pk:
+                    existing_row.member = member
+                    row_changed = True
+                if existing_row.legacy_role_key != role_key:
+                    existing_row.legacy_role_key = role_key
+                    row_changed = True
+                if existing_row.shift_code != "":
+                    existing_row.shift_code = ""
+                    row_changed = True
+
+                if row_changed:
+                    rows_to_update.append(existing_row)
+            elif existing_row is not None:
+                rows_to_delete.append(existing_row.pk)
+
+        if rows_to_create:
+            DutyAssignmentRole.objects.bulk_create(rows_to_create)
+
+        if rows_to_update:
+            DutyAssignmentRole.objects.bulk_update(
+                rows_to_update,
+                ["member", "legacy_role_key", "shift_code"],
+            )
 
         if rows_to_delete:
             DutyAssignmentRole.objects.filter(pk__in=rows_to_delete).delete()

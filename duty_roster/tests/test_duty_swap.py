@@ -1414,6 +1414,83 @@ class TestDynamicAssignmentUpdateEdgeCases:
         assert created_swap_row.legacy_role_key == "towpilot"
         assert swap_assignment.tow_pilot == alice
 
+    def test_dynamic_swap_backfills_existing_swap_row_metadata_and_surge_legacy_sync(
+        self, alice, bob, site_config
+    ):
+        """Existing swap rows missing metadata should be backfilled before legacy sync."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="surge_launch_coord",
+            display_name="Surge Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+            legacy_role_key="surge_towpilot",
+            shift_code="pm",
+        )
+
+        original_date = date.today() + timedelta(days=17)
+        proposed_swap_date = date.today() + timedelta(days=24)
+
+        original_assignment = DutyAssignment.objects.create(
+            date=original_date,
+            surge_tow_pilot=alice,
+        )
+        swap_assignment = DutyAssignment.objects.create(
+            date=proposed_swap_date,
+            surge_tow_pilot=bob,
+        )
+
+        DutyAssignmentRole.objects.create(
+            assignment=original_assignment,
+            role_key="surge_launch_coord",
+            member=alice,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=swap_assignment,
+            role_key="surge_launch_coord",
+            member=bob,
+            legacy_role_key="",
+            shift_code="",
+            role_definition=None,
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="surge_launch_coord",
+            dynamic_role_label="Surge Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="swap",
+            proposed_swap_date=proposed_swap_date,
+            status="pending",
+        )
+
+        update_duty_assignments(swap_request, offer)
+
+        original_assignment.refresh_from_db()
+        swap_assignment.refresh_from_db()
+
+        swap_row = DutyAssignmentRole.objects.get(
+            assignment=swap_assignment,
+            role_key="surge_launch_coord",
+        )
+
+        assert original_assignment.surge_tow_pilot == bob
+        assert swap_assignment.surge_tow_pilot == alice
+        assert swap_row.member == alice
+        assert swap_row.legacy_role_key == "surge_towpilot"
+        assert swap_row.shift_code == "pm"
+        assert swap_row.role_definition == role_definition
+
     def test_accept_offer_rolls_back_when_original_assignment_missing(
         self, alice, bob, site_config
     ):

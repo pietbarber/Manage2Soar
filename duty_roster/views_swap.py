@@ -19,7 +19,6 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from members.constants.membership import ROLE_FIELD_MAP
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -1061,7 +1060,9 @@ def update_duty_assignments(swap_request, offer):
             original_row.legacy_role_key or resolved_legacy_role_key
         )
         if original_legacy_role_key:
-            legacy_field_name = ROLE_FIELD_MAP.get(original_legacy_role_key)
+            legacy_field_name = DutyAssignment.LEGACY_ROLE_TO_FIELD.get(
+                original_legacy_role_key
+            )
             if legacy_field_name:
                 setattr(original_assignment, legacy_field_name, offer.offered_by)
                 original_assignment.save(update_fields=[legacy_field_name])
@@ -1080,12 +1081,35 @@ def update_duty_assignments(swap_request, offer):
                     "role_definition": original_row.role_definition or role_definition,
                 },
             )
+            swap_row_fields_to_update = []
             if swap_row.member_id != swap_request.requester.id:
                 swap_row.member = swap_request.requester
-                swap_row.save(update_fields=["member"])
+                swap_row_fields_to_update.append("member")
+
+            if not swap_row.legacy_role_key and original_legacy_role_key:
+                swap_row.legacy_role_key = original_legacy_role_key
+                swap_row_fields_to_update.append("legacy_role_key")
+
+            resolved_swap_shift_code = original_row.shift_code or resolved_shift_code
+            if not swap_row.shift_code and resolved_swap_shift_code:
+                swap_row.shift_code = resolved_swap_shift_code
+                swap_row_fields_to_update.append("shift_code")
+
+            resolved_role_definition = original_row.role_definition or role_definition
+            if (
+                swap_row.role_definition is None
+                and resolved_role_definition is not None
+            ):
+                swap_row.role_definition = resolved_role_definition
+                swap_row_fields_to_update.append("role_definition")
+
+            if swap_row_fields_to_update:
+                swap_row.save(update_fields=swap_row_fields_to_update)
 
             if swap_row.legacy_role_key:
-                legacy_field_name = ROLE_FIELD_MAP.get(swap_row.legacy_role_key)
+                legacy_field_name = DutyAssignment.LEGACY_ROLE_TO_FIELD.get(
+                    swap_row.legacy_role_key
+                )
                 if legacy_field_name:
                     setattr(swap_assignment, legacy_field_name, swap_request.requester)
                     swap_assignment.save(update_fields=[legacy_field_name])
