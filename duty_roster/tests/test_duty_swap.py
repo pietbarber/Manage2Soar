@@ -1414,6 +1414,50 @@ class TestDynamicAssignmentUpdateEdgeCases:
         assert created_swap_row.legacy_role_key == "towpilot"
         assert swap_assignment.tow_pilot == alice
 
+    def test_accept_offer_rolls_back_when_original_assignment_missing(
+        self, alice, bob, site_config
+    ):
+        """Acceptance should rollback request/offer status if dynamic assignment update fails."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        original_date = date.today() + timedelta(days=18)
+        DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+            status="pending",
+        )
+
+        with pytest.raises(ValueError, match="Missing original assignment"):
+            _accept_offer_and_finalize(swap_request, offer)
+
+        swap_request.refresh_from_db()
+        offer.refresh_from_db()
+
+        assert swap_request.status == "open"
+        assert swap_request.accepted_offer is None
+        assert swap_request.fulfilled_at is None
+        assert offer.status == "pending"
+        assert offer.responded_at is None
+
 
 # =============================================================================
 # Email Notification Tests

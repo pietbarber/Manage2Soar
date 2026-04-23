@@ -636,11 +636,12 @@ def swap_request_detail(request, request_id):
     # Check if user can view this request
     is_requester = swap_request.requester == member
     is_offerer = swap_request.offers.filter(offered_by=member).exists()
-    is_eligible = member in get_eligible_members_for_role(
+    eligible_members = get_eligible_members_for_role(
         swap_request.role,
         exclude_member=swap_request.requester,
         dynamic_role_key=swap_request.dynamic_role_key,
     )
+    is_eligible = eligible_members.filter(pk=member.pk).exists()
     is_target = swap_request.direct_request_to == member
 
     if (
@@ -760,11 +761,12 @@ def make_offer(request, request_id):
         return redirect("duty_roster:swap_request_detail", request_id=request_id)
 
     # Check if user is eligible for this role
-    if member not in get_eligible_members_for_role(
+    eligible_members = get_eligible_members_for_role(
         swap_request.role,
         exclude_member=swap_request.requester,
         dynamic_role_key=swap_request.dynamic_role_key,
-    ):
+    )
+    if not eligible_members.filter(pk=member.pk).exists():
         messages.error(request, "You are not qualified for this role.")
         return redirect("duty_roster:open_swap_requests")
 
@@ -1007,15 +1009,17 @@ def update_duty_assignments(swap_request, offer):
     """Update duty assignments after a swap/cover is accepted."""
     if swap_request.role == "DYNAMIC":
         if not swap_request.dynamic_role_key:
-            logger.error("Missing dynamic_role_key for dynamic swap request")
-            return
+            message = "Missing dynamic_role_key for dynamic swap request"
+            logger.error(message)
+            raise ValueError(message)
 
         original_assignment = DutyAssignment.objects.filter(
             date=swap_request.original_date
         ).first()
         if not original_assignment:
-            logger.error("Missing original assignment for dynamic swap request")
-            return
+            message = "Missing original assignment for dynamic swap request"
+            logger.error(message)
+            raise ValueError(message)
 
         role_definition = DutyRoleDefinition.objects.filter(
             key=swap_request.dynamic_role_key,

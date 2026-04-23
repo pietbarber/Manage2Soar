@@ -2782,7 +2782,6 @@ def propose_roster(request):
             _set_proposed_roster_range(request, range_start, range_end)
 
         elif action == "publish":
-            from .models import DutyAssignment, DutyAssignmentRole, DutyRoleDefinition
             from .utils.email import send_roster_published_notifications
 
             default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
