@@ -81,12 +81,24 @@ class RoleResolutionService:
                 self._role_queryset().filter(key=role_key, is_active=True).first()
             )
 
-        if role_definition and role_definition.legacy_role_key:
-            return get_role_title(role_definition.legacy_role_key)
+        # If we have an active dynamic role definition, prefer legacy site
+        # terminology when mapped, otherwise the role's display name.
         if role_definition:
-            return role_definition.display_name
+            if role_definition.legacy_role_key:
+                title = get_role_title(role_definition.legacy_role_key)
+                if title:
+                    return title
+            if role_definition.display_name:
+                return role_definition.display_name
 
-        return get_role_title(role_key)
+        # Fall back to site-level role title or a safe, non-None textual
+        # fallback derived from the role key. `get_role_title` may return
+        # None if site-config fields are unset, so ensure we always return
+        # a plain `str` here to satisfy static type checks.
+        title = get_role_title(role_key)
+        if title:
+            return title
+        return (role_key or "").replace("_", " ").title()
 
     def is_member_eligible(self, member: Member, role_key: str) -> bool:
         """Determine role eligibility, using dynamic requirements when enabled."""
