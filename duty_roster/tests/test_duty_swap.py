@@ -1274,6 +1274,78 @@ class TestCancelAndConvert:
 class TestDynamicAssignmentUpdateEdgeCases:
     """Tests for dynamic assignment update edge cases."""
 
+    def test_dynamic_swap_recovers_when_original_role_row_missing(
+        self, alice, bob, site_config
+    ):
+        """Missing original dynamic role row should be recreated and assignments updated."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+            legacy_role_key="towpilot",
+        )
+
+        original_date = date.today() + timedelta(days=22)
+        proposed_swap_date = date.today() + timedelta(days=29)
+        original_assignment = DutyAssignment.objects.create(
+            date=original_date,
+            tow_pilot=alice,
+        )
+        swap_assignment = DutyAssignment.objects.create(
+            date=proposed_swap_date,
+            tow_pilot=bob,
+        )
+
+        DutyAssignmentRole.objects.create(
+            assignment=swap_assignment,
+            role_key="launch_coord",
+            member=bob,
+            role_definition=role_definition,
+            legacy_role_key="towpilot",
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="swap",
+            proposed_swap_date=proposed_swap_date,
+            status="pending",
+        )
+
+        update_duty_assignments(swap_request, offer)
+
+        original_assignment.refresh_from_db()
+        swap_assignment.refresh_from_db()
+
+        recreated_original_row = DutyAssignmentRole.objects.get(
+            assignment=original_assignment,
+            role_key="launch_coord",
+        )
+        swap_row = DutyAssignmentRole.objects.get(
+            assignment=swap_assignment,
+            role_key="launch_coord",
+        )
+
+        assert recreated_original_row.member == bob
+        assert recreated_original_row.legacy_role_key == "towpilot"
+        assert original_assignment.tow_pilot == bob
+        assert swap_row.member == alice
+        assert swap_assignment.tow_pilot == alice
+
     def test_dynamic_swap_creates_missing_role_row_on_proposed_swap_date(
         self, alice, bob, site_config
     ):

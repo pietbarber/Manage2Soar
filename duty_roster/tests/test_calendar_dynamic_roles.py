@@ -4,6 +4,7 @@ import pytest
 from django.urls import reverse
 
 from duty_roster.models import DutyAssignment, DutyAssignmentRole, DutyRoleDefinition
+from duty_roster.utils.role_resolution import RoleResolutionService
 from members.models import Member
 from siteconfig.models import MembershipStatus, SiteConfiguration
 
@@ -203,6 +204,54 @@ def test_calendar_month_dynamic_roles_do_not_call_get_member_for_role_fallback(
         raise AssertionError("get_member_for_role should not be used for dynamic rows")
 
     monkeypatch.setattr(DutyAssignment, "get_member_for_role", _raise_if_called)
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": duty_date.year, "month": duty_date.month},
+        )
+    )
+
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_calendar_month_dynamic_roles_do_not_call_get_role_label_per_key(
+    client, monkeypatch
+):
+    _ensure_full_member_status()
+
+    viewer = _make_member("dynamic_table_viewer_no_role_label_calls")
+    dynamic_member = _make_member("dynamic_table_assigned_no_role_label_calls")
+
+    site_config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+    )
+    role_definition = DutyRoleDefinition.objects.create(
+        site_configuration=site_config,
+        key="launch_coord",
+        display_name="Launch Coordinator",
+        is_active=True,
+        sort_order=10,
+    )
+
+    duty_date = date.today() + timedelta(days=15)
+    assignment = DutyAssignment.objects.create(date=duty_date)
+    DutyAssignmentRole.objects.create(
+        assignment=assignment,
+        role_key="launch_coord",
+        member=dynamic_member,
+        role_definition=role_definition,
+    )
+
+    def _raise_if_called(*_args, **_kwargs):
+        raise AssertionError("get_role_label should not be called for month labels")
+
+    monkeypatch.setattr(RoleResolutionService, "get_role_label", _raise_if_called)
 
     client.force_login(viewer)
     response = client.get(

@@ -72,6 +72,24 @@ def test_dynamic_role_labels_use_site_terminology_for_legacy_mapping(site_config
 
 
 @pytest.mark.django_db
+def test_get_role_label_ignores_inactive_dynamic_role(site_config):
+    site_config.enable_dynamic_duty_roles = True
+    site_config.save()
+
+    DutyRoleDefinition.objects.create(
+        site_configuration=site_config,
+        key="inactive_role",
+        display_name="Inactive Dynamic Label",
+        is_active=False,
+        sort_order=99,
+    )
+
+    service = RoleResolutionService(site_configuration=site_config)
+
+    assert service.get_role_label("inactive_role") == "Inactive Role"
+
+
+@pytest.mark.django_db
 def test_dynamic_role_eligibility_from_member_duty_qualification(
     site_config, full_member
 ):

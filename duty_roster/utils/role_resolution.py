@@ -75,7 +75,9 @@ class RoleResolutionService:
         """Resolve display label with Site Configuration terminology precedence."""
         role_definition = None
         if self._is_dynamic_enabled():
-            role_definition = self._role_queryset().filter(key=role_key).first()
+            role_definition = (
+                self._role_queryset().filter(key=role_key, is_active=True).first()
+            )
 
         if role_definition and role_definition.legacy_role_key:
             return get_role_title(role_definition.legacy_role_key)

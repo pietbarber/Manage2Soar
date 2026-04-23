@@ -55,6 +55,7 @@ from .models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
+    DutyRoleDefinition,
     DutyRosterMessage,
     DutySwapRequest,
     GliderReservation,
@@ -135,6 +136,10 @@ def _get_dynamic_role_assignments(
         if not member:
             continue
 
+        label = role_labels_by_key.get(role_key)
+        if label is None:
+            label = role_service.get_role_label(role_key)
+
         legacy_role_key = ""
         if role_row:
             legacy_role_key = role_row.legacy_role_key or ""
@@ -156,10 +161,7 @@ def _get_dynamic_role_assignments(
         dynamic_role_assignments.append(
             {
                 "key": role_key,
-                "label": role_labels_by_key.get(
-                    role_key,
-                    role_service.get_role_label(role_key),
-                ),
+                "label": label,
                 "member": member,
                 "legacy_role_key": legacy_role_key,
                 "swap_role_code": swap_role_code,
@@ -809,10 +811,26 @@ def duty_calendar_view(request, year=None, month=None):
         if site_config and site_config.enable_dynamic_duty_roles
         else []
     )
-    role_labels_by_key = {
-        role_key: role_service.get_role_label(role_key)
-        for role_key in enabled_role_keys
-    }
+    role_labels_by_key = {}
+    if enabled_role_keys:
+        role_definitions_by_key = {
+            role_def.key: role_def
+            for role_def in DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+                key__in=enabled_role_keys,
+            )
+        }
+        for role_key in enabled_role_keys:
+            role_def = role_definitions_by_key.get(role_key)
+            if role_def:
+                role_labels_by_key[role_key] = (
+                    get_role_title(role_def.legacy_role_key)
+                    if role_def.legacy_role_key
+                    else role_def.display_name
+                )
+            else:
+                role_labels_by_key[role_key] = get_role_title(role_key)
     dynamic_role_assignments_by_date = {
         assignment.date: _get_dynamic_role_assignments(
             assignment,

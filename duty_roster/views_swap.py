@@ -1017,19 +1017,50 @@ def update_duty_assignments(swap_request, offer):
             logger.error("Missing original assignment for dynamic swap request")
             return
 
+        role_definition = DutyRoleDefinition.objects.filter(
+            key=swap_request.dynamic_role_key,
+            site_configuration=SiteConfiguration.objects.first(),
+            is_active=True,
+        ).first()
+
+        resolved_legacy_role_key = (
+            role_definition.legacy_role_key if role_definition else ""
+        )
+        resolved_shift_code = role_definition.shift_code if role_definition else ""
+
         original_row = DutyAssignmentRole.objects.filter(
             assignment=original_assignment,
             role_key=swap_request.dynamic_role_key,
         ).first()
-        if original_row:
-            original_row.member = offer.offered_by
-            original_row.save(update_fields=["member"])
 
-            if original_row.legacy_role_key:
-                legacy_field_name = ROLE_FIELD_MAP.get(original_row.legacy_role_key)
-                if legacy_field_name:
-                    setattr(original_assignment, legacy_field_name, offer.offered_by)
-                    original_assignment.save(update_fields=[legacy_field_name])
+        if not original_row:
+            original_row = DutyAssignmentRole.objects.create(
+                assignment=original_assignment,
+                role_key=swap_request.dynamic_role_key,
+                member=swap_request.requester,
+                role_definition=role_definition,
+                legacy_role_key=resolved_legacy_role_key,
+                shift_code=resolved_shift_code,
+            )
+        else:
+            if original_row.role_definition is None and role_definition is not None:
+                original_row.role_definition = role_definition
+            if not original_row.legacy_role_key and resolved_legacy_role_key:
+                original_row.legacy_role_key = resolved_legacy_role_key
+            if not original_row.shift_code and resolved_shift_code:
+                original_row.shift_code = resolved_shift_code
+
+        original_row.member = offer.offered_by
+        original_row.save()
+
+        original_legacy_role_key = (
+            original_row.legacy_role_key or resolved_legacy_role_key
+        )
+        if original_legacy_role_key:
+            legacy_field_name = ROLE_FIELD_MAP.get(original_legacy_role_key)
+            if legacy_field_name:
+                setattr(original_assignment, legacy_field_name, offer.offered_by)
+                original_assignment.save(update_fields=[legacy_field_name])
 
         if offer.offer_type == "swap" and offer.proposed_swap_date:
             swap_assignment, _created = DutyAssignment.objects.get_or_create(
@@ -1040,19 +1071,9 @@ def update_duty_assignments(swap_request, offer):
                 role_key=swap_request.dynamic_role_key,
                 defaults={
                     "member": swap_request.requester,
-                    "legacy_role_key": (
-                        original_row.legacy_role_key if original_row else ""
-                    ),
-                    "shift_code": original_row.shift_code if original_row else "",
-                    "role_definition": (
-                        original_row.role_definition
-                        if original_row
-                        else DutyRoleDefinition.objects.filter(
-                            key=swap_request.dynamic_role_key,
-                            site_configuration=SiteConfiguration.objects.first(),
-                            is_active=True,
-                        ).first()
-                    ),
+                    "legacy_role_key": original_legacy_role_key,
+                    "shift_code": original_row.shift_code or resolved_shift_code,
+                    "role_definition": original_row.role_definition or role_definition,
                 },
             )
             if swap_row.member_id != swap_request.requester.id:
