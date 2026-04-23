@@ -168,6 +168,54 @@ def test_calendar_month_table_shows_dynamic_role_badge(client):
 
 
 @pytest.mark.django_db
+def test_calendar_month_dynamic_roles_do_not_call_get_member_for_role_fallback(
+    client, monkeypatch
+):
+    _ensure_full_member_status()
+
+    viewer = _make_member("dynamic_table_viewer_no_fallback")
+    dynamic_member = _make_member("dynamic_table_assigned_no_fallback")
+
+    site_config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+    )
+    role_definition = DutyRoleDefinition.objects.create(
+        site_configuration=site_config,
+        key="launch_coord",
+        display_name="Launch Coordinator",
+        is_active=True,
+        sort_order=10,
+    )
+
+    duty_date = date.today() + timedelta(days=14)
+    assignment = DutyAssignment.objects.create(date=duty_date)
+    DutyAssignmentRole.objects.create(
+        assignment=assignment,
+        role_key="launch_coord",
+        member=dynamic_member,
+        role_definition=role_definition,
+    )
+
+    def _raise_if_called(*_args, **_kwargs):
+        raise AssertionError("get_member_for_role should not be used for dynamic rows")
+
+    monkeypatch.setattr(DutyAssignment, "get_member_for_role", _raise_if_called)
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": duty_date.year, "month": duty_date.month},
+        )
+    )
+
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
 def test_calendar_agenda_shows_dynamic_role_card(client):
     _ensure_full_member_status()
 

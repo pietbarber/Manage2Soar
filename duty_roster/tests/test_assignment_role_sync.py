@@ -2,6 +2,8 @@ from datetime import date
 
 import pytest
 from django.core.management import call_command
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from duty_roster.models import DutyAssignment, DutyAssignmentRole
 from members.models import Member
@@ -97,3 +99,20 @@ def test_backfill_assignment_role_rows_command_repairs_missing_rows(instructor_m
         assignment=assignment, role_key="instructor"
     )
     assert repaired.member == instructor_member
+
+
+@pytest.mark.django_db
+def test_sync_role_rows_skips_delete_when_row_absent():
+    assignment = DutyAssignment.objects.create(
+        date=date(2026, 4, 27),
+    )
+
+    with CaptureQueriesContext(connection) as queries:
+        assignment.sync_role_rows_from_legacy_fields()
+
+    delete_queries = [
+        q["sql"]
+        for q in queries.captured_queries
+        if "DELETE FROM" in q["sql"] and "duty_roster_dutyassignmentrole" in q["sql"]
+    ]
+    assert not delete_queries

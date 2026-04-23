@@ -485,6 +485,16 @@ class DutyAssignment(models.Model):
         This keeps normalized rows aligned for all legacy role keys without
         touching dynamic role rows (role keys not in LEGACY_ROLE_TO_FIELD).
         """
+        legacy_role_keys = tuple(self.LEGACY_ROLE_TO_FIELD.keys())
+        existing_rows_by_key = {
+            row.role_key: row
+            for row in DutyAssignmentRole.objects.filter(
+                assignment=self,
+                role_key__in=legacy_role_keys,
+            )
+        }
+        rows_to_delete = []
+
         for role_key, field_name in self.LEGACY_ROLE_TO_FIELD.items():
             member = getattr(self, field_name, None)
             if member:
@@ -497,11 +507,11 @@ class DutyAssignment(models.Model):
                         "shift_code": "",
                     },
                 )
-            else:
-                DutyAssignmentRole.objects.filter(
-                    assignment=self,
-                    role_key=role_key,
-                ).delete()
+            elif role_key in existing_rows_by_key:
+                rows_to_delete.append(existing_rows_by_key[role_key].pk)
+
+        if rows_to_delete:
+            DutyAssignmentRole.objects.filter(pk__in=rows_to_delete).delete()
 
 
 class DutyAssignmentRole(models.Model):

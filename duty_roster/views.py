@@ -133,8 +133,6 @@ def _get_dynamic_role_assignments(
         role_row = role_rows_by_key.get(role_key)
         member = role_row.member if role_row and role_row.member else None
         if not member:
-            member = assignment.get_member_for_role(role_key)
-        if not member:
             continue
 
         legacy_role_key = ""
