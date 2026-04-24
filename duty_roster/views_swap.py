@@ -31,12 +31,15 @@ from utils.url_helpers import get_canonical_url
 from .forms import DutySwapOfferForm, DutySwapRequestForm
 from .models import (
     DutyAssignment,
+    DutyAssignmentRole,
+    DutyRoleDefinition,
     DutySwapOffer,
     DutySwapRequest,
     MemberBlackout,
     OpsIntent,
 )
 from .utils.ics import generate_swap_ics
+from .utils.role_resolution import RoleResolutionService
 from .utils.roles import member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views_swap")
@@ -65,8 +68,25 @@ def is_role_scheduled(role):
     return get_scheduling_config().get(role, False)
 
 
-def get_eligible_members_for_role(role, exclude_member=None):
+def get_eligible_members_for_role(role, exclude_member=None, dynamic_role_key=""):
     """Get members who are eligible to fill a specific role."""
+    if role == "DYNAMIC" and dynamic_role_key:
+        active_statuses = get_active_membership_statuses()
+        candidates = Member.objects.filter(membership_status__in=active_statuses)
+        if exclude_member:
+            candidates = candidates.exclude(pk=exclude_member.pk)
+
+        role_service = RoleResolutionService(
+            site_configuration=SiteConfiguration.objects.first()
+        )
+        eligible_ids = role_service.get_eligible_member_ids(
+            dynamic_role_key,
+            members_queryset=candidates,
+        )
+        return Member.objects.filter(id__in=eligible_ids).order_by(
+            "last_name", "first_name"
+        )
+
     role_attr_map = {
         "DO": "duty_officer",
         "ADO": "assistant_duty_officer",
@@ -99,14 +119,33 @@ def create_swap_request(request, year, month, day, role):
     """Create a new swap request for a specific duty date and role."""
     duty_date = date(year, month, day)
     today = timezone.now().date()
+    dynamic_role_key = (
+        request.POST.get("dynamic_role_key")
+        or request.GET.get("dynamic_role_key")
+        or ""
+    ).strip()
+    dynamic_role_label = ""
 
     # Validate the role
     if role not in dict(DutySwapRequest.ROLE_CHOICES):
         messages.error(request, "Invalid role specified.")
         return redirect("duty_roster:duty_calendar")
 
+    if role == "DYNAMIC":
+        if not dynamic_role_key:
+            messages.error(request, "Missing dynamic role key for swap request.")
+            return redirect("duty_roster:duty_calendar")
+        role_service = RoleResolutionService(
+            site_configuration=SiteConfiguration.objects.first()
+        )
+        enabled_roles = role_service.get_enabled_roles()
+        if dynamic_role_key not in enabled_roles:
+            messages.error(request, "This dynamic role is not enabled for swapping.")
+            return redirect("duty_roster:duty_calendar")
+        dynamic_role_label = role_service.get_role_label(dynamic_role_key)
+
     # Check if this role is scheduled (not ad-hoc)
-    if not is_role_scheduled(role):
+    if role != "DYNAMIC" and not is_role_scheduled(role):
         role_title = get_role_title(
             {
                 "DO": "duty_officer",
@@ -129,7 +168,11 @@ def create_swap_request(request, year, month, day, role):
 
     # Check if there's an existing open request
     existing = DutySwapRequest.objects.filter(
-        requester=request.user, original_date=duty_date, role=role, status="open"
+        requester=request.user,
+        original_date=duty_date,
+        role=role,
+        dynamic_role_key=dynamic_role_key,
+        status="open",
     ).first()
 
     if existing:
@@ -139,27 +182,46 @@ def create_swap_request(request, year, month, day, role):
     # Verify the user is actually assigned this role on this date
     assignment = DutyAssignment.objects.filter(date=duty_date).first()
     if assignment:
+        if role == "DYNAMIC":
+            assigned_row = DutyAssignmentRole.objects.filter(
+                assignment=assignment,
+                role_key=dynamic_role_key,
+                member=request.user,
+            ).first()
+            if not assigned_row:
+                messages.error(
+                    request,
+                    "You are not assigned this dynamic role on this date.",
+                )
+                return redirect("duty_roster:duty_calendar")
+
         role_field_map = {
             "DO": "duty_officer",
             "ADO": "assistant_duty_officer",
             "INSTRUCTOR": "instructor",
             "TOW": "tow_pilot",
         }
-        role_field = role_field_map.get(role)
-        if not role_field:
-            messages.error(request, "Invalid role specified.")
-            return redirect("duty_roster:duty_calendar")
-        assigned_member = getattr(assignment, role_field, None)
-        if assigned_member != request.user:
-            messages.error(request, "You are not assigned this role on this date.")
-            return redirect("duty_roster:duty_calendar")
+        if role != "DYNAMIC":
+            role_field = role_field_map.get(role)
+            if not role_field:
+                messages.error(request, "Invalid role specified.")
+                return redirect("duty_roster:duty_calendar")
+            assigned_member = getattr(assignment, role_field, None)
+            if assigned_member != request.user:
+                messages.error(request, "You are not assigned this role on this date.")
+                return redirect("duty_roster:duty_calendar")
     else:
         messages.error(request, "No duty assignment exists for this date.")
         return redirect("duty_roster:duty_calendar")
 
     if request.method == "POST":
         form = DutySwapRequestForm(
-            request.POST, role=role, date=duty_date, requester=request.user
+            request.POST,
+            role=role,
+            date=duty_date,
+            requester=request.user,
+            dynamic_role_key=dynamic_role_key,
+            dynamic_role_label=dynamic_role_label,
         )
         if form.is_valid():
             swap_request = form.save()
@@ -178,22 +240,31 @@ def create_swap_request(request, year, month, day, role):
         days_until = (duty_date - today).days
         initial = {"is_emergency": days_until <= 2}
         form = DutySwapRequestForm(
-            role=role, date=duty_date, requester=request.user, initial=initial
+            role=role,
+            date=duty_date,
+            requester=request.user,
+            dynamic_role_key=dynamic_role_key,
+            dynamic_role_label=dynamic_role_label,
+            initial=initial,
         )
 
-    role_title = get_role_title(
-        {
-            "DO": "duty_officer",
-            "ADO": "assistant_duty_officer",
-            "INSTRUCTOR": "instructor",
-            "TOW": "towpilot",
-        }.get(role, role)
-    )
+    if role == "DYNAMIC":
+        role_title = dynamic_role_label or dynamic_role_key
+    else:
+        role_title = get_role_title(
+            {
+                "DO": "duty_officer",
+                "ADO": "assistant_duty_officer",
+                "INSTRUCTOR": "instructor",
+                "TOW": "towpilot",
+            }.get(role, role)
+        )
 
     context = {
         "form": form,
         "duty_date": duty_date,
         "role": role,
+        "dynamic_role_key": dynamic_role_key,
         "role_title": role_title,
         "days_until": (duty_date - today).days,
     }
@@ -240,6 +311,11 @@ def open_swap_requests(request):
         .select_related("requester")
     )
 
+    # If direct request, only show to the target member.
+    open_requests = open_requests.filter(
+        models.Q(request_type="general") | models.Q(direct_request_to=member)
+    )
+
     # Filter to roles the user is qualified for
     qualified_roles = []
     if member.instructor:
@@ -251,14 +327,41 @@ def open_swap_requests(request):
     if member.assistant_duty_officer:
         qualified_roles.append("ADO")
 
-    if qualified_roles:
-        open_requests = open_requests.filter(role__in=qualified_roles)
-    else:
-        open_requests = open_requests.none()
+    static_open_requests = (
+        open_requests.filter(role__in=qualified_roles)
+        if qualified_roles
+        else open_requests.none()
+    )
 
-    # Also filter: if direct request, only show to the target member
-    open_requests = open_requests.filter(
-        models.Q(request_type="general") | models.Q(direct_request_to=member)
+    dynamic_requests = list(open_requests.filter(role="DYNAMIC"))
+    dynamic_role_keys = {
+        req.dynamic_role_key for req in dynamic_requests if req.dynamic_role_key
+    }
+    eligible_dynamic_role_keys = set()
+    if dynamic_role_keys:
+        role_service = RoleResolutionService(
+            site_configuration=SiteConfiguration.objects.first()
+        )
+        member_queryset = Member.objects.filter(pk=member.pk)
+        eligible_dynamic_role_keys = {
+            role_key
+            for role_key in dynamic_role_keys
+            if member.pk
+            in role_service.get_eligible_member_ids(
+                role_key,
+                members_queryset=member_queryset,
+            )
+        }
+
+    dynamic_open_requests = [
+        req
+        for req in dynamic_requests
+        if req.dynamic_role_key in eligible_dynamic_role_keys
+    ]
+
+    open_requests = sorted(
+        list(static_open_requests) + dynamic_open_requests,
+        key=lambda req: (req.original_date, req.pk),
     )
 
     # -----------------------------------------------------------------------
@@ -532,9 +635,12 @@ def swap_request_detail(request, request_id):
     # Check if user can view this request
     is_requester = swap_request.requester == member
     is_offerer = swap_request.offers.filter(offered_by=member).exists()
-    is_eligible = member in get_eligible_members_for_role(
-        swap_request.role, exclude_member=swap_request.requester
+    eligible_members = get_eligible_members_for_role(
+        swap_request.role,
+        exclude_member=swap_request.requester,
+        dynamic_role_key=swap_request.dynamic_role_key,
     )
+    is_eligible = eligible_members.filter(pk=member.pk).exists()
     is_target = swap_request.direct_request_to == member
 
     if (
@@ -654,9 +760,12 @@ def make_offer(request, request_id):
         return redirect("duty_roster:swap_request_detail", request_id=request_id)
 
     # Check if user is eligible for this role
-    if member not in get_eligible_members_for_role(
-        swap_request.role, exclude_member=swap_request.requester
-    ):
+    eligible_members = get_eligible_members_for_role(
+        swap_request.role,
+        exclude_member=swap_request.requester,
+        dynamic_role_key=swap_request.dynamic_role_key,
+    )
+    if not eligible_members.filter(pk=member.pk).exists():
         messages.error(request, "You are not qualified for this role.")
         return redirect("duty_roster:open_swap_requests")
 
@@ -897,6 +1006,115 @@ def withdraw_offer(request, offer_id):
 
 def update_duty_assignments(swap_request, offer):
     """Update duty assignments after a swap/cover is accepted."""
+    if swap_request.role == "DYNAMIC":
+        if not swap_request.dynamic_role_key:
+            message = "Missing dynamic_role_key for dynamic swap request"
+            logger.error(message)
+            raise ValueError(message)
+
+        original_assignment = DutyAssignment.objects.filter(
+            date=swap_request.original_date
+        ).first()
+        if not original_assignment:
+            message = "Missing original assignment for dynamic swap request"
+            logger.error(message)
+            raise ValueError(message)
+
+        role_definition = DutyRoleDefinition.objects.filter(
+            key=swap_request.dynamic_role_key,
+            site_configuration=SiteConfiguration.objects.first(),
+            is_active=True,
+        ).first()
+
+        resolved_legacy_role_key = (
+            role_definition.legacy_role_key if role_definition else ""
+        )
+        resolved_shift_code = role_definition.shift_code if role_definition else ""
+
+        original_row = DutyAssignmentRole.objects.filter(
+            assignment=original_assignment,
+            role_key=swap_request.dynamic_role_key,
+        ).first()
+
+        if not original_row:
+            original_row = DutyAssignmentRole.objects.create(
+                assignment=original_assignment,
+                role_key=swap_request.dynamic_role_key,
+                member=swap_request.requester,
+                role_definition=role_definition,
+                legacy_role_key=resolved_legacy_role_key,
+                shift_code=resolved_shift_code,
+            )
+        else:
+            if original_row.role_definition is None and role_definition is not None:
+                original_row.role_definition = role_definition
+            if not original_row.legacy_role_key and resolved_legacy_role_key:
+                original_row.legacy_role_key = resolved_legacy_role_key
+            if not original_row.shift_code and resolved_shift_code:
+                original_row.shift_code = resolved_shift_code
+
+        original_row.member = offer.offered_by
+        original_row.save()
+
+        original_legacy_role_key = (
+            original_row.legacy_role_key or resolved_legacy_role_key
+        )
+        if original_legacy_role_key:
+            legacy_field_name = DutyAssignment.LEGACY_ROLE_TO_FIELD.get(
+                original_legacy_role_key
+            )
+            if legacy_field_name:
+                setattr(original_assignment, legacy_field_name, offer.offered_by)
+                original_assignment.save(update_fields=[legacy_field_name])
+
+        if offer.offer_type == "swap" and offer.proposed_swap_date:
+            swap_assignment, _created = DutyAssignment.objects.get_or_create(
+                date=offer.proposed_swap_date
+            )
+            swap_row, _ = DutyAssignmentRole.objects.get_or_create(
+                assignment=swap_assignment,
+                role_key=swap_request.dynamic_role_key,
+                defaults={
+                    "member": swap_request.requester,
+                    "legacy_role_key": original_legacy_role_key,
+                    "shift_code": original_row.shift_code or resolved_shift_code,
+                    "role_definition": original_row.role_definition or role_definition,
+                },
+            )
+            swap_row_fields_to_update = []
+            if swap_row.member_id != swap_request.requester.id:
+                swap_row.member = swap_request.requester
+                swap_row_fields_to_update.append("member")
+
+            if not swap_row.legacy_role_key and original_legacy_role_key:
+                swap_row.legacy_role_key = original_legacy_role_key
+                swap_row_fields_to_update.append("legacy_role_key")
+
+            resolved_swap_shift_code = original_row.shift_code or resolved_shift_code
+            if not swap_row.shift_code and resolved_swap_shift_code:
+                swap_row.shift_code = resolved_swap_shift_code
+                swap_row_fields_to_update.append("shift_code")
+
+            resolved_role_definition = original_row.role_definition or role_definition
+            if (
+                swap_row.role_definition is None
+                and resolved_role_definition is not None
+            ):
+                swap_row.role_definition = resolved_role_definition
+                swap_row_fields_to_update.append("role_definition")
+
+            if swap_row_fields_to_update:
+                swap_row.save(update_fields=swap_row_fields_to_update)
+
+            if swap_row.legacy_role_key:
+                legacy_field_name = DutyAssignment.LEGACY_ROLE_TO_FIELD.get(
+                    swap_row.legacy_role_key
+                )
+                if legacy_field_name:
+                    setattr(swap_assignment, legacy_field_name, swap_request.requester)
+                    swap_assignment.save(update_fields=[legacy_field_name])
+        return
+
     role_field_map = {
         "DO": "duty_officer",
         "ADO": "assistant_duty_officer",
@@ -969,7 +1187,9 @@ def send_swap_request_notifications(swap_request):
     else:
         # Send to all eligible members
         recipients = get_eligible_members_for_role(
-            swap_request.role, exclude_member=swap_request.requester
+            swap_request.role,
+            exclude_member=swap_request.requester,
+            dynamic_role_key=swap_request.dynamic_role_key,
         )
 
     if not recipients:
@@ -1176,7 +1396,9 @@ def send_request_cancelled_notifications(swap_request):
     else:
         # For broadcast requests, notify all eligible members
         recipients = get_eligible_members_for_role(
-            swap_request.role, exclude_member=swap_request.requester
+            swap_request.role,
+            exclude_member=swap_request.requester,
+            dynamic_role_key=swap_request.dynamic_role_key,
         )
 
     if not recipients:

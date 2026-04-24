@@ -180,6 +180,23 @@
                     </div>
                   </div>
                 {% endif %}
+
+                {% with dynamic_roles=dynamic_role_assignments_by_date|dict_get:day %}
+                  {% for dynamic_role in dynamic_roles %}
+                    <div class="col-md-6 mb-3">
+                      <div class="duty-role-card bg-info bg-opacity-10 border border-info rounded p-3">
+                        <h6 class="text-info-emphasis mb-2">
+                          <i class="bi bi-diagram-3 me-2" aria-hidden="true"></i>
+                          {{ dynamic_role.label }}
+                        </h6>
+                        <p class="mb-0 fw-bold">{{ dynamic_role.member.full_display_name }}</p>
+                        {% if dynamic_role.member.phone and user.is_authenticated and user.is_active_member and not dynamic_role.member.redact_contact %}
+                          <small class="text-muted">{{ dynamic_role.member.phone }}</small>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% endfor %}
+                {% endwith %}
               </div>
 
               <!-- Quick Actions -->

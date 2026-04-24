@@ -3,7 +3,8 @@ from datetime import date
 import pytest
 from django.urls import reverse
 
-from duty_roster.models import OpsIntent
+from duty_roster.models import DutyRoleDefinition, OpsIntent
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -58,3 +59,62 @@ def test_ops_intent_admin_shows_labels_in_list_display(client, django_user_model
     resp = client.get(url)
     assert resp.status_code == 200
     assert "Planned activities" in resp.content.decode("utf-8")
+
+
+@pytest.mark.django_db
+def test_dynamic_duty_role_admin_changelist_available(client, django_user_model):
+    admin = django_user_model.objects.create_user(
+        username="admin_dynamic_roles",
+        email="admin_dynamic_roles@example.com",
+        password="pass",
+        membership_status="Full Member",
+    )
+    admin.is_staff = True
+    admin.is_superuser = True
+    admin.save()
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+    )
+    DutyRoleDefinition.objects.create(
+        site_configuration=SiteConfiguration.objects.first(),
+        key="am_tow",
+        display_name="AM Tow",
+    )
+
+    client.login(username="admin_dynamic_roles", password="pass")
+    url = reverse("admin:duty_roster_dutyroledefinition_changelist")
+    resp = client.get(url)
+
+    assert resp.status_code == 200
+    content = resp.content.decode("utf-8")
+    assert "Dynamic Duty Roles" in content
+    assert "AM Tow" in content
+
+
+@pytest.mark.django_db
+def test_siteconfig_admin_shows_dynamic_duty_roles_inline(client, django_user_model):
+    admin = django_user_model.objects.create_user(
+        username="admin_siteconfig_inline",
+        email="admin_siteconfig_inline@example.com",
+        password="pass",
+        membership_status="Full Member",
+    )
+    admin.is_staff = True
+    admin.is_superuser = True
+    admin.save()
+
+    config = SiteConfiguration.objects.create(
+        club_name="Inline Club",
+        domain_name="inline.example.org",
+        club_abbreviation="IC",
+    )
+
+    client.login(username="admin_siteconfig_inline", password="pass")
+    url = reverse("admin:siteconfig_siteconfiguration_change", args=[config.pk])
+    resp = client.get(url)
+
+    assert resp.status_code == 200
+    assert "Dynamic Duty Roles (Prototype)" in resp.content.decode("utf-8")

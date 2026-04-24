@@ -12,6 +12,7 @@ from siteconfig.models import ReservationLimitPeriod, SiteConfiguration
 
 from .models import (
     DutyAssignment,
+    DutyAssignmentRole,
     DutyPreference,
     DutyRosterMessage,
     DutySwapOffer,
@@ -20,6 +21,7 @@ from .models import (
     InstructionSlot,
     MemberBlackout,
 )
+from .utils.role_resolution import RoleResolutionService
 from .utils.roles import member_has_role
 
 # Maps member role attributes to their corresponding form field names
@@ -486,11 +488,22 @@ class DutySwapRequestForm(forms.ModelForm):
             "is_emergency": "This is urgent (less than 48 hours notice)",
         }
 
-    def __init__(self, *args, role=None, date=None, requester=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        role=None,
+        date=None,
+        requester=None,
+        dynamic_role_key="",
+        dynamic_role_label="",
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.role = role
         self.date = date
         self.requester = requester
+        self.dynamic_role_key = dynamic_role_key or ""
+        self.dynamic_role_label = dynamic_role_label or ""
 
         # Ensure labels are set (sometimes Meta labels don't apply correctly)
         self.fields["request_type"].label = "Who should receive this request?"
@@ -519,6 +532,21 @@ class DutySwapRequestForm(forms.ModelForm):
                     membership_status__in=active_statuses,
                 ).exclude(pk=requester.pk if requester else None)
                 self.fields["direct_request_to"].queryset = eligible
+            elif role == "DYNAMIC" and self.dynamic_role_key:
+                active_statuses = get_active_membership_statuses()
+                candidates = Member.objects.filter(
+                    membership_status__in=active_statuses
+                ).exclude(pk=requester.pk if requester else None)
+                role_service = RoleResolutionService(
+                    site_configuration=SiteConfiguration.objects.first()
+                )
+                eligible_ids = role_service.get_eligible_member_ids(
+                    self.dynamic_role_key,
+                    members_queryset=candidates,
+                )
+                self.fields["direct_request_to"].queryset = Member.objects.filter(
+                    id__in=eligible_ids
+                ).order_by("last_name", "first_name")
             else:
                 self.fields["direct_request_to"].queryset = Member.objects.none()
 
@@ -543,6 +571,8 @@ class DutySwapRequestForm(forms.ModelForm):
         instance.role = self.role
         instance.original_date = self.date
         instance.requester = self.requester
+        instance.dynamic_role_key = self.dynamic_role_key
+        instance.dynamic_role_label = self.dynamic_role_label
 
         # If not direct, clear the direct_request_to field
         if instance.request_type != "direct":
@@ -616,6 +646,31 @@ class DutySwapOfferForm(forms.ModelForm):
                     "proposed_swap_date",
                     "Swap date must be in the future.",
                 )
+
+        if (
+            offer_type == "swap"
+            and proposed_date
+            and self.swap_request
+            and self.offered_by
+            and self.swap_request.role == "DYNAMIC"
+        ):
+            dynamic_role_key = self.swap_request.dynamic_role_key
+            if not dynamic_role_key:
+                self.add_error(
+                    "proposed_swap_date",
+                    "This dynamic swap request is missing role metadata.",
+                )
+            else:
+                has_assignment = DutyAssignmentRole.objects.filter(
+                    assignment__date=proposed_date,
+                    role_key=dynamic_role_key,
+                    member=self.offered_by,
+                ).exists()
+                if not has_assignment:
+                    self.add_error(
+                        "proposed_swap_date",
+                        "You can only swap with a date where you hold this same dynamic role.",
+                    )
 
         return cleaned_data
 

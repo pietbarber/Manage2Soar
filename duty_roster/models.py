@@ -223,6 +223,134 @@ class DutyPreference(models.Model):
         return f"Preferences for {self.member.full_display_name}"
 
 
+class DutyRoleDefinition(models.Model):
+    """Configurable duty role definition for a club/site configuration."""
+
+    LEGACY_ROLE_CHOICES = [
+        ("instructor", "Instructor"),
+        ("towpilot", "Tow Pilot"),
+        ("duty_officer", "Duty Officer"),
+        ("assistant_duty_officer", "Assistant Duty Officer"),
+        ("commercial_pilot", "Commercial Pilot"),
+        ("surge_towpilot", "Surge Tow Pilot"),
+        ("surge_instructor", "Surge Instructor"),
+    ]
+
+    site_configuration = models.ForeignKey(
+        SiteConfiguration,
+        on_delete=models.CASCADE,
+        related_name="duty_role_definitions",
+    )
+    key = models.SlugField(
+        max_length=64,
+        help_text="Stable internal key used in scheduling and integrations.",
+    )
+    display_name = models.CharField(
+        max_length=80,
+        help_text="Human-readable role label used when no legacy terminology override applies.",
+    )
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=100)
+    legacy_role_key = models.CharField(
+        max_length=32,
+        blank=True,
+        null=True,
+        choices=LEGACY_ROLE_CHOICES,
+        help_text=(
+            "Optional mapping to legacy role terminology fields in Site Configuration. "
+            "If set, terminology labels from Site Configuration take precedence."
+        ),
+    )
+    shift_code = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        help_text="Optional shift identifier (e.g. am, pm) for role/slot segmentation.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "display_name"]
+        unique_together = ("site_configuration", "key")
+
+    def __str__(self):
+        return f"{self.display_name} ({self.key})"
+
+
+class DutyQualificationRequirement(models.Model):
+    """Eligibility requirements for a dynamic duty role definition."""
+
+    TYPE_LEGACY_ROLE_FLAG = "legacy_role_flag"
+    TYPE_LEGACY_GLIDER_RATING = "legacy_glider_rating"
+    TYPE_MEMBER_DUTY_QUAL = "member_duty_qualification"
+
+    REQUIREMENT_TYPE_CHOICES = [
+        (TYPE_LEGACY_ROLE_FLAG, "Legacy member role flag"),
+        (TYPE_LEGACY_GLIDER_RATING, "Legacy glider rating"),
+        (TYPE_MEMBER_DUTY_QUAL, "Member duty qualification code"),
+    ]
+
+    role_definition = models.ForeignKey(
+        DutyRoleDefinition,
+        on_delete=models.CASCADE,
+        related_name="qualification_requirements",
+    )
+    requirement_type = models.CharField(max_length=32, choices=REQUIREMENT_TYPE_CHOICES)
+    requirement_value = models.CharField(
+        max_length=64,
+        help_text=(
+            "For legacy role flag, use member field name (e.g. instructor). "
+            "For legacy glider rating, use rating value (e.g. commercial). "
+            "For member duty qualification, use qualification code."
+        ),
+    )
+    is_required = models.BooleanField(default=True)
+    notes = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        unique_together = (
+            "role_definition",
+            "requirement_type",
+            "requirement_value",
+        )
+
+    def __str__(self):
+        return f"{self.role_definition.key}: {self.requirement_type}={self.requirement_value}"
+
+
+class MemberDutyQualification(models.Model):
+    """Per-member duty qualification used by the dynamic role prototype."""
+
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="duty_qualifications",
+    )
+    qualification_code = models.SlugField(max_length=64)
+    is_qualified = models.BooleanField(default=True)
+    awarded_date = models.DateField(blank=True, null=True)
+    expires_on = models.DateField(blank=True, null=True)
+    notes = models.CharField(max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["qualification_code"]
+        unique_together = ("member", "qualification_code")
+
+    def __str__(self):
+        return f"{self.member.full_display_name}: {self.qualification_code}"
+
+    @property
+    def is_current(self) -> bool:
+        if not self.is_qualified:
+            return False
+        if self.expires_on is None:
+            return True
+        return self.expires_on >= timezone.localdate()
+
+
 class DutyPairing(models.Model):
     member = models.ForeignKey(
         Member, on_delete=models.CASCADE, related_name="pairing_source"
@@ -248,6 +376,16 @@ class DutyAvoidance(models.Model):
 
 
 class DutyAssignment(models.Model):
+    LEGACY_ROLE_TO_FIELD = {
+        "instructor": "instructor",
+        "duty_officer": "duty_officer",
+        "assistant_duty_officer": "assistant_duty_officer",
+        "towpilot": "tow_pilot",
+        "commercial_pilot": "commercial_pilot",
+        "surge_instructor": "surge_instructor",
+        "surge_towpilot": "surge_tow_pilot",
+    }
+
     date = models.DateField(unique=True)
 
     # Primary duty roles
@@ -327,6 +465,126 @@ class DutyAssignment(models.Model):
         return self.instruction_slots.select_related("student").exclude(
             status="cancelled"
         )
+
+    def get_member_for_role(self, role_key: str):
+        """Dual-read helper: normalized role row first, legacy field fallback."""
+        role_row = (
+            self.role_rows.select_related("member").filter(role_key=role_key).first()
+        )
+        if role_row:
+            return role_row.member
+
+        field_name = self.LEGACY_ROLE_TO_FIELD.get(role_key)
+        if field_name:
+            return getattr(self, field_name, None)
+        return None
+
+    def sync_role_rows_from_legacy_fields(self):
+        """Sync normalized legacy role rows from legacy assignment columns.
+
+        This keeps normalized rows aligned for all legacy role keys without
+        touching dynamic role rows (role keys not in LEGACY_ROLE_TO_FIELD).
+        """
+        legacy_role_keys = tuple(self.LEGACY_ROLE_TO_FIELD.keys())
+        existing_rows_by_key = {
+            row.role_key: row
+            for row in DutyAssignmentRole.objects.filter(
+                assignment=self,
+                role_key__in=legacy_role_keys,
+            )
+        }
+        rows_to_create = []
+        rows_to_update = []
+        rows_to_delete = []
+
+        for role_key, field_name in self.LEGACY_ROLE_TO_FIELD.items():
+            member = getattr(self, field_name, None)
+            existing_row = existing_rows_by_key.get(role_key)
+
+            if member:
+                if existing_row is None:
+                    rows_to_create.append(
+                        DutyAssignmentRole(
+                            assignment=self,
+                            role_key=role_key,
+                            member=member,
+                            legacy_role_key=role_key,
+                            shift_code="",
+                        )
+                    )
+                    continue
+
+                row_changed = False
+                if existing_row.member_id != member.pk:
+                    existing_row.member = member
+                    row_changed = True
+                if existing_row.legacy_role_key != role_key:
+                    existing_row.legacy_role_key = role_key
+                    row_changed = True
+                if existing_row.shift_code != "":
+                    existing_row.shift_code = ""
+                    row_changed = True
+
+                if row_changed:
+                    rows_to_update.append(existing_row)
+            elif existing_row is not None:
+                rows_to_delete.append(existing_row.pk)
+
+        if rows_to_create:
+            DutyAssignmentRole.objects.bulk_create(rows_to_create)
+
+        if rows_to_update:
+            DutyAssignmentRole.objects.bulk_update(
+                rows_to_update,
+                ["member", "legacy_role_key", "shift_code"],
+            )
+
+        if rows_to_delete:
+            DutyAssignmentRole.objects.filter(pk__in=rows_to_delete).delete()
+
+
+class DutyAssignmentRole(models.Model):
+    """Normalized assignment rows for legacy and dynamic duty roles."""
+
+    assignment = models.ForeignKey(
+        DutyAssignment,
+        on_delete=models.CASCADE,
+        related_name="role_rows",
+    )
+    role_key = models.SlugField(max_length=64)
+    member = models.ForeignKey(
+        Member,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="duty_assignment_roles",
+    )
+    role_definition = models.ForeignKey(
+        DutyRoleDefinition,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="assignment_rows",
+    )
+    legacy_role_key = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Legacy role mapping used for compatibility with fixed assignment fields.",
+    )
+    shift_code = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+    )
+
+    class Meta:
+        ordering = ["assignment__date", "role_key"]
+        unique_together = ("assignment", "role_key")
+
+    def __str__(self):
+        member_name = self.member.full_display_name if self.member else "Unassigned"
+        return f"{self.assignment.date} {self.role_key}: {member_name}"
 
 
 class InstructionSlot(models.Model):
@@ -471,6 +729,7 @@ class DutySwapRequest(models.Model):
         ("ADO", "Assistant Duty Officer"),
         ("INSTRUCTOR", "Instructor"),
         ("TOW", "Tow Pilot"),
+        ("DYNAMIC", "Dynamic Role"),
     ]
 
     REQUEST_TYPE_CHOICES = [
@@ -489,6 +748,18 @@ class DutySwapRequest(models.Model):
         Member, on_delete=models.CASCADE, related_name="swap_requests"
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    dynamic_role_key = models.SlugField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="Non-legacy dynamic role key when role is DYNAMIC.",
+    )
+    dynamic_role_label = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        help_text="Display label snapshot for a dynamic role request.",
+    )
     original_date = models.DateField()
 
     request_type = models.CharField(
@@ -528,6 +799,21 @@ class DutySwapRequest(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(role="DYNAMIC")
+                    & ~models.Q(dynamic_role_key="")
+                    & ~models.Q(dynamic_role_label="")
+                )
+                | (
+                    ~models.Q(role="DYNAMIC")
+                    & models.Q(dynamic_role_key="")
+                    & models.Q(dynamic_role_label="")
+                ),
+                name="swap_request_dynamic_role_metadata_consistency",
+            )
+        ]
 
     # Legacy compatibility
     @property
@@ -537,6 +823,9 @@ class DutySwapRequest(models.Model):
     def get_role_title(self):
         """Get the display title for this role from site config."""
         from siteconfig.utils import get_role_title
+
+        if self.role == "DYNAMIC":
+            return self.dynamic_role_label or self.dynamic_role_key or "Dynamic Role"
 
         role_map = {
             "DO": "duty_officer",

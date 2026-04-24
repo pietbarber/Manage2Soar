@@ -188,6 +188,18 @@
           </div>
         </div>
         {% endif %}
+
+        {% for dynamic_role in dynamic_role_assignments %}
+        <div class="col-6">
+          <div class="d-flex align-items-start">
+            <span class="badge bg-info text-dark me-2 mt-1"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ dynamic_role.label }}</small>
+              <span class="fw-medium">{{ dynamic_role.member.full_display_name }}</span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
       </div>
     </div>
   </div>
@@ -310,6 +322,44 @@
             {% endif %}
           {% endif %}
         </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if user_dynamic_role_assignments %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light text-dark py-2 border-bottom">
+        <h6 class="mb-0 fw-semibold">
+          <i class="bi bi-diagram-3 me-2" aria-hidden="true"></i>Your Dynamic Role Assignments
+        </h6>
+      </div>
+      <div class="card-body p-3">
+        <p class="text-muted small mb-2">You are assigned on this day under these dynamic roles:</p>
+        <ul class="mb-2 ps-3">
+          {% for role in user_dynamic_role_assignments %}
+          <li>
+            <strong>{{ role.label }}</strong>
+            {% if role.swap_role_code %}
+            <div class="mt-1">
+              <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role=role.swap_role_code %}"
+                 class="btn btn-outline-primary btn-sm"
+                 style="font-size:0.75rem;padding:2px 8px;">
+                <i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Request Coverage
+              </a>
+            </div>
+            {% else %}
+            <div class="mt-1">
+              <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='DYNAMIC' %}?dynamic_role_key={{ role.key|urlencode }}"
+                 class="btn btn-outline-primary btn-sm"
+                 style="font-size:0.75rem;padding:2px 8px;">
+                <i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Request Coverage
+              </a>
+            </div>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="text-muted small mb-0">Coverage actions are available for all your dynamic roles. Legacy-mapped roles use existing swap routing while non-legacy roles use dynamic-role coverage requests.</p>
       </div>
     </div>
     {% endif %}

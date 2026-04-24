@@ -144,6 +144,28 @@ def test_commercial_configuration_custom_values():
     assert config.commercial_pilot_title == "Ride Pilot"
 
 
+@pytest.mark.django_db
+def test_dynamic_duty_roles_flag_defaults_disabled():
+    """Dynamic duty roles should default to disabled for backward compatibility."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+    assert config.enable_dynamic_duty_roles is False
+
+
+@pytest.mark.django_db
+def test_dynamic_duty_roles_flag_can_be_enabled():
+    """Dynamic duty roles flag should be configurable per club."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+    )
+    config.refresh_from_db()
+    assert config.enable_dynamic_duty_roles is True
+
+
 # MembershipStatus Tests
 @pytest.mark.django_db
 def test_create_membership_status():
@@ -450,21 +472,21 @@ def test_quick_altitude_validation_positive_integers():
     config.quick_altitude_buttons = "2000,-100,3000"
     with pytest.raises(ValidationError) as exc_info:
         config.full_clean()
-    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "quick_altitude_buttons" in (exc_info.value.error_dict or {})
     assert "positive integers" in str(exc_info.value)
 
     # Non-integer values should fail validation
     config.quick_altitude_buttons = "2000,abc,3000"
     with pytest.raises(ValidationError) as exc_info:
         config.full_clean()
-    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "quick_altitude_buttons" in (exc_info.value.error_dict or {})
     assert "must be integers" in str(exc_info.value)
 
     # Values over 7000 should fail validation
     config.quick_altitude_buttons = "2000,8000,3000"
     with pytest.raises(ValidationError) as exc_info:
         config.full_clean()
-    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "quick_altitude_buttons" in (exc_info.value.error_dict or {})
     assert "7000 feet or less" in str(exc_info.value)
 
     # Valid values should pass

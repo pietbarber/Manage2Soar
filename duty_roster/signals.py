@@ -521,3 +521,26 @@ def handle_instruction_slot_delete(sender, instance, **kwargs):
 
     # Invalidate cache for affected instructors
     _invalidate_instructor_cache_for_slot(instance)
+
+
+@receiver(post_save, sender="duty_roster.DutyAssignment")
+def sync_assignment_role_rows_from_legacy(sender, instance, **kwargs):
+    """Keep normalized legacy role rows aligned after any assignment save."""
+    if not is_safe_to_run_signals():
+        return
+
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None:
+        tracked_fields = set(instance.LEGACY_ROLE_TO_FIELD.values())
+        tracked_fields_with_fk_ids = tracked_fields | {
+            f"{field_name}_id" for field_name in tracked_fields
+        }
+        if tracked_fields_with_fk_ids.isdisjoint(set(update_fields)):
+            return
+
+    try:
+        instance.sync_role_rows_from_legacy_fields()
+    except Exception:
+        logger.exception(
+            "Failed syncing normalized role rows for assignment %s", instance.pk
+        )

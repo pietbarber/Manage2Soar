@@ -12,11 +12,15 @@ from datetime import date, timedelta
 
 import pytest
 from django.core import mail
+from django.db import IntegrityError, transaction
+from django.test import override_settings
 from django.urls import reverse
 
 from duty_roster.forms import DutySwapOfferForm, DutySwapRequestForm
 from duty_roster.models import (
     DutyAssignment,
+    DutyAssignmentRole,
+    DutyRoleDefinition,
     DutySwapOffer,
     DutySwapRequest,
     MemberBlackout,
@@ -24,6 +28,7 @@ from duty_roster.models import (
 from duty_roster.views_swap import (
     _accept_offer_and_finalize,
     get_eligible_members_for_role,
+    update_duty_assignments,
 )
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -309,6 +314,47 @@ class TestDutySwapRequestModel:
         swap_request.save()
         assert swap_request.get_urgency_level() == "emergency"
 
+    def test_dynamic_request_requires_dynamic_role_metadata(
+        self, alice, alice_duty_assignment
+    ):
+        """Dynamic swap requests require both dynamic key and label."""
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                DutySwapRequest.objects.create(
+                    requester=alice,
+                    original_date=alice_duty_assignment.date,
+                    role="DYNAMIC",
+                    dynamic_role_key="",
+                    dynamic_role_label="",
+                )
+
+    def test_non_dynamic_request_rejects_dynamic_role_metadata(
+        self, alice, alice_duty_assignment
+    ):
+        """Non-dynamic swap requests cannot persist dynamic metadata."""
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                DutySwapRequest.objects.create(
+                    requester=alice,
+                    original_date=alice_duty_assignment.date,
+                    role="TOW",
+                    dynamic_role_key="launch_coord",
+                    dynamic_role_label="Launch Coordinator",
+                )
+
+    def test_dynamic_request_with_metadata_is_allowed(
+        self, alice, alice_duty_assignment
+    ):
+        """Dynamic swap requests with key and label satisfy DB constraint."""
+        request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=alice_duty_assignment.date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+        )
+        assert request.pk is not None
+
 
 @pytest.mark.django_db
 class TestDutySwapOfferModel:
@@ -490,6 +536,69 @@ class TestSwapViewAccess:
         resp = client.get(url)
         assert resp.status_code == 200
 
+    def test_open_requests_shows_only_dynamic_roles_member_is_eligible_for(
+        self, client, alice, bob, site_config
+    ):
+        """Dynamic open requests are filtered by role-key eligibility."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        eligible_role = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="dynamic_tow",
+            display_name="Dynamic Tow",
+            is_active=True,
+            sort_order=10,
+        )
+        eligible_role.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="towpilot",
+            is_required=True,
+        )
+
+        ineligible_role = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="dynamic_instructor",
+            display_name="Dynamic Instructor",
+            is_active=True,
+            sort_order=20,
+        )
+        ineligible_role.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="instructor",
+            is_required=True,
+        )
+
+        tomorrow = date.today() + timedelta(days=1)
+        day_after = date.today() + timedelta(days=2)
+        eligible_request = DutySwapRequest.objects.create(
+            requester=bob,
+            original_date=tomorrow,
+            role="DYNAMIC",
+            dynamic_role_key="dynamic_tow",
+            dynamic_role_label="Dynamic Tow",
+            request_type="general",
+            status="open",
+        )
+        ineligible_request = DutySwapRequest.objects.create(
+            requester=bob,
+            original_date=day_after,
+            role="DYNAMIC",
+            dynamic_role_key="dynamic_instructor",
+            dynamic_role_label="Dynamic Instructor",
+            request_type="general",
+            status="open",
+        )
+
+        client.force_login(alice)
+        url = reverse("duty_roster:open_swap_requests")
+        resp = client.get(url)
+
+        assert resp.status_code == 200
+        open_request_ids = {req.id for req in resp.context["open_requests"]}
+        assert eligible_request.id in open_request_ids
+        assert ineligible_request.id not in open_request_ids
+
 
 @pytest.mark.django_db
 class TestSwapRequestCreation:
@@ -541,6 +650,55 @@ class TestSwapRequestCreation:
             requester=alice,
             original_date=alice_duty_assignment.date,
         ).exists()
+
+    def test_create_dynamic_request_post_success(
+        self, client, alice, alice_duty_assignment, site_config
+    ):
+        """Posting a valid dynamic-role swap request creates it with role metadata."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=alice_duty_assignment,
+            role_key="launch_coord",
+            member=alice,
+            role_definition=role_definition,
+        )
+
+        client.force_login(alice)
+        url = reverse(
+            "duty_roster:create_swap_request",
+            kwargs={
+                "year": alice_duty_assignment.date.year,
+                "month": alice_duty_assignment.date.month,
+                "day": alice_duty_assignment.date.day,
+                "role": "DYNAMIC",
+            },
+        )
+        resp = client.post(
+            f"{url}?dynamic_role_key=launch_coord",
+            {
+                "dynamic_role_key": "launch_coord",
+                "request_type": "general",
+                "notes": "Need dynamic coverage",
+                "is_emergency": False,
+            },
+        )
+        assert resp.status_code in [200, 302]
+        created_request = DutySwapRequest.objects.get(
+            requester=alice,
+            original_date=alice_duty_assignment.date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+        )
+        assert created_request.dynamic_role_label == "Launch Coordinator"
 
 
 # =============================================================================
@@ -719,6 +877,170 @@ class TestSwapOfferWorkflow:
         )
         assert eligible.filter(pk=ado_helper_probationary.pk).exists()
 
+    def test_dynamic_role_eligibility_helper_uses_dynamic_requirements(
+        self, site_config, alice, bob
+    ):
+        """Dynamic helper eligibility should include only members who meet role requirements."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="dynamic_instructor",
+            display_name="Dynamic Instructor",
+            is_active=True,
+            sort_order=20,
+        )
+        # Use legacy role mapping by requirement to test resolver path.
+        role_definition.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="instructor",
+            is_required=True,
+        )
+
+        alice.instructor = True
+        alice.save(update_fields=["instructor"])
+        bob.instructor = False
+        bob.save(update_fields=["instructor"])
+
+        eligible = get_eligible_members_for_role(
+            "DYNAMIC",
+            exclude_member=None,
+            dynamic_role_key="dynamic_instructor",
+        )
+
+        assert eligible.filter(pk=alice.pk).exists()
+        assert not eligible.filter(pk=bob.pk).exists()
+
+    def test_dynamic_swap_offer_requires_matching_role_assignment_on_proposed_date(
+        self, client, site_config, alice, bob
+    ):
+        """Dynamic swap offers must propose a date where offerer has same dynamic role."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        original_date = date.today() + timedelta(days=10)
+        proposed_swap_date = date.today() + timedelta(days=17)
+
+        original_assignment = DutyAssignment.objects.create(date=original_date)
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+        role_definition.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="towpilot",
+            is_required=True,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=original_assignment,
+            role_key="launch_coord",
+            member=alice,
+            role_definition=role_definition,
+        )
+
+        dynamic_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+
+        # Bob is eligible in general for this dynamic role, but has no assignment on proposed date.
+        client.force_login(bob)
+        url = reverse("duty_roster:make_swap_offer", args=[dynamic_request.id])
+        response = client.post(
+            url,
+            {
+                "offer_type": "swap",
+                "proposed_swap_date": proposed_swap_date,
+                "notes": "I can swap that date",
+            },
+        )
+
+        assert response.status_code == 200
+        assert (
+            "You can only swap with a date where you hold this same dynamic role."
+            in (response.content.decode())
+        )
+        assert not DutySwapOffer.objects.filter(
+            swap_request=dynamic_request,
+            offered_by=bob,
+        ).exists()
+
+    def test_dynamic_swap_offer_allows_matching_role_assignment_on_proposed_date(
+        self, client, site_config, alice, bob
+    ):
+        """Dynamic swap offers are allowed when offerer has same role on proposed date."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        original_date = date.today() + timedelta(days=11)
+        proposed_swap_date = date.today() + timedelta(days=18)
+
+        original_assignment = DutyAssignment.objects.create(date=original_date)
+        proposed_assignment = DutyAssignment.objects.create(date=proposed_swap_date)
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+        role_definition.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="towpilot",
+            is_required=True,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=original_assignment,
+            role_key="launch_coord",
+            member=alice,
+            role_definition=role_definition,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=proposed_assignment,
+            role_key="launch_coord",
+            member=bob,
+            role_definition=role_definition,
+        )
+
+        dynamic_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+
+        client.force_login(bob)
+        url = reverse("duty_roster:make_swap_offer", args=[dynamic_request.id])
+        response = client.post(
+            url,
+            {
+                "offer_type": "swap",
+                "proposed_swap_date": proposed_swap_date,
+                "notes": "Let's trade launch coordinator duties",
+            },
+        )
+
+        assert response.status_code == 302
+        offer = DutySwapOffer.objects.get(
+            swap_request=dynamic_request,
+            offered_by=bob,
+        )
+        assert offer.offer_type == "swap"
+        assert offer.proposed_swap_date == proposed_swap_date
+        assert offer.status == "pending"
+
 
 @pytest.mark.django_db
 class TestOfferAcceptDecline:
@@ -828,6 +1150,390 @@ class TestCancelAndConvert:
         direct_request = DutySwapRequest.objects.get(pk=direct_request.pk)
         assert direct_request.request_type == "general"
         assert direct_request.direct_request_to is None
+
+    @override_settings(EMAIL_DEV_MODE=False, EMAIL_DEV_MODE_REDIRECT_TO="")
+    def test_dynamic_direct_request_notifies_only_direct_recipient(
+        self,
+        client,
+        alice,
+        bob,
+        charlie,
+        alice_duty_assignment,
+        site_config,
+    ):
+        """Dynamic direct requests should notify only the selected member."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+        role_definition.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="towpilot",
+            is_required=True,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=alice_duty_assignment,
+            role_key="launch_coord",
+            member=alice,
+            role_definition=role_definition,
+        )
+
+        mail.outbox.clear()
+        client.force_login(alice)
+        url = reverse(
+            "duty_roster:create_swap_request",
+            kwargs={
+                "year": alice_duty_assignment.date.year,
+                "month": alice_duty_assignment.date.month,
+                "day": alice_duty_assignment.date.day,
+                "role": "DYNAMIC",
+            },
+        )
+        response = client.post(
+            f"{url}?dynamic_role_key=launch_coord",
+            {
+                "dynamic_role_key": "launch_coord",
+                "request_type": "direct",
+                "direct_request_to": bob.id,
+                "notes": "Can you take this launch coordinator duty?",
+                "is_emergency": False,
+            },
+        )
+
+        assert response.status_code == 302
+        assert len(mail.outbox) == 1
+        assert mail.outbox[0].to == [bob.email]
+
+    @override_settings(EMAIL_DEV_MODE=False, EMAIL_DEV_MODE_REDIRECT_TO="")
+    def test_convert_dynamic_direct_to_general_notifies_all_eligible_members(
+        self,
+        client,
+        alice,
+        bob,
+        charlie,
+        alice_duty_assignment,
+        site_config,
+    ):
+        """Converting dynamic direct requests broadcasts to all eligible members."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+        role_definition.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="towpilot",
+            is_required=True,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=alice_duty_assignment,
+            role_key="launch_coord",
+            member=alice,
+            role_definition=role_definition,
+        )
+
+        direct_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=alice_duty_assignment.date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        mail.outbox.clear()
+        client.force_login(alice)
+        url = reverse("duty_roster:convert_to_general", args=[direct_request.id])
+        response = client.post(url)
+
+        assert response.status_code == 302
+        direct_request.refresh_from_db()
+        assert direct_request.request_type == "general"
+        assert direct_request.direct_request_to is None
+
+        recipients = sorted(
+            email for message in mail.outbox for email in message.to if email
+        )
+        assert recipients == sorted([bob.email, charlie.email])
+
+
+@pytest.mark.django_db
+class TestDynamicAssignmentUpdateEdgeCases:
+    """Tests for dynamic assignment update edge cases."""
+
+    def test_dynamic_swap_recovers_when_original_role_row_missing(
+        self, alice, bob, site_config
+    ):
+        """Missing original dynamic role row should be recreated and assignments updated."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+            legacy_role_key="towpilot",
+        )
+
+        original_date = date.today() + timedelta(days=22)
+        proposed_swap_date = date.today() + timedelta(days=29)
+        original_assignment = DutyAssignment.objects.create(
+            date=original_date,
+            tow_pilot=alice,
+        )
+        swap_assignment = DutyAssignment.objects.create(
+            date=proposed_swap_date,
+            tow_pilot=bob,
+        )
+
+        DutyAssignmentRole.objects.create(
+            assignment=swap_assignment,
+            role_key="launch_coord",
+            member=bob,
+            role_definition=role_definition,
+            legacy_role_key="towpilot",
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="swap",
+            proposed_swap_date=proposed_swap_date,
+            status="pending",
+        )
+
+        update_duty_assignments(swap_request, offer)
+
+        original_assignment.refresh_from_db()
+        swap_assignment.refresh_from_db()
+
+        recreated_original_row = DutyAssignmentRole.objects.get(
+            assignment=original_assignment,
+            role_key="launch_coord",
+        )
+        swap_row = DutyAssignmentRole.objects.get(
+            assignment=swap_assignment,
+            role_key="launch_coord",
+        )
+
+        assert recreated_original_row.member == bob
+        assert recreated_original_row.legacy_role_key == "towpilot"
+        assert original_assignment.tow_pilot == bob
+        assert swap_row.member == alice
+        assert swap_assignment.tow_pilot == alice
+
+    def test_dynamic_swap_creates_missing_role_row_on_proposed_swap_date(
+        self, alice, bob, site_config
+    ):
+        """Dynamic swap should create missing role row on swap date and sync legacy field."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+            legacy_role_key="towpilot",
+        )
+
+        original_date = date.today() + timedelta(days=13)
+        proposed_swap_date = date.today() + timedelta(days=20)
+        original_assignment = DutyAssignment.objects.create(
+            date=original_date,
+            tow_pilot=alice,
+        )
+        swap_assignment = DutyAssignment.objects.create(
+            date=proposed_swap_date,
+            tow_pilot=bob,
+        )
+
+        original_row = DutyAssignmentRole.objects.create(
+            assignment=original_assignment,
+            role_key="launch_coord",
+            member=alice,
+            role_definition=role_definition,
+            legacy_role_key="towpilot",
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="swap",
+            proposed_swap_date=proposed_swap_date,
+            status="pending",
+        )
+
+        update_duty_assignments(swap_request, offer)
+
+        original_row.refresh_from_db()
+        original_assignment.refresh_from_db()
+        swap_assignment.refresh_from_db()
+        created_swap_row = DutyAssignmentRole.objects.get(
+            assignment=swap_assignment,
+            role_key="launch_coord",
+        )
+
+        assert original_row.member == bob
+        assert original_assignment.tow_pilot == bob
+        assert created_swap_row.member == alice
+        assert created_swap_row.legacy_role_key == "towpilot"
+        assert swap_assignment.tow_pilot == alice
+
+    def test_dynamic_swap_backfills_existing_swap_row_metadata_and_surge_legacy_sync(
+        self, alice, bob, site_config
+    ):
+        """Existing swap rows missing metadata should be backfilled before legacy sync."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="surge_launch_coord",
+            display_name="Surge Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+            legacy_role_key="surge_towpilot",
+            shift_code="pm",
+        )
+
+        original_date = date.today() + timedelta(days=17)
+        proposed_swap_date = date.today() + timedelta(days=24)
+
+        original_assignment = DutyAssignment.objects.create(
+            date=original_date,
+            surge_tow_pilot=alice,
+        )
+        swap_assignment = DutyAssignment.objects.create(
+            date=proposed_swap_date,
+            surge_tow_pilot=bob,
+        )
+
+        DutyAssignmentRole.objects.create(
+            assignment=original_assignment,
+            role_key="surge_launch_coord",
+            member=alice,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=swap_assignment,
+            role_key="surge_launch_coord",
+            member=bob,
+            legacy_role_key="",
+            shift_code="",
+            role_definition=None,
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="surge_launch_coord",
+            dynamic_role_label="Surge Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="swap",
+            proposed_swap_date=proposed_swap_date,
+            status="pending",
+        )
+
+        update_duty_assignments(swap_request, offer)
+
+        original_assignment.refresh_from_db()
+        swap_assignment.refresh_from_db()
+
+        swap_row = DutyAssignmentRole.objects.get(
+            assignment=swap_assignment,
+            role_key="surge_launch_coord",
+        )
+
+        assert original_assignment.surge_tow_pilot == bob
+        assert swap_assignment.surge_tow_pilot == alice
+        assert swap_row.member == alice
+        assert swap_row.legacy_role_key == "surge_towpilot"
+        assert swap_row.shift_code == "pm"
+        assert swap_row.role_definition == role_definition
+
+    def test_accept_offer_rolls_back_when_original_assignment_missing(
+        self, alice, bob, site_config
+    ):
+        """Acceptance should rollback request/offer status if dynamic assignment update fails."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        original_date = date.today() + timedelta(days=18)
+        DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+            status="pending",
+        )
+
+        with pytest.raises(ValueError, match="Missing original assignment"):
+            _accept_offer_and_finalize(swap_request, offer)
+
+        swap_request.refresh_from_db()
+        offer.refresh_from_db()
+
+        assert swap_request.status == "open"
+        assert swap_request.accepted_offer is None
+        assert swap_request.fulfilled_at is None
+        assert offer.status == "pending"
+        assert offer.responded_at is None
 
 
 # =============================================================================

@@ -33,7 +33,6 @@ from duty_roster.utils.email import (
     notify_ops_status,
 )
 from logsheet.models import Airfield
-from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -51,9 +50,11 @@ from .forms import (
 )
 from .models import (
     DutyAssignment,
+    DutyAssignmentRole,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
+    DutyRoleDefinition,
     DutyRosterMessage,
     DutySwapRequest,
     GliderReservation,
@@ -70,6 +71,7 @@ from .roster_generator import (
     is_within_operational_season,
     resolve_roster_date_range,
 )
+from .utils.role_resolution import RoleResolutionService
 from .utils.roles import member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views")
@@ -96,6 +98,76 @@ def calendar_refresh_response(year, month):
     """Helper function to create HTMX response that refreshes calendar with month context"""
     trigger_data = {"refreshCalendar": {"year": int(year), "month": int(month)}}
     return HttpResponse(headers={"HX-Trigger": json.dumps(trigger_data)})
+
+
+def _get_dynamic_role_assignments(
+    assignment,
+    site_config,
+    *,
+    role_service=None,
+    enabled_roles=None,
+    role_labels_by_key=None,
+):
+    """Return assigned non-legacy dynamic roles for an assignment."""
+    if not assignment or not site_config or not site_config.enable_dynamic_duty_roles:
+        return []
+
+    role_service = role_service or RoleResolutionService(site_configuration=site_config)
+    enabled_roles = (
+        enabled_roles if enabled_roles is not None else role_service.get_enabled_roles()
+    )
+    role_labels_by_key = role_labels_by_key or {}
+    legacy_to_swap_role = {
+        "instructor": "INSTRUCTOR",
+        "towpilot": "TOW",
+        "duty_officer": "DO",
+        "assistant_duty_officer": "ADO",
+    }
+    role_rows_by_key = {row.role_key: row for row in assignment.role_rows.all()}
+    dynamic_role_assignments = []
+    for role_key in enabled_roles:
+        # Legacy role keys are rendered from fixed assignment fields.
+        if role_key in DutyAssignment.LEGACY_ROLE_TO_FIELD:
+            continue
+
+        role_row = role_rows_by_key.get(role_key)
+        member = role_row.member if role_row and role_row.member else None
+        if not member:
+            continue
+
+        label = role_labels_by_key.get(role_key)
+        if label is None:
+            label = role_service.get_role_label(role_key)
+
+        legacy_role_key = ""
+        if role_row:
+            legacy_role_key = role_row.legacy_role_key or ""
+            if not legacy_role_key and role_row.role_definition:
+                legacy_role_key = role_row.role_definition.legacy_role_key or ""
+
+        swap_role_code = legacy_to_swap_role.get(legacy_role_key)
+        if swap_role_code:
+            # The current swap workflow enforces legacy duty-field assignment ownership.
+            legacy_field_name = DutyAssignment.LEGACY_ROLE_TO_FIELD.get(legacy_role_key)
+            assigned_legacy_member = (
+                getattr(assignment, legacy_field_name, None)
+                if legacy_field_name
+                else None
+            )
+            if assigned_legacy_member != member:
+                swap_role_code = None
+
+        dynamic_role_assignments.append(
+            {
+                "key": role_key,
+                "label": label,
+                "member": member,
+                "legacy_role_key": legacy_role_key,
+                "swap_role_code": swap_role_code,
+            }
+        )
+
+    return dynamic_role_assignments
 
 
 def roster_home(request):
@@ -717,12 +789,57 @@ def duty_calendar_view(request, year=None, month=None):
     weeks = cal.monthdatescalendar(year, month)
     first_visible_day = weeks[0][0]
     last_visible_day = weeks[-1][-1]
-    assignments = DutyAssignment.objects.filter(
-        date__range=(first_visible_day, last_visible_day)
-    ).order_by("date")
+    assignments = (
+        DutyAssignment.objects.filter(date__range=(first_visible_day, last_visible_day))
+        .prefetch_related(
+            models.Prefetch(
+                "role_rows",
+                queryset=DutyAssignmentRole.objects.select_related(
+                    "role_definition", "member"
+                ),
+            )
+        )
+        .order_by("date")
+    )
     visible_dates = [day for week in weeks for day in week]
 
     assignments_by_date = {a.date: a for a in assignments}
+    role_service = RoleResolutionService(site_configuration=site_config)
+    enabled_role_keys = (
+        role_service.get_enabled_roles()
+        if site_config and site_config.enable_dynamic_duty_roles
+        else []
+    )
+    role_labels_by_key = {}
+    if enabled_role_keys:
+        role_definitions_by_key = {
+            role_def.key: role_def
+            for role_def in DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+                key__in=enabled_role_keys,
+            )
+        }
+        for role_key in enabled_role_keys:
+            role_def = role_definitions_by_key.get(role_key)
+            if role_def:
+                role_labels_by_key[role_key] = (
+                    get_role_title(role_def.legacy_role_key)
+                    if role_def.legacy_role_key
+                    else role_def.display_name
+                )
+            else:
+                role_labels_by_key[role_key] = get_role_title(role_key)
+    dynamic_role_assignments_by_date = {
+        assignment.date: _get_dynamic_role_assignments(
+            assignment,
+            site_config,
+            role_service=role_service,
+            enabled_roles=enabled_role_keys,
+            role_labels_by_key=role_labels_by_key,
+        )
+        for assignment in assignments
+    }
 
     active_statuses = set(get_active_membership_statuses())
 
@@ -828,6 +945,7 @@ def duty_calendar_view(request, year=None, month=None):
         "next_month_name": next_month_name,
         "weeks": weeks,
         "assignments_by_date": assignments_by_date,
+        "dynamic_role_assignments_by_date": dynamic_role_assignments_by_date,
         "has_upcoming_assignments": has_upcoming_assignments,
         "prev_year": prev_year,
         "prev_month": prev_month,
@@ -848,7 +966,18 @@ def duty_calendar_view(request, year=None, month=None):
 
 def calendar_day_detail(request, year, month, day):
     day_date = date(year, month, day)
-    assignment = DutyAssignment.objects.filter(date=day_date).first()
+    assignment = (
+        DutyAssignment.objects.filter(date=day_date)
+        .prefetch_related(
+            models.Prefetch(
+                "role_rows",
+                queryset=DutyAssignmentRole.objects.select_related(
+                    "member", "role_definition"
+                ),
+            )
+        )
+        .first()
+    )
     open_panel = request.GET.get("open_panel", "")
     if open_panel not in {"plan_to_fly", "request_instruction"}:
         open_panel = ""
@@ -1069,6 +1198,15 @@ def calendar_day_detail(request, year, month, day):
                 if is_qualified:
                     volunteerable_holes[hole_role] = True
 
+    dynamic_role_assignments = _get_dynamic_role_assignments(assignment, site_config)
+    user_dynamic_role_assignments = []
+    if request.user.is_authenticated and dynamic_role_assignments:
+        user_dynamic_role_assignments = [
+            role
+            for role in dynamic_role_assignments
+            if role["member"].id == request.user.id
+        ]
+
     return render(
         request,
         "duty_roster/calendar_day_modal.html",
@@ -1132,6 +1270,8 @@ def calendar_day_detail(request, year, month, day):
             ),
             "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
             "open_panel": open_panel,
+            "dynamic_role_assignments": dynamic_role_assignments,
+            "user_dynamic_role_assignments": user_dynamic_role_assignments,
         },
     )
 
@@ -2522,20 +2662,8 @@ def propose_roster(request):
     # Get site config and determine which roles to schedule
     siteconfig = SiteConfiguration.objects.first()
     use_ortools_scheduler = bool(siteconfig and siteconfig.use_ortools_scheduler)
-    enabled_roles = []
-    if siteconfig:
-        if getattr(siteconfig, "schedule_instructors", False):
-            enabled_roles.append("instructor")
-        if getattr(siteconfig, "schedule_duty_officers", False):
-            enabled_roles.append("duty_officer")
-        if getattr(siteconfig, "schedule_assistant_duty_officers", False):
-            enabled_roles.append("assistant_duty_officer")
-        if getattr(siteconfig, "schedule_tow_pilots", False):
-            enabled_roles.append("towpilot")
-        if getattr(siteconfig, "schedule_commercial_pilots", False):
-            enabled_roles.append("commercial_pilot")
-    else:
-        enabled_roles = DEFAULT_ROLES.copy()
+    role_service = RoleResolutionService(site_configuration=siteconfig)
+    enabled_roles = role_service.get_enabled_roles()
 
     if not enabled_roles:
         # No scheduling for this club
@@ -2664,7 +2792,6 @@ def propose_roster(request):
             _set_proposed_roster_range(request, range_start, range_end)
 
         elif action == "publish":
-            from .models import DutyAssignment
             from .utils.email import send_roster_published_notifications
 
             default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
@@ -2680,6 +2807,15 @@ def propose_roster(request):
                             continue
 
             members_by_id = Member.objects.in_bulk(member_ids)
+            role_definitions_by_key = {}
+            if siteconfig and siteconfig.enable_dynamic_duty_roles:
+                role_definitions_by_key = {
+                    role_def.key: role_def
+                    for role_def in DutyRoleDefinition.objects.filter(
+                        site_configuration=siteconfig,
+                        is_active=True,
+                    )
+                }
 
             try:
                 with transaction.atomic():
@@ -2690,6 +2826,7 @@ def propose_roster(request):
                         date__lte=active_end,
                     ).delete()
 
+                    unsupported_assigned_roles = set()
                     for e in draft_entries:
                         try:
                             edt = dt_date.fromisoformat(e["date"])
@@ -2702,25 +2839,81 @@ def propose_roster(request):
                             "date": edt,
                             "location": default_field,
                         }
+                        normalized_role_rows = []
                         for role, mem in e["slots"].items():
-                            field_name = ROLE_FIELD_MAP.get(role)
-                            if field_name and mem:
+                            if not mem:
+                                continue
+
+                            role_def = role_definitions_by_key.get(role)
+                            legacy_role_key = (
+                                role_def.legacy_role_key
+                                if role_def and role_def.legacy_role_key
+                                else role
+                            )
+                            field_name = DutyAssignment.LEGACY_ROLE_TO_FIELD.get(
+                                legacy_role_key
+                            )
+
+                            if not field_name:
+                                unsupported_assigned_roles.add(get_role_title(role))
+
+                            try:
+                                member = members_by_id.get(int(mem))
+                            except (TypeError, ValueError):
+                                member = None
+
+                            if not member:
+                                logger.warning(
+                                    "Skipping missing/invalid member id %s for role %s on %s",
+                                    mem,
+                                    role,
+                                    edt.isoformat(),
+                                )
+                                continue
+
+                            if field_name:
                                 try:
-                                    member = members_by_id.get(int(mem))
-                                except (TypeError, ValueError):
-                                    member = None
-                                if member:
                                     assignment_data[field_name] = member
-                                else:
-                                    logger.warning(
-                                        "Skipping missing/invalid member id %s for role %s on %s",
-                                        mem,
-                                        role,
+                                except Exception:
+                                    logger.exception(
+                                        "Failed assigning legacy field %s for %s",
+                                        field_name,
                                         edt.isoformat(),
                                     )
 
+                            # Keep dynamic role rows separate from legacy rows.
+                            # Legacy rows are synced from assignment fields post-save.
+                            if role not in DutyAssignment.LEGACY_ROLE_TO_FIELD:
+                                normalized_role_rows.append(
+                                    DutyAssignmentRole(
+                                        assignment=None,
+                                        role_key=role,
+                                        member=member,
+                                        role_definition=role_def,
+                                        legacy_role_key=(
+                                            legacy_role_key if field_name else ""
+                                        ),
+                                        shift_code=(
+                                            role_def.shift_code if role_def else ""
+                                        ),
+                                    )
+                                )
+
                         assignment = DutyAssignment.objects.create(**assignment_data)
                         created_assignments.append(assignment)
+                        if normalized_role_rows:
+                            for row in normalized_role_rows:
+                                row.assignment = assignment
+                            DutyAssignmentRole.objects.bulk_create(normalized_role_rows)
+
+                if unsupported_assigned_roles:
+                    unsupported_list = ", ".join(sorted(unsupported_assigned_roles))
+                    messages.warning(
+                        request,
+                        "Some configured dynamic roles do not map to legacy assignment "
+                        "columns. They were stored in normalized assignment rows only: "
+                        f"{unsupported_list}.",
+                    )
             except Exception:
                 logger.exception("Failed publishing proposed roster")
                 messages.error(

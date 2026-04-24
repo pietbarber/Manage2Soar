@@ -7,7 +7,10 @@ so test behavior stays aligned with the deployed script.
 """
 
 import re
+import tempfile
+import uuid
 from email.message import EmailMessage
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Any, Callable, cast
 from unittest.mock import mock_open, patch
@@ -48,9 +51,22 @@ def load_template_namespace():
         "template; template structure may have changed"
     )
 
-    namespace = {"__name__": "maillist_rewriter_under_test"}
-    exec(compile(source, str(_TEMPLATE_PATH), "exec"), namespace)
-    return namespace
+    # Use importlib module loading via a temporary file to avoid direct exec usage.
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix="_maillist_rewriter_under_test.py", delete=False
+    ) as tmp_file:
+        tmp_file.write(source)
+        tmp_path = Path(tmp_file.name)
+
+    try:
+        module_name = f"maillist_rewriter_under_test_{uuid.uuid4().hex}"
+        spec = spec_from_file_location(module_name, tmp_path)
+        assert spec is not None and spec.loader is not None
+        module = module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return cast(dict[str, Any], module.__dict__)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def get_callable(namespace, name):
