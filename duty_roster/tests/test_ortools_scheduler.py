@@ -19,6 +19,7 @@ from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
+    DutyRoleDefinition,
     MemberBlackout,
 )
 from duty_roster.ortools_scheduler import (
@@ -928,8 +929,8 @@ class ORToolsHardConstraintsTests(TestCase):
             f"Expected role split penalty to reduce or match drift; baseline={baseline_drift}, tuned={tuned_drift}",
         )
 
-    def test_adjacent_weekend_spacing_can_make_schedule_infeasible(self):
-        """Adjacent-weekend spacing should fail clearly when staffing cannot satisfy it."""
+    def test_adjacent_weekend_spacing_skips_when_understaffed(self):
+        """Adjacent-weekend hard spacing is skipped when either day has only one candidate."""
         pref1 = DutyPreference.objects.get(member=self.member1)
         pref1.allow_weekend_double = False
         pref1.save()
@@ -959,14 +960,14 @@ class ORToolsHardConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        self.assertEqual(result["status"], "INFEASIBLE")
-        self.assertIn(
-            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
-            result["diagnostics"]["infeasible_hints"],
-        )
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned_member_ids = [
+            day_schedule["slots"]["instructor"] for day_schedule in result["schedule"]
+        ]
+        self.assertEqual(assigned_member_ids, [self.member1.id, self.member1.id])
 
-    def test_adjacent_weekend_spacing_enforced_with_sat_sun_schedule(self):
-        """Saturday-to-Saturday spacing must apply even when Sundays are also duty days."""
+    def test_adjacent_weekend_spacing_sat_sun_skips_understaffed_saturday_pair(self):
+        """Saturday adjacent-weekend hard spacing is skipped when Saturday staffing is single-candidate."""
         pref1 = DutyPreference.objects.get(member=self.member1)
         pref1.allow_weekend_double = False
         pref1.save()
@@ -1002,14 +1003,16 @@ class ORToolsHardConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        self.assertEqual(result["status"], "INFEASIBLE")
-        self.assertIn(
-            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
-            result["diagnostics"]["infeasible_hints"],
-        )
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        saturday_slots = [
+            day_schedule["slots"]["instructor"]
+            for day_schedule in result["schedule"]
+            if day_schedule["date"] in {date(2026, 3, 7), date(2026, 3, 14)}
+        ]
+        self.assertEqual(saturday_slots, [self.member1.id, self.member1.id])
 
-    def test_adjacent_weekend_spacing_defaults_missing_preference_to_no_double(self):
-        """Missing preference rows should default to no adjacent-weekend doubles."""
+    def test_adjacent_weekend_spacing_missing_preference_skips_when_understaffed(self):
+        """Missing preference defaults remain, but hard spacing is skipped for single-candidate slots."""
         # Force member1 to be the only available member on two adjacent weekends.
         # member1 is intentionally omitted from preferences to validate default behavior.
         MemberBlackout.objects.create(member=self.member2, date=date(2026, 3, 7))
@@ -1035,11 +1038,45 @@ class ORToolsHardConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        self.assertEqual(result["status"], "INFEASIBLE")
-        self.assertIn(
-            "Adjacent-weekend same-role spacing constraints may be too strict for available staffing.",
-            result["diagnostics"]["infeasible_hints"],
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned_member_ids = [
+            day_schedule["slots"]["instructor"] for day_schedule in result["schedule"]
+        ]
+        self.assertEqual(assigned_member_ids, [self.member1.id, self.member1.id])
+
+    def test_adjacent_weekend_spacing_enforced_when_two_candidates_exist(self):
+        """Hard spacing should still apply when both adjacent slots have >=2 candidates."""
+        pref1 = DutyPreference.objects.get(member=self.member1)
+        pref1.allow_weekend_double = False
+        pref1.save()
+
+        pref2 = DutyPreference.objects.get(member=self.member2)
+        pref2.allow_weekend_double = False
+        pref2.save()
+
+        data = SchedulingData(
+            members=[self.member1, self.member2],
+            duty_days=[date(2026, 3, 7), date(2026, 3, 14)],
+            roles=["instructor"],
+            preferences={
+                self.member1.id: pref1,
+                self.member2.id: pref2,
+            },
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={"instructor": {"scarcity_score": 1.0}},
+            earliest_duty_day=date(2026, 3, 7),
         )
+
+        scheduler = DutyRosterScheduler(data)
+        result = scheduler.solve(timeout_seconds=5.0)
+
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+        assigned_member_ids = [
+            day_schedule["slots"]["instructor"] for day_schedule in result["schedule"]
+        ]
+        self.assertNotEqual(assigned_member_ids[0], assigned_member_ids[1])
 
     def test_adjacent_weekend_hint_not_added_without_seven_day_weekday_pair(self):
         """Do not emit adjacent-weekend hint when no day has a matching day+7."""
@@ -1432,6 +1469,59 @@ class ORToolsEdgeCasesTests(TestCase):
             # Should have zero duty days
             self.assertEqual(len(data.duty_days), 0)
 
+    @patch("duty_roster.ortools_scheduler.DutyRosterScheduler")
+    @patch("duty_roster.ortools_scheduler.extract_scheduling_data")
+    def test_generate_roster_retries_relaxed_after_infeasible(
+        self, mock_extract, mock_scheduler_cls
+    ):
+        """Strict infeasible solve should retry with relaxed repeat constraints."""
+        mock_extract.return_value = SchedulingData(
+            members=[],
+            duty_days=[],
+            roles=[],
+            preferences={},
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={},
+            earliest_duty_day=date(2026, 4, 1),
+        )
+
+        strict_scheduler = mock_scheduler_cls.return_value
+        relaxed_scheduler = mock_scheduler_cls.return_value
+
+        strict_scheduler.solve.side_effect = [
+            {
+                "status": "INFEASIBLE",
+                "schedule": [],
+                "diagnostics": {"infeasible_hints": []},
+            },
+            {
+                "status": "FEASIBLE",
+                "schedule": [
+                    {
+                        "date": date(2026, 4, 5),
+                        "slots": {"instructor": 1},
+                        "diagnostics": {"instructor": None},
+                    }
+                ],
+                "diagnostics": {"infeasible_hints": []},
+            },
+        ]
+
+        schedule = generate_roster_ortools(year=2026, month=4, roles=["instructor"])
+
+        self.assertEqual(len(schedule), 1)
+        self.assertEqual(schedule[0]["slots"]["instructor"], 1)
+
+        self.assertEqual(mock_scheduler_cls.call_count, 2)
+        _, strict_kwargs = mock_scheduler_cls.call_args_list[0]
+        _, relaxed_kwargs = mock_scheduler_cls.call_args_list[1]
+        self.assertTrue(strict_kwargs.get("enforce_anti_repeat", True))
+        self.assertTrue(strict_kwargs.get("enforce_adjacent_weekend_spacing", True))
+        self.assertFalse(relaxed_kwargs.get("enforce_anti_repeat", True))
+        self.assertFalse(relaxed_kwargs.get("enforce_adjacent_weekend_spacing", True))
+
 
 class ORToolsIntegrationTests(TestCase):
     """Integration tests with Django ORM and legacy scheduler comparison."""
@@ -1572,3 +1662,72 @@ class ORToolsRegressionTests(TestCase):
             for day1, day2 in zip(result1["schedule"], result2["schedule"]):
                 self.assertEqual(day1["date"], day2["date"])
                 self.assertEqual(day1["slots"], day2["slots"])
+
+
+class ORToolsDynamicRoleSupportTests(TestCase):
+    """Ensure OR-Tools scheduler supports dynamic role keys."""
+
+    def setUp(self):
+        self.site_config = SiteConfiguration.objects.create(
+            club_name="Test Soaring Club",
+            domain_name="test.example.com",
+            club_abbreviation="TSC",
+            enable_dynamic_duty_roles=True,
+            use_ortools_scheduler=True,
+        )
+
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.site_config,
+            key="am_tow",
+            display_name="AM Tow",
+            legacy_role_key="towpilot",
+            shift_code="am",
+            is_active=True,
+            sort_order=10,
+        )
+
+        self.member1 = Member.objects.create(
+            username="dynamic_tow_1",
+            email="dynamic_tow_1@test.com",
+            first_name="Dynamic",
+            last_name="TowOne",
+            membership_status="Full Member",
+            towpilot=True,
+            is_active=True,
+        )
+        self.member2 = Member.objects.create(
+            username="dynamic_tow_2",
+            email="dynamic_tow_2@test.com",
+            first_name="Dynamic",
+            last_name="TowTwo",
+            membership_status="Full Member",
+            towpilot=True,
+            is_active=True,
+        )
+
+        DutyPreference.objects.create(member=self.member1, max_assignments_per_month=8)
+        DutyPreference.objects.create(member=self.member2, max_assignments_per_month=8)
+
+    def test_extract_data_maps_dynamic_role_to_legacy_percent_basis(self):
+        data = extract_scheduling_data(year=2026, month=4, roles=["am_tow"])
+
+        self.assertEqual(data.role_percent_basis["am_tow"], "towpilot")
+        self.assertIn("am_tow", data.role_eligible_member_ids)
+        self.assertIn(self.member1.id, data.role_eligible_member_ids["am_tow"])
+        self.assertIn(self.member2.id, data.role_eligible_member_ids["am_tow"])
+
+    @patch("duty_roster.roster_generator.is_within_operational_season")
+    def test_generate_roster_ortools_fills_dynamic_tow_slots(self, mock_in_season):
+        mock_in_season.return_value = True
+
+        schedule = generate_roster_ortools(
+            start_date=date(2026, 4, 4),
+            end_date=date(2026, 4, 5),
+            roles=["am_tow"],
+            timeout_seconds=5.0,
+        )
+
+        self.assertGreater(len(schedule), 0)
+        for day_schedule in schedule:
+            assigned_member_id = day_schedule["slots"].get("am_tow")
+            self.assertIn(assigned_member_id, {self.member1.id, self.member2.id})

@@ -13,9 +13,11 @@ from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
+    DutyRoleDefinition,
     MemberBlackout,
 )
 from duty_roster.operational_calendar import get_operational_weekend
+from duty_roster.utils.role_resolution import RoleResolutionService
 from duty_roster.utils.roles import member_has_role
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.models import Member
@@ -590,6 +592,52 @@ def _generate_roster_legacy(
     # Use provided roles or fall back to DEFAULT_ROLES
     roles_to_schedule = roles if roles is not None else DEFAULT_ROLES
 
+    site_config = SiteConfiguration.objects.first()
+    role_service = RoleResolutionService(site_configuration=site_config)
+    role_percent_basis = {role: role for role in roles_to_schedule}
+    role_eligible_member_ids = {}
+
+    if site_config and site_config.enable_dynamic_duty_roles:
+        role_defs_by_key = {
+            role_def.key: role_def
+            for role_def in DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+                key__in=roles_to_schedule,
+            )
+        }
+        active_members_qs = Member.objects.filter(is_active=True)
+
+        for role in roles_to_schedule:
+            role_def = role_defs_by_key.get(role)
+            role_percent_basis[role] = (
+                role_def.legacy_role_key
+                if role_def and role_def.legacy_role_key
+                else role
+            )
+            role_eligible_member_ids[role] = role_service.get_eligible_member_ids(
+                role,
+                members_queryset=active_members_qs,
+            )
+
+    def _member_has_scheduled_role(member, role):
+        eligible_ids = role_eligible_member_ids.get(role)
+        if eligible_ids is not None:
+            return member.id in eligible_ids
+        return _member_has_role(member, role)
+
+    def _role_percent_field(role):
+        basis_role = role_percent_basis.get(role, role)
+        return PERCENT_FIELDS.get(basis_role, f"{basis_role}_percent")
+
+    def _eligible_percent_fields(member):
+        fields = []
+        for scheduled_role in roles_to_schedule:
+            if _member_has_scheduled_role(member, scheduled_role):
+                fields.append(_role_percent_field(scheduled_role))
+        # Keep deterministic order for diagnostics/behavior.
+        return sorted(set(fields))
+
     all_weekend_dates = get_weekend_dates_in_range(start_date, end_date)
 
     # Filter weekend dates to only include those within operational season
@@ -653,7 +701,7 @@ def _generate_roster_legacy(
             if m in assigned:
                 logger.debug(f"{m.full_display_name}: Already assigned today.")
                 return False
-            flag = _member_has_role(m, role)
+            flag = _member_has_scheduled_role(m, role)
             if not flag:
                 logger.debug(
                     f"{m.full_display_name}: Not eligible for role {role} (flag is False)."
@@ -686,10 +734,8 @@ def _generate_roster_legacy(
         if m in assigned:
             logger.debug(f"{m.full_display_name}: Already assigned today.")
             return False
-        flag = _member_has_role(m, role)
-        eligible_role_fields = [
-            field for r, field in PERCENT_FIELDS.items() if _member_has_role(m, r)
-        ]
+        flag = _member_has_scheduled_role(m, role)
+        eligible_role_fields = _eligible_percent_fields(m)
         if len(eligible_role_fields) == 1:
             field = eligible_role_fields[0]
             pct = getattr(p, field, 0)
@@ -700,11 +746,7 @@ def _generate_roster_legacy(
                 pct = 100
         else:
             all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-            pct = (
-                getattr(p, PERCENT_FIELDS.get(role, f"{role}_percent"), 0)
-                if not all_zero
-                else 100
-            )
+            pct = getattr(p, _role_percent_field(role), 0) if not all_zero else 100
             if all_zero:
                 logger.debug(
                     f"{m.full_display_name}: All eligible role percents are zero, treating {role} as 100%."
@@ -732,9 +774,7 @@ def _generate_roster_legacy(
         weights = []
         for m in cands:
             p = prefs.get(m.id)
-            eligible_role_fields = [
-                field for r, field in PERCENT_FIELDS.items() if _member_has_role(m, r)
-            ]
+            eligible_role_fields = _eligible_percent_fields(m)
             if not p:
                 # Member has no preference - treat as 100% available
                 base = 100
@@ -745,11 +785,7 @@ def _generate_roster_legacy(
                     base = 100
             else:
                 all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-                base = (
-                    getattr(p, PERCENT_FIELDS.get(role, f"{role}_percent"), 0)
-                    if not all_zero
-                    else 100
-                )
+                base = getattr(p, _role_percent_field(role), 0) if not all_zero else 100
             w = base
             for o in assigned:
                 if o.id in pairings.get(m.id, set()) or m.id in pairings.get(
@@ -773,10 +809,64 @@ def _generate_roster_legacy(
     # Calculate role scarcity and prioritize most constrained roles first
     role_scarcity = {}
     for role in roles_to_schedule:
-        scarcity_data = calculate_role_scarcity(
-            members, prefs, blackouts, weekend_dates, role
+        if not weekend_dates:
+            role_scarcity[role] = {
+                "total_members": 0,
+                "avg_available_per_day": 0,
+                "scarcity_score": float("inf"),
+                "availability_by_day": [],
+            }
+            continue
+
+        total_with_role = sum(1 for m in members if _member_has_scheduled_role(m, role))
+        availability_by_day = []
+
+        for day in weekend_dates:
+            available_count = 0
+            for m in members:
+                if not _member_has_scheduled_role(m, role):
+                    continue
+
+                p = prefs.get(m.id)
+                if p and (p.dont_schedule or p.scheduling_suspended):
+                    continue
+                if (m.id, day) in blackouts:
+                    continue
+
+                if p:
+                    eligible_role_fields = _eligible_percent_fields(m)
+                    if len(eligible_role_fields) == 1:
+                        field = eligible_role_fields[0]
+                        pct = getattr(p, field, 0)
+                        if pct == 0:
+                            pct = 100
+                    else:
+                        all_zero = all(
+                            getattr(p, f, 0) == 0 for f in eligible_role_fields
+                        )
+                        pct = (
+                            getattr(p, _role_percent_field(role), 0)
+                            if not all_zero
+                            else 100
+                        )
+                    if pct == 0:
+                        continue
+
+                available_count += 1
+
+            availability_by_day.append(available_count)
+
+        avg_available = (
+            sum(availability_by_day) / len(availability_by_day)
+            if availability_by_day
+            else 0
         )
-        role_scarcity[role] = scarcity_data
+        role_scarcity[role] = {
+            "total_members": total_with_role,
+            "avg_available_per_day": avg_available,
+            "scarcity_score": avg_available,
+            "availability_by_day": availability_by_day,
+        }
 
     # Sort roles by scarcity score (lowest = most constrained = highest priority)
     prioritized_roles = sorted(
@@ -932,9 +1022,18 @@ def generate_roster(
             )
             return schedule
 
+        except RuntimeError as e:
+            # Expected fallback path for infeasible models: keep logs concise and
+            # avoid traceback spam in dev console.
+            logger.warning(
+                "OR-Tools scheduler returned no feasible solution; falling back to "
+                f"legacy algorithm: {e}",
+                extra={"year": year, "month": month, "error": str(e)},
+            )
+            # Fall through to legacy scheduler
         except Exception as e:
             logger.error(
-                f"OR-Tools scheduler failed, falling back to legacy algorithm: {e}",
+                f"OR-Tools scheduler crashed unexpectedly; falling back to legacy algorithm: {e}",
                 extra={"year": year, "month": month, "error": str(e)},
                 exc_info=True,
             )

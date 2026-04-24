@@ -2074,8 +2074,17 @@ def get_eligible_members_for_slot(request):
         if not date_str or not role:
             return JsonResponse({"error": "Missing date or role"}, status=400)
 
-        # Validate role is one of the allowed role names (security)
-        if role not in ALLOWED_ROLES:
+        # Validate role is one of the allowed role names (security).
+        # If dynamic roles are enabled, include enabled dynamic role keys.
+        site_config = SiteConfiguration.objects.first()
+        allowed = set(ALLOWED_ROLES)
+        if site_config and site_config.enable_dynamic_duty_roles:
+            allowed.update(
+                RoleResolutionService(
+                    site_configuration=site_config
+                ).get_enabled_roles()
+            )
+        if role not in allowed:
             return JsonResponse({"error": "Invalid role"}, status=400)
 
         try:
@@ -2185,15 +2194,43 @@ def get_eligible_members_for_slot(request):
             get_default_max_assignments_per_month(), range_months
         )
         eligible_members = []
-        for m in members:
-            # Check if member has the role flag
-            has_role = (
-                _is_commercial_pilot_qualified(m)
-                if role == "commercial_pilot"
-                else bool(getattr(m, role, False))
+
+        # If dynamic roles are enabled, precompute eligible member ids for the
+        # requested dynamic role to avoid per-member attribute checks that
+        # don't exist for dynamic keys (e.g. "am_tow"). Use RoleResolutionService
+        # which applies qualification requirements and legacy-role fallbacks.
+        role_service = RoleResolutionService(site_configuration=site_config)
+        enabled_dynamic_roles = (
+            set(role_service.get_enabled_roles())
+            if site_config and site_config.enable_dynamic_duty_roles
+            else set()
+        )
+        dynamic_role_eligible_ids = None
+        dynamic_role_legacy_key = None
+        if role in enabled_dynamic_roles:
+            dynamic_role_eligible_ids = role_service.get_eligible_member_ids(
+                role, members_queryset=Member.objects.filter(is_active=True)
             )
-            if not has_role:
-                continue
+            # Derive a legacy_role_key (if any) for preference percent field lookups
+            rd = role_service._role_queryset().filter(key=role).first()
+            dynamic_role_legacy_key = rd.legacy_role_key if rd else None
+
+        for m in members:
+            # If we have a computed dynamic-eligibility set, only consider members
+            # whose IDs are included. Otherwise fall back to legacy attribute checks.
+            if dynamic_role_eligible_ids is not None:
+                if m.id not in dynamic_role_eligible_ids:
+                    continue
+                has_role = True
+            else:
+                # Check if member has the role flag
+                has_role = (
+                    _is_commercial_pilot_qualified(m)
+                    if role == "commercial_pilot"
+                    else bool(getattr(m, role, False))
+                )
+                if not has_role:
+                    continue
 
             p = prefs.get(m.id)
 
@@ -2248,7 +2285,8 @@ def get_eligible_members_for_slot(request):
             # Check if already assigned (also show as warning)
             already_assigned = m in assigned_today
 
-            # Check percentage
+            # Check percentage. For dynamic roles, prefer legacy role mapping
+            # when determining which percent field applies (e.g. am_tow -> towpilot).
             percent_fields = [
                 ("instructor", "instructor_percent"),
                 ("duty_officer", "duty_officer_percent"),
@@ -2256,13 +2294,18 @@ def get_eligible_members_for_slot(request):
                 ("towpilot", "towpilot_percent"),
                 ("commercial_pilot", "commercial_pilot_percent"),
             ]
+            effective_role_for_flag = dynamic_role_legacy_key or role
             eligible_role_fields = [
                 field
                 for r, field in percent_fields
                 if (
                     _is_commercial_pilot_qualified(m)
                     if r == "commercial_pilot"
-                    else getattr(m, r, False)
+                    else getattr(
+                        m,
+                        effective_role_for_flag if role in enabled_dynamic_roles else r,
+                        False,
+                    )
                 )
             ]
 
@@ -2333,8 +2376,14 @@ def update_roster_slot(request):
     if not date_str or not role:
         return JsonResponse({"error": "Missing date or role"}, status=400)
 
-    # Validate role is one of the allowed role names (security)
-    if role not in ALLOWED_ROLES:
+    # Validate role is one of the allowed role names (security).
+    site_config = SiteConfiguration.objects.first()
+    allowed = set(ALLOWED_ROLES)
+    if site_config and site_config.enable_dynamic_duty_roles:
+        allowed.update(
+            RoleResolutionService(site_configuration=site_config).get_enabled_roles()
+        )
+    if role not in allowed:
         return JsonResponse({"error": "Invalid role"}, status=400)
 
     # Validate member exists and is eligible if provided
@@ -2348,18 +2397,34 @@ def update_roster_slot(request):
             return JsonResponse({"error": "Invalid member"}, status=400)
 
         # Enforce that the selected member is actually eligible for this role.
-        # For the allowed roles, the Member capability flag matches the role name
-        # (e.g., member.instructor, member.duty_officer, member.towpilot).
-        has_role = (
-            _is_commercial_pilot_qualified(member)
-            if role == "commercial_pilot"
-            else bool(getattr(member, role, False))
+        # If dynamic roles are enabled, consult RoleResolutionService which
+        # applies qualification requirements and legacy fallbacks.
+        role_service = RoleResolutionService(site_configuration=site_config)
+        enabled_dynamic_roles = (
+            set(role_service.get_enabled_roles())
+            if site_config and site_config.enable_dynamic_duty_roles
+            else set()
         )
-        if not has_role:
-            return JsonResponse(
-                {"error": "Member not eligible for this role"},
-                status=400,
+
+        if role in enabled_dynamic_roles:
+            if not role_service.is_member_eligible(member, role):
+                return JsonResponse(
+                    {"error": "Member not eligible for this role"},
+                    status=400,
+                )
+        else:
+            # For the allowed roles, the Member capability flag matches the role name
+            # (e.g., member.instructor, member.duty_officer, member.towpilot).
+            has_role = (
+                _is_commercial_pilot_qualified(member)
+                if role == "commercial_pilot"
+                else bool(getattr(member, role, False))
             )
+            if not has_role:
+                return JsonResponse(
+                    {"error": "Member not eligible for this role"},
+                    status=400,
+                )
 
         # Check active membership status
         if not member.is_active:
@@ -2664,6 +2729,7 @@ def propose_roster(request):
     use_ortools_scheduler = bool(siteconfig and siteconfig.use_ortools_scheduler)
     role_service = RoleResolutionService(site_configuration=siteconfig)
     enabled_roles = role_service.get_enabled_roles()
+    role_labels = {role: role_service.get_role_label(role) for role in enabled_roles}
 
     if not enabled_roles:
         # No scheduling for this club
@@ -2679,6 +2745,7 @@ def propose_roster(request):
                 "month_span": month_span,
                 "incomplete": False,
                 "enabled_roles": [],
+                "role_labels": {},
                 "no_scheduling": True,
                 "use_ortools_scheduler": use_ortools_scheduler,
             },
@@ -3074,6 +3141,7 @@ def propose_roster(request):
             "month_span": display_month_span,
             "incomplete": incomplete,
             "enabled_roles": enabled_roles,
+            "role_labels": role_labels,
             "no_scheduling": False,
             "operational_info": operational_info,
             "filtered_dates": filtered_dates,
