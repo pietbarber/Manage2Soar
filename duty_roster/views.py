@@ -2255,20 +2255,26 @@ def get_eligible_members_for_slot(request):
         # don't exist for dynamic keys (e.g. "am_tow"). Use RoleResolutionService
         # which applies qualification requirements and legacy-role fallbacks.
         role_service = RoleResolutionService(site_configuration=site_config)
-        enabled_dynamic_roles = (
-            set(role_service.get_enabled_roles())
-            if site_config and site_config.enable_dynamic_duty_roles
-            else set()
-        )
+        dynamic_role_keys = set()
+        dynamic_role_legacy_by_key = {}
+        if site_config and site_config.enable_dynamic_duty_roles:
+            dynamic_role_rows = DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+            ).values("key", "legacy_role_key")
+            dynamic_role_keys = {row["key"] for row in dynamic_role_rows}
+            dynamic_role_legacy_by_key = {
+                row["key"]: row["legacy_role_key"] for row in dynamic_role_rows
+            }
+
         dynamic_role_eligible_ids = None
         dynamic_role_legacy_key = None
-        if role in enabled_dynamic_roles:
+        if role in dynamic_role_keys:
             dynamic_role_eligible_ids = role_service.get_eligible_member_ids(
                 role, members_queryset=Member.objects.filter(is_active=True)
             )
             # Derive a legacy_role_key (if any) for preference percent field lookups
-            rd = role_service._role_queryset().filter(key=role).first()
-            dynamic_role_legacy_key = rd.legacy_role_key if rd else None
+            dynamic_role_legacy_key = dynamic_role_legacy_by_key.get(role)
 
         for m in members:
             # If we have a computed dynamic-eligibility set, only consider members
@@ -2349,6 +2355,7 @@ def get_eligible_members_for_slot(request):
                 ("towpilot", "towpilot_percent"),
                 ("commercial_pilot", "commercial_pilot_percent"),
             ]
+            percent_field_by_role = {r: field for r, field in percent_fields}
             effective_role_for_flag = dynamic_role_legacy_key or role
             eligible_role_fields = [
                 field
@@ -2356,11 +2363,7 @@ def get_eligible_members_for_slot(request):
                 if (
                     _is_commercial_pilot_qualified(m)
                     if r == "commercial_pilot"
-                    else getattr(
-                        m,
-                        effective_role_for_flag if role in enabled_dynamic_roles else r,
-                        False,
-                    )
+                    else getattr(m, r, False)
                 )
             ]
 
@@ -2371,10 +2374,11 @@ def get_eligible_members_for_slot(request):
                     pct = 100
             else:
                 all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-                if role == "assistant_duty_officer":
-                    pct = p.ado_percent if not all_zero else 100
-                else:
-                    pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+                target_field = percent_field_by_role.get(
+                    effective_role_for_flag,
+                    f"{effective_role_for_flag}_percent",
+                )
+                pct = getattr(p, target_field, 0) if not all_zero else 100
 
             if pct == 0:
                 continue
@@ -2455,13 +2459,19 @@ def update_roster_slot(request):
         # If dynamic roles are enabled, consult RoleResolutionService which
         # applies qualification requirements and legacy fallbacks.
         role_service = RoleResolutionService(site_configuration=site_config)
-        enabled_dynamic_roles = (
-            set(role_service.get_enabled_roles())
-            if site_config and site_config.enable_dynamic_duty_roles
-            else set()
-        )
+        dynamic_role_keys = set()
+        dynamic_role_legacy_by_key = {}
+        if site_config and site_config.enable_dynamic_duty_roles:
+            dynamic_role_rows = DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+            ).values("key", "legacy_role_key")
+            dynamic_role_keys = {row["key"] for row in dynamic_role_rows}
+            dynamic_role_legacy_by_key = {
+                row["key"]: row["legacy_role_key"] for row in dynamic_role_rows
+            }
 
-        if role in enabled_dynamic_roles:
+        if role in dynamic_role_keys:
             if not role_service.is_member_eligible(member, role):
                 return JsonResponse(
                     {"error": "Member not eligible for this role"},
@@ -2516,6 +2526,12 @@ def update_roster_slot(request):
                 ("towpilot", "towpilot_percent"),
                 ("commercial_pilot", "commercial_pilot_percent"),
             ]
+            percent_field_by_role = {r: field for r, field in percent_fields}
+            effective_role_for_flag = (
+                dynamic_role_legacy_by_key.get(role)
+                if role in dynamic_role_keys
+                else role
+            )
             eligible_role_fields = [
                 field
                 for r, field in percent_fields
@@ -2533,10 +2549,11 @@ def update_roster_slot(request):
                     pct = 100  # Single role, treat 0 as 100
             else:
                 all_zero = all(getattr(pref, f, 0) == 0 for f in eligible_role_fields)
-                if role == "assistant_duty_officer":
-                    pct = pref.ado_percent if not all_zero else 100
-                else:
-                    pct = getattr(pref, f"{role}_percent", 0) if not all_zero else 100
+                target_field = percent_field_by_role.get(
+                    effective_role_for_flag,
+                    f"{effective_role_for_flag}_percent",
+                )
+                pct = getattr(pref, target_field, 0) if not all_zero else 100
 
             if pct == 0:
                 return JsonResponse(
