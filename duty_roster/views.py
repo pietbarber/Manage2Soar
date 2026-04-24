@@ -220,13 +220,51 @@ def blackout_manage(request):
     ]
 
     site_config = SiteConfiguration.objects.first()
+    dynamic_mode_enabled = bool(site_config and site_config.enable_dynamic_duty_roles)
+    dynamic_roles_by_legacy = {}
+    if dynamic_mode_enabled:
+        for role_def in DutyRoleDefinition.objects.filter(
+            site_configuration=site_config,
+            is_active=True,
+            legacy_role_key__isnull=False,
+        ).exclude(legacy_role_key=""):
+            dynamic_roles_by_legacy.setdefault(role_def.legacy_role_key, []).append(
+                role_def.display_name
+            )
+
+    def _is_role_scheduled(legacy_role_key, legacy_schedule_flag):
+        if dynamic_mode_enabled:
+            return bool(dynamic_roles_by_legacy.get(legacy_role_key))
+        if site_config is None:
+            return True
+        return bool(legacy_schedule_flag)
+
+    def _role_label_with_dynamic_variants(legacy_role_key, default_label):
+        base_label = get_role_title(legacy_role_key) or default_label
+        variants = dynamic_roles_by_legacy.get(legacy_role_key, [])
+        if variants:
+            seen = set()
+            deduped = [v for v in variants if not (v in seen or seen.add(v))]
+            return f"{base_label} ({', '.join(deduped)})"
+        return base_label
+
     role_schedule_flags = {
-        "instructor": bool(site_config and site_config.schedule_instructors),
-        "duty_officer": bool(site_config and site_config.schedule_duty_officers),
-        "ado": bool(site_config and site_config.schedule_assistant_duty_officers),
-        "towpilot": bool(site_config and site_config.schedule_tow_pilots),
-        "commercial_pilot": bool(
-            site_config and site_config.schedule_commercial_pilots
+        "instructor": _is_role_scheduled(
+            "instructor", site_config and site_config.schedule_instructors
+        ),
+        "duty_officer": _is_role_scheduled(
+            "duty_officer", site_config and site_config.schedule_duty_officers
+        ),
+        "ado": _is_role_scheduled(
+            "assistant_duty_officer",
+            site_config and site_config.schedule_assistant_duty_officers,
+        ),
+        "towpilot": _is_role_scheduled(
+            "towpilot", site_config and site_config.schedule_tow_pilots
+        ),
+        "commercial_pilot": _is_role_scheduled(
+            "commercial_pilot",
+            site_config and site_config.schedule_commercial_pilots,
         ),
     }
     scheduled_roles_for_form = {
@@ -242,20 +280,35 @@ def blackout_manage(request):
 
     role_choices = []
     if member.instructor and role_schedule_flags["instructor"]:
-        role_choices.append(("instructor", "Flight Instructor"))
+        role_choices.append(
+            (
+                "instructor",
+                _role_label_with_dynamic_variants("instructor", "Instructor"),
+            )
+        )
     if member.duty_officer and role_schedule_flags["duty_officer"]:
         role_choices.append(
-            ("duty_officer", get_role_title("duty_officer") or "Duty Officer")
+            (
+                "duty_officer",
+                _role_label_with_dynamic_variants("duty_officer", "Duty Officer"),
+            )
         )
     if member.assistant_duty_officer and role_schedule_flags["ado"]:
         role_choices.append(
             (
                 "ado",
-                get_role_title("assistant_duty_officer") or "Assistant Duty Officer",
+                _role_label_with_dynamic_variants(
+                    "assistant_duty_officer", "Assistant Duty Officer"
+                ),
             )
         )
     if member.towpilot and role_schedule_flags["towpilot"]:
-        role_choices.append(("towpilot", "Tow Pilot"))
+        role_choices.append(
+            (
+                "towpilot",
+                _role_label_with_dynamic_variants("towpilot", "Tow Pilot"),
+            )
+        )
     if (
         _is_commercial_pilot_qualified(member)
         and role_schedule_flags["commercial_pilot"]
@@ -263,7 +316,9 @@ def blackout_manage(request):
         role_choices.append(
             (
                 "commercial_pilot",
-                get_role_title("commercial_pilot") or "Commercial Pilot",
+                _role_label_with_dynamic_variants(
+                    "commercial_pilot", "Commercial Pilot"
+                ),
             )
         )
     shown_roles = [role for role, _label in role_choices]
@@ -3203,6 +3258,27 @@ def duty_delinquents_detail(request):
         .distinct()
     )
 
+    site_config = SiteConfiguration.objects.first()
+    role_service = RoleResolutionService(site_configuration=site_config)
+    enabled_role_keys = role_service.get_enabled_roles()
+    role_definitions_by_key = {}
+    if site_config and site_config.enable_dynamic_duty_roles and enabled_role_keys:
+        role_definitions_by_key = {
+            role_def.key: role_def
+            for role_def in DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+                key__in=enabled_role_keys,
+            )
+        }
+    eligible_member_ids_by_role = {
+        role_key: role_service.get_eligible_member_ids(
+            role_key,
+            members_queryset=active_flyers,
+        )
+        for role_key in enabled_role_keys
+    }
+
     # Step 3: Build detailed report for each active flyer
     duty_delinquents = []
 
@@ -3229,16 +3305,20 @@ def duty_delinquents_detail(request):
                 .first()
             )
 
-            # Get member's roles
+            # Derive eligible roles from configured enabled roles.
             roles = []
-            if member.duty_officer:
-                roles.append("Duty Officer")
-            if member.assistant_duty_officer:
-                roles.append("Assistant Duty Officer")
-            if member.instructor:
-                roles.append("Instructor")
-            if member.towpilot:
-                roles.append("Tow Pilot")
+            for role_key in enabled_role_keys:
+                if member.id not in eligible_member_ids_by_role.get(role_key, set()):
+                    continue
+
+                dynamic_definition = role_definitions_by_key.get(role_key)
+                role_label = (
+                    dynamic_definition.display_name
+                    if dynamic_definition and dynamic_definition.display_name
+                    else role_service.get_role_label(role_key)
+                )
+                if role_label and role_label not in roles:
+                    roles.append(role_label)
 
             # Get blackout information (current and recent)
             current_blackouts = MemberBlackout.objects.filter(
