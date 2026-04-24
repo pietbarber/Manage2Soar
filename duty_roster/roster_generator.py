@@ -628,7 +628,19 @@ def _generate_roster_legacy(
 
     def _role_percent_field(role):
         basis_role = role_percent_basis.get(role, role)
-        return PERCENT_FIELDS.get(basis_role, f"{basis_role}_percent")
+        mapped_field = PERCENT_FIELDS.get(basis_role)
+        if mapped_field:
+            return mapped_field
+        field_name = f"{basis_role}_percent"
+        return field_name if hasattr(DutyPreference, field_name) else None
+
+    def _role_percent_value(pref, role, all_zero):
+        if all_zero:
+            return 100
+        field_name = _role_percent_field(role)
+        if not field_name:
+            return 100
+        return getattr(pref, field_name, 0)
 
     actual_percent_basis_roles = sorted(set(role_percent_basis.values()))
 
@@ -636,7 +648,9 @@ def _generate_roster_legacy(
         fields = []
         for basis_role in actual_percent_basis_roles:
             if _member_has_role(member, basis_role):
-                fields.append(_role_percent_field(basis_role))
+                field_name = _role_percent_field(basis_role)
+                if field_name:
+                    fields.append(field_name)
         # Keep deterministic order for diagnostics/behavior.
         return sorted(set(fields))
 
@@ -748,7 +762,7 @@ def _generate_roster_legacy(
                 pct = 100
         else:
             all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-            pct = getattr(p, _role_percent_field(role), 0) if not all_zero else 100
+            pct = _role_percent_value(p, role, all_zero)
             if all_zero:
                 logger.debug(
                     f"{m.full_display_name}: All eligible role percents are zero, treating {role} as 100%."
@@ -787,7 +801,7 @@ def _generate_roster_legacy(
                     base = 100
             else:
                 all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-                base = getattr(p, _role_percent_field(role), 0) if not all_zero else 100
+                base = _role_percent_value(p, role, all_zero)
             w = base
             for o in assigned:
                 if o.id in pairings.get(m.id, set()) or m.id in pairings.get(
@@ -846,11 +860,7 @@ def _generate_roster_legacy(
                         all_zero = all(
                             getattr(p, f, 0) == 0 for f in eligible_role_fields
                         )
-                        pct = (
-                            getattr(p, _role_percent_field(role), 0)
-                            if not all_zero
-                            else 100
-                        )
+                        pct = _role_percent_value(p, role, all_zero)
                     if pct == 0:
                         continue
 

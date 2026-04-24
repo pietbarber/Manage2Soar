@@ -10,7 +10,7 @@ Tests cover:
 """
 
 from datetime import date, timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 
@@ -1487,27 +1487,26 @@ class ORToolsEdgeCasesTests(TestCase):
             earliest_duty_day=date(2026, 4, 1),
         )
 
-        strict_scheduler = mock_scheduler_cls.return_value
-        relaxed_scheduler = mock_scheduler_cls.return_value
+        strict_scheduler = MagicMock()
+        relaxed_scheduler = MagicMock()
+        mock_scheduler_cls.side_effect = [strict_scheduler, relaxed_scheduler]
 
-        strict_scheduler.solve.side_effect = [
-            {
-                "status": "INFEASIBLE",
-                "schedule": [],
-                "diagnostics": {"infeasible_hints": []},
-            },
-            {
-                "status": "FEASIBLE",
-                "schedule": [
-                    {
-                        "date": date(2026, 4, 5),
-                        "slots": {"instructor": 1},
-                        "diagnostics": {"instructor": None},
-                    }
-                ],
-                "diagnostics": {"infeasible_hints": []},
-            },
-        ]
+        strict_scheduler.solve.return_value = {
+            "status": "INFEASIBLE",
+            "schedule": [],
+            "diagnostics": {"infeasible_hints": []},
+        }
+        relaxed_scheduler.solve.return_value = {
+            "status": "FEASIBLE",
+            "schedule": [
+                {
+                    "date": date(2026, 4, 5),
+                    "slots": {"instructor": 1},
+                    "diagnostics": {"instructor": None},
+                }
+            ],
+            "diagnostics": {"infeasible_hints": []},
+        }
 
         schedule = generate_roster_ortools(year=2026, month=4, roles=["instructor"])
 

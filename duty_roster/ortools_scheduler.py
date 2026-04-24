@@ -242,8 +242,13 @@ class DutyRosterScheduler:
             "commercial_pilot": "commercial_pilot_percent",
         }
         percent_basis_role = self.data.role_percent_basis.get(role, role)
-        field_name = field_map.get(percent_basis_role, f"{percent_basis_role}_percent")
-        return getattr(pref, field_name, 0)
+        mapped_field = field_map.get(percent_basis_role)
+        if mapped_field:
+            return getattr(pref, mapped_field, 0)
+        field_name = f"{percent_basis_role}_percent"
+        if hasattr(pref, field_name):
+            return getattr(pref, field_name, 0)
+        return 100
 
     def _is_member_eligible_for_role(self, member: Member, role: str) -> bool:
         """Check member eligibility for legacy and dynamic roles.

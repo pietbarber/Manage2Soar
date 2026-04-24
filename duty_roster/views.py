@@ -221,11 +221,15 @@ def blackout_manage(request):
 
     site_config = SiteConfiguration.objects.first()
     dynamic_mode_enabled = bool(site_config and site_config.enable_dynamic_duty_roles)
+    has_active_dynamic_role_definitions = False
     dynamic_roles_by_legacy = {}
     if dynamic_mode_enabled:
-        for role_def in DutyRoleDefinition.objects.filter(
+        active_dynamic_roles = DutyRoleDefinition.objects.filter(
             site_configuration=site_config,
             is_active=True,
+        )
+        has_active_dynamic_role_definitions = active_dynamic_roles.exists()
+        for role_def in active_dynamic_roles.filter(
             legacy_role_key__isnull=False,
         ).exclude(legacy_role_key=""):
             dynamic_roles_by_legacy.setdefault(role_def.legacy_role_key, []).append(
@@ -233,7 +237,7 @@ def blackout_manage(request):
             )
 
     def _is_role_scheduled(legacy_role_key, legacy_schedule_flag):
-        if dynamic_mode_enabled:
+        if dynamic_mode_enabled and has_active_dynamic_role_definitions:
             return bool(dynamic_roles_by_legacy.get(legacy_role_key))
         if site_config is None:
             return True
@@ -2378,7 +2382,12 @@ def get_eligible_members_for_slot(request):
                     effective_role_for_flag,
                     f"{effective_role_for_flag}_percent",
                 )
-                pct = getattr(p, target_field, 0) if not all_zero else 100
+                if all_zero:
+                    pct = 100
+                elif hasattr(p, target_field):
+                    pct = getattr(p, target_field, 0)
+                else:
+                    pct = 100
 
             if pct == 0:
                 continue
@@ -2527,10 +2536,16 @@ def update_roster_slot(request):
                 ("commercial_pilot", "commercial_pilot_percent"),
             ]
             percent_field_by_role = {r: field for r, field in percent_fields}
+            role_key_for_lookup = role if isinstance(role, str) else str(role)
+            effective_role_for_flag_obj = (
+                dynamic_role_legacy_by_key.get(role_key_for_lookup)
+                if role_key_for_lookup in dynamic_role_keys
+                else role_key_for_lookup
+            )
             effective_role_for_flag = (
-                dynamic_role_legacy_by_key.get(role)
-                if role in dynamic_role_keys
-                else role
+                effective_role_for_flag_obj
+                if isinstance(effective_role_for_flag_obj, str)
+                else role_key_for_lookup
             )
             eligible_role_fields = [
                 field
@@ -2553,7 +2568,12 @@ def update_roster_slot(request):
                     effective_role_for_flag,
                     f"{effective_role_for_flag}_percent",
                 )
-                pct = getattr(pref, target_field, 0) if not all_zero else 100
+                if all_zero:
+                    pct = 100
+                elif hasattr(pref, target_field):
+                    pct = getattr(pref, target_field, 0)
+                else:
+                    pct = 100
 
             if pct == 0:
                 return JsonResponse(
