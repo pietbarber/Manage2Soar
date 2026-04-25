@@ -1730,3 +1730,27 @@ class ORToolsDynamicRoleSupportTests(TestCase):
         for day_schedule in schedule:
             assigned_member_id = day_schedule["slots"].get("am_tow")
             self.assertIn(assigned_member_id, {self.member1.id, self.member2.id})
+
+    def test_dynamic_subset_respects_explicit_zero_percent_preference(self):
+        member = Member.objects.create(
+            username="dynamic_tow_with_other_capability",
+            email="dynamic_tow_with_other_capability@test.com",
+            first_name="Dynamic",
+            last_name="TowInstructor",
+            membership_status="Full Member",
+            towpilot=True,
+            instructor=True,
+            is_active=True,
+        )
+        pref = DutyPreference.objects.create(
+            member=member,
+            towpilot_percent=0,
+            instructor_percent=100,
+            max_assignments_per_month=8,
+        )
+
+        data = extract_scheduling_data(year=2026, month=4, roles=["am_tow"])
+        scheduler = DutyRosterScheduler(data)
+
+        self.assertFalse(scheduler._is_role_allowed(member, "am_tow", pref))
+        self.assertEqual(scheduler._calculate_preference_weight(member, "am_tow"), 0)

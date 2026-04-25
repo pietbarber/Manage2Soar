@@ -244,7 +244,17 @@ def calculate_assignment_cap(
     return int(raw_total.to_integral_value(rounding=ROUND_CEILING))
 
 
-def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
+def calculate_role_scarcity(
+    members,
+    prefs,
+    blackouts,
+    weekend_dates,
+    role,
+    *,
+    role_eligibility_fn=None,
+    eligible_percent_fields_fn=None,
+    role_percent_value_fn=None,
+):
     """
     Calculate scarcity score for a role based on actual availability.
 
@@ -272,8 +282,34 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
             "availability_by_day": [],
         }
 
+    role_eligibility_fn = role_eligibility_fn or _member_has_role
+
+    resolved_eligible_percent_fields_fn = eligible_percent_fields_fn
+    if resolved_eligible_percent_fields_fn is None:
+
+        def default_eligible_percent_fields_fn(member):
+            return [
+                field
+                for r, field in PERCENT_FIELDS.items()
+                if _member_has_role(member, r)
+            ]
+
+        resolved_eligible_percent_fields_fn = default_eligible_percent_fields_fn
+
+    resolved_role_percent_value_fn = role_percent_value_fn
+    if resolved_role_percent_value_fn is None:
+
+        def default_role_percent_value_fn(pref, role_name, all_zero):
+            if all_zero:
+                return 100
+            return getattr(
+                pref, PERCENT_FIELDS.get(role_name, f"{role_name}_percent"), 0
+            )
+
+        resolved_role_percent_value_fn = default_role_percent_value_fn
+
     # Count total members with this role
-    total_with_role = sum(1 for m in members if _member_has_role(m, role))
+    total_with_role = sum(1 for m in members if role_eligibility_fn(m, role))
 
     # Count available members for each day
     availability_by_day = []
@@ -281,7 +317,7 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
         available_count = 0
         for m in members:
             # Check if member has the role flag
-            if not _member_has_role(m, role):
+            if not role_eligibility_fn(m, role):
                 continue
 
             # Check DutyPreference constraints
@@ -300,11 +336,7 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
             # Only check percentages if member has DutyPreference
             if p:
                 # Get all eligible role fields for this member
-                eligible_role_fields = [
-                    field
-                    for r, field in PERCENT_FIELDS.items()
-                    if _member_has_role(m, r)
-                ]
+                eligible_role_fields = resolved_eligible_percent_fields_fn(m)
 
                 # Determine if percentage is blocking
                 if len(eligible_role_fields) == 1:
@@ -316,11 +348,7 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
                 else:
                     # Multiple roles - check if all are zero
                     all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-                    pct = (
-                        getattr(p, PERCENT_FIELDS.get(role, f"{role}_percent"), 0)
-                        if not all_zero
-                        else 100
-                    )
+                    pct = resolved_role_percent_value_fn(p, role, all_zero)
 
                 if pct == 0:
                     continue  # Skip if percentage explicitly set to 0
@@ -818,63 +846,20 @@ def _generate_roster_legacy(
         )
         return chosen
 
-    # Calculate role scarcity and prioritize most constrained roles first
-    role_scarcity = {}
-    for role in roles_to_schedule:
-        if not weekend_dates:
-            role_scarcity[role] = {
-                "total_members": 0,
-                "avg_available_per_day": 0,
-                "scarcity_score": float("inf"),
-                "availability_by_day": [],
-            }
-            continue
-
-        total_with_role = sum(1 for m in members if _member_has_scheduled_role(m, role))
-        availability_by_day = []
-
-        for day in weekend_dates:
-            available_count = 0
-            for m in members:
-                if not _member_has_scheduled_role(m, role):
-                    continue
-
-                p = prefs.get(m.id)
-                if p and (p.dont_schedule or p.scheduling_suspended):
-                    continue
-                if (m.id, day) in blackouts:
-                    continue
-
-                if p:
-                    eligible_role_fields = _eligible_percent_fields(m)
-                    if len(eligible_role_fields) == 1:
-                        field = eligible_role_fields[0]
-                        pct = getattr(p, field, 0)
-                        if pct == 0:
-                            pct = 100
-                    else:
-                        all_zero = all(
-                            getattr(p, f, 0) == 0 for f in eligible_role_fields
-                        )
-                        pct = _role_percent_value(p, role, all_zero)
-                    if pct == 0:
-                        continue
-
-                available_count += 1
-
-            availability_by_day.append(available_count)
-
-        avg_available = (
-            sum(availability_by_day) / len(availability_by_day)
-            if availability_by_day
-            else 0
+    # Calculate role scarcity and prioritize most constrained roles first.
+    role_scarcity = {
+        role: calculate_role_scarcity(
+            members,
+            prefs,
+            blackouts,
+            weekend_dates,
+            role,
+            role_eligibility_fn=_member_has_scheduled_role,
+            eligible_percent_fields_fn=_eligible_percent_fields,
+            role_percent_value_fn=_role_percent_value,
         )
-        role_scarcity[role] = {
-            "total_members": total_with_role,
-            "avg_available_per_day": avg_available,
-            "scarcity_score": avg_available,
-            "availability_by_day": availability_by_day,
-        }
+        for role in roles_to_schedule
+    }
 
     # Sort roles by scarcity score (lowest = most constrained = highest priority)
     prioritized_roles = sorted(

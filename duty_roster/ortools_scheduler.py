@@ -64,6 +64,14 @@ MAX_WEEKEND_SPACING_PAIR_TERMS = 1200
 # can dominate solve time.
 MAX_WEEKEND_SPACING_DECISION_VARS = 500
 
+ROLE_PERCENT_FIELD_MAP = {
+    "instructor": "instructor_percent",
+    "towpilot": "towpilot_percent",
+    "duty_officer": "duty_officer_percent",
+    "assistant_duty_officer": "ado_percent",
+    "commercial_pilot": "commercial_pilot_percent",
+}
+
 
 @dataclass
 class SchedulingData:
@@ -205,10 +213,9 @@ class DutyRosterScheduler:
         # Get percent for this role
         percent = self._get_role_percent(pref, role)
 
-        # Determine eligible roles for member
-        eligible_roles = [
-            r for r in self.data.roles if self._is_member_eligible_for_role(member, r)
-        ]
+        # Determine member's full percent-basis capabilities, not just the
+        # currently scheduled role subset.
+        eligible_roles = self._get_member_eligible_percent_roles(member)
 
         if len(eligible_roles) == 1:
             # Single role: treat 0% as 100% (override logic)
@@ -234,21 +241,45 @@ class DutyRosterScheduler:
         Returns:
             Preference percentage (0-100)
         """
-        field_map = {
-            "instructor": "instructor_percent",
-            "towpilot": "towpilot_percent",
-            "duty_officer": "duty_officer_percent",
-            "assistant_duty_officer": "ado_percent",
-            "commercial_pilot": "commercial_pilot_percent",
-        }
         percent_basis_role = self.data.role_percent_basis.get(role, role)
-        mapped_field = field_map.get(percent_basis_role)
+        mapped_field = ROLE_PERCENT_FIELD_MAP.get(percent_basis_role)
         if mapped_field:
             return getattr(pref, mapped_field, 0)
         field_name = f"{percent_basis_role}_percent"
         if hasattr(pref, field_name):
             return getattr(pref, field_name, 0)
         return 100
+
+    def _get_member_eligible_percent_roles(self, member: Member) -> list[str]:
+        """Return full percent-basis roles applicable to this member.
+
+        This intentionally considers all legacy percent-bearing capabilities,
+        not only the current scheduled subset, so 0% override semantics remain
+        consistent when scheduling a subset of roles.
+        """
+        eligible_roles = [
+            role for role in ROLE_PERCENT_FIELD_MAP if _member_has_role(member, role)
+        ]
+
+        for scheduled_role in self.data.roles:
+            if not self._is_member_eligible_for_role(member, scheduled_role):
+                continue
+            percent_basis_role = self.data.role_percent_basis.get(
+                scheduled_role, scheduled_role
+            )
+            if (
+                percent_basis_role in ROLE_PERCENT_FIELD_MAP
+                and percent_basis_role not in eligible_roles
+            ):
+                eligible_roles.append(percent_basis_role)
+
+        if not eligible_roles:
+            return [
+                role
+                for role in self.data.roles
+                if self._is_member_eligible_for_role(member, role)
+            ]
+        return eligible_roles
 
     def _is_member_eligible_for_role(self, member: Member, role: str) -> bool:
         """Check member eligibility for legacy and dynamic roles.
@@ -390,7 +421,7 @@ class DutyRosterScheduler:
         historical behavior for weekend rosters where the next duty day may be
         several calendar days later (for example Sunday -> next Saturday).
         """
-        sorted_days = list(self.data.duty_days)
+        sorted_days = sorted(set(self.data.duty_days))
         role_candidates_by_day = {
             role: {
                 day: [m.id for m in self.data.members if (m.id, role, day) in self.x]
@@ -919,10 +950,8 @@ class DutyRosterScheduler:
 
         percent = self._get_role_percent(pref, role)
 
-        # Determine eligible roles for member
-        eligible_roles = [
-            r for r in self.data.roles if self._is_member_eligible_for_role(member, r)
-        ]
+        # Determine full percent-basis roles for member, not just scheduled subset.
+        eligible_roles = self._get_member_eligible_percent_roles(member)
 
         if len(eligible_roles) == 1:
             # Single role: use 100 if percent is 0

@@ -2280,6 +2280,15 @@ def get_eligible_members_for_slot(request):
             # Derive a legacy_role_key (if any) for preference percent field lookups
             dynamic_role_legacy_key = dynamic_role_legacy_by_key.get(role)
 
+        percent_fields = [
+            ("instructor", "instructor_percent"),
+            ("duty_officer", "duty_officer_percent"),
+            ("assistant_duty_officer", "ado_percent"),
+            ("towpilot", "towpilot_percent"),
+            ("commercial_pilot", "commercial_pilot_percent"),
+        ]
+        percent_field_by_role = {r: field for r, field in percent_fields}
+
         for m in members:
             # If we have a computed dynamic-eligibility set, only consider members
             # whose IDs are included. Otherwise fall back to legacy attribute checks.
@@ -2352,14 +2361,6 @@ def get_eligible_members_for_slot(request):
 
             # Check percentage. For dynamic roles, prefer legacy role mapping
             # when determining which percent field applies (e.g. am_tow -> towpilot).
-            percent_fields = [
-                ("instructor", "instructor_percent"),
-                ("duty_officer", "duty_officer_percent"),
-                ("assistant_duty_officer", "ado_percent"),
-                ("towpilot", "towpilot_percent"),
-                ("commercial_pilot", "commercial_pilot_percent"),
-            ]
-            percent_field_by_role = {r: field for r, field in percent_fields}
             effective_role_for_flag = dynamic_role_legacy_key or role
             eligible_role_fields = [
                 field
