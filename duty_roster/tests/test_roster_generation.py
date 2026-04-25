@@ -11,6 +11,7 @@ from datetime import date, timedelta
 
 import pytest
 
+import duty_roster.roster_generator as roster_generator_module
 from duty_roster.models import DutyPreference, DutyRoleDefinition, MemberBlackout
 from duty_roster.ortools_scheduler import generate_roster_ortools
 from duty_roster.roster_generator import (
@@ -125,6 +126,56 @@ class TestRosterGenerationDefaults:
         filled_slots = sum(1 for day in roster if day.get("slots", {}).get("am_tow"))
         assert filled_slots > 0
         assert any(day["slots"].get("am_tow") == member.id for day in roster)
+
+    def test_dynamic_subset_respects_multi_role_zero_percent_preference(
+        self, monkeypatch
+    ):
+        """Scheduling a dynamic role subset should still honor explicit 0% among all role capabilities."""
+        monkeypatch.setattr(
+            roster_generator_module,
+            "is_within_operational_season",
+            lambda _check_date: True,
+        )
+
+        config = SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="example.org",
+            club_abbreviation="TC",
+            enable_dynamic_duty_roles=True,
+            use_ortools_scheduler=False,
+        )
+        DutyRoleDefinition.objects.create(
+            site_configuration=config,
+            key="am_tow",
+            display_name="AM Tow",
+            legacy_role_key="towpilot",
+            shift_code="am",
+            is_active=True,
+            sort_order=10,
+        )
+
+        member = Member.objects.create(
+            username="dynamic_subset_zero_pref",
+            email="dynamic_subset_zero_pref@test.com",
+            first_name="Subset",
+            last_name="ZeroPref",
+            towpilot=True,
+            instructor=True,
+            is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today() - timedelta(days=365),
+        )
+        DutyPreference.objects.create(
+            member=member,
+            towpilot_percent=0,
+            instructor_percent=100,
+            max_assignments_per_month=8,
+        )
+
+        roster = generate_roster(year=2026, month=4, roles=["am_tow"])
+
+        assert roster
+        assert all(day.get("slots", {}).get("am_tow") is None for day in roster)
 
 
 @pytest.mark.django_db

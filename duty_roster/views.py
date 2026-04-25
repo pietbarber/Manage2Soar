@@ -2821,7 +2821,21 @@ def propose_roster(request):
     use_ortools_scheduler = bool(siteconfig and siteconfig.use_ortools_scheduler)
     role_service = RoleResolutionService(site_configuration=siteconfig)
     enabled_roles = role_service.get_enabled_roles()
-    role_labels = {role: role_service.get_role_label(role) for role in enabled_roles}
+    dynamic_role_labels = {}
+    if siteconfig and siteconfig.enable_dynamic_duty_roles and enabled_roles:
+        dynamic_role_labels = {
+            role_def.key: role_def.display_name
+            for role_def in DutyRoleDefinition.objects.filter(
+                site_configuration=siteconfig,
+                is_active=True,
+                key__in=enabled_roles,
+            )
+            if role_def.display_name
+        }
+    role_labels = {
+        role: dynamic_role_labels.get(role) or role_service.get_role_label(role)
+        for role in enabled_roles
+    }
 
     if not enabled_roles:
         # No scheduling for this club

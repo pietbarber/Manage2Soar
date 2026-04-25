@@ -642,15 +642,11 @@ def _generate_roster_legacy(
             return 100
         return getattr(pref, field_name, 0)
 
-    actual_percent_basis_roles = sorted(set(role_percent_basis.values()))
-
     def _eligible_percent_fields(member):
         fields = []
-        for basis_role in actual_percent_basis_roles:
-            if _member_has_role(member, basis_role):
-                field_name = _role_percent_field(basis_role)
-                if field_name:
-                    fields.append(field_name)
+        for legacy_role, field_name in PERCENT_FIELDS.items():
+            if _member_has_role(member, legacy_role):
+                fields.append(field_name)
         # Keep deterministic order for diagnostics/behavior.
         return sorted(set(fields))
 
