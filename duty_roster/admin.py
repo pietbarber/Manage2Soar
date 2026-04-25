@@ -261,10 +261,27 @@ class GliderReservationAdmin(AdminHelperMixin, admin.ModelAdmin):
         return super().get_queryset(request).select_related("member", "glider")
 
 
-class DutyQualificationRequirementInline(admin.TabularInline):
+class DutyQualificationRequirementInline(admin.StackedInline):
     model = DutyQualificationRequirement
     extra = 0
-    fields = ("requirement_type", "requirement_value", "is_required", "notes")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "requirement_type",
+                    "requirement_value",
+                    "is_required",
+                    "notes",
+                ),
+                "description": (
+                    "Requirement value examples: for legacy role flags use member field names "
+                    "like 'towpilot' or 'instructor'; for glider rating use values like "
+                    "'commercial'; for member duty qualification use your qualification code."
+                ),
+            },
+        ),
+    )
 
 
 @admin.register(DutyRoleDefinition)
@@ -283,6 +300,26 @@ class DutyRoleDefinitionAdmin(AdminHelperMixin, admin.ModelAdmin):
     ordering = ("site_configuration", "sort_order", "display_name")
     autocomplete_fields = ("site_configuration",)
     inlines = (DutyQualificationRequirementInline,)
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "site_configuration",
+                    "key",
+                    "display_name",
+                    "legacy_role_key",
+                    "shift_code",
+                    "is_active",
+                    "sort_order",
+                ),
+                "description": (
+                    "Shift code conventions: use 'am' for morning, 'pm' for afternoon, "
+                    "or leave blank for all-day/non-shifted roles."
+                ),
+            },
+        ),
+    )
     admin_helper_message = (
         "<b>Dynamic Duty Roles (Prototype):</b> Define club-specific roles and optional "
         "legacy terminology mapping. These are only active when the Site Configuration "

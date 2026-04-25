@@ -5,7 +5,12 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from duty_roster.models import DutyAssignment, DutyPreference, MemberBlackout
+from duty_roster.models import (
+    DutyAssignment,
+    DutyPreference,
+    DutyRoleDefinition,
+    MemberBlackout,
+)
 from duty_roster.views import (
     _calculate_membership_duration,
     _has_performed_duty_detailed,
@@ -160,6 +165,79 @@ class DutyDelinquentsDetailViewTests(TestCase):
         # Should show roles
         self.assertContains(response, "Instructor")
         self.assertContains(response, "Tow Pilot")
+
+    def test_dynamic_enabled_uses_configured_dynamic_role_labels(self):
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.org",
+            club_abbreviation="TC",
+            enable_dynamic_duty_roles=True,
+            schedule_instructors=False,
+            schedule_tow_pilots=False,
+            schedule_duty_officers=False,
+            schedule_assistant_duty_officers=False,
+            schedule_commercial_pilots=False,
+        )
+        site_config = SiteConfiguration.objects.first()
+        assert site_config is not None
+
+        DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="am_tow",
+            display_name="AM Tow",
+            legacy_role_key="towpilot",
+            is_active=True,
+            sort_order=10,
+        )
+        DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="pm_tow",
+            display_name="PM Tow",
+            legacy_role_key="towpilot",
+            is_active=True,
+            sort_order=20,
+        )
+
+        self.client.force_login(self.rostermeister)
+        response = self.client.get(reverse("duty_roster:duty_delinquents_detail"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "AM Tow")
+        self.assertContains(response, "PM Tow")
+
+    def test_dynamic_enabled_without_commercial_role_hides_commercial_label(self):
+        self.delinquent_member.glider_rating = "commercial"
+        self.delinquent_member.save()
+
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.org",
+            club_abbreviation="TC",
+            enable_dynamic_duty_roles=True,
+            schedule_instructors=True,
+            schedule_tow_pilots=False,
+            schedule_duty_officers=False,
+            schedule_assistant_duty_officers=False,
+            schedule_commercial_pilots=True,
+        )
+        site_config = SiteConfiguration.objects.first()
+        assert site_config is not None
+
+        DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="am_instructor",
+            display_name="AM Instructor",
+            legacy_role_key="instructor",
+            is_active=True,
+            sort_order=10,
+        )
+
+        self.client.force_login(self.rostermeister)
+        response = self.client.get(reverse("duty_roster:duty_delinquents_detail"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "AM Instructor")
+        self.assertNotContains(response, "Commercial Pilot")
 
     def test_member_with_recent_duty_not_in_report(self):
         """Member who has done recent duty should not appear"""
@@ -1807,3 +1885,102 @@ class BlackoutRoleChoiceSiteConfigTests(TestCase):
         self.assertEqual(pref.instructor_percent, 0)
         self.assertEqual(pref.towpilot_percent, 0)
         self.assertContains(response, "Duty preferences saved successfully")
+
+    def test_dynamic_roles_enable_choices_even_when_legacy_schedule_flags_disabled(
+        self,
+    ):
+        self.config.schedule_instructors = False
+        self.config.schedule_tow_pilots = False
+        self.config.schedule_duty_officers = False
+        self.config.schedule_assistant_duty_officers = False
+        self.config.schedule_commercial_pilots = False
+        self.config.enable_dynamic_duty_roles = True
+        self.config.save()
+
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.config,
+            key="am_tow",
+            display_name="AM Tow",
+            legacy_role_key="towpilot",
+            is_active=True,
+            sort_order=10,
+        )
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.config,
+            key="pm_tow",
+            display_name="PM Tow",
+            legacy_role_key="towpilot",
+            is_active=True,
+            sort_order=20,
+        )
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.config,
+            key="am_instructor",
+            display_name="AM Instructor",
+            legacy_role_key="instructor",
+            is_active=True,
+            sort_order=30,
+        )
+
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("duty_roster:blackout_manage"))
+        self.assertEqual(response.status_code, 200)
+
+        role_choices = dict(response.context["role_percent_choices"])
+        self.assertIn("towpilot", role_choices)
+        self.assertIn("instructor", role_choices)
+        self.assertIn("AM Tow", role_choices["towpilot"])
+        self.assertIn("PM Tow", role_choices["towpilot"])
+        self.assertIn("AM Instructor", role_choices["instructor"])
+
+    def test_dynamic_mode_hides_commercial_when_not_configured(self):
+        self.config.enable_dynamic_duty_roles = True
+        self.config.schedule_commercial_pilots = True
+        self.config.schedule_instructors = True
+        self.config.save()
+
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.config,
+            key="am_instructor",
+            display_name="AM Instructor",
+            legacy_role_key="instructor",
+            is_active=True,
+            sort_order=10,
+        )
+
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("duty_roster:blackout_manage"))
+        self.assertEqual(response.status_code, 200)
+
+        role_keys = {role for role, _label in response.context["role_percent_choices"]}
+        self.assertIn("instructor", role_keys)
+        self.assertNotIn("commercial_pilot", role_keys)
+
+    def test_dynamic_role_variant_labels_follow_sort_order(self):
+        self.config.schedule_tow_pilots = False
+        self.config.enable_dynamic_duty_roles = True
+        self.config.save()
+
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.config,
+            key="pm_tow",
+            display_name="PM Tow",
+            legacy_role_key="towpilot",
+            is_active=True,
+            sort_order=20,
+        )
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.config,
+            key="am_tow",
+            display_name="AM Tow",
+            legacy_role_key="towpilot",
+            is_active=True,
+            sort_order=10,
+        )
+
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("duty_roster:blackout_manage"))
+        self.assertEqual(response.status_code, 200)
+
+        role_choices = dict(response.context["role_percent_choices"])
+        self.assertEqual(role_choices["towpilot"], "Tow Pilot (AM Tow, PM Tow)")

@@ -220,13 +220,55 @@ def blackout_manage(request):
     ]
 
     site_config = SiteConfiguration.objects.first()
+    dynamic_mode_enabled = bool(site_config and site_config.enable_dynamic_duty_roles)
+    has_active_dynamic_role_definitions = False
+    dynamic_roles_by_legacy = {}
+    if dynamic_mode_enabled:
+        active_dynamic_roles = DutyRoleDefinition.objects.filter(
+            site_configuration=site_config,
+            is_active=True,
+        ).order_by("sort_order", "display_name", "key")
+        has_active_dynamic_role_definitions = active_dynamic_roles.exists()
+        for role_def in active_dynamic_roles.filter(
+            legacy_role_key__isnull=False,
+        ).exclude(legacy_role_key=""):
+            dynamic_roles_by_legacy.setdefault(role_def.legacy_role_key, []).append(
+                role_def.display_name
+            )
+
+    def _is_role_scheduled(legacy_role_key, legacy_schedule_flag):
+        if dynamic_mode_enabled and has_active_dynamic_role_definitions:
+            return bool(dynamic_roles_by_legacy.get(legacy_role_key))
+        if site_config is None:
+            return True
+        return bool(legacy_schedule_flag)
+
+    def _role_label_with_dynamic_variants(legacy_role_key, default_label):
+        base_label = get_role_title(legacy_role_key) or default_label
+        variants = dynamic_roles_by_legacy.get(legacy_role_key, [])
+        if variants:
+            seen = set()
+            deduped = [v for v in variants if not (v in seen or seen.add(v))]
+            return f"{base_label} ({', '.join(deduped)})"
+        return base_label
+
     role_schedule_flags = {
-        "instructor": bool(site_config and site_config.schedule_instructors),
-        "duty_officer": bool(site_config and site_config.schedule_duty_officers),
-        "ado": bool(site_config and site_config.schedule_assistant_duty_officers),
-        "towpilot": bool(site_config and site_config.schedule_tow_pilots),
-        "commercial_pilot": bool(
-            site_config and site_config.schedule_commercial_pilots
+        "instructor": _is_role_scheduled(
+            "instructor", site_config and site_config.schedule_instructors
+        ),
+        "duty_officer": _is_role_scheduled(
+            "duty_officer", site_config and site_config.schedule_duty_officers
+        ),
+        "ado": _is_role_scheduled(
+            "assistant_duty_officer",
+            site_config and site_config.schedule_assistant_duty_officers,
+        ),
+        "towpilot": _is_role_scheduled(
+            "towpilot", site_config and site_config.schedule_tow_pilots
+        ),
+        "commercial_pilot": _is_role_scheduled(
+            "commercial_pilot",
+            site_config and site_config.schedule_commercial_pilots,
         ),
     }
     scheduled_roles_for_form = {
@@ -242,20 +284,35 @@ def blackout_manage(request):
 
     role_choices = []
     if member.instructor and role_schedule_flags["instructor"]:
-        role_choices.append(("instructor", "Flight Instructor"))
+        role_choices.append(
+            (
+                "instructor",
+                _role_label_with_dynamic_variants("instructor", "Instructor"),
+            )
+        )
     if member.duty_officer and role_schedule_flags["duty_officer"]:
         role_choices.append(
-            ("duty_officer", get_role_title("duty_officer") or "Duty Officer")
+            (
+                "duty_officer",
+                _role_label_with_dynamic_variants("duty_officer", "Duty Officer"),
+            )
         )
     if member.assistant_duty_officer and role_schedule_flags["ado"]:
         role_choices.append(
             (
                 "ado",
-                get_role_title("assistant_duty_officer") or "Assistant Duty Officer",
+                _role_label_with_dynamic_variants(
+                    "assistant_duty_officer", "Assistant Duty Officer"
+                ),
             )
         )
     if member.towpilot and role_schedule_flags["towpilot"]:
-        role_choices.append(("towpilot", "Tow Pilot"))
+        role_choices.append(
+            (
+                "towpilot",
+                _role_label_with_dynamic_variants("towpilot", "Tow Pilot"),
+            )
+        )
     if (
         _is_commercial_pilot_qualified(member)
         and role_schedule_flags["commercial_pilot"]
@@ -263,7 +320,9 @@ def blackout_manage(request):
         role_choices.append(
             (
                 "commercial_pilot",
-                get_role_title("commercial_pilot") or "Commercial Pilot",
+                _role_label_with_dynamic_variants(
+                    "commercial_pilot", "Commercial Pilot"
+                ),
             )
         )
     shown_roles = [role for role, _label in role_choices]
@@ -2074,8 +2133,17 @@ def get_eligible_members_for_slot(request):
         if not date_str or not role:
             return JsonResponse({"error": "Missing date or role"}, status=400)
 
-        # Validate role is one of the allowed role names (security)
-        if role not in ALLOWED_ROLES:
+        # Validate role is one of the allowed role names (security).
+        # If dynamic roles are enabled, include enabled dynamic role keys.
+        site_config = SiteConfiguration.objects.first()
+        allowed = set(ALLOWED_ROLES)
+        if site_config and site_config.enable_dynamic_duty_roles:
+            allowed.update(
+                RoleResolutionService(
+                    site_configuration=site_config
+                ).get_enabled_roles()
+            )
+        if role not in allowed:
             return JsonResponse({"error": "Invalid role"}, status=400)
 
         try:
@@ -2103,7 +2171,8 @@ def get_eligible_members_for_slot(request):
 
     try:
         # Get all members and prefs for eligibility checking
-        members = list(Member.objects.filter(is_active=True))
+        members_qs = Member.objects.filter(is_active=True)
+        members = list(members_qs)
         prefs = {
             p.member_id: p
             for p in DutyPreference.objects.select_related("member").all()
@@ -2185,15 +2254,58 @@ def get_eligible_members_for_slot(request):
             get_default_max_assignments_per_month(), range_months
         )
         eligible_members = []
-        for m in members:
-            # Check if member has the role flag
-            has_role = (
-                _is_commercial_pilot_qualified(m)
-                if role == "commercial_pilot"
-                else bool(getattr(m, role, False))
+
+        # If dynamic roles are enabled, precompute eligible member ids for the
+        # requested dynamic role to avoid per-member attribute checks that
+        # don't exist for dynamic keys (e.g. "am_tow"). Use RoleResolutionService
+        # which applies qualification requirements and legacy-role fallbacks.
+        role_service = RoleResolutionService(site_configuration=site_config)
+        dynamic_role_keys = set()
+        dynamic_role_legacy_by_key = {}
+        if site_config and site_config.enable_dynamic_duty_roles:
+            dynamic_role_rows = DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+            ).values("key", "legacy_role_key")
+            dynamic_role_keys = {row["key"] for row in dynamic_role_rows}
+            dynamic_role_legacy_by_key = {
+                row["key"]: row["legacy_role_key"] for row in dynamic_role_rows
+            }
+
+        dynamic_role_eligible_ids = None
+        dynamic_role_legacy_key = None
+        if role in dynamic_role_keys:
+            dynamic_role_eligible_ids = role_service.get_eligible_member_ids(
+                role, members_queryset=members_qs
             )
-            if not has_role:
-                continue
+            # Derive a legacy_role_key (if any) for preference percent field lookups
+            dynamic_role_legacy_key = dynamic_role_legacy_by_key.get(role)
+
+        percent_fields = [
+            ("instructor", "instructor_percent"),
+            ("duty_officer", "duty_officer_percent"),
+            ("assistant_duty_officer", "ado_percent"),
+            ("towpilot", "towpilot_percent"),
+            ("commercial_pilot", "commercial_pilot_percent"),
+        ]
+        percent_field_by_role = {r: field for r, field in percent_fields}
+
+        for m in members:
+            # If we have a computed dynamic-eligibility set, only consider members
+            # whose IDs are included. Otherwise fall back to legacy attribute checks.
+            if dynamic_role_eligible_ids is not None:
+                if m.id not in dynamic_role_eligible_ids:
+                    continue
+                has_role = True
+            else:
+                # Check if member has the role flag
+                has_role = (
+                    _is_commercial_pilot_qualified(m)
+                    if role == "commercial_pilot"
+                    else bool(getattr(m, role, False))
+                )
+                if not has_role:
+                    continue
 
             p = prefs.get(m.id)
 
@@ -2248,14 +2360,9 @@ def get_eligible_members_for_slot(request):
             # Check if already assigned (also show as warning)
             already_assigned = m in assigned_today
 
-            # Check percentage
-            percent_fields = [
-                ("instructor", "instructor_percent"),
-                ("duty_officer", "duty_officer_percent"),
-                ("assistant_duty_officer", "ado_percent"),
-                ("towpilot", "towpilot_percent"),
-                ("commercial_pilot", "commercial_pilot_percent"),
-            ]
+            # Check percentage. For dynamic roles, prefer legacy role mapping
+            # when determining which percent field applies (e.g. am_tow -> towpilot).
+            effective_role_for_flag = dynamic_role_legacy_key or role
             eligible_role_fields = [
                 field
                 for r, field in percent_fields
@@ -2273,10 +2380,16 @@ def get_eligible_members_for_slot(request):
                     pct = 100
             else:
                 all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-                if role == "assistant_duty_officer":
-                    pct = p.ado_percent if not all_zero else 100
+                target_field = percent_field_by_role.get(
+                    effective_role_for_flag,
+                    f"{effective_role_for_flag}_percent",
+                )
+                if all_zero:
+                    pct = 100
+                elif hasattr(p, target_field):
+                    pct = getattr(p, target_field, 0)
                 else:
-                    pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+                    pct = 100
 
             if pct == 0:
                 continue
@@ -2333,8 +2446,14 @@ def update_roster_slot(request):
     if not date_str or not role:
         return JsonResponse({"error": "Missing date or role"}, status=400)
 
-    # Validate role is one of the allowed role names (security)
-    if role not in ALLOWED_ROLES:
+    # Validate role is one of the allowed role names (security).
+    site_config = SiteConfiguration.objects.first()
+    allowed = set(ALLOWED_ROLES)
+    if site_config and site_config.enable_dynamic_duty_roles:
+        allowed.update(
+            RoleResolutionService(site_configuration=site_config).get_enabled_roles()
+        )
+    if role not in allowed:
         return JsonResponse({"error": "Invalid role"}, status=400)
 
     # Validate member exists and is eligible if provided
@@ -2348,18 +2467,40 @@ def update_roster_slot(request):
             return JsonResponse({"error": "Invalid member"}, status=400)
 
         # Enforce that the selected member is actually eligible for this role.
-        # For the allowed roles, the Member capability flag matches the role name
-        # (e.g., member.instructor, member.duty_officer, member.towpilot).
-        has_role = (
-            _is_commercial_pilot_qualified(member)
-            if role == "commercial_pilot"
-            else bool(getattr(member, role, False))
-        )
-        if not has_role:
-            return JsonResponse(
-                {"error": "Member not eligible for this role"},
-                status=400,
+        # If dynamic roles are enabled, consult RoleResolutionService which
+        # applies qualification requirements and legacy fallbacks.
+        role_service = RoleResolutionService(site_configuration=site_config)
+        dynamic_role_keys = set()
+        dynamic_role_legacy_by_key = {}
+        if site_config and site_config.enable_dynamic_duty_roles:
+            dynamic_role_rows = DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+            ).values("key", "legacy_role_key")
+            dynamic_role_keys = {row["key"] for row in dynamic_role_rows}
+            dynamic_role_legacy_by_key = {
+                row["key"]: row["legacy_role_key"] for row in dynamic_role_rows
+            }
+
+        if role in dynamic_role_keys:
+            if not role_service.is_member_eligible(member, role):
+                return JsonResponse(
+                    {"error": "Member not eligible for this role"},
+                    status=400,
+                )
+        else:
+            # For the allowed roles, the Member capability flag matches the role name
+            # (e.g., member.instructor, member.duty_officer, member.towpilot).
+            has_role = (
+                _is_commercial_pilot_qualified(member)
+                if role == "commercial_pilot"
+                else bool(getattr(member, role, False))
             )
+            if not has_role:
+                return JsonResponse(
+                    {"error": "Member not eligible for this role"},
+                    status=400,
+                )
 
         # Check active membership status
         if not member.is_active:
@@ -2396,6 +2537,18 @@ def update_roster_slot(request):
                 ("towpilot", "towpilot_percent"),
                 ("commercial_pilot", "commercial_pilot_percent"),
             ]
+            percent_field_by_role = {r: field for r, field in percent_fields}
+            role_key_for_lookup = role if isinstance(role, str) else str(role)
+            effective_role_for_flag_obj = (
+                dynamic_role_legacy_by_key.get(role_key_for_lookup)
+                if role_key_for_lookup in dynamic_role_keys
+                else role_key_for_lookup
+            )
+            effective_role_for_flag = (
+                effective_role_for_flag_obj
+                if isinstance(effective_role_for_flag_obj, str)
+                else role_key_for_lookup
+            )
             eligible_role_fields = [
                 field
                 for r, field in percent_fields
@@ -2413,10 +2566,16 @@ def update_roster_slot(request):
                     pct = 100  # Single role, treat 0 as 100
             else:
                 all_zero = all(getattr(pref, f, 0) == 0 for f in eligible_role_fields)
-                if role == "assistant_duty_officer":
-                    pct = pref.ado_percent if not all_zero else 100
+                target_field = percent_field_by_role.get(
+                    effective_role_for_flag,
+                    f"{effective_role_for_flag}_percent",
+                )
+                if all_zero:
+                    pct = 100
+                elif hasattr(pref, target_field):
+                    pct = getattr(pref, target_field, 0)
                 else:
-                    pct = getattr(pref, f"{role}_percent", 0) if not all_zero else 100
+                    pct = 100
 
             if pct == 0:
                 return JsonResponse(
@@ -2664,6 +2823,21 @@ def propose_roster(request):
     use_ortools_scheduler = bool(siteconfig and siteconfig.use_ortools_scheduler)
     role_service = RoleResolutionService(site_configuration=siteconfig)
     enabled_roles = role_service.get_enabled_roles()
+    dynamic_role_labels = {}
+    if siteconfig and siteconfig.enable_dynamic_duty_roles and enabled_roles:
+        dynamic_role_labels = {
+            role_def.key: role_def.display_name
+            for role_def in DutyRoleDefinition.objects.filter(
+                site_configuration=siteconfig,
+                is_active=True,
+                key__in=enabled_roles,
+            )
+            if role_def.display_name
+        }
+    role_labels = {
+        role: dynamic_role_labels.get(role) or role_service.get_role_label(role)
+        for role in enabled_roles
+    }
 
     if not enabled_roles:
         # No scheduling for this club
@@ -2679,6 +2853,7 @@ def propose_roster(request):
                 "month_span": month_span,
                 "incomplete": False,
                 "enabled_roles": [],
+                "role_labels": {},
                 "no_scheduling": True,
                 "use_ortools_scheduler": use_ortools_scheduler,
             },
@@ -3074,6 +3249,7 @@ def propose_roster(request):
             "month_span": display_month_span,
             "incomplete": incomplete,
             "enabled_roles": enabled_roles,
+            "role_labels": role_labels,
             "no_scheduling": False,
             "operational_info": operational_info,
             "filtered_dates": filtered_dates,
@@ -3134,6 +3310,46 @@ def duty_delinquents_detail(request):
         .filter(flight_count__gte=min_flights)
         .distinct()
     )
+    active_flyers = active_flyers.filter(is_active=True)
+
+    site_config = SiteConfiguration.objects.first()
+    role_service = RoleResolutionService(site_configuration=site_config)
+    enabled_role_keys = role_service.get_enabled_roles()
+    role_definitions_by_key = {}
+    if site_config and site_config.enable_dynamic_duty_roles and enabled_role_keys:
+        role_definitions_by_key = {
+            role_def.key: role_def
+            for role_def in DutyRoleDefinition.objects.filter(
+                site_configuration=site_config,
+                is_active=True,
+                key__in=enabled_role_keys,
+            )
+        }
+    if site_config and site_config.enable_dynamic_duty_roles:
+        eligible_member_ids_by_role = {
+            role_key: role_service.get_eligible_member_ids(
+                role_key,
+                members_queryset=active_flyers,
+            )
+            for role_key in enabled_role_keys
+        }
+    else:
+        active_flyers_list = list(active_flyers)
+        eligible_member_ids_by_role = {}
+        for role_key in enabled_role_keys:
+            if role_key == "commercial_pilot":
+                eligible_member_ids_by_role[role_key] = {
+                    member.id
+                    for member in active_flyers_list
+                    if _is_commercial_pilot_qualified(member)
+                }
+            else:
+                eligible_member_ids_by_role[role_key] = {
+                    member.id
+                    for member in active_flyers_list
+                    if bool(getattr(member, role_key, False))
+                }
+        active_flyers = active_flyers_list
 
     # Step 3: Build detailed report for each active flyer
     duty_delinquents = []
@@ -3161,16 +3377,20 @@ def duty_delinquents_detail(request):
                 .first()
             )
 
-            # Get member's roles
+            # Derive eligible roles from configured enabled roles.
             roles = []
-            if member.duty_officer:
-                roles.append("Duty Officer")
-            if member.assistant_duty_officer:
-                roles.append("Assistant Duty Officer")
-            if member.instructor:
-                roles.append("Instructor")
-            if member.towpilot:
-                roles.append("Tow Pilot")
+            for role_key in enabled_role_keys:
+                if member.id not in eligible_member_ids_by_role.get(role_key, set()):
+                    continue
+
+                dynamic_definition = role_definitions_by_key.get(role_key)
+                role_label = (
+                    dynamic_definition.display_name
+                    if dynamic_definition and dynamic_definition.display_name
+                    else role_service.get_role_label(role_key)
+                )
+                if role_label and role_label not in roles:
+                    roles.append(role_label)
 
             # Get blackout information (current and recent)
             current_blackouts = MemberBlackout.objects.filter(

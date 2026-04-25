@@ -75,6 +75,45 @@ def test_propose_roster_uses_dynamic_role_keys_when_feature_enabled(
 
 
 @pytest.mark.django_db
+def test_propose_roster_uses_dynamic_display_names_for_dynamic_keys(
+    client, rostermeister
+):
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+        towpilot_title="Tow Pilot",
+    )
+    DutyRoleDefinition.objects.create(
+        site_configuration=config,
+        key="am_tow",
+        display_name="AM Tow",
+        legacy_role_key="towpilot",
+        is_active=True,
+        sort_order=10,
+    )
+    DutyRoleDefinition.objects.create(
+        site_configuration=config,
+        key="pm_tow",
+        display_name="PM Tow",
+        legacy_role_key="towpilot",
+        is_active=True,
+        sort_order=20,
+    )
+
+    client.login(username="rm_dynamic", password="testpass123")
+    url = reverse("duty_roster:propose_roster")
+
+    with patch("duty_roster.views.generate_roster", return_value=[]):
+        response = client.get(url, {"year": 2026, "month": 3})
+
+    assert response.status_code == 200
+    assert response.context["role_labels"]["am_tow"] == "AM Tow"
+    assert response.context["role_labels"]["pm_tow"] == "PM Tow"
+
+
+@pytest.mark.django_db
 def test_propose_roster_legacy_role_discovery_unchanged_when_dynamic_disabled(
     client, rostermeister
 ):

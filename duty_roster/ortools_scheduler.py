@@ -21,14 +21,17 @@ from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
+    DutyRoleDefinition,
     MemberBlackout,
 )
 from duty_roster.roster_generator import (
     calculate_assignment_cap,
     get_default_max_assignments_per_month,
 )
+from duty_roster.utils.role_resolution import RoleResolutionService
 from duty_roster.utils.roles import member_has_role
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger("duty_roster.ortools_scheduler")
 
@@ -61,6 +64,14 @@ MAX_WEEKEND_SPACING_PAIR_TERMS = 1200
 # can dominate solve time.
 MAX_WEEKEND_SPACING_DECISION_VARS = 500
 
+ROLE_PERCENT_FIELD_MAP = {
+    "instructor": "instructor_percent",
+    "towpilot": "towpilot_percent",
+    "duty_officer": "duty_officer_percent",
+    "assistant_duty_officer": "ado_percent",
+    "commercial_pilot": "commercial_pilot_percent",
+}
+
 
 @dataclass
 class SchedulingData:
@@ -79,6 +90,8 @@ class SchedulingData:
     pairings: set[tuple[int, int]]
     role_scarcity: dict[str, dict[str, Any]]
     earliest_duty_day: date
+    role_eligible_member_ids: dict[str, set[int]] = field(default_factory=dict)
+    role_percent_basis: dict[str, str] = field(default_factory=dict)
     month_span: int = 1
     prior_assignments: dict[str, int | None] = field(default_factory=dict)
 
@@ -96,7 +109,13 @@ class DutyRosterScheduler:
         schedule = scheduler.solve()
     """
 
-    def __init__(self, data: SchedulingData):
+    def __init__(
+        self,
+        data: SchedulingData,
+        *,
+        enforce_anti_repeat: bool = True,
+        enforce_adjacent_weekend_spacing: bool = True,
+    ):
         """
         Initialize scheduler with preprocessed data.
 
@@ -104,9 +123,12 @@ class DutyRosterScheduler:
             data: SchedulingData object with all necessary scheduling information
         """
         self.data = data
+        self.enforce_anti_repeat = enforce_anti_repeat
+        self.enforce_adjacent_weekend_spacing = enforce_adjacent_weekend_spacing
         self.model = cp_model.CpModel()
         self.x = {}  # Decision variables: x[member_id, role, day] = BoolVar
         self.solver = cp_model.CpSolver()
+        self._adjacent_spacing_constraints_added = 0
 
         # Configure solver parameters
         self.solver.parameters.max_time_in_seconds = 10.0
@@ -137,7 +159,7 @@ class DutyRosterScheduler:
 
             for role in self.data.roles:
                 # Check role qualification
-                if not _member_has_role(member, role):
+                if not self._is_member_eligible_for_role(member, role):
                     continue  # Member not qualified for this role
 
                 # Check role percentage (hard constraint if 0% and not overridden)
@@ -191,8 +213,9 @@ class DutyRosterScheduler:
         # Get percent for this role
         percent = self._get_role_percent(pref, role)
 
-        # Determine eligible roles for member
-        eligible_roles = [r for r in self.data.roles if _member_has_role(member, r)]
+        # Determine member's full percent-basis capabilities, not just the
+        # currently scheduled role subset.
+        eligible_roles = self._get_member_eligible_percent_roles(member)
 
         if len(eligible_roles) == 1:
             # Single role: treat 0% as 100% (override logic)
@@ -218,15 +241,57 @@ class DutyRosterScheduler:
         Returns:
             Preference percentage (0-100)
         """
-        field_map = {
-            "instructor": "instructor_percent",
-            "towpilot": "towpilot_percent",
-            "duty_officer": "duty_officer_percent",
-            "assistant_duty_officer": "ado_percent",
-            "commercial_pilot": "commercial_pilot_percent",
-        }
-        field_name = field_map.get(role, f"{role}_percent")
-        return getattr(pref, field_name, 0)
+        percent_basis_role = self.data.role_percent_basis.get(role, role)
+        mapped_field = ROLE_PERCENT_FIELD_MAP.get(percent_basis_role)
+        if mapped_field:
+            return getattr(pref, mapped_field, 0)
+        field_name = f"{percent_basis_role}_percent"
+        if hasattr(pref, field_name):
+            return getattr(pref, field_name, 0)
+        return 100
+
+    def _get_member_eligible_percent_roles(self, member: Member) -> list[str]:
+        """Return full percent-basis roles applicable to this member.
+
+        This intentionally considers all legacy percent-bearing capabilities,
+        not only the current scheduled subset, so 0% override semantics remain
+        consistent when scheduling a subset of roles.
+        """
+        eligible_roles = [
+            role for role in ROLE_PERCENT_FIELD_MAP if _member_has_role(member, role)
+        ]
+
+        for scheduled_role in self.data.roles:
+            if not self._is_member_eligible_for_role(member, scheduled_role):
+                continue
+            percent_basis_role = self.data.role_percent_basis.get(
+                scheduled_role, scheduled_role
+            )
+            if (
+                percent_basis_role in ROLE_PERCENT_FIELD_MAP
+                and percent_basis_role not in eligible_roles
+            ):
+                eligible_roles.append(percent_basis_role)
+
+        if not eligible_roles:
+            return [
+                role
+                for role in self.data.roles
+                if self._is_member_eligible_for_role(member, role)
+            ]
+        return eligible_roles
+
+    def _is_member_eligible_for_role(self, member: Member, role: str) -> bool:
+        """Check member eligibility for legacy and dynamic roles.
+
+        For dynamic roles this uses precomputed eligible member IDs generated by
+        RoleResolutionService. For legacy roles it falls back to direct member
+        role flags via member_has_role.
+        """
+        eligible_ids = self.data.role_eligible_member_ids.get(role)
+        if eligible_ids is not None:
+            return member.id in eligible_ids
+        return _member_has_role(member, role)
 
     def _add_hard_constraints(self):
         """
@@ -256,10 +321,12 @@ class DutyRosterScheduler:
         self._add_one_assignment_per_day()
 
         # Constraint 4: Anti-repeat constraint
-        self._add_anti_repeat_constraints()
+        if self.enforce_anti_repeat:
+            self._add_anti_repeat_constraints()
 
         # Constraint 5: Adjacent-weekend spacing for members who opt out
-        self._add_adjacent_weekend_spacing_constraints()
+        if self.enforce_adjacent_weekend_spacing:
+            self._add_adjacent_weekend_spacing_constraints()
 
         # Constraint 6: Max assignments per month
         self._add_max_assignments_constraints()
@@ -354,11 +421,28 @@ class DutyRosterScheduler:
         historical behavior for weekend rosters where the next duty day may be
         several calendar days later (for example Sunday -> next Saturday).
         """
+        sorted_days = sorted(set(self.data.duty_days))
+        role_candidates_by_day = {
+            role: {
+                day: [m.id for m in self.data.members if (m.id, role, day) in self.x]
+                for day in sorted_days
+            }
+            for role in self.data.roles
+        }
+
         for member in self.data.members:
             for role in self.data.roles:
-                for i in range(len(self.data.duty_days) - 1):
-                    day1 = self.data.duty_days[i]
-                    day2 = self.data.duty_days[i + 1]
+                for i in range(len(sorted_days) - 1):
+                    day1 = sorted_days[i]
+                    day2 = sorted_days[i + 1]
+
+                    # Feasibility guard: only enforce anti-repeat when both
+                    # consecutive duty-day slots have at least two candidates.
+                    if (
+                        len(role_candidates_by_day[role].get(day1, [])) < 2
+                        or len(role_candidates_by_day[role].get(day2, [])) < 2
+                    ):
+                        continue
 
                     # Check if both variables exist in our sparse set
                     key1 = (member.id, role, day1)
@@ -398,23 +482,40 @@ class DutyRosterScheduler:
         duty_day_set = set(self.data.duty_days)
         sorted_days = sorted(duty_day_set)
 
-        for member in self.data.members:
-            if self._member_allows_weekend_double(member.id):
-                continue
+        for role in self.data.roles:
+            # Candidate pool per (role, day) from sparse decision variables.
+            role_candidates_by_day = {
+                day: [m.id for m in self.data.members if (m.id, role, day) in self.x]
+                for day in sorted_days
+            }
 
-            for role in self.data.roles:
-                for day1 in sorted_days:
-                    day2 = day1 + timedelta(days=7)
+            for day1 in sorted_days:
+                day2 = day1 + timedelta(days=7)
 
-                    # Enforce spacing whenever the same weekday exists on the adjacent weekend,
-                    # regardless of other duty days in between (e.g. Saturday/Sunday schedules).
-                    if day2 not in duty_day_set:
+                # Enforce spacing whenever the same weekday exists on the adjacent weekend,
+                # regardless of other duty days in between (e.g. Saturday/Sunday schedules).
+                if day2 not in duty_day_set:
+                    continue
+
+                # Feasibility guard: only enforce this hard spacing constraint when
+                # both adjacent same-weekday slots have at least two eligible candidates.
+                # If either side has just one candidate, hard-blocking that member can make
+                # the model infeasible, so we rely on soft spacing objective instead.
+                if (
+                    len(role_candidates_by_day.get(day1, [])) < 2
+                    or len(role_candidates_by_day.get(day2, [])) < 2
+                ):
+                    continue
+
+                for member in self.data.members:
+                    if self._member_allows_weekend_double(member.id):
                         continue
 
                     key1 = (member.id, role, day1)
                     key2 = (member.id, role, day2)
                     if key1 in self.x and key2 in self.x:
                         self.model.Add(self.x[key1] + self.x[key2] <= 1)
+                        self._adjacent_spacing_constraints_added += 1
 
     def _add_max_assignments_constraints(self):
         """
@@ -665,7 +766,7 @@ class DutyRosterScheduler:
             eligible_roles = [
                 role
                 for role in self.data.roles
-                if getattr(member, role, False)
+                if self._is_member_eligible_for_role(member, role)
                 and any((member.id, role, day) in self.x for day in self.data.duty_days)
             ]
             if len(eligible_roles) < 2:
@@ -849,8 +950,8 @@ class DutyRosterScheduler:
 
         percent = self._get_role_percent(pref, role)
 
-        # Determine eligible roles for member
-        eligible_roles = [r for r in self.data.roles if _member_has_role(member, r)]
+        # Determine full percent-basis roles for member, not just scheduled subset.
+        eligible_roles = self._get_member_eligible_percent_roles(member)
 
         if len(eligible_roles) == 1:
             # Single role: use 100 if percent is 0
@@ -941,9 +1042,14 @@ class DutyRosterScheduler:
         else:
             result["objective_value"] = None
             if result["status"] == "INFEASIBLE":
-                if self._has_adjacent_weekday_pairs() and any(
-                    not self._member_allows_weekend_double(member.id)
-                    for member in self.data.members
+                if (
+                    self.enforce_adjacent_weekend_spacing
+                    and self._adjacent_spacing_constraints_added > 0
+                    and self._has_adjacent_weekday_pairs()
+                    and any(
+                        not self._member_allows_weekend_double(member.id)
+                        for member in self.data.members
+                    )
                 ):
                     result["diagnostics"]["infeasible_hints"].append(
                         "Adjacent-weekend same-role spacing constraints may be too strict for available staffing."
@@ -1040,7 +1146,8 @@ def extract_scheduling_data(
         duty_days = [d for d in duty_days if d not in exclude_set]
 
     # Query Django ORM
-    members = list(Member.objects.filter(is_active=True))
+    active_members_qs = Member.objects.filter(is_active=True)
+    members = list(active_members_qs)
     preferences = {
         p.member_id: p for p in DutyPreference.objects.select_related("member").all()
     }
@@ -1065,13 +1172,76 @@ def extract_scheduling_data(
         a, b = sorted((member_id, pair_with_id))
         pairings.add((a, b))
 
+    # Dynamic-role compatibility mappings used by OR-Tools constraints.
+    config = SiteConfiguration.objects.first()
+    role_service = RoleResolutionService(site_configuration=config)
+    dynamic_enabled = bool(config and config.enable_dynamic_duty_roles)
+
+    role_percent_basis: dict[str, str] = {role: role for role in roles}
+    role_eligible_member_ids: dict[str, set[int]] = {}
+
+    if dynamic_enabled:
+        role_defs_by_key = {
+            role_def.key: role_def
+            for role_def in DutyRoleDefinition.objects.filter(
+                site_configuration=config,
+                is_active=True,
+                key__in=roles,
+            )
+        }
+
+        for role in roles:
+            role_def = role_defs_by_key.get(role)
+            role_percent_basis[role] = (
+                role_def.legacy_role_key
+                if role_def and role_def.legacy_role_key
+                else role
+            )
+            role_eligible_member_ids[role] = role_service.get_eligible_member_ids(
+                role,
+                members_queryset=active_members_qs,
+            )
+
     # Calculate role scarcity
     from duty_roster.roster_generator import calculate_role_scarcity
 
     role_scarcity = {}
+
+    def scarcity_role_eligibility(member, role):
+        eligible_ids = role_eligible_member_ids.get(role)
+        if eligible_ids is not None:
+            return member.id in eligible_ids
+        return _member_has_role(member, role)
+
+    def scarcity_eligible_percent_fields(member):
+        fields = []
+        for legacy_role, field_name in ROLE_PERCENT_FIELD_MAP.items():
+            if _member_has_role(member, legacy_role):
+                fields.append(field_name)
+        return sorted(set(fields))
+
+    def scarcity_role_percent_value(pref, role, all_zero):
+        if all_zero:
+            return 100
+        percent_basis_role = role_percent_basis.get(role) or role
+        mapped_field = ROLE_PERCENT_FIELD_MAP.get(percent_basis_role)
+        if mapped_field:
+            return getattr(pref, mapped_field, 0)
+        field_name = f"{percent_basis_role}_percent"
+        if hasattr(pref, field_name):
+            return getattr(pref, field_name, 0)
+        return 100
+
     for role in roles:
         scarcity_data = calculate_role_scarcity(
-            members, preferences, blackouts, duty_days, role
+            members,
+            preferences,
+            blackouts,
+            duty_days,
+            role,
+            role_eligibility_fn=scarcity_role_eligibility,
+            eligible_percent_fields_fn=scarcity_eligible_percent_fields,
+            role_percent_value_fn=scarcity_role_percent_value,
         )
         role_scarcity[role] = scarcity_data
 
@@ -1097,6 +1267,8 @@ def extract_scheduling_data(
         pairings=pairings,
         role_scarcity=role_scarcity,
         earliest_duty_day=earliest_duty_day,
+        role_eligible_member_ids=role_eligible_member_ids,
+        role_percent_basis=role_percent_basis,
         month_span=month_span,
         prior_assignments=prior_assignments,
     )
@@ -1145,9 +1317,31 @@ def generate_roster_ortools(
         end_date=end_date,
     )
 
-    # Create scheduler and solve
+    # First pass: strict model
     scheduler = DutyRosterScheduler(data)
     result = scheduler.solve(timeout_seconds=timeout_seconds)
+
+    # Second pass fallback: if strict model is infeasible, retry with repeat
+    # hard constraints relaxed to salvage a feasible OR-Tools schedule.
+    if result["status"] == "INFEASIBLE":
+        logger.warning(
+            "OR-Tools strict model infeasible; retrying with relaxed repeat constraints "
+            "(anti-repeat and adjacent-weekend spacing disabled)."
+        )
+        relaxed_scheduler = DutyRosterScheduler(
+            data,
+            enforce_anti_repeat=False,
+            enforce_adjacent_weekend_spacing=False,
+        )
+        relaxed_result = relaxed_scheduler.solve(timeout_seconds=timeout_seconds)
+        if relaxed_result["status"] in ("OPTIMAL", "FEASIBLE"):
+            logger.warning(
+                "OR-Tools recovered with relaxed repeat constraints; returning feasible schedule."
+            )
+            return relaxed_result["schedule"]
+
+        # Keep latest diagnostics for downstream error handling/logging.
+        result = relaxed_result
 
     # Check solver status
     if result["status"] not in ("OPTIMAL", "FEASIBLE"):
@@ -1156,8 +1350,8 @@ def generate_roster_ortools(
         if hints:
             hint_text = f" Hint: {hints[0]}"
 
-        logger.error(
-            f"OR-Tools scheduler failed: status={result['status']}, "
+        logger.warning(
+            f"OR-Tools scheduler found no feasible schedule: status={result['status']}, "
             f"diagnostics={result['diagnostics']}"
         )
         raise RuntimeError(
