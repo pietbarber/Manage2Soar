@@ -3310,6 +3310,7 @@ def duty_delinquents_detail(request):
         .filter(flight_count__gte=min_flights)
         .distinct()
     )
+    active_flyers = active_flyers.filter(is_active=True)
 
     site_config = SiteConfiguration.objects.first()
     role_service = RoleResolutionService(site_configuration=site_config)
@@ -3325,15 +3326,10 @@ def duty_delinquents_detail(request):
             )
         }
     if site_config and site_config.enable_dynamic_duty_roles:
-        active_flyer_ids = list(active_flyers.values_list("id", flat=True))
-        active_flyers_for_resolution = Member.objects.filter(
-            id__in=active_flyer_ids,
-            is_active=True,
-        )
         eligible_member_ids_by_role = {
             role_key: role_service.get_eligible_member_ids(
                 role_key,
-                members_queryset=active_flyers_for_resolution,
+                members_queryset=active_flyers,
             )
             for role_key in enabled_role_keys
         }
