@@ -1146,8 +1146,8 @@ def extract_scheduling_data(
         duty_days = [d for d in duty_days if d not in exclude_set]
 
     # Query Django ORM
-    members = list(Member.objects.filter(is_active=True))
     active_members_qs = Member.objects.filter(is_active=True)
+    members = list(active_members_qs)
     preferences = {
         p.member_id: p for p in DutyPreference.objects.select_related("member").all()
     }
