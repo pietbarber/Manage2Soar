@@ -309,6 +309,102 @@ def test_calendar_agenda_shows_dynamic_role_card(client):
 
 
 @pytest.mark.django_db
+def test_calendar_month_mapped_dynamic_tow_role_uses_display_name_and_tow_badge(client):
+    _ensure_full_member_status()
+
+    viewer = _make_member("dynamic_table_tow_styling_viewer")
+    dynamic_member = _make_member("dynamic_table_tow_styling_assigned")
+
+    site_config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+        towpilot_title="Tow Captain",
+    )
+    role_definition = DutyRoleDefinition.objects.create(
+        site_configuration=site_config,
+        key="am_tow",
+        display_name="AM Tow",
+        legacy_role_key="towpilot",
+        is_active=True,
+        sort_order=10,
+    )
+
+    duty_date = date.today() + timedelta(days=16)
+    assignment = DutyAssignment.objects.create(date=duty_date)
+    DutyAssignmentRole.objects.create(
+        assignment=assignment,
+        role_key="am_tow",
+        member=dynamic_member,
+        role_definition=role_definition,
+        legacy_role_key="towpilot",
+    )
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": duty_date.year, "month": duty_date.month},
+        )
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "AM Tow:" in content
+    assert "badge-tow-pilot" in content
+    assert "bi bi-airplane" in content
+
+
+@pytest.mark.django_db
+def test_calendar_agenda_mapped_dynamic_tow_role_uses_display_name_and_tow_card(client):
+    _ensure_full_member_status()
+
+    viewer = _make_member("dynamic_agenda_tow_styling_viewer")
+    dynamic_member = _make_member("dynamic_agenda_tow_styling_assigned")
+
+    site_config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        enable_dynamic_duty_roles=True,
+        towpilot_title="Tow Captain",
+    )
+    role_definition = DutyRoleDefinition.objects.create(
+        site_configuration=site_config,
+        key="am_tow",
+        display_name="AM Tow",
+        legacy_role_key="towpilot",
+        is_active=True,
+        sort_order=10,
+    )
+
+    duty_date = date.today() + timedelta(days=17)
+    assignment = DutyAssignment.objects.create(date=duty_date)
+    DutyAssignmentRole.objects.create(
+        assignment=assignment,
+        role_key="am_tow",
+        member=dynamic_member,
+        role_definition=role_definition,
+        legacy_role_key="towpilot",
+    )
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": duty_date.year, "month": duty_date.month},
+        )
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "AM Tow" in content
+    assert "bg-danger bg-opacity-10 border border-danger" in content
+    assert "bi bi-airplane me-2" in content
+
+
+@pytest.mark.django_db
 def test_calendar_day_modal_shows_dynamic_role_assignment_card_for_assigned_member(
     client,
 ):

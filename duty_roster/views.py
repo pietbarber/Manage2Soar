@@ -882,11 +882,10 @@ def duty_calendar_view(request, year=None, month=None):
         for role_key in enabled_role_keys:
             role_def = role_definitions_by_key.get(role_key)
             if role_def:
-                role_labels_by_key[role_key] = (
-                    get_role_title(role_def.legacy_role_key)
-                    if role_def.legacy_role_key
-                    else role_def.display_name
-                )
+                # Calendar month/agenda should display the configured dynamic
+                # role label (for example "AM Tow"), even when the role maps
+                # to a legacy role for eligibility.
+                role_labels_by_key[role_key] = role_def.display_name
             else:
                 role_labels_by_key[role_key] = get_role_title(role_key)
     dynamic_role_assignments_by_date = {
