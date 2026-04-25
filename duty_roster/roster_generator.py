@@ -624,6 +624,7 @@ def _generate_roster_legacy(
     role_service = RoleResolutionService(site_configuration=site_config)
     role_percent_basis = {role: role for role in roles_to_schedule}
     role_eligible_member_ids = {}
+    active_members_qs = Member.objects.filter(is_active=True)
 
     if site_config and site_config.enable_dynamic_duty_roles:
         role_defs_by_key = {
@@ -634,8 +635,6 @@ def _generate_roster_legacy(
                 key__in=roles_to_schedule,
             )
         }
-        active_members_qs = Member.objects.filter(is_active=True)
-
         for role in roles_to_schedule:
             role_def = role_defs_by_key.get(role)
             role_percent_basis[role] = (
@@ -701,7 +700,7 @@ def _generate_roster_legacy(
                 f"Excluded {excluded_count} user-removed dates from roster generation: "
                 f"{sorted(exclude_set)}"
             )
-    members = list(Member.objects.filter(is_active=True))
+    members = list(active_members_qs)
     prefs = {
         p.member_id: p for p in DutyPreference.objects.select_related("member").all()
     }

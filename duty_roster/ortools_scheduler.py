@@ -1206,9 +1206,42 @@ def extract_scheduling_data(
     from duty_roster.roster_generator import calculate_role_scarcity
 
     role_scarcity = {}
+
+    def scarcity_role_eligibility(member, role):
+        eligible_ids = role_eligible_member_ids.get(role)
+        if eligible_ids is not None:
+            return member.id in eligible_ids
+        return _member_has_role(member, role)
+
+    def scarcity_eligible_percent_fields(member):
+        fields = []
+        for legacy_role, field_name in ROLE_PERCENT_FIELD_MAP.items():
+            if _member_has_role(member, legacy_role):
+                fields.append(field_name)
+        return sorted(set(fields))
+
+    def scarcity_role_percent_value(pref, role, all_zero):
+        if all_zero:
+            return 100
+        percent_basis_role = role_percent_basis.get(role) or role
+        mapped_field = ROLE_PERCENT_FIELD_MAP.get(percent_basis_role)
+        if mapped_field:
+            return getattr(pref, mapped_field, 0)
+        field_name = f"{percent_basis_role}_percent"
+        if hasattr(pref, field_name):
+            return getattr(pref, field_name, 0)
+        return 100
+
     for role in roles:
         scarcity_data = calculate_role_scarcity(
-            members, preferences, blackouts, duty_days, role
+            members,
+            preferences,
+            blackouts,
+            duty_days,
+            role,
+            role_eligibility_fn=scarcity_role_eligibility,
+            eligible_percent_fields_fn=scarcity_eligible_percent_fields,
+            role_percent_value_fn=scarcity_role_percent_value,
         )
         role_scarcity[role] = scarcity_data
 

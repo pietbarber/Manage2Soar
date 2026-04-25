@@ -2171,7 +2171,8 @@ def get_eligible_members_for_slot(request):
 
     try:
         # Get all members and prefs for eligibility checking
-        members = list(Member.objects.filter(is_active=True))
+        members_qs = Member.objects.filter(is_active=True)
+        members = list(members_qs)
         prefs = {
             p.member_id: p
             for p in DutyPreference.objects.select_related("member").all()
@@ -2275,7 +2276,7 @@ def get_eligible_members_for_slot(request):
         dynamic_role_legacy_key = None
         if role in dynamic_role_keys:
             dynamic_role_eligible_ids = role_service.get_eligible_member_ids(
-                role, members_queryset=Member.objects.filter(is_active=True)
+                role, members_queryset=members_qs
             )
             # Derive a legacy_role_key (if any) for preference percent field lookups
             dynamic_role_legacy_key = dynamic_role_legacy_by_key.get(role)

@@ -1707,13 +1707,18 @@ class ORToolsDynamicRoleSupportTests(TestCase):
         DutyPreference.objects.create(member=self.member1, max_assignments_per_month=8)
         DutyPreference.objects.create(member=self.member2, max_assignments_per_month=8)
 
-    def test_extract_data_maps_dynamic_role_to_legacy_percent_basis(self):
+    @patch("duty_roster.roster_generator.is_within_operational_season")
+    def test_extract_data_maps_dynamic_role_to_legacy_percent_basis(
+        self, mock_in_season
+    ):
+        mock_in_season.return_value = True
         data = extract_scheduling_data(year=2026, month=4, roles=["am_tow"])
 
         self.assertEqual(data.role_percent_basis["am_tow"], "towpilot")
         self.assertIn("am_tow", data.role_eligible_member_ids)
         self.assertIn(self.member1.id, data.role_eligible_member_ids["am_tow"])
         self.assertIn(self.member2.id, data.role_eligible_member_ids["am_tow"])
+        self.assertEqual(data.role_scarcity["am_tow"]["total_members"], 2)
 
     @patch("duty_roster.roster_generator.is_within_operational_season")
     def test_generate_roster_ortools_fills_dynamic_tow_slots(self, mock_in_season):
