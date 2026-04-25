@@ -1955,3 +1955,32 @@ class BlackoutRoleChoiceSiteConfigTests(TestCase):
         role_keys = {role for role, _label in response.context["role_percent_choices"]}
         self.assertIn("instructor", role_keys)
         self.assertNotIn("commercial_pilot", role_keys)
+
+    def test_dynamic_role_variant_labels_follow_sort_order(self):
+        self.config.schedule_tow_pilots = False
+        self.config.enable_dynamic_duty_roles = True
+        self.config.save()
+
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.config,
+            key="pm_tow",
+            display_name="PM Tow",
+            legacy_role_key="towpilot",
+            is_active=True,
+            sort_order=20,
+        )
+        DutyRoleDefinition.objects.create(
+            site_configuration=self.config,
+            key="am_tow",
+            display_name="AM Tow",
+            legacy_role_key="towpilot",
+            is_active=True,
+            sort_order=10,
+        )
+
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("duty_roster:blackout_manage"))
+        self.assertEqual(response.status_code, 200)
+
+        role_choices = dict(response.context["role_percent_choices"])
+        self.assertEqual(role_choices["towpilot"], "Tow Pilot (AM Tow, PM Tow)")

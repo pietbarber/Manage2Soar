@@ -227,7 +227,7 @@ def blackout_manage(request):
         active_dynamic_roles = DutyRoleDefinition.objects.filter(
             site_configuration=site_config,
             is_active=True,
-        )
+        ).order_by("sort_order", "display_name", "key")
         has_active_dynamic_role_definitions = active_dynamic_roles.exists()
         for role_def in active_dynamic_roles.filter(
             legacy_role_key__isnull=False,
@@ -3322,13 +3322,36 @@ def duty_delinquents_detail(request):
                 key__in=enabled_role_keys,
             )
         }
-    eligible_member_ids_by_role = {
-        role_key: role_service.get_eligible_member_ids(
-            role_key,
-            members_queryset=active_flyers,
+    if site_config and site_config.enable_dynamic_duty_roles:
+        active_flyer_ids = list(active_flyers.values_list("id", flat=True))
+        active_flyers_for_resolution = Member.objects.filter(
+            id__in=active_flyer_ids,
+            is_active=True,
         )
-        for role_key in enabled_role_keys
-    }
+        eligible_member_ids_by_role = {
+            role_key: role_service.get_eligible_member_ids(
+                role_key,
+                members_queryset=active_flyers_for_resolution,
+            )
+            for role_key in enabled_role_keys
+        }
+    else:
+        active_flyers_list = list(active_flyers)
+        eligible_member_ids_by_role = {}
+        for role_key in enabled_role_keys:
+            if role_key == "commercial_pilot":
+                eligible_member_ids_by_role[role_key] = {
+                    member.id
+                    for member in active_flyers_list
+                    if _is_commercial_pilot_qualified(member)
+                }
+            else:
+                eligible_member_ids_by_role[role_key] = {
+                    member.id
+                    for member in active_flyers_list
+                    if bool(getattr(member, role_key, False))
+                }
+        active_flyers = active_flyers_list
 
     # Step 3: Build detailed report for each active flyer
     duty_delinquents = []
