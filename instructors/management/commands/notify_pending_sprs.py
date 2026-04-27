@@ -1,0 +1,161 @@
+from datetime import date, timedelta
+
+from django.conf import settings
+from django.db.models import Q
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
+
+from instructors.utils import (
+    PENDING_SPR_NOTIFICATION_FRAGMENT,
+    get_pending_sprs_for_date,
+)
+from notifications.models import Notification
+from siteconfig.models import SiteConfiguration
+from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
+from utils.management.commands.base_cronjob import BaseCronJobCommand
+from utils.url_helpers import build_absolute_url, get_canonical_url
+
+
+class Command(BaseCronJobCommand):
+    help = "Notify instructors about pending SPRs from a finalized flying day"
+    job_name = "notify_pending_sprs"
+    max_execution_time = timedelta(minutes=10)
+
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument(
+            "--days-ago",
+            type=int,
+            default=1,
+            help="Send reminders for finalized flights from N days ago (default: 1)",
+        )
+        parser.add_argument(
+            "--flight-date",
+            type=lambda value: date.fromisoformat(value),
+            help="Override target flight date (YYYY-MM-DD)",
+        )
+
+    def execute_job(self, *args, **options):
+        target_date = options.get("flight_date") or (
+            timezone.localdate() - timedelta(days=options.get("days_ago", 1))
+        )
+        self.log_info(
+            f"Checking for pending SPRs from finalized flights on {target_date}"
+        )
+
+        pending_sprs = get_pending_sprs_for_date(target_date)
+        if not pending_sprs:
+            self.log_info("No pending SPRs found")
+            return
+
+        total_instructors = len(pending_sprs)
+        total_pending = sum(len(sprs) for sprs in pending_sprs.values())
+        self.log_info(
+            f"Found {total_pending} pending SPRs for {total_instructors} instructor(s)"
+        )
+
+        notifications_sent = 0
+        for instructor, spr_data in pending_sprs.items():
+            if options.get("dry_run"):
+                self.log_info(
+                    f"Would notify {instructor.full_display_name} about {len(spr_data)} pending SPR(s) from {target_date}"
+                )
+                continue
+
+            if self._send_notification(instructor, spr_data, target_date):
+                notifications_sent += 1
+
+        if notifications_sent:
+            self.log_success(
+                f"Sent pending SPR reminders to {notifications_sent} instructor(s)"
+            )
+        else:
+            self.log_info("No reminders sent")
+
+    def _send_notification(self, instructor, spr_data, target_date):
+        message = (
+            f"You have {len(spr_data)} {PENDING_SPR_NOTIFICATION_FRAGMENT}(s) "
+            f"from {target_date.isoformat()}."
+        )
+        existing = Notification.objects.filter(
+            user=instructor,
+            dismissed=False,
+        ).filter(
+            Q(message__contains=PENDING_SPR_NOTIFICATION_FRAGMENT)
+            & Q(message__contains=target_date.isoformat())
+        )
+        if existing.exists():
+            self.log_info(
+                f"Skipping duplicate pending SPR reminder for {instructor.full_display_name} on {target_date}"
+            )
+            return False
+
+        config = SiteConfiguration.objects.first()
+        canonical_base = get_canonical_url()
+        dashboard_url = build_absolute_url("/instructors/", canonical=canonical_base)
+        pending_sprs = [
+            {
+                "student_name": spr["student"].full_display_name,
+                "report_url": build_absolute_url(
+                    reverse(
+                        "instructors:fill_instruction_report",
+                        args=[spr["student"].pk, target_date],
+                    ),
+                    canonical=canonical_base,
+                ),
+            }
+            for spr in spr_data
+        ]
+
+        context = {
+            "instructor_name": instructor.full_display_name,
+            "flight_date": target_date.strftime("%A, %B %d, %Y"),
+            "pending_sprs": pending_sprs,
+            "pending_count": len(pending_sprs),
+            "club_name": config.club_name if config else "Soaring Club",
+            "club_logo_url": get_absolute_club_logo_url(config),
+            "dashboard_url": dashboard_url,
+            "site_url": canonical_base,
+        }
+
+        subject = (
+            "Student Progress Report Reminder - "
+            f"{len(pending_sprs)} Pending Report(s) from {target_date.strftime('%B %d, %Y')}"
+        )
+        html_message = render_to_string(
+            "instructors/emails/pending_sprs_notification.html", context
+        )
+        text_message = render_to_string(
+            "instructors/emails/pending_sprs_notification.txt", context
+        )
+
+        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
+        if "@" in default_from:
+            domain = default_from.split("@")[-1]
+            from_email = f"noreply@{domain}"
+        elif config and config.domain_name:
+            from_email = f"noreply@{config.domain_name}"
+        else:
+            from_email = "noreply@manage2soar.com"
+
+        if instructor.email:
+            send_mail(
+                subject=subject,
+                message=text_message,
+                from_email=from_email,
+                recipient_list=[instructor.email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+
+        Notification.objects.create(
+            user=instructor,
+            message=message,
+            url=dashboard_url,
+        )
+        self.log_success(
+            f"Notified {instructor.full_display_name} about {len(pending_sprs)} pending SPR(s)"
+        )
+        return True

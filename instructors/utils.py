@@ -28,6 +28,7 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 OVERDUE_SPR_NOTIFICATION_FRAGMENT = "overdue Student Progress Report"
+PENDING_SPR_NOTIFICATION_FRAGMENT = "pending Student Progress Report"
 
 
 def get_spr_escalation_level(days_overdue):
@@ -114,6 +115,67 @@ def get_overdue_sprs(max_days=30, as_of_date=None, instructor=None):
     return overdue_by_instructor
 
 
+def get_pending_sprs_for_date(flight_date, instructor=None):
+    """Return pending SPR data grouped by instructor for a specific flight date.
+
+    A flight is considered pending when its logsheet is finalized, it has both a
+    pilot and instructor, and no InstructionReport exists for the same
+    instructor, student, and flight date. Multiple flights for the same
+    instructor/student/date are consolidated into a single reminder entry.
+    """
+    flights_qs = Flight.objects.filter(
+        instructor__isnull=False,
+        pilot__isnull=False,
+        logsheet__finalized=True,
+        logsheet__log_date=flight_date,
+    )
+
+    if instructor is not None:
+        flights_qs = flights_qs.filter(instructor=instructor)
+
+    flights = list(
+        flights_qs.select_related("instructor", "pilot", "logsheet").order_by(
+            "instructor", "pilot"
+        )
+    )
+
+    if not flights:
+        return {}
+
+    report_qs = InstructionReport.objects.filter(report_date=flight_date)
+    if instructor is not None:
+        report_qs = report_qs.filter(instructor=instructor)
+    else:
+        report_qs = report_qs.filter(
+            instructor_id__in={flight.instructor_id for flight in flights}
+        )
+
+    existing_reports = set(
+        report_qs.values_list("instructor_id", "student_id", "report_date")
+    )
+
+    pending_by_instructor = {}
+    seen = set()
+    for flight in flights:
+        report_key = (flight.instructor_id, flight.pilot_id, flight_date)
+        if report_key in seen:
+            continue
+        seen.add(report_key)
+
+        if report_key in existing_reports:
+            continue
+
+        pending_by_instructor.setdefault(flight.instructor, []).append(
+            {
+                "flight": flight,
+                "student": flight.pilot,
+                "flight_date": flight_date,
+            }
+        )
+
+    return pending_by_instructor
+
+
 def get_instructor_overdue_spr_count(instructor, max_days=30, as_of_date=None):
     """Return overdue SPR count for a single instructor."""
     overdue = get_overdue_sprs(
@@ -163,6 +225,11 @@ def get_instructor_has_overdue_sprs(instructor, max_days=30, as_of_date=None):
 def is_overdue_spr_notification_message(message):
     """Return True when a notification message is an overdue SPR reminder."""
     return OVERDUE_SPR_NOTIFICATION_FRAGMENT in (message or "")
+
+
+def is_pending_spr_notification_message(message):
+    """Return True when a notification message is a pending SPR reminder."""
+    return PENDING_SPR_NOTIFICATION_FRAGMENT in (message or "")
 
 
 ####################################################
