@@ -74,6 +74,11 @@ _ANCHOR_TAG_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+_IMG_SRC_RE = re.compile(
+    r'(<img\b[^>]*\bsrc=["\'])([^"\']+)(["\'][^>]*>)',
+    re.IGNORECASE | re.DOTALL,
+)
+
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -146,6 +151,73 @@ def _make_pdf_link_from_embed(match, site_url):
     )
 
 
+def _trusted_email_image_prefixes(site_url=None):
+    """Return allowed URL prefixes for inline images rendered into member emails."""
+    trusted_prefixes = {
+        "https://img.youtube.com/",
+        "https://i.ytimg.com/",
+    }
+
+    for candidate in (site_url, getattr(settings, "MEDIA_URL", "") or ""):
+        parsed = urlparse(candidate)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            continue
+
+        path = (
+            parsed.path.rstrip("/")
+            if isinstance(parsed.path, str)
+            else parsed.path.decode("utf-8", errors="ignore").rstrip("/")
+        )
+        prefix = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+        if path:
+            prefix = f"{prefix}{path}/"
+        else:
+            prefix = f"{prefix}/"
+        trusted_prefixes.add(prefix)
+
+    return trusted_prefixes
+
+
+def _normalize_img_src_for_email(raw_url, site_url=None):
+    """Normalize image URLs so relative first-party images work in emails."""
+    parsed = urlparse(raw_url)
+    if parsed.scheme in ("http", "https"):
+        return raw_url
+    # Protocol-relative URLs (e.g. //evil.example.com/...) must not be
+    # absolutized onto site_url; leave them for Bleach to strip.
+    if (
+        not parsed.scheme
+        and not raw_url.startswith("//")
+        and raw_url.startswith("/")
+        and site_url
+    ):
+        return build_absolute_url(raw_url, canonical=site_url)
+    return raw_url
+
+
+def _normalized_absolute_url_for_compare(raw_url):
+    """Normalize absolute URLs for prefix comparison in trusted image checks."""
+    parsed = urlparse(raw_url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return ""
+
+    path = parsed.path or "/"
+    normalized = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{path}"
+    if parsed.query:
+        normalized = f"{normalized}?{parsed.query}"
+    return normalized
+
+
+def _normalize_img_tags_for_email(html, site_url=None):
+    """Normalize img src attributes before Bleach allowlist filtering."""
+
+    def _replace(match):
+        normalized_src = _normalize_img_src_for_email(match.group(2), site_url)
+        return f"{match.group(1)}{normalized_src}{match.group(3)}"
+
+    return _IMG_SRC_RE.sub(_replace, html)
+
+
 # Bleach allowlist for closeout HTML rendered inside emails.
 # Permits common formatting and table tags produced by TinyMCE while
 # stripping any script, object, or embed elements not already handled by
@@ -195,36 +267,37 @@ _EMAIL_ALLOWED_TAGS = [
 ]
 
 
-def _email_allowed_attribute(tag, name, value):
-    """
-    Callable bleach attribute filter for email-bound HTML.
+def _email_allowed_attribute(site_url=None):
+    """Return a bleach attribute filter for email-bound HTML."""
+    trusted_image_prefixes = _trusted_email_image_prefixes(site_url)
 
-    Restricts ``img[src]`` to trusted image CDN hosts so that remote tracking
-    pixels embedded in TinyMCE content cannot reach member inboxes.
-
-    Attributes are allowlisted per tag (plus a small global set); any attribute
-    not explicitly permitted is rejected.
-    """
-    # Global attributes permitted on every element
-    if name in ("style", "class", "title"):
-        return True
-    if tag == "a":
-        return name in ("href", "target", "rel")
-    if tag == "img":
-        if name == "src":
-            # Only allow images served from trusted CDN hosts (e.g. YouTube
-            # thumbnails added by the embed-replacement functions above).
-            parsed = urlparse(value)
-            return parsed.scheme in ("http", "https") and (parsed.hostname or "") in (
-                "img.youtube.com",
-                "i.ytimg.com",
+    def _allow(tag, name, value):
+        # Global attributes permitted on every element
+        if name in ("style", "class", "title"):
+            return True
+        if tag == "a":
+            return name in ("href", "target", "rel")
+        if tag == "img":
+            if name == "src":
+                normalized_value = _normalized_absolute_url_for_compare(value)
+                return bool(normalized_value) and any(
+                    normalized_value.startswith(prefix)
+                    for prefix in trusted_image_prefixes
+                )
+            return name in ("alt", "width", "height", "style")
+        if tag in ("td", "th"):
+            return name in ("colspan", "rowspan", "align", "valign", "style")
+        if tag == "table":
+            return name in (
+                "border",
+                "cellpadding",
+                "cellspacing",
+                "width",
+                "style",
             )
-        return name in ("alt", "width", "height", "style")
-    if tag in ("td", "th"):
-        return name in ("colspan", "rowspan", "align", "valign", "style")
-    if tag == "table":
-        return name in ("border", "cellpadding", "cellspacing", "width", "style")
-    return False
+        return False
+
+    return _allow
 
 
 _EMAIL_CSS_SANITIZER = CSSSanitizer(
@@ -268,12 +341,12 @@ _EMAIL_CSS_SANITIZER = CSSSanitizer(
 )
 
 
-def _bleach_clean_email_html(html: str) -> str:
+def _bleach_clean_email_html(html: str, site_url=None) -> str:
     """Run bleach allowlist sanitization on HTML intended for email delivery."""
     return bleach.clean(
         html,
         tags=_EMAIL_ALLOWED_TAGS,
-        attributes=_email_allowed_attribute,
+        attributes=_email_allowed_attribute(site_url),
         css_sanitizer=_EMAIL_CSS_SANITIZER,
         strip=True,
     )
@@ -288,17 +361,21 @@ def sanitize_closeout_html_for_email(html, site_url=None):
     - YouTube ``<iframe>`` → linked thumbnail image
     - Google Docs PDF viewer ``<iframe>`` → styled "View PDF" link
     - Bare ``<embed>``/``<object>`` for .pdf files → styled "View PDF" link
+    - Relative ``img[src]`` values → absolute first-party URLs when ``site_url`` is set
 
-    Relative PDF URLs (e.g. ``/media/uploads/doc.pdf``) are converted to
-    absolute using ``site_url`` so they resolve correctly in email clients.
-    In production, pass the canonical site origin (an absolute site URL);
-    ``get_finalization_email_context`` already provides this via its
-    resolved ``site_url`` argument.
+    Relative PDF URLs (e.g. ``/media/uploads/doc.pdf``) and relative image URLs
+    (e.g. ``/media/tinymce/photo.jpg``) are converted to absolute using
+    ``site_url`` so they resolve correctly in email clients. The follow-on
+    Bleach sanitization only preserves ``img[src]`` values that match trusted
+    URL prefixes: the canonical site origin, the configured ``MEDIA_URL``
+    prefix, and the specific YouTube thumbnail prefixes used by embed
+    replacements.
 
     Args:
         html (str): Raw HTML from a TinyMCE HTMLField.
         site_url (str | None): Canonical site origin used to absolutise
-            relative PDF URLs.  When ``None``, relative URLs are left as-is.
+            relative PDF and image URLs. When ``None``, relative URLs are left
+            as-is.
 
     Returns:
         str: HTML safe for rendering inside an email.
@@ -310,11 +387,12 @@ def sanitize_closeout_html_for_email(html, site_url=None):
         lambda m: _make_pdf_link_from_gdocs_params(m.group(1), site_url), html
     )
     html = _PDF_EMBED_RE.sub(lambda m: _make_pdf_link_from_embed(m, site_url), html)
-    # Allowlist-sanitize the remaining HTML.  Unknown tags are stripped
-    # (strip=True), img[src] is restricted to trusted CDN hosts only (see
-    # _email_allowed_attribute), and the CSS shorthand "background" is
-    # excluded to prevent url()-based beacons.
-    html = _bleach_clean_email_html(html)
+    html = _normalize_img_tags_for_email(html, site_url)
+    # Allowlist-sanitize the remaining HTML. Unknown tags are stripped
+    # (strip=True), img[src] is kept only for trusted URL prefixes after
+    # normalization, and the CSS shorthand "background" is excluded to
+    # prevent url()-based beacons.
+    html = _bleach_clean_email_html(html, site_url=site_url)
     return html
 
 
