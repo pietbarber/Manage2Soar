@@ -130,7 +130,7 @@
                   {% endif %}
                   {% with dynamic_roles=dynamic_role_assignments_by_date|dict_get:day %}
                     {% for dynamic_role in dynamic_roles %}
-                      <span class="duty-badge badge-dynamic-role"><i class="bi bi-diagram-3" aria-hidden="true"></i> {{ dynamic_role.label }}: {{ dynamic_role.member.last_name }}</span>
+                      <span class="duty-badge {{ dynamic_role.badge_class }}"><i class="{{ dynamic_role.icon_class }}" aria-hidden="true"></i> {{ dynamic_role.label }}: {{ dynamic_role.member.last_name }}</span>
                     {% endfor %}
                   {% endwith %}
                 </div>
