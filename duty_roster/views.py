@@ -130,13 +130,13 @@ _DYNAMIC_ROLE_PRESENTATION_BY_LEGACY_KEY = {
         "badge_class": "badge-instructor",
         "card_class": "bg-success bg-opacity-10 border border-success",
         "heading_class": "text-success",
-        "icon_class": "fas fa-graduation-cap",
+        "icon_class": "bi bi-mortarboard",
     },
     "surge_instructor": {
         "badge_class": "badge-instructor",
         "card_class": "bg-success bg-opacity-10 border border-success",
         "heading_class": "text-success",
-        "icon_class": "fas fa-graduation-cap",
+        "icon_class": "bi bi-mortarboard",
     },
     "duty_officer": {
         "badge_class": "badge-duty-officer",
