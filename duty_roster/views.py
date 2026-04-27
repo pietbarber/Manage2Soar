@@ -100,6 +100,66 @@ def calendar_refresh_response(year, month):
     return HttpResponse(headers={"HX-Trigger": json.dumps(trigger_data)})
 
 
+_DEFAULT_DYNAMIC_ROLE_PRESENTATION = {
+    "badge_class": "badge-dynamic-role",
+    "card_class": "bg-info bg-opacity-10 border border-info",
+    "heading_class": "text-info-emphasis",
+    "icon_class": "bi bi-diagram-3",
+}
+
+_DYNAMIC_ROLE_PRESENTATION_BY_LEGACY_KEY = {
+    "towpilot": {
+        "badge_class": "badge-tow-pilot",
+        "card_class": "bg-danger bg-opacity-10 border border-danger",
+        "heading_class": "text-danger",
+        "icon_class": "bi bi-airplane",
+    },
+    "surge_towpilot": {
+        "badge_class": "badge-tow-pilot",
+        "card_class": "bg-danger bg-opacity-10 border border-danger",
+        "heading_class": "text-danger",
+        "icon_class": "bi bi-airplane",
+    },
+    "commercial_pilot": {
+        "badge_class": "badge-tow-pilot",
+        "card_class": "bg-danger bg-opacity-10 border border-danger",
+        "heading_class": "text-danger",
+        "icon_class": "bi bi-airplane",
+    },
+    "instructor": {
+        "badge_class": "badge-instructor",
+        "card_class": "bg-success bg-opacity-10 border border-success",
+        "heading_class": "text-success",
+        "icon_class": "bi bi-mortarboard",
+    },
+    "surge_instructor": {
+        "badge_class": "badge-instructor",
+        "card_class": "bg-success bg-opacity-10 border border-success",
+        "heading_class": "text-success",
+        "icon_class": "bi bi-mortarboard",
+    },
+    "duty_officer": {
+        "badge_class": "badge-duty-officer",
+        "card_class": "duty-role-card-do",
+        "heading_class": "",
+        "icon_class": "bi bi-clipboard-check",
+    },
+    "assistant_duty_officer": {
+        "badge_class": "badge-assistant-duty-officer",
+        "card_class": "bg-secondary bg-opacity-10 border border-secondary",
+        "heading_class": "text-secondary",
+        "icon_class": "bi bi-person-badge",
+    },
+}
+
+
+def _get_dynamic_role_presentation(legacy_role_key):
+    presentation = _DYNAMIC_ROLE_PRESENTATION_BY_LEGACY_KEY.get(legacy_role_key)
+    if presentation is None:
+        presentation = _DEFAULT_DYNAMIC_ROLE_PRESENTATION
+    return presentation.copy()
+
+
 def _get_dynamic_role_assignments(
     assignment,
     site_config,
@@ -157,6 +217,7 @@ def _get_dynamic_role_assignments(
             if assigned_legacy_member != member:
                 swap_role_code = None
 
+        presentation = _get_dynamic_role_presentation(legacy_role_key)
         dynamic_role_assignments.append(
             {
                 "key": role_key,
@@ -164,6 +225,7 @@ def _get_dynamic_role_assignments(
                 "member": member,
                 "legacy_role_key": legacy_role_key,
                 "swap_role_code": swap_role_code,
+                **presentation,
             }
         )
 

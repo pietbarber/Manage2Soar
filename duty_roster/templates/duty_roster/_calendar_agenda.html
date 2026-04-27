@@ -184,37 +184,11 @@
                 {% with dynamic_roles=dynamic_role_assignments_by_date|dict_get:day %}
                   {% for dynamic_role in dynamic_roles %}
                     <div class="col-md-6 mb-3">
-                      {% if dynamic_role.legacy_role_key == "towpilot" %}
-                        <div class="duty-role-card bg-danger bg-opacity-10 border border-danger rounded p-3">
-                          <h6 class="text-danger mb-2">
-                            <i class="bi bi-airplane me-2" aria-hidden="true"></i>
-                            {{ dynamic_role.label }}
-                          </h6>
-                      {% elif dynamic_role.legacy_role_key == "instructor" %}
-                        <div class="duty-role-card bg-success bg-opacity-10 border border-success rounded p-3">
-                          <h6 class="text-success mb-2">
-                            <i class="bi bi-mortarboard me-2" aria-hidden="true"></i>
-                            {{ dynamic_role.label }}
-                          </h6>
-                      {% elif dynamic_role.legacy_role_key == "duty_officer" %}
-                        <div class="duty-role-card duty-role-card-do rounded p-3">
-                          <h6 class="mb-2">
-                            <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>
-                            {{ dynamic_role.label }}
-                          </h6>
-                      {% elif dynamic_role.legacy_role_key == "assistant_duty_officer" %}
-                        <div class="duty-role-card bg-secondary bg-opacity-10 border border-secondary rounded p-3">
-                          <h6 class="text-secondary mb-2">
-                            <i class="bi bi-person-badge me-2" aria-hidden="true"></i>
-                            {{ dynamic_role.label }}
-                          </h6>
-                      {% else %}
-                        <div class="duty-role-card bg-info bg-opacity-10 border border-info rounded p-3">
-                          <h6 class="text-info-emphasis mb-2">
-                            <i class="bi bi-diagram-3 me-2" aria-hidden="true"></i>
-                            {{ dynamic_role.label }}
-                          </h6>
-                      {% endif %}
+                      <div class="duty-role-card {{ dynamic_role.card_class }} rounded p-3">
+                        <h6 class="{% if dynamic_role.heading_class %}{{ dynamic_role.heading_class }} {% endif %}mb-2">
+                          <i class="{{ dynamic_role.icon_class }} me-2" aria-hidden="true"></i>
+                          {{ dynamic_role.label }}
+                        </h6>
                         <p class="mb-0 fw-bold">{{ dynamic_role.member.full_display_name }}</p>
                         {% if dynamic_role.member.phone and user.is_authenticated and user.is_active_member and not dynamic_role.member.redact_contact %}
                           <small class="text-muted">{{ dynamic_role.member.phone }}</small>
