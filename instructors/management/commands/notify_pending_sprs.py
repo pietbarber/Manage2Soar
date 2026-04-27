@@ -81,7 +81,6 @@ class Command(BaseCronJobCommand):
         )
         existing = Notification.objects.filter(
             user=instructor,
-            dismissed=False,
         ).filter(
             Q(message__contains=PENDING_SPR_NOTIFICATION_FRAGMENT)
             & Q(message__contains=target_date.isoformat())

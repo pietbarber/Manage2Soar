@@ -11,7 +11,7 @@ REPORTS STILL NEEDED
 --------------------
 {% for spr in pending_sprs %}
 - {{ spr.student_name }}
-	Open report form: {{ spr.report_url }}
+  Open report form: {{ spr.report_url }}
 {% endfor %}
 
 Filing these reports promptly keeps student training records current and helps

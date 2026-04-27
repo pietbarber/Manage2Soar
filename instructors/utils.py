@@ -227,11 +227,6 @@ def is_overdue_spr_notification_message(message):
     return OVERDUE_SPR_NOTIFICATION_FRAGMENT in (message or "")
 
 
-def is_pending_spr_notification_message(message):
-    """Return True when a notification message is a pending SPR reminder."""
-    return PENDING_SPR_NOTIFICATION_FRAGMENT in (message or "")
-
-
 ####################################################
 # get_flight_summary_for_member
 #

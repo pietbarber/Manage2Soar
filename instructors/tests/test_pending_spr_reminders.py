@@ -149,6 +149,40 @@ def test_notify_pending_sprs_sends_one_email_per_instructor_and_dedupes_reruns(
     DEFAULT_FROM_EMAIL="noreply@test.com",
     SITE_URL="https://test.manage2soar.com",
 )
+def test_notify_pending_sprs_dedupes_even_after_notification_is_dismissed(
+    site_config, airfield, instructor, student_one
+):
+    target_date = date(2026, 4, 25)
+    logsheet = Logsheet.objects.create(
+        log_date=target_date,
+        airfield=airfield,
+        created_by=instructor,
+        finalized=True,
+    )
+    create_flight(logsheet, student_one, instructor, 10)
+
+    mail.outbox.clear()
+    Notification.objects.all().delete()
+
+    call_command("notify_pending_sprs", f"--flight-date={target_date.isoformat()}")
+
+    notification = Notification.objects.get(user=instructor)
+    notification.dismissed = True
+    notification.save(update_fields=["dismissed"])
+
+    call_command("notify_pending_sprs", f"--flight-date={target_date.isoformat()}")
+
+    assert len(mail.outbox) == 1
+    assert Notification.objects.filter(user=instructor).count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_DEV_MODE=False,
+    DEFAULT_FROM_EMAIL="noreply@test.com",
+    SITE_URL="https://test.manage2soar.com",
+)
 def test_notify_pending_sprs_ignores_non_finalized_logsheets(
     site_config, airfield, instructor, student_one
 ):
