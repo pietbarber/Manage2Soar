@@ -74,6 +74,11 @@ _ANCHOR_TAG_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+_IMG_SRC_RE = re.compile(
+    r'(<img\b[^>]*\bsrc=["\'])([^"\']+)(["\'][^>]*>)',
+    re.IGNORECASE | re.DOTALL,
+)
+
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -146,6 +151,42 @@ def _make_pdf_link_from_embed(match, site_url):
     )
 
 
+def _trusted_email_image_hosts(site_url=None):
+    """Return allowed hosts for inline images rendered into member emails."""
+    trusted_hosts = {
+        "img.youtube.com",
+        "i.ytimg.com",
+    }
+
+    for candidate in (site_url, getattr(settings, "MEDIA_URL", "") or ""):
+        parsed = urlparse(candidate)
+        hostname = (parsed.hostname or "").lower()
+        if parsed.scheme in ("http", "https") and hostname:
+            trusted_hosts.add(str(hostname))
+
+    return trusted_hosts
+
+
+def _normalize_img_src_for_email(raw_url, site_url=None):
+    """Normalize image URLs so relative first-party images work in emails."""
+    parsed = urlparse(raw_url)
+    if parsed.scheme in ("http", "https"):
+        return raw_url
+    if not parsed.scheme and raw_url.startswith("/") and site_url:
+        return build_absolute_url(raw_url, canonical=site_url)
+    return raw_url
+
+
+def _normalize_img_tags_for_email(html, site_url=None):
+    """Normalize img src attributes before Bleach allowlist filtering."""
+
+    def _replace(match):
+        normalized_src = _normalize_img_src_for_email(match.group(2), site_url)
+        return f"{match.group(1)}{normalized_src}{match.group(3)}"
+
+    return _IMG_SRC_RE.sub(_replace, html)
+
+
 # Bleach allowlist for closeout HTML rendered inside emails.
 # Permits common formatting and table tags produced by TinyMCE while
 # stripping any script, object, or embed elements not already handled by
@@ -195,36 +236,36 @@ _EMAIL_ALLOWED_TAGS = [
 ]
 
 
-def _email_allowed_attribute(tag, name, value):
-    """
-    Callable bleach attribute filter for email-bound HTML.
+def _email_allowed_attribute(site_url=None):
+    """Return a bleach attribute filter for email-bound HTML."""
+    trusted_image_hosts = _trusted_email_image_hosts(site_url)
 
-    Restricts ``img[src]`` to trusted image CDN hosts so that remote tracking
-    pixels embedded in TinyMCE content cannot reach member inboxes.
-
-    Attributes are allowlisted per tag (plus a small global set); any attribute
-    not explicitly permitted is rejected.
-    """
-    # Global attributes permitted on every element
-    if name in ("style", "class", "title"):
-        return True
-    if tag == "a":
-        return name in ("href", "target", "rel")
-    if tag == "img":
-        if name == "src":
-            # Only allow images served from trusted CDN hosts (e.g. YouTube
-            # thumbnails added by the embed-replacement functions above).
-            parsed = urlparse(value)
-            return parsed.scheme in ("http", "https") and (parsed.hostname or "") in (
-                "img.youtube.com",
-                "i.ytimg.com",
+    def _allow(tag, name, value):
+        # Global attributes permitted on every element
+        if name in ("style", "class", "title"):
+            return True
+        if tag == "a":
+            return name in ("href", "target", "rel")
+        if tag == "img":
+            if name == "src":
+                parsed = urlparse(value)
+                return parsed.scheme in ("http", "https") and (
+                    (parsed.hostname or "").lower() in trusted_image_hosts
+                )
+            return name in ("alt", "width", "height", "style")
+        if tag in ("td", "th"):
+            return name in ("colspan", "rowspan", "align", "valign", "style")
+        if tag == "table":
+            return name in (
+                "border",
+                "cellpadding",
+                "cellspacing",
+                "width",
+                "style",
             )
-        return name in ("alt", "width", "height", "style")
-    if tag in ("td", "th"):
-        return name in ("colspan", "rowspan", "align", "valign", "style")
-    if tag == "table":
-        return name in ("border", "cellpadding", "cellspacing", "width", "style")
-    return False
+        return False
+
+    return _allow
 
 
 _EMAIL_CSS_SANITIZER = CSSSanitizer(
@@ -268,12 +309,12 @@ _EMAIL_CSS_SANITIZER = CSSSanitizer(
 )
 
 
-def _bleach_clean_email_html(html: str) -> str:
+def _bleach_clean_email_html(html: str, site_url=None) -> str:
     """Run bleach allowlist sanitization on HTML intended for email delivery."""
     return bleach.clean(
         html,
         tags=_EMAIL_ALLOWED_TAGS,
-        attributes=_email_allowed_attribute,
+        attributes=_email_allowed_attribute(site_url),
         css_sanitizer=_EMAIL_CSS_SANITIZER,
         strip=True,
     )
@@ -310,11 +351,12 @@ def sanitize_closeout_html_for_email(html, site_url=None):
         lambda m: _make_pdf_link_from_gdocs_params(m.group(1), site_url), html
     )
     html = _PDF_EMBED_RE.sub(lambda m: _make_pdf_link_from_embed(m, site_url), html)
+    html = _normalize_img_tags_for_email(html, site_url)
     # Allowlist-sanitize the remaining HTML.  Unknown tags are stripped
     # (strip=True), img[src] is restricted to trusted CDN hosts only (see
     # _email_allowed_attribute), and the CSS shorthand "background" is
     # excluded to prevent url()-based beacons.
-    html = _bleach_clean_email_html(html)
+    html = _bleach_clean_email_html(html, site_url=site_url)
     return html
 
 

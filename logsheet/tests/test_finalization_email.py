@@ -123,6 +123,33 @@ class TestSanitizeCloseoutHtml(SimpleTestCase):
         assert "evil.example.com" not in result
         assert "tracker.png" not in result
 
+    def test_trusted_same_origin_img_source_is_preserved(self):
+        html = '<p><img src="https://club.example.com/media/tinymce/photo.jpg" alt="x"></p>'
+        result = sanitize_closeout_html_for_email(
+            html, site_url="https://club.example.com"
+        )
+        assert 'src="https://club.example.com/media/tinymce/photo.jpg"' in result
+
+    @override_settings(
+        MEDIA_URL="https://storage.googleapis.com/demo-bucket/ssc/media/"
+    )
+    def test_media_storage_host_img_source_is_preserved(self):
+        html = '<p><img src="https://storage.googleapis.com/demo-bucket/ssc/media/tinymce/photo.jpg" alt="x"></p>'
+        result = sanitize_closeout_html_for_email(
+            html, site_url="https://club.example.com"
+        )
+        assert (
+            'src="https://storage.googleapis.com/demo-bucket/ssc/media/tinymce/photo.jpg"'
+            in result
+        )
+
+    def test_relative_media_img_source_is_absolutized(self):
+        html = '<p><img src="/media/tinymce/photo.jpg" alt="x"></p>'
+        result = sanitize_closeout_html_for_email(
+            html, site_url="https://club.example.com"
+        )
+        assert 'src="https://club.example.com/media/tinymce/photo.jpg"' in result
+
     def test_background_url_is_stripped_from_inline_style(self):
         html = (
             '<p style="background:url(https://evil.example.com/bg.png);'
@@ -273,6 +300,22 @@ class TestGetFinalizationEmailContext:
         assert "All clear." in ctx["safety_issues_html"]
         assert "Good day." in ctx["operations_summary_html"]
         assert ctx["equipment_issues_html"] == ""
+
+    def test_closeout_context_preserves_embedded_images(self):
+        closeout = self.logsheet.closeout
+        closeout.equipment_issues = (
+            '<p><img src="/media/tinymce/photo.jpg" width="480" height="640"></p>'
+        )
+        closeout.save()
+
+        ctx = get_finalization_email_context(
+            self.logsheet, site_url="https://club.example.com"
+        )
+
+        assert (
+            'src="https://club.example.com/media/tinymce/photo.jpg"'
+            in ctx["equipment_issues_html"]
+        )
 
     def test_flights_list_is_empty_when_no_flights(self):
         ctx = get_finalization_email_context(self.logsheet)
