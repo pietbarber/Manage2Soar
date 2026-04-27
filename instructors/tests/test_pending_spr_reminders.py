@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 
 import pytest
 from django.core import mail
@@ -219,7 +219,9 @@ def test_notify_pending_sprs_picks_up_late_finalized_logsheet(
     finalized 2+ days after the flights are still picked up."""
     # Logsheet dated 3 days ago but finalized late (today) — simulates a
     # real scenario where the DO closes out after a delay.
-    flight_date = date(2026, 4, 23)  # 3 days before the mock today
+    from django.utils import timezone
+
+    flight_date = timezone.now().date() - timedelta(days=3)
     logsheet = Logsheet.objects.create(
         log_date=flight_date,
         airfield=airfield,
@@ -237,5 +239,5 @@ def test_notify_pending_sprs_picks_up_late_finalized_logsheet(
 
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == [instructor.email]
-    assert "April 23, 2026" in mail.outbox[0].subject
+    assert flight_date.strftime("%B %d, %Y") in mail.outbox[0].subject
     assert Notification.objects.filter(user=instructor).count() == 1

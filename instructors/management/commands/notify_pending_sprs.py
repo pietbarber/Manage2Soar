@@ -46,10 +46,11 @@ class Command(BaseCronJobCommand):
             # Explicit --days-ago override: compute from UTC midnight.
             target_date = today - timedelta(days=options["days_ago"])
         else:
-            # Default: find the most recent finalized flying day with
-            # instructional flights so late-finalized logsheets are not
-            # silently skipped by a hard-coded "yesterday" offset.
-            target_date = (
+            # Default: find the most recent finalized flying day that still
+            # has at least one pending SPR. This ensures late-finalized
+            # logsheets are not skipped and that a newer all-reports-complete
+            # day does not shadow an older day with outstanding SPRs.
+            recent_dates = (
                 Logsheet.objects.filter(
                     finalized=True,
                     log_date__lt=today,
@@ -57,10 +58,15 @@ class Command(BaseCronJobCommand):
                 )
                 .order_by("-log_date")
                 .values_list("log_date", flat=True)
-                .first()
+                .distinct()
             )
+            target_date = None
+            for candidate_date in recent_dates:
+                if get_pending_sprs_for_date(candidate_date):
+                    target_date = candidate_date
+                    break
             if target_date is None:
-                self.log_info("No finalized logsheets with instructional flights found")
+                self.log_info("No finalized logsheets with pending SPRs found")
                 return
         self.log_info(
             f"Checking for pending SPRs from finalized flights on {target_date}"
@@ -116,7 +122,7 @@ class Command(BaseCronJobCommand):
             return False
 
         config = SiteConfiguration.objects.first()
-        canonical_base = get_canonical_url()
+        canonical_base = get_canonical_url(config)
         dashboard_url = build_absolute_url("/instructors/", canonical=canonical_base)
         pending_sprs = [
             {
