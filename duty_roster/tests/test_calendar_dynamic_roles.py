@@ -323,6 +323,8 @@ def test_calendar_month_mapped_dynamic_tow_role_uses_display_name_and_tow_badge(
 
     viewer = _make_member("dynamic_table_tow_styling_viewer")
     dynamic_member = _make_member("dynamic_table_tow_styling_assigned")
+    dynamic_member.last_name = "Towerson"
+    dynamic_member.save(update_fields=["last_name"])
 
     site_config = SiteConfiguration.objects.create(
         club_name="Test Club",
