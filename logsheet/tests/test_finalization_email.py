@@ -161,6 +161,14 @@ class TestSanitizeCloseoutHtml(SimpleTestCase):
         )
         assert 'src="https://club.example.com/media/tinymce/photo.jpg"' in result
 
+    def test_protocol_relative_untrusted_img_source_is_removed(self):
+        html = '<p><img src="//evil.example.com/tracker.png" alt="x"></p>'
+        result = sanitize_closeout_html_for_email(
+            html, site_url="https://club.example.com"
+        )
+        assert "evil.example.com" not in result
+        assert "tracker.png" not in result
+
     def test_background_url_is_stripped_from_inline_style(self):
         html = (
             '<p style="background:url(https://evil.example.com/bg.png);'

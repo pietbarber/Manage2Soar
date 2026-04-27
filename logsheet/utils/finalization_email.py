@@ -183,7 +183,14 @@ def _normalize_img_src_for_email(raw_url, site_url=None):
     parsed = urlparse(raw_url)
     if parsed.scheme in ("http", "https"):
         return raw_url
-    if not parsed.scheme and raw_url.startswith("/") and site_url:
+    # Protocol-relative URLs (e.g. //evil.example.com/...) must not be
+    # absolutized onto site_url; leave them for Bleach to strip.
+    if (
+        not parsed.scheme
+        and not raw_url.startswith("//")
+        and raw_url.startswith("/")
+        and site_url
+    ):
         return build_absolute_url(raw_url, canonical=site_url)
     return raw_url
 
