@@ -35,7 +35,7 @@ Instructor SPR reminders now happen in two stages:
 
 ### Timezone note
 
-The first implementation uses a UTC Cron schedule. The job is intended to run after the previous flying day has closed, but tenant-specific timezone delivery is not yet configurable in `SiteConfiguration`.
+The first implementation uses a UTC Cron schedule and computes the target date from UTC (via `timezone.now().date()`), so the "previous day" boundary is always midnight UTC regardless of the server's local timezone. The job is intended to run after the previous flying day has closed, but tenant-specific timezone delivery is not yet configurable in `SiteConfiguration`.
 
 ### When emails are sent
 

@@ -38,8 +38,10 @@ class Command(BaseCronJobCommand):
         )
 
     def execute_job(self, *args, **options):
+        # Compute the target date from UTC so the result is stable regardless
+        # of the Django TIME_ZONE setting or the server's local timezone.
         target_date = options.get("flight_date") or (
-            timezone.localdate() - timedelta(days=options.get("days_ago", 1))
+            timezone.now().date() - timedelta(days=options.get("days_ago", 1))
         )
         self.log_info(
             f"Checking for pending SPRs from finalized flights on {target_date}"
@@ -64,8 +66,11 @@ class Command(BaseCronJobCommand):
                 )
                 continue
 
-            if self._send_notification(instructor, spr_data, target_date):
-                notifications_sent += 1
+            try:
+                if self._send_notification(instructor, spr_data, target_date):
+                    notifications_sent += 1
+            except Exception as e:
+                self.log_error(f"Failed to notify {instructor.full_display_name}: {e}")
 
         if notifications_sent:
             self.log_success(

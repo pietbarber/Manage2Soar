@@ -102,7 +102,7 @@ Uses PostgreSQL's atomic operations:
    - ✅ `expire_ad_hoc_days.py` - **SCHEDULED DAILY**
 2. ✅ Created new notification commands:
    - ✅ `notify_aging_logsheets.py` - **FINDING REAL ISSUES**
-    - ✅ `notify_pending_sprs.py` - **FIRST DAILY SPR REMINDER DIGEST**
+   - ✅ `notify_pending_sprs.py` - **FIRST DAILY SPR REMINDER DIGEST**
    - ✅ `notify_late_sprs.py` - **MONITORING 34 FLIGHTS**
    - ✅ `report_duty_delinquents.py` - **IDENTIFIED 19 DELINQUENTS** (Issue #288 fixed recipient filtering)
    - ✅ `cleanup_old_notifications.py` - **PURGING STALE NOTIFICATIONS / PREVENTS NOTIFICATION ACCUMULATION** (Issue #290 60+ day cleanup & notification timeout)
