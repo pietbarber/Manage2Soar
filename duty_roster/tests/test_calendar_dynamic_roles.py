@@ -424,7 +424,12 @@ def test_calendar_agenda_mapped_dynamic_tow_role_uses_display_name_and_tow_card(
         "expected_icon_class",
     ),
     [
-        ("instructor", "badge-instructor", "text-success", "bi bi-mortarboard"),
+        (
+            "instructor",
+            "badge-instructor",
+            "text-success",
+            "fas fa-graduation-cap",
+        ),
         ("duty_officer", "badge-duty-officer", "", "bi bi-clipboard-check"),
         (
             "assistant_duty_officer",
@@ -433,7 +438,12 @@ def test_calendar_agenda_mapped_dynamic_tow_role_uses_display_name_and_tow_card(
             "bi bi-person-badge",
         ),
         ("surge_towpilot", "badge-tow-pilot", "text-danger", "bi bi-airplane"),
-        ("surge_instructor", "badge-instructor", "text-success", "bi bi-mortarboard"),
+        (
+            "surge_instructor",
+            "badge-instructor",
+            "text-success",
+            "fas fa-graduation-cap",
+        ),
         ("commercial_pilot", "badge-tow-pilot", "text-danger", "bi bi-airplane"),
     ],
 )
