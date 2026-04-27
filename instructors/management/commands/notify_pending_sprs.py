@@ -10,6 +10,7 @@ from instructors.utils import (
     PENDING_SPR_NOTIFICATION_FRAGMENT,
     get_pending_sprs_for_date,
 )
+from logsheet.models import Logsheet
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
@@ -28,8 +29,8 @@ class Command(BaseCronJobCommand):
         parser.add_argument(
             "--days-ago",
             type=int,
-            default=1,
-            help="Send reminders for finalized flights from N days ago (default: 1)",
+            default=None,
+            help="Send reminders for finalized flights from N days ago",
         )
         parser.add_argument(
             "--flight-date",
@@ -38,11 +39,29 @@ class Command(BaseCronJobCommand):
         )
 
     def execute_job(self, *args, **options):
-        # Compute the target date from UTC so the result is stable regardless
-        # of the Django TIME_ZONE setting or the server's local timezone.
-        target_date = options.get("flight_date") or (
-            timezone.now().date() - timedelta(days=options.get("days_ago", 1))
-        )
+        today = timezone.now().date()
+        if options.get("flight_date"):
+            target_date = options["flight_date"]
+        elif options.get("days_ago") is not None:
+            # Explicit --days-ago override: compute from UTC midnight.
+            target_date = today - timedelta(days=options["days_ago"])
+        else:
+            # Default: find the most recent finalized flying day with
+            # instructional flights so late-finalized logsheets are not
+            # silently skipped by a hard-coded "yesterday" offset.
+            target_date = (
+                Logsheet.objects.filter(
+                    finalized=True,
+                    log_date__lt=today,
+                    flights__instructor__isnull=False,
+                )
+                .order_by("-log_date")
+                .values_list("log_date", flat=True)
+                .first()
+            )
+            if target_date is None:
+                self.log_info("No finalized logsheets with instructional flights found")
+                return
         self.log_info(
             f"Checking for pending SPRs from finalized flights on {target_date}"
         )
@@ -135,14 +154,14 @@ class Command(BaseCronJobCommand):
             "instructors/emails/pending_sprs_notification.txt", context
         )
 
-        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-        if "@" in default_from:
-            domain = default_from.split("@")[-1]
-            from_email = f"noreply@{domain}"
-        elif config and config.domain_name:
-            from_email = f"noreply@{config.domain_name}"
-        else:
-            from_email = "noreply@manage2soar.com"
+        # Let send_mail() normalise the sender via enforce_noreply_from_email()
+        # so From headers are correct even when DEFAULT_FROM_EMAIL is in
+        # "Name <addr@domain>" format.
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "") or (
+            f"noreply@{config.domain_name}"
+            if config and config.domain_name
+            else "noreply@manage2soar.com"
+        )
 
         if instructor.email:
             send_mail(

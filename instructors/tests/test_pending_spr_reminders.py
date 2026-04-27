@@ -202,3 +202,40 @@ def test_notify_pending_sprs_ignores_non_finalized_logsheets(
 
     assert len(mail.outbox) == 0
     assert Notification.objects.count() == 0
+
+
+@pytest.mark.django_db
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_DEV_MODE=False,
+    DEFAULT_FROM_EMAIL="noreply@test.com",
+    SITE_URL="https://test.manage2soar.com",
+)
+def test_notify_pending_sprs_picks_up_late_finalized_logsheet(
+    site_config, airfield, instructor, student_one
+):
+    """Without --flight-date, the command should find the most recent finalized
+    flying day regardless of when the logsheet was finalized, so logsheets
+    finalized 2+ days after the flights are still picked up."""
+    # Logsheet dated 3 days ago but finalized late (today) — simulates a
+    # real scenario where the DO closes out after a delay.
+    flight_date = date(2026, 4, 23)  # 3 days before the mock today
+    logsheet = Logsheet.objects.create(
+        log_date=flight_date,
+        airfield=airfield,
+        created_by=instructor,
+        finalized=True,
+    )
+    create_flight(logsheet, student_one, instructor, 10)
+
+    mail.outbox.clear()
+    Notification.objects.all().delete()
+
+    # Run without --flight-date; should auto-discover flight_date as the
+    # most recent finalized instructional flying day.
+    call_command("notify_pending_sprs")
+
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == [instructor.email]
+    assert "April 23, 2026" in mail.outbox[0].subject
+    assert Notification.objects.filter(user=instructor).count() == 1
