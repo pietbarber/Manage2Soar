@@ -151,20 +151,31 @@ def _make_pdf_link_from_embed(match, site_url):
     )
 
 
-def _trusted_email_image_hosts(site_url=None):
-    """Return allowed hosts for inline images rendered into member emails."""
-    trusted_hosts = {
-        "img.youtube.com",
-        "i.ytimg.com",
+def _trusted_email_image_prefixes(site_url=None):
+    """Return allowed URL prefixes for inline images rendered into member emails."""
+    trusted_prefixes = {
+        "https://img.youtube.com/",
+        "https://i.ytimg.com/",
     }
 
     for candidate in (site_url, getattr(settings, "MEDIA_URL", "") or ""):
         parsed = urlparse(candidate)
-        hostname = (parsed.hostname or "").lower()
-        if parsed.scheme in ("http", "https") and hostname:
-            trusted_hosts.add(str(hostname))
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            continue
 
-    return trusted_hosts
+        path = (
+            parsed.path.rstrip("/")
+            if isinstance(parsed.path, str)
+            else parsed.path.decode("utf-8", errors="ignore").rstrip("/")
+        )
+        prefix = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+        if path:
+            prefix = f"{prefix}{path}/"
+        else:
+            prefix = f"{prefix}/"
+        trusted_prefixes.add(prefix)
+
+    return trusted_prefixes
 
 
 def _normalize_img_src_for_email(raw_url, site_url=None):
@@ -175,6 +186,19 @@ def _normalize_img_src_for_email(raw_url, site_url=None):
     if not parsed.scheme and raw_url.startswith("/") and site_url:
         return build_absolute_url(raw_url, canonical=site_url)
     return raw_url
+
+
+def _normalized_absolute_url_for_compare(raw_url):
+    """Normalize absolute URLs for prefix comparison in trusted image checks."""
+    parsed = urlparse(raw_url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return ""
+
+    path = parsed.path or "/"
+    normalized = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{path}"
+    if parsed.query:
+        normalized = f"{normalized}?{parsed.query}"
+    return normalized
 
 
 def _normalize_img_tags_for_email(html, site_url=None):
@@ -238,7 +262,7 @@ _EMAIL_ALLOWED_TAGS = [
 
 def _email_allowed_attribute(site_url=None):
     """Return a bleach attribute filter for email-bound HTML."""
-    trusted_image_hosts = _trusted_email_image_hosts(site_url)
+    trusted_image_prefixes = _trusted_email_image_prefixes(site_url)
 
     def _allow(tag, name, value):
         # Global attributes permitted on every element
@@ -248,9 +272,10 @@ def _email_allowed_attribute(site_url=None):
             return name in ("href", "target", "rel")
         if tag == "img":
             if name == "src":
-                parsed = urlparse(value)
-                return parsed.scheme in ("http", "https") and (
-                    (parsed.hostname or "").lower() in trusted_image_hosts
+                normalized_value = _normalized_absolute_url_for_compare(value)
+                return bool(normalized_value) and any(
+                    normalized_value.startswith(prefix)
+                    for prefix in trusted_image_prefixes
                 )
             return name in ("alt", "width", "height", "style")
         if tag in ("td", "th"):
@@ -329,17 +354,21 @@ def sanitize_closeout_html_for_email(html, site_url=None):
     - YouTube ``<iframe>`` → linked thumbnail image
     - Google Docs PDF viewer ``<iframe>`` → styled "View PDF" link
     - Bare ``<embed>``/``<object>`` for .pdf files → styled "View PDF" link
+    - Relative ``img[src]`` values → absolute first-party URLs when ``site_url`` is set
 
-    Relative PDF URLs (e.g. ``/media/uploads/doc.pdf``) are converted to
-    absolute using ``site_url`` so they resolve correctly in email clients.
-    In production, pass the canonical site origin (an absolute site URL);
-    ``get_finalization_email_context`` already provides this via its
-    resolved ``site_url`` argument.
+    Relative PDF URLs (e.g. ``/media/uploads/doc.pdf``) and relative image URLs
+    (e.g. ``/media/tinymce/photo.jpg``) are converted to absolute using
+    ``site_url`` so they resolve correctly in email clients. The follow-on
+    Bleach sanitization only preserves ``img[src]`` values that match trusted
+    URL prefixes: the canonical site origin, the configured ``MEDIA_URL``
+    prefix, and the specific YouTube thumbnail prefixes used by embed
+    replacements.
 
     Args:
         html (str): Raw HTML from a TinyMCE HTMLField.
         site_url (str | None): Canonical site origin used to absolutise
-            relative PDF URLs.  When ``None``, relative URLs are left as-is.
+            relative PDF and image URLs. When ``None``, relative URLs are left
+            as-is.
 
     Returns:
         str: HTML safe for rendering inside an email.
@@ -352,10 +381,10 @@ def sanitize_closeout_html_for_email(html, site_url=None):
     )
     html = _PDF_EMBED_RE.sub(lambda m: _make_pdf_link_from_embed(m, site_url), html)
     html = _normalize_img_tags_for_email(html, site_url)
-    # Allowlist-sanitize the remaining HTML.  Unknown tags are stripped
-    # (strip=True), img[src] is restricted to trusted CDN hosts only (see
-    # _email_allowed_attribute), and the CSS shorthand "background" is
-    # excluded to prevent url()-based beacons.
+    # Allowlist-sanitize the remaining HTML. Unknown tags are stripped
+    # (strip=True), img[src] is kept only for trusted URL prefixes after
+    # normalization, and the CSS shorthand "background" is excluded to
+    # prevent url()-based beacons.
     html = _bleach_clean_email_html(html, site_url=site_url)
     return html
 

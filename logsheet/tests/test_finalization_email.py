@@ -143,6 +143,17 @@ class TestSanitizeCloseoutHtml(SimpleTestCase):
             in result
         )
 
+    @override_settings(
+        MEDIA_URL="https://storage.googleapis.com/demo-bucket/ssc/media/"
+    )
+    def test_other_storage_bucket_img_source_is_removed(self):
+        html = '<p><img src="https://storage.googleapis.com/other-bucket/ssc/media/tinymce/tracker.png" alt="x"></p>'
+        result = sanitize_closeout_html_for_email(
+            html, site_url="https://club.example.com"
+        )
+        assert "other-bucket" not in result
+        assert "tracker.png" not in result
+
     def test_relative_media_img_source_is_absolutized(self):
         html = '<p><img src="/media/tinymce/photo.jpg" alt="x"></p>'
         result = sanitize_closeout_html_for_email(
