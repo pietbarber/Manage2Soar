@@ -57,7 +57,7 @@ class Command(BaseCronJobCommand):
             # has at least one pending SPR. Bounded to --max-days (default 30)
             # to avoid scanning the full Logsheet history on quiet days and
             # risking the 10-minute CronJob deadline.
-            max_days = options.get("max_days") or 30
+            max_days = options["max_days"]
             search_start = today - timedelta(days=max_days)
             recent_dates = (
                 Logsheet.objects.filter(

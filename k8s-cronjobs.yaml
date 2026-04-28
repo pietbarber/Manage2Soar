@@ -159,8 +159,8 @@ spec:
                 secretName: gcp-sa-key
 
 ---
-# Daily: Pending SPR reminder digest (7:00 AM UTC, previous finalized flying day)
-# UTC-first schedule until tenant-specific timezone configuration is available.
+# Daily: Pending SPR reminder digest (7:00 AM UTC, most recent finalized flying day with pending SPRs,
+# which may be older than the immediately previous finalized day if more recent days have no pending reports)
 apiVersion: batch/v1
 kind: CronJob
 metadata:

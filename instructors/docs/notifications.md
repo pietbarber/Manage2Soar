@@ -21,7 +21,7 @@ In addition to in-app notifications, instruction reports trigger email delivery:
 Instructor SPR reminders now happen in two stages:
 
 - **Immediate in-app reminder on landed flight**: `logsheet.signals.notify_instructor_on_flight_created()` creates a dashboard notification when an instruction flight lands. This remains the fastest in-product cue that a report is needed.
-- **Daily consolidated email reminder**: `notify_pending_sprs` sends one email per instructor for missing Student Progress Reports from the previous finalized flying day. This reduces noise for instructors who flew with multiple students in one day.
+- **Daily consolidated email reminder**: `notify_pending_sprs` sends one email per instructor for missing Student Progress Reports from the most recent finalized flying day within its lookback window that still has pending reports. This reduces noise for instructors who flew with multiple students in one day.
 - **Weekly overdue escalation**: `notify_late_sprs` still handles unresolved reports once they become overdue.
 
 ### Pending SPR digest behavior

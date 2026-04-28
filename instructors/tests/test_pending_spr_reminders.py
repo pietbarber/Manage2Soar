@@ -104,6 +104,32 @@ def test_get_pending_sprs_for_date_groups_students_and_excludes_existing_reports
 
 
 @pytest.mark.django_db
+def test_get_pending_sprs_for_date_deduplicates_multiple_flights_for_same_student(
+    airfield, instructor, student_one
+):
+    """Multiple flights on the same day for the same instructor/student pair
+    should produce exactly one pending SPR entry, not one per flight."""
+    target_date = date(2026, 4, 25)
+    logsheet = Logsheet.objects.create(
+        log_date=target_date,
+        airfield=airfield,
+        created_by=instructor,
+        finalized=True,
+    )
+    # Same student flew twice with the same instructor on the same day.
+    create_flight(logsheet, student_one, instructor, 10)
+    create_flight(logsheet, student_one, instructor, 14)
+
+    pending = get_pending_sprs_for_date(target_date)
+
+    assert list(pending.keys()) == [instructor]
+    assert (
+        len(pending[instructor]) == 1
+    ), "Expected exactly one pending entry for a student who flew twice on the same day"
+    assert pending[instructor][0]["student"] == student_one
+
+
+@pytest.mark.django_db
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     EMAIL_DEV_MODE=False,

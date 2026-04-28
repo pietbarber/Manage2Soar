@@ -117,7 +117,7 @@ Uses PostgreSQL's atomic operations:
 
 ### 🕒 Active Production Schedule
 - **Daily 6:00 AM UTC**: Pre-op duty emails (for next day) ✅ **DEPLOYED**
-- **Daily 7:00 AM UTC**: Pending SPR reminder digest for previous finalized flying day ✅ **CONFIGURED**
+- **Daily 7:00 AM UTC**: Pending SPR reminder digest for the most recent finalized flying day with pending SPRs (may fall back to an older finalized day within `--max-days`) ✅ **CONFIGURED**
 - **Daily 8:00 AM UTC**: Aging logsheet notifications ✅ **DEPLOYED**
 - **Weekly Sunday 9:00 AM UTC**: Maintenance digest ✅ **DEPLOYED**
 - **Weekly Monday 10:00 AM UTC**: Late SPR notifications ✅ **DEPLOYED**
