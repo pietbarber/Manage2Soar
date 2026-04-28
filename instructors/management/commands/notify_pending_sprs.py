@@ -73,7 +73,26 @@ class Command(BaseCronJobCommand):
             target_date = None
             for candidate_date in recent_dates:
                 result = get_pending_sprs_for_date(candidate_date)
-                if result:
+                if not result:
+                    continue
+                # Skip this date if every eligible instructor has already
+                # received a notification for it. Without this check, the job
+                # would stall on a fully-notified newer date and never fall back
+                # to older dates that still need a first reminder (e.g., when
+                # multiple logsheets are finalized late on different days).
+                date_iso = candidate_date.isoformat()
+                already_notified_ids = set(
+                    Notification.objects.filter(user__in=result.keys())
+                    .filter(
+                        Q(message__contains=PENDING_SPR_NOTIFICATION_FRAGMENT)
+                        & Q(message__contains=date_iso)
+                    )
+                    .values_list("user_id", flat=True)
+                )
+                eligible = [
+                    instr for instr in result if instr.pk not in already_notified_ids
+                ]
+                if eligible:
                     target_date = candidate_date
                     # Reuse the already-fetched result to avoid a second query
                     # for the same date immediately after this loop.

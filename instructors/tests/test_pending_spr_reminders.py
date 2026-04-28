@@ -267,3 +267,76 @@ def test_notify_pending_sprs_picks_up_late_finalized_logsheet(
     assert mail.outbox[0].to == [instructor.email]
     assert flight_date.strftime("%B %d, %Y") in mail.outbox[0].subject
     assert Notification.objects.filter(user=instructor).count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_DEV_MODE=False,
+    DEFAULT_FROM_EMAIL="noreply@test.com",
+    SITE_URL="https://test.manage2soar.com",
+)
+def test_notify_pending_sprs_skips_fully_notified_date_and_falls_back_to_older(
+    site_config, airfield, instructor, student_one, student_two
+):
+    """If the most recent finalized date with pending SPRs already has
+    notifications for all its instructors, the command should skip that date
+    and process the next older date that still has un-notified pending SPRs.
+
+    Scenario:
+      - newer_date (2 days ago): pending SPR, but notification ALREADY sent
+      - older_date (4 days ago): pending SPR, NO notification sent yet
+      → command should email for older_date, not newer_date
+    """
+    from django.utils import timezone
+
+    from instructors.utils import PENDING_SPR_NOTIFICATION_FRAGMENT
+
+    today = timezone.now().date()
+    newer_date = today - timedelta(days=2)
+    older_date = today - timedelta(days=4)
+
+    # Set up newer_date logsheet with a pending SPR for instructor
+    newer_logsheet = Logsheet.objects.create(
+        log_date=newer_date,
+        airfield=airfield,
+        created_by=instructor,
+        finalized=True,
+    )
+    create_flight(newer_logsheet, student_one, instructor, 10)
+
+    # Set up older_date logsheet with a pending SPR for instructor
+    older_logsheet = Logsheet.objects.create(
+        log_date=older_date,
+        airfield=airfield,
+        created_by=instructor,
+        finalized=True,
+    )
+    create_flight(older_logsheet, student_two, instructor, 10)
+
+    # Pre-seed a notification for newer_date so the command treats it as
+    # already handled for this instructor.
+    Notification.objects.create(
+        user=instructor,
+        message=(
+            f"You have 1 {PENDING_SPR_NOTIFICATION_FRAGMENT}(s) "
+            f"from {newer_date.isoformat()}."
+        ),
+        url="/instructors/",
+    )
+
+    mail.outbox.clear()
+
+    call_command("notify_pending_sprs")
+
+    # Should have emailed for older_date (the first un-notified date)
+    assert (
+        len(mail.outbox) == 1
+    ), "Expected one email for older_date; newer_date should have been skipped"
+    assert older_date.strftime("%B %d, %Y") in mail.outbox[0].subject
+    assert mail.outbox[0].to == [instructor.email]
+    # Notification for older_date should now exist
+    assert Notification.objects.filter(
+        user=instructor,
+        message__contains=older_date.isoformat(),
+    ).exists()
