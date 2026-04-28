@@ -83,6 +83,10 @@ class Command(BaseCronJobCommand):
             f"Found {total_pending} pending SPRs for {total_instructors} instructor(s)"
         )
 
+        # Load global config once to avoid repeated DB queries per instructor.
+        config = SiteConfiguration.objects.first()
+        canonical_base = get_canonical_url(config)
+
         notifications_sent = 0
         for instructor, spr_data in pending_sprs.items():
             if options.get("dry_run"):
@@ -92,7 +96,9 @@ class Command(BaseCronJobCommand):
                 continue
 
             try:
-                if self._send_notification(instructor, spr_data, target_date):
+                if self._send_notification(
+                    instructor, spr_data, target_date, config, canonical_base
+                ):
                     notifications_sent += 1
             except Exception as e:
                 self.log_error(f"Failed to notify {instructor.full_display_name}: {e}")
@@ -104,7 +110,9 @@ class Command(BaseCronJobCommand):
         else:
             self.log_info("No reminders sent")
 
-    def _send_notification(self, instructor, spr_data, target_date):
+    def _send_notification(
+        self, instructor, spr_data, target_date, config, canonical_base
+    ):
         message = (
             f"You have {len(spr_data)} {PENDING_SPR_NOTIFICATION_FRAGMENT}(s) "
             f"from {target_date.isoformat()}."
@@ -121,8 +129,6 @@ class Command(BaseCronJobCommand):
             )
             return False
 
-        config = SiteConfiguration.objects.first()
-        canonical_base = get_canonical_url(config)
         dashboard_url = build_absolute_url("/instructors/", canonical=canonical_base)
         pending_sprs = [
             {
@@ -169,20 +175,27 @@ class Command(BaseCronJobCommand):
             else "noreply@manage2soar.com"
         )
 
-        if instructor.email:
-            send_mail(
-                subject=subject,
-                message=text_message,
-                from_email=from_email,
-                recipient_list=[instructor.email],
-                html_message=html_message,
-                fail_silently=False,
+        if not instructor.email:
+            self.log_info(
+                f"Skipping {instructor.full_display_name}: no email address on file"
             )
+            return False
 
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=from_email,
+            recipient_list=[instructor.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+
+        # Use a relative URL for the in-app notification so it stays on the
+        # current host rather than redirecting to the canonical domain.
         Notification.objects.create(
             user=instructor,
             message=message,
-            url=dashboard_url,
+            url="/instructors/",
         )
         self.log_success(
             f"Notified {instructor.full_display_name} about {len(pending_sprs)} pending SPR(s)"
