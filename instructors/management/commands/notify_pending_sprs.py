@@ -154,6 +154,10 @@ class Command(BaseCronJobCommand):
     def _send_notification(
         self, instructor, spr_data, target_date, config, canonical_base
     ):
+        # Normalize email once at the start to ensure consistent handling
+        # of whitespace-only or leading/trailing-space addresses throughout.
+        email = (instructor.email or "").strip()
+
         message = (
             f"You have {len(spr_data)} {PENDING_SPR_NOTIFICATION_FRAGMENT}(s) "
             f"from {target_date.isoformat()}."
@@ -216,7 +220,7 @@ class Command(BaseCronJobCommand):
             else "noreply@manage2soar.com"
         )
 
-        if not instructor.email:
+        if not email:
             self.log_info(
                 f"Skipping {instructor.full_display_name}: no email address on file"
             )
@@ -226,7 +230,7 @@ class Command(BaseCronJobCommand):
             subject=subject,
             message=text_message,
             from_email=from_email,
-            recipient_list=[instructor.email],
+            recipient_list=[email],
             html_message=html_message,
             fail_silently=False,
         )
