@@ -37,9 +37,16 @@ class Command(BaseCronJobCommand):
             type=lambda value: date.fromisoformat(value),
             help="Override target flight date (YYYY-MM-DD)",
         )
+        parser.add_argument(
+            "--max-days",
+            type=int,
+            default=30,
+            help="Maximum number of past days to search for pending SPRs when no date is specified (default: 30)",
+        )
 
     def execute_job(self, *args, **options):
         today = timezone.now().date()
+        pending_sprs = None  # may be pre-populated by the default discovery loop
         if options.get("flight_date"):
             target_date = options["flight_date"]
         elif options.get("days_ago") is not None:
@@ -47,13 +54,16 @@ class Command(BaseCronJobCommand):
             target_date = today - timedelta(days=options["days_ago"])
         else:
             # Default: find the most recent finalized flying day that still
-            # has at least one pending SPR. This ensures late-finalized
-            # logsheets are not skipped and that a newer all-reports-complete
-            # day does not shadow an older day with outstanding SPRs.
+            # has at least one pending SPR. Bounded to --max-days (default 30)
+            # to avoid scanning the full Logsheet history on quiet days and
+            # risking the 10-minute CronJob deadline.
+            max_days = options.get("max_days") or 30
+            search_start = today - timedelta(days=max_days)
             recent_dates = (
                 Logsheet.objects.filter(
                     finalized=True,
                     log_date__lt=today,
+                    log_date__gte=search_start,
                     flights__instructor__isnull=False,
                 )
                 .order_by("-log_date")
@@ -62,17 +72,26 @@ class Command(BaseCronJobCommand):
             )
             target_date = None
             for candidate_date in recent_dates:
-                if get_pending_sprs_for_date(candidate_date):
+                result = get_pending_sprs_for_date(candidate_date)
+                if result:
                     target_date = candidate_date
+                    # Reuse the already-fetched result to avoid a second query
+                    # for the same date immediately after this loop.
+                    pending_sprs = result
                     break
             if target_date is None:
-                self.log_info("No finalized logsheets with pending SPRs found")
+                self.log_info(
+                    f"No finalized logsheets with pending SPRs found in the last {max_days} days"
+                )
                 return
         self.log_info(
             f"Checking for pending SPRs from finalized flights on {target_date}"
         )
 
-        pending_sprs = get_pending_sprs_for_date(target_date)
+        # Use the result cached during date discovery; fall back to an explicit
+        # query when a date was supplied via --flight-date or --days-ago.
+        if pending_sprs is None:
+            pending_sprs = get_pending_sprs_for_date(target_date)
         if not pending_sprs:
             self.log_info("No pending SPRs found")
             return
