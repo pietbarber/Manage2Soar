@@ -90,7 +90,10 @@ class Command(BaseCronJobCommand):
                     .values_list("user_id", flat=True)
                 )
                 eligible = [
-                    instr for instr in result if instr.pk not in already_notified_ids
+                    instr
+                    for instr in result
+                    if instr.pk not in already_notified_ids
+                    and getattr(instr, "email", "").strip()
                 ]
                 if eligible:
                     target_date = candidate_date

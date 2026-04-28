@@ -340,3 +340,77 @@ def test_notify_pending_sprs_skips_fully_notified_date_and_falls_back_to_older(
         user=instructor,
         message__contains=older_date.isoformat(),
     ).exists()
+
+
+@pytest.mark.django_db
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_DEV_MODE=False,
+    DEFAULT_FROM_EMAIL="noreply@test.com",
+    SITE_URL="https://test.manage2soar.com",
+)
+def test_notify_pending_sprs_skips_emailless_date_and_falls_back_to_older(
+    site_config, airfield, student_one
+):
+    """If the most recent finalized date only has pending SPRs for instructors
+    without an email address, the command should skip that date and fall back
+    to an older date whose instructors *do* have an email address.
+
+    Scenario:
+      - newer_date (2 days ago): pending SPR for an email-less instructor
+      - older_date (4 days ago): pending SPR for an instructor with an email
+      → command should email for older_date, skipping newer_date entirely
+    """
+    from django.utils import timezone
+
+    today = timezone.now().date()
+    newer_date = today - timedelta(days=2)
+    older_date = today - timedelta(days=4)
+
+    # Instructor without an email address (should be skipped)
+    emailless_instructor = Member.objects.create(
+        username="noemail_inst",
+        first_name="No",
+        last_name="Email",
+        email="",
+        membership_status="Full Member",
+    )
+    # Instructor with a valid email (should receive the reminder)
+    emailable_instructor = Member.objects.create(
+        username="email_inst",
+        first_name="Has",
+        last_name="Email",
+        email="has@example.com",
+        membership_status="Full Member",
+    )
+
+    # newer_date: pending SPR, but instructor has no email
+    newer_logsheet = Logsheet.objects.create(
+        log_date=newer_date,
+        airfield=airfield,
+        created_by=emailless_instructor,
+        finalized=True,
+    )
+    create_flight(newer_logsheet, student_one, emailless_instructor, 10)
+
+    # older_date: pending SPR for an emailable instructor
+    older_logsheet = Logsheet.objects.create(
+        log_date=older_date,
+        airfield=airfield,
+        created_by=emailable_instructor,
+        finalized=True,
+    )
+    create_flight(older_logsheet, student_one, emailable_instructor, 10)
+
+    mail.outbox.clear()
+    Notification.objects.all().delete()
+
+    call_command("notify_pending_sprs")
+
+    # Should email for older_date only (newer_date's instructor has no email)
+    assert len(mail.outbox) == 1, (
+        "Expected one email for older_date; newer_date should have been skipped "
+        "because its instructor has no email address"
+    )
+    assert older_date.strftime("%B %d, %Y") in mail.outbox[0].subject
+    assert mail.outbox[0].to == [emailable_instructor.email]
