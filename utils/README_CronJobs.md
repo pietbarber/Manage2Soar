@@ -38,6 +38,13 @@ All CronJob commands inherit from `BaseCronJobCommand` which provides:
 - **Timeout**: 10 minutes
 - **Note**: Existing command, converted to use new framework
 
+#### `notify_pending_sprs` (7:00 AM UTC)
+- **Purpose**: Send one consolidated reminder email per instructor for missing Student Progress Reports from the most recent finalized flying day with pending reports, scanning back up to `--max-days`
+- **Recipients**: Flight instructors with missing reports
+- **Frequency**: Daily
+- **Timeout**: 10 minutes
+- **Note**: UTC-first schedule until tenant-specific timezone support exists; by default the command looks back only within its `--max-days` bound
+
 #### `expire_ad_hoc_days` (3:00 AM UTC = 10 PM EST / 11 PM EDT)
 - **Purpose**: Expire unconfirmed ad-hoc duty assignments for today (runs at night-before deadline)
 - **Target**: Ad-hoc duty slots

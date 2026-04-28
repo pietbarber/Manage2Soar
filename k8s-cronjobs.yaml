@@ -159,6 +159,59 @@ spec:
                 secretName: gcp-sa-key
 
 ---
+# Daily: Pending SPR reminder digest (7:00 AM UTC, most recent finalized flying day with pending SPRs,
+# which may be older than the immediately previous finalized day if more recent days have no pending reports)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: notify-pending-sprs
+  namespace: default
+spec:
+  schedule: "0 7 * * *" # Daily at 7:00 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600 # 10 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: notify-pending-sprs
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - notify_pending_sprs
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/gcp-credentials.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
 # Daily: Instructor Summary Emails (6:00 AM UTC, 48 hours ahead)
 # Sends summary to instructors about students requesting instruction
 apiVersion: batch/v1

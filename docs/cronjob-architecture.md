@@ -102,6 +102,7 @@ Uses PostgreSQL's atomic operations:
    - ✅ `expire_ad_hoc_days.py` - **SCHEDULED DAILY**
 2. ✅ Created new notification commands:
    - ✅ `notify_aging_logsheets.py` - **FINDING REAL ISSUES**
+   - ✅ `notify_pending_sprs.py` - **FIRST DAILY SPR REMINDER DIGEST**
    - ✅ `notify_late_sprs.py` - **MONITORING 34 FLIGHTS**
    - ✅ `report_duty_delinquents.py` - **IDENTIFIED 19 DELINQUENTS** (Issue #288 fixed recipient filtering)
    - ✅ `cleanup_old_notifications.py` - **PURGING STALE NOTIFICATIONS / PREVENTS NOTIFICATION ACCUMULATION** (Issue #290 60+ day cleanup & notification timeout)
@@ -116,6 +117,7 @@ Uses PostgreSQL's atomic operations:
 
 ### 🕒 Active Production Schedule
 - **Daily 6:00 AM UTC**: Pre-op duty emails (for next day) ✅ **DEPLOYED**
+- **Daily 7:00 AM UTC**: Pending SPR reminder digest for the most recent finalized flying day with pending SPRs (may fall back to an older finalized day within `--max-days`) ✅ **CONFIGURED**
 - **Daily 8:00 AM UTC**: Aging logsheet notifications ✅ **DEPLOYED**
 - **Weekly Sunday 9:00 AM UTC**: Maintenance digest ✅ **DEPLOYED**
 - **Weekly Monday 10:00 AM UTC**: Late SPR notifications ✅ **DEPLOYED**
@@ -125,6 +127,7 @@ Uses PostgreSQL's atomic operations:
 
 ### 📊 Recent Production Metrics
 - **Aging Logsheets**: Found 1 logsheet (11 days old), notified Todd Morris & Bob Alexander
+- **Pending SPR Reminders**: Consolidates same-day missing reports into one email per instructor after the flying day closes
 - **Late SPRs**: Checked 34 instructional flights, no overdue SPRs found
 - **Duty Delinquents**: Found 19 delinquent members, notifications sent to 4 Member Managers only
 - **Notification Cleanup**: New monthly job to purge notifications older than 60 days (both dismissed and undismissed)
