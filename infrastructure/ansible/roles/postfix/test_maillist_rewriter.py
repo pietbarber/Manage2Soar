@@ -294,10 +294,10 @@ def test_reverse_lookup_uses_exact_alias_token_not_prefix_match():
 def test_rewrite_headers_skips_same_domain_sender():
     """Automated emails from the same domain as the list are not rewritten (issue #846).
 
-    When Django sends a notification to board@skylinesoaring.org the envelope
-    sender is noreply@skylinesoaring.org.  Rewriting that From header to
-    board-bounces@skylinesoaring.org is incorrect; the message should pass through
-    unchanged so recipients see the original noreply address.
+    When Django sends a notification to board@skylinesoaring.org the SMTP envelope
+    sender is noreply@skylinesoaring.org (set by Postfix, not the From header).
+    The guard must use envelope_sender, not the From header, so that an external
+    sender cannot spoof their way out of list rewriting.
     """
     ns = load_template_namespace()
     rewrite_headers = get_callable(ns, "rewrite_headers")
@@ -308,7 +308,9 @@ def test_rewrite_headers_skips_same_domain_sender():
     msg["Subject"] = "Automated notification"
     msg.set_content("Notification body")
 
-    result = rewrite_headers(msg, "board@skylinesoaring.org")
+    result = rewrite_headers(
+        msg, "board@skylinesoaring.org", envelope_sender="noreply@skylinesoaring.org"
+    )
 
     # From header must be unchanged
     assert result["From"] == "noreply@skylinesoaring.org"
@@ -317,10 +319,11 @@ def test_rewrite_headers_skips_same_domain_sender():
 
 
 def test_rewrite_headers_skips_noreply_sender_any_domain():
-    """Any sender whose local-part is 'noreply' is treated as automated (issue #846).
+    """Any SMTP envelope sender whose local-part is 'noreply' is treated as automated (issue #846).
 
     This catches cases where the application sends from noreply@manage2soar.com
     to a list address on a different subdomain, e.g. board@ssc.manage2soar.com.
+    The guard uses envelope_sender so a spoofed From header cannot bypass rewriting.
     """
     ns = load_template_namespace()
     rewrite_headers = get_callable(ns, "rewrite_headers")
@@ -331,7 +334,9 @@ def test_rewrite_headers_skips_noreply_sender_any_domain():
     msg["Subject"] = "Cross-domain automated notification"
     msg.set_content("Notification body")
 
-    result = rewrite_headers(msg, "board@ssc.manage2soar.com")
+    result = rewrite_headers(
+        msg, "board@ssc.manage2soar.com", envelope_sender="noreply@manage2soar.com"
+    )
 
     assert result["From"] == "noreply@manage2soar.com"
     assert result["Reply-To"] is None
@@ -348,8 +353,36 @@ def test_rewrite_headers_still_rewrites_external_sender():
     msg["Subject"] = "External post to list"
     msg.set_content("External body")
 
-    result = rewrite_headers(msg, "board@skylinesoaring.org")
+    result = rewrite_headers(
+        msg, "board@skylinesoaring.org", envelope_sender="john@gmail.com"
+    )
 
     assert "board-bounces@skylinesoaring.org" in result["From"]
     assert "John Doe via Board" in result["From"]
     assert "john@gmail.com" in result["Reply-To"]
+
+
+def test_rewrite_headers_external_spoofed_from_cannot_bypass_rewriting():
+    """An external sender cannot bypass rewriting by spoofing a same-domain From header.
+
+    If the SMTP envelope sender (john@gmail.com) is external, the message must be
+    rewritten even if the From header claims to be noreply@skylinesoaring.org.
+    Without using envelope_sender the previous From-header guard was bypassable.
+    """
+    ns = load_template_namespace()
+    rewrite_headers = get_callable(ns, "rewrite_headers")
+
+    msg = EmailMessage()
+    # Attacker spoofs From to look like internal noreply
+    msg["From"] = "noreply@skylinesoaring.org"
+    msg["To"] = "board@skylinesoaring.org"
+    msg["Subject"] = "Spoofed automated-looking post"
+    msg.set_content("Spam body")
+
+    # But the SMTP envelope sender is their real external address
+    result = rewrite_headers(
+        msg, "board@skylinesoaring.org", envelope_sender="attacker@gmail.com"
+    )
+
+    # Must be rewritten — the envelope sender is external
+    assert "board-bounces@skylinesoaring.org" in result["From"]

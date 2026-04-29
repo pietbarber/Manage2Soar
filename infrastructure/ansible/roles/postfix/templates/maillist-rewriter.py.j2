@@ -70,7 +70,7 @@ def _load_lists_from_virtual(virtual_file='/etc/postfix/virtual'):
 ALL_KNOWN_LISTS = MAILING_LISTS | _load_lists_from_virtual()
 
 
-def rewrite_headers(msg, recipient):
+def rewrite_headers(msg, recipient, envelope_sender=None):
     """
     Rewrite headers Mailman-style:
     - Save original From to Reply-To
@@ -79,7 +79,18 @@ def rewrite_headers(msg, recipient):
     Internal/automated senders (same domain as the list, or local-part 'noreply')
     are passed through unchanged so that transactional notification emails do not
     appear to come from a bounces address (issue #846).
+
+    The guard uses ``envelope_sender`` (the SMTP envelope sender passed by
+    Postfix, which is verified at the MTA level and cannot be trivially spoofed)
+    when available.  It falls back to parsing the ``From`` header only when no
+    envelope sender is provided (e.g. in unit tests).
     """
+    # Determine the effective sender address for the passthrough guard.
+    # Prefer the SMTP envelope sender: it is set by Postfix from the MAIL FROM
+    # command and cannot be overridden by the message body, so an unauthenticated
+    # external sender cannot forge it to bypass list rewriting.
+    guard_email = envelope_sender or parseaddr(msg.get('From', ''))[1]
+
     original_from = msg.get('From', '')
     original_name, original_email = parseaddr(original_from)
 
@@ -87,8 +98,8 @@ def rewrite_headers(msg, recipient):
     # automated/transactional emails from the application, not user posts to
     # the list.  Rewriting them would make notifications appear to come from
     # "board-bounces@domain" instead of "noreply@domain".
-    if original_email:
-        sender_local, _, sender_domain = original_email.partition('@')
+    if guard_email:
+        sender_local, _, sender_domain = guard_email.partition('@')
         _, _, list_domain = recipient.lower().partition('@')
         if sender_domain.lower() == list_domain or sender_local.lower() == 'noreply':
             return msg
@@ -277,9 +288,11 @@ def main():
             sys.stderr.write(f"maillist-rewriter: SMTP passthrough failed: {e}\n")
             sys.exit(os.EX_TEMPFAIL)
 
-    # Rewrite if this is going to a mailing list
+    # Rewrite if this is going to a mailing list.
+    # Pass the SMTP envelope sender so the passthrough guard uses a
+    # Postfix-verified address instead of the (spoofable) From header.
     if original_to and original_to.lower() in ALL_KNOWN_LISTS:
-        msg = rewrite_headers(msg, original_to)
+        msg = rewrite_headers(msg, original_to, envelope_sender=sender)
 
     # Reinject to port 10025 (bypasses content_filter)
     # CRITICAL: Use rewritten From header as envelope sender for SMTP2Go verification
