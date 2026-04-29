@@ -3,7 +3,10 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("logsheet", "0018_maintenancedeadline_maintenance_deadline_must_have_aircraft"),
+        (
+            "logsheet",
+            "0018_maintenancedeadline_maintenance_deadline_must_have_aircraft",
+        ),
     ]
 
     operations = [

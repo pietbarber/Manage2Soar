@@ -8,61 +8,164 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('duty_roster', '0011_commercial_pilot_role_fields'),
-        ('siteconfig', '0042_siteconfiguration_enable_dynamic_duty_roles'),
+        ("duty_roster", "0011_commercial_pilot_role_fields"),
+        ("siteconfig", "0042_siteconfiguration_enable_dynamic_duty_roles"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='DutyRoleDefinition',
+            name="DutyRoleDefinition",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('key', models.SlugField(help_text='Stable internal key used in scheduling and integrations.', max_length=64)),
-                ('display_name', models.CharField(help_text='Human-readable role label used when no legacy terminology override applies.', max_length=80)),
-                ('is_active', models.BooleanField(default=True)),
-                ('sort_order', models.PositiveIntegerField(default=100)),
-                ('legacy_role_key', models.CharField(blank=True, choices=[('instructor', 'Instructor'), ('towpilot', 'Tow Pilot'), ('duty_officer', 'Duty Officer'), ('assistant_duty_officer', 'Assistant Duty Officer'), ('commercial_pilot', 'Commercial Pilot'), ('surge_towpilot', 'Surge Tow Pilot'), ('surge_instructor', 'Surge Instructor')], help_text='Optional mapping to legacy role terminology fields in Site Configuration. If set, terminology labels from Site Configuration take precedence.', max_length=32, null=True)),
-                ('shift_code', models.CharField(blank=True, default='', help_text='Optional shift identifier (e.g. am, pm) for role/slot segmentation.', max_length=16)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('site_configuration', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='duty_role_definitions', to='siteconfig.siteconfiguration')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "key",
+                    models.SlugField(
+                        help_text="Stable internal key used in scheduling and integrations.",
+                        max_length=64,
+                    ),
+                ),
+                (
+                    "display_name",
+                    models.CharField(
+                        help_text="Human-readable role label used when no legacy terminology override applies.",
+                        max_length=80,
+                    ),
+                ),
+                ("is_active", models.BooleanField(default=True)),
+                ("sort_order", models.PositiveIntegerField(default=100)),
+                (
+                    "legacy_role_key",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("instructor", "Instructor"),
+                            ("towpilot", "Tow Pilot"),
+                            ("duty_officer", "Duty Officer"),
+                            ("assistant_duty_officer", "Assistant Duty Officer"),
+                            ("commercial_pilot", "Commercial Pilot"),
+                            ("surge_towpilot", "Surge Tow Pilot"),
+                            ("surge_instructor", "Surge Instructor"),
+                        ],
+                        help_text="Optional mapping to legacy role terminology fields in Site Configuration. If set, terminology labels from Site Configuration take precedence.",
+                        max_length=32,
+                        null=True,
+                    ),
+                ),
+                (
+                    "shift_code",
+                    models.CharField(
+                        blank=True,
+                        default="",
+                        help_text="Optional shift identifier (e.g. am, pm) for role/slot segmentation.",
+                        max_length=16,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "site_configuration",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="duty_role_definitions",
+                        to="siteconfig.siteconfiguration",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['sort_order', 'display_name'],
-                'unique_together': {('site_configuration', 'key')},
+                "ordering": ["sort_order", "display_name"],
+                "unique_together": {("site_configuration", "key")},
             },
         ),
         migrations.CreateModel(
-            name='DutyQualificationRequirement',
+            name="DutyQualificationRequirement",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('requirement_type', models.CharField(choices=[('legacy_role_flag', 'Legacy member role flag'), ('legacy_glider_rating', 'Legacy glider rating'), ('member_duty_qualification', 'Member duty qualification code')], max_length=32)),
-                ('requirement_value', models.CharField(help_text='For legacy role flag, use member field name (e.g. instructor). For legacy glider rating, use rating value (e.g. commercial). For member duty qualification, use qualification code.', max_length=64)),
-                ('is_required', models.BooleanField(default=True)),
-                ('notes', models.CharField(blank=True, max_length=255)),
-                ('role_definition', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='qualification_requirements', to='duty_roster.dutyroledefinition')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "requirement_type",
+                    models.CharField(
+                        choices=[
+                            ("legacy_role_flag", "Legacy member role flag"),
+                            ("legacy_glider_rating", "Legacy glider rating"),
+                            (
+                                "member_duty_qualification",
+                                "Member duty qualification code",
+                            ),
+                        ],
+                        max_length=32,
+                    ),
+                ),
+                (
+                    "requirement_value",
+                    models.CharField(
+                        help_text="For legacy role flag, use member field name (e.g. instructor). For legacy glider rating, use rating value (e.g. commercial). For member duty qualification, use qualification code.",
+                        max_length=64,
+                    ),
+                ),
+                ("is_required", models.BooleanField(default=True)),
+                ("notes", models.CharField(blank=True, max_length=255)),
+                (
+                    "role_definition",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="qualification_requirements",
+                        to="duty_roster.dutyroledefinition",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['id'],
-                'unique_together': {('role_definition', 'requirement_type', 'requirement_value')},
+                "ordering": ["id"],
+                "unique_together": {
+                    ("role_definition", "requirement_type", "requirement_value")
+                },
             },
         ),
         migrations.CreateModel(
-            name='MemberDutyQualification',
+            name="MemberDutyQualification",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('qualification_code', models.SlugField(max_length=64)),
-                ('is_qualified', models.BooleanField(default=True)),
-                ('awarded_date', models.DateField(blank=True, null=True)),
-                ('expires_on', models.DateField(blank=True, null=True)),
-                ('notes', models.CharField(blank=True, max_length=255)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='duty_qualifications', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("qualification_code", models.SlugField(max_length=64)),
+                ("is_qualified", models.BooleanField(default=True)),
+                ("awarded_date", models.DateField(blank=True, null=True)),
+                ("expires_on", models.DateField(blank=True, null=True)),
+                ("notes", models.CharField(blank=True, max_length=255)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="duty_qualifications",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['qualification_code'],
-                'unique_together': {('member', 'qualification_code')},
+                "ordering": ["qualification_code"],
+                "unique_together": {("member", "qualification_code")},
             },
         ),
     ]
