@@ -40,6 +40,33 @@ from members.models import Member
 from siteconfig.models import SiteConfiguration
 
 
+class ORToolsSchedulerTestBase(TestCase):
+    """
+    Base test class for OR-Tools scheduler tests.
+
+    Provides shared helper methods for creating schedulers with specific
+    configurations to isolate constraint behavior.
+    """
+
+    def _create_scheduler_without_adjacent_weekend_spacing(self, data):
+        """
+        Helper to create a scheduler without enforcing adjacent-weekend spacing.
+
+        This disables the adjacent-weekend spacing hard constraint gating in
+        DutyRosterScheduler._add_hard_constraints(). Note that this does NOT disable
+        the separate weekend-spacing soft objective terms (lag penalties), which
+        are controlled independently.
+
+        Hard-constraint tests use this to isolate specific constraints without
+        interference from the adjacent-weekend spacing hard constraint.
+
+        Soft-constraint tests use this to isolate preference/affinity/staleness
+        weighting without the adjacent-weekend spacing hard constraint making
+        the problem infeasible.
+        """
+        return DutyRosterScheduler(data, enforce_adjacent_weekend_spacing=False)
+
+
 class ORToolsSchedulerBasicTests(TestCase):
     """Test basic OR-Tools scheduler functionality."""
 
@@ -170,7 +197,7 @@ class ORToolsSchedulerBasicTests(TestCase):
         self.assertGreater(len(towpilot1_vars), 0)
 
 
-class ORToolsHardConstraintsTests(TestCase):
+class ORToolsHardConstraintsTests(ORToolsSchedulerTestBase):
     """Test individual hard constraints."""
 
     def setUp(self):
@@ -358,7 +385,7 @@ class ORToolsHardConstraintsTests(TestCase):
         # Verify avoidance is in data
         self.assertIn((self.member1.id, self.member2.id), data.avoidances)
 
-        scheduler = DutyRosterScheduler(data)
+        scheduler = self._create_scheduler_without_adjacent_weekend_spacing(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -412,7 +439,7 @@ class ORToolsHardConstraintsTests(TestCase):
             role_scarcity={role: {"scarcity_score": 1.0} for role in self.test_roles},
             earliest_duty_day=three_dates[0],
         )
-        scheduler = DutyRosterScheduler(data)
+        scheduler = self._create_scheduler_without_adjacent_weekend_spacing(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -1118,7 +1145,7 @@ class ORToolsHardConstraintsTests(TestCase):
         )
 
 
-class ORToolsSoftConstraintsTests(TestCase):
+class ORToolsSoftConstraintsTests(ORToolsSchedulerTestBase):
     """Test soft constraints (objective function optimization)."""
 
     def setUp(self):
@@ -1162,7 +1189,9 @@ class ORToolsSoftConstraintsTests(TestCase):
         )
 
         data = extract_scheduling_data(year=2026, month=3, roles=self.test_roles)
-        scheduler = DutyRosterScheduler(data)
+        # Disable adjacent-weekend spacing hard constraint so this test isolates
+        # preference weighting without interference from spacing feasibility.
+        scheduler = self._create_scheduler_without_adjacent_weekend_spacing(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -1237,7 +1266,9 @@ class ORToolsSoftConstraintsTests(TestCase):
         data = extract_scheduling_data(
             year=2026, month=3, roles=["instructor", "towpilot"]
         )
-        scheduler = DutyRosterScheduler(data)
+        # Disable adjacent-weekend spacing hard constraint so this test isolates
+        # pairing-affinity weighting without interference from spacing feasibility.
+        scheduler = self._create_scheduler_without_adjacent_weekend_spacing(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -1280,7 +1311,9 @@ class ORToolsSoftConstraintsTests(TestCase):
         )
 
         data = extract_scheduling_data(year=2026, month=3, roles=self.test_roles)
-        scheduler = DutyRosterScheduler(data)
+        # Disable adjacent-weekend spacing hard constraint so this test isolates
+        # staleness-based weighting without interference from spacing feasibility.
+        scheduler = self._create_scheduler_without_adjacent_weekend_spacing(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
