@@ -4,6 +4,7 @@ This data migration is idempotent and will attach roles to the first
 SiteConfiguration row (the demo site). It can be safely run multiple
 times in staging/production.
 """
+
 from django.db import migrations
 
 
@@ -79,7 +80,10 @@ def backwards(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("duty_roster", "0015_dutyswaprequest_swap_request_dynamic_role_metadata_consistency"),
+        (
+            "duty_roster",
+            "0015_dutyswaprequest_swap_request_dynamic_role_metadata_consistency",
+        ),
     ]
 
     operations = [

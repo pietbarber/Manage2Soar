@@ -2,7 +2,6 @@ import re
 
 from django.db import migrations
 
-
 CONTACT_URL_RE = re.compile(r"/admin/cms/visitorcontact/(?P<pk>\d+)/change/?$")
 
 
@@ -10,9 +9,11 @@ def backfill_contact_submission_links(apps, schema_editor):
     Notification = apps.get_model("notifications", "Notification")
     VisitorContact = apps.get_model("cms", "VisitorContact")
 
-    candidates = Notification.objects.filter(contact_submission__isnull=True).exclude(
-        url__isnull=True
-    ).exclude(url="")
+    candidates = (
+        Notification.objects.filter(contact_submission__isnull=True)
+        .exclude(url__isnull=True)
+        .exclude(url="")
+    )
 
     for notification in candidates.iterator():
         match = CONTACT_URL_RE.search(notification.url)

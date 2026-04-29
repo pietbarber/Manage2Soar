@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('siteconfig', '0041_siteconfiguration_commercial_pilot_title_and_more'),
+        ("siteconfig", "0041_siteconfiguration_commercial_pilot_title_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='enable_dynamic_duty_roles',
-            field=models.BooleanField(default=False, help_text='Enable the prototype dynamic duty role registry and qualification mapping. When disabled, the duty roster uses legacy fixed roles and qualification fields.', verbose_name='Enable Dynamic Duty Roles'),
+            model_name="siteconfiguration",
+            name="enable_dynamic_duty_roles",
+            field=models.BooleanField(
+                default=False,
+                help_text="Enable the prototype dynamic duty role registry and qualification mapping. When disabled, the duty roster uses legacy fixed roles and qualification fields.",
+                verbose_name="Enable Dynamic Duty Roles",
+            ),
         ),
     ]
