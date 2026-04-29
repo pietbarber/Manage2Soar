@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 anyio==4.11.0
 asgiref==3.9.1
-Authlib==1.6.9
+Authlib==1.6.11
 bandit==1.8.6
 black==26.3.1
 bleach==6.3.0
@@ -98,7 +98,7 @@ pytest-cov==7.0.0
 pytest-django==4.11.1
 pytest-playwright==0.7.2
 python-dateutil==2.9.0.post0
-python-dotenv==1.1.1
+python-dotenv==1.2.2
 python-slugify==8.0.4
 python3-openid==3.2.0
 pytokens==0.4.1
