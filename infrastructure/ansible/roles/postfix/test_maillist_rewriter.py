@@ -289,3 +289,67 @@ def test_reverse_lookup_uses_exact_alias_token_not_prefix_match():
         original_to = detect_original_list(msg, recipients)
 
     assert original_to == "members@skylinesoaring.org"
+
+
+def test_rewrite_headers_skips_same_domain_sender():
+    """Automated emails from the same domain as the list are not rewritten (issue #846).
+
+    When Django sends a notification to board@skylinesoaring.org the envelope
+    sender is noreply@skylinesoaring.org.  Rewriting that From header to
+    board-bounces@skylinesoaring.org is incorrect; the message should pass through
+    unchanged so recipients see the original noreply address.
+    """
+    ns = load_template_namespace()
+    rewrite_headers = get_callable(ns, "rewrite_headers")
+
+    msg = EmailMessage()
+    msg["From"] = "noreply@skylinesoaring.org"
+    msg["To"] = "board@skylinesoaring.org"
+    msg["Subject"] = "Automated notification"
+    msg.set_content("Notification body")
+
+    result = rewrite_headers(msg, "board@skylinesoaring.org")
+
+    # From header must be unchanged
+    assert result["From"] == "noreply@skylinesoaring.org"
+    # No Reply-To should be injected for automated messages
+    assert result["Reply-To"] is None
+
+
+def test_rewrite_headers_skips_noreply_sender_any_domain():
+    """Any sender whose local-part is 'noreply' is treated as automated (issue #846).
+
+    This catches cases where the application sends from noreply@manage2soar.com
+    to a list address on a different subdomain, e.g. board@ssc.manage2soar.com.
+    """
+    ns = load_template_namespace()
+    rewrite_headers = get_callable(ns, "rewrite_headers")
+
+    msg = EmailMessage()
+    msg["From"] = "noreply@manage2soar.com"
+    msg["To"] = "board@ssc.manage2soar.com"
+    msg["Subject"] = "Cross-domain automated notification"
+    msg.set_content("Notification body")
+
+    result = rewrite_headers(msg, "board@ssc.manage2soar.com")
+
+    assert result["From"] == "noreply@manage2soar.com"
+    assert result["Reply-To"] is None
+
+
+def test_rewrite_headers_still_rewrites_external_sender():
+    """External senders to a list are still rewritten normally (regression guard)."""
+    ns = load_template_namespace()
+    rewrite_headers = get_callable(ns, "rewrite_headers")
+
+    msg = EmailMessage()
+    msg["From"] = "John Doe <john@gmail.com>"
+    msg["To"] = "board@skylinesoaring.org"
+    msg["Subject"] = "External post to list"
+    msg.set_content("External body")
+
+    result = rewrite_headers(msg, "board@skylinesoaring.org")
+
+    assert "board-bounces@skylinesoaring.org" in result["From"]
+    assert "John Doe via Board" in result["From"]
+    assert "john@gmail.com" in result["Reply-To"]

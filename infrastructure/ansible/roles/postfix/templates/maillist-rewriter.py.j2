@@ -75,9 +75,23 @@ def rewrite_headers(msg, recipient):
     Rewrite headers Mailman-style:
     - Save original From to Reply-To
     - Rewrite From to list-bounces address with original name
+
+    Internal/automated senders (same domain as the list, or local-part 'noreply')
+    are passed through unchanged so that transactional notification emails do not
+    appear to come from a bounces address (issue #846).
     """
     original_from = msg.get('From', '')
     original_name, original_email = parseaddr(original_from)
+
+    # Do not rewrite headers for same-domain or noreply senders — these are
+    # automated/transactional emails from the application, not user posts to
+    # the list.  Rewriting them would make notifications appear to come from
+    # "board-bounces@domain" instead of "noreply@domain".
+    if original_email:
+        sender_local, _, sender_domain = original_email.partition('@')
+        _, _, list_domain = recipient.lower().partition('@')
+        if sender_domain.lower() == list_domain or sender_local.lower() == 'noreply':
+            return msg
 
     # Get list address from recipient
     recipient_lower = recipient.lower()

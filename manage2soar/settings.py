@@ -221,6 +221,10 @@ SOCIAL_AUTH_PIPELINE = (
 # and editable only by the member or admin.
 SOCIAL_AUTH_PROTECTED_USER_FIELDS = ["first_name", "last_name"]
 
+# Issue #674: Preserve the ?next= redirect parameter through the Google OAuth2
+# redirect cycle so users land on the page they originally requested.
+SOCIAL_AUTH_FIELDS_STORED_IN_SESSION = ["next"]
+
 
 MESSAGE_TAGS = {
     messages.ERROR: "danger",  # maps Django "error" to Bootstrap "danger"
