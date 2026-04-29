@@ -251,35 +251,21 @@ def send_mass_mail(
     )
 
 
-class DevModeEmailMessage(EmailMessage):
-    """EmailMessage subclass with dev mode support.
+class _DevModeApplyMixin:
+    """Mixin that applies EMAIL_DEV_MODE redirection to outbound email objects.
 
-    When EMAIL_DEV_MODE is enabled, emails are redirected to
-    EMAIL_DEV_MODE_REDIRECT_TO address(es).
-
-    Use this class when you need to construct EmailMessage objects directly
-    instead of using send_mail(). This is useful for HTML emails with attachments
-    or when you need more control over the email structure.
-
-    Example:
-        from utils.email import DevModeEmailMessage
-
-        msg = DevModeEmailMessage(
-            subject="Welcome!",
-            body="Your account is ready.",
-            from_email="noreply@example.com",
-            to=["user@example.com"],
-        )
-        msg.send()
+    Both DevModeEmailMessage and DevModeEmailMultiAlternatives share this logic.
+    Centralising it here prevents the two classes from drifting when the
+    redirection behaviour (subject annotation, cc/bcc clearing, redirect list
+    validation) needs to change.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.from_email = enforce_noreply_from_email(self.from_email)
-        self._apply_dev_mode()
-
     def _apply_dev_mode(self):
-        """Apply dev mode redirection if enabled."""
+        """Redirect to EMAIL_DEV_MODE_REDIRECT_TO when dev mode is enabled.
+
+        Raises:
+            ValueError: If dev mode is enabled but no redirect address is configured.
+        """
         dev_mode, redirect_list = get_dev_mode_info()
 
         if dev_mode:
@@ -321,3 +307,57 @@ class DevModeEmailMessage(EmailMessage):
             self.to = redirect_list
             self.cc = []
             self.bcc = []
+
+
+class DevModeEmailMessage(_DevModeApplyMixin, EmailMessage):
+    """EmailMessage subclass with dev mode support.
+
+    When EMAIL_DEV_MODE is enabled, emails are redirected to
+    EMAIL_DEV_MODE_REDIRECT_TO address(es).
+
+    Use this class when you need to construct EmailMessage objects directly
+    instead of using send_mail(). This is useful for HTML emails with attachments
+    or when you need more control over the email structure.
+
+    Example:
+        from utils.email import DevModeEmailMessage
+
+        msg = DevModeEmailMessage(
+            subject="Welcome!",
+            body="Your account is ready.",
+            from_email="noreply@example.com",
+            to=["user@example.com"],
+        )
+        msg.send()
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.from_email = enforce_noreply_from_email(self.from_email)
+        self._apply_dev_mode()
+
+
+class DevModeEmailMultiAlternatives(_DevModeApplyMixin, EmailMultiAlternatives):
+    """EmailMultiAlternatives subclass with dev mode support.
+
+    Use this in place of EmailMultiAlternatives directly when you need HTML
+    alternatives, attachments, or other features beyond send_mail(), while
+    still honouring EMAIL_DEV_MODE redirection and the noreply From enforcement.
+
+    Example:
+        from utils.email import DevModeEmailMultiAlternatives
+
+        msg = DevModeEmailMultiAlternatives(
+            subject="Your roster",
+            body="Plain text",
+            from_email="noreply@example.com",
+            to=["member@example.com"],
+        )
+        msg.attach_alternative("<p>HTML</p>", "text/html")
+        msg.send()
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.from_email = enforce_noreply_from_email(self.from_email)
+        self._apply_dev_mode()

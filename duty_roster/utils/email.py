@@ -2,13 +2,12 @@ from collections import defaultdict
 from datetime import date
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 
 from duty_roster.utils.ics import generate_roster_ics
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
-from utils.email import send_mail
+from utils.email import DevModeEmailMultiAlternatives, send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
@@ -262,7 +261,7 @@ def send_roster_published_notifications(year, month, assignments):
             f"[{email_config['club_name']}] Your Duty Assignments for {month_name}"
         )
 
-        email = EmailMultiAlternatives(
+        email = DevModeEmailMultiAlternatives(
             subject=subject,
             body=text_message,
             from_email=email_config["from_email"],

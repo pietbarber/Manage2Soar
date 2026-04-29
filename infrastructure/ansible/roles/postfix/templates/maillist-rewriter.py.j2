@@ -70,17 +70,43 @@ def _load_lists_from_virtual(virtual_file='/etc/postfix/virtual'):
 ALL_KNOWN_LISTS = MAILING_LISTS | _load_lists_from_virtual()
 
 
-def rewrite_headers(msg, recipient):
+def rewrite_headers(msg, recipient, envelope_sender=None):
     """
     Rewrite headers Mailman-style:
     - Save original From to Reply-To
     - Rewrite From to list-bounces address with original name
+
+    The automated sender ``noreply@<list_domain>`` is passed through unchanged
+    so that transactional notification emails do not appear to come from a
+    bounces address (issue #846).
+
+    The guard uses ``envelope_sender`` (the SMTP envelope sender from the
+    ``MAIL FROM`` command as seen by Postfix) when available. This is preferred
+    for the passthrough check because it is SMTP-session metadata rather than a
+    message header, but it is still client-supplied and should not be treated as
+    authenticated or unforgeable. It falls back to parsing the ``From`` header
+    only when no envelope sender is provided (e.g. in unit tests).
     """
+    # Determine the effective sender address for the passthrough guard.
+    # Prefer the SMTP envelope sender because it comes from the SMTP session's
+    # MAIL FROM command rather than the message headers/body. That makes it a
+    # better signal than the From header for this heuristic, but it is still
+    # client-provided SMTP metadata and not inherently trustworthy.
+    guard_email = envelope_sender or parseaddr(msg.get('From', ''))[1]
+
     original_from = msg.get('From', '')
     original_name, original_email = parseaddr(original_from)
 
     # Get list address from recipient
     recipient_lower = recipient.lower()
+    _, _, list_domain = recipient_lower.partition('@')
+
+    # Only allow a narrow passthrough for the exact automated sender address
+    # used by the application on the list domain.  Do not exempt arbitrary
+    # same-domain or generic "noreply" senders, because on port 25 the
+    # envelope sender is client-supplied and not inherently trustworthy.
+    if guard_email and guard_email.lower() == f"noreply@{list_domain}":
+        return msg
 
     # Extract list name and domain (e.g., "webmaster" from "webmaster@domain.com")
     list_local, list_domain = recipient_lower.split('@', 1)
@@ -263,9 +289,11 @@ def main():
             sys.stderr.write(f"maillist-rewriter: SMTP passthrough failed: {e}\n")
             sys.exit(os.EX_TEMPFAIL)
 
-    # Rewrite if this is going to a mailing list
+    # Rewrite if this is going to a mailing list.
+    # Pass the SMTP envelope sender so the passthrough guard uses a
+    # Postfix-verified address instead of the (spoofable) From header.
     if original_to and original_to.lower() in ALL_KNOWN_LISTS:
-        msg = rewrite_headers(msg, original_to)
+        msg = rewrite_headers(msg, original_to, envelope_sender=sender)
 
     # Reinject to port 10025 (bypasses content_filter)
     # CRITICAL: Use rewritten From header as envelope sender for SMTP2Go verification

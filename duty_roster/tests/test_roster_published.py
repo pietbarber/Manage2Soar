@@ -175,7 +175,7 @@ class TestSendRosterPublishedNotifications:
         )
 
         with patch(
-            "duty_roster.utils.email.EmailMultiAlternatives"
+            "duty_roster.utils.email.DevModeEmailMultiAlternatives"
         ) as mock_email_class:
             mock_email = MagicMock()
             mock_email_class.return_value = mock_email
@@ -205,7 +205,7 @@ class TestSendRosterPublishedNotifications:
         )
 
         with patch(
-            "duty_roster.utils.email.EmailMultiAlternatives"
+            "duty_roster.utils.email.DevModeEmailMultiAlternatives"
         ) as mock_email_class:
             mock_email = MagicMock()
             mock_email_class.return_value = mock_email
@@ -244,7 +244,7 @@ class TestSendRosterPublishedNotifications:
         )
 
         with patch(
-            "duty_roster.utils.email.EmailMultiAlternatives"
+            "duty_roster.utils.email.DevModeEmailMultiAlternatives"
         ) as mock_email_class:
             mock_email = MagicMock()
             mock_email_class.return_value = mock_email
@@ -283,7 +283,7 @@ class TestSendRosterPublishedNotifications:
         )
 
         with patch(
-            "duty_roster.utils.email.EmailMultiAlternatives"
+            "duty_roster.utils.email.DevModeEmailMultiAlternatives"
         ) as mock_email_class:
             mock_email = MagicMock()
             mock_email_class.return_value = mock_email
@@ -311,7 +311,7 @@ class TestSendRosterPublishedNotifications:
         )
 
         with patch(
-            "duty_roster.utils.email.EmailMultiAlternatives"
+            "duty_roster.utils.email.DevModeEmailMultiAlternatives"
         ) as mock_email_class:
             mock_email = MagicMock()
             mock_email_class.return_value = mock_email
@@ -335,7 +335,7 @@ class TestSendRosterPublishedNotifications:
         )
 
         with patch(
-            "duty_roster.utils.email.EmailMultiAlternatives"
+            "duty_roster.utils.email.DevModeEmailMultiAlternatives"
         ) as mock_email_class:
             mock_email = MagicMock()
             mock_email.send.side_effect = Exception("SMTP connection failed")
