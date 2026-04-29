@@ -358,7 +358,7 @@ class ORToolsHardConstraintsTests(TestCase):
         # Verify avoidance is in data
         self.assertIn((self.member1.id, self.member2.id), data.avoidances)
 
-        scheduler = DutyRosterScheduler(data)
+        scheduler = DutyRosterScheduler(data, enforce_adjacent_weekend_spacing=False)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -412,7 +412,7 @@ class ORToolsHardConstraintsTests(TestCase):
             role_scarcity={role: {"scarcity_score": 1.0} for role in self.test_roles},
             earliest_duty_day=three_dates[0],
         )
-        scheduler = DutyRosterScheduler(data)
+        scheduler = DutyRosterScheduler(data, enforce_adjacent_weekend_spacing=False)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -1162,7 +1162,7 @@ class ORToolsSoftConstraintsTests(TestCase):
         )
 
         data = extract_scheduling_data(year=2026, month=3, roles=self.test_roles)
-        scheduler = DutyRosterScheduler(data)
+        scheduler = DutyRosterScheduler(data, enforce_adjacent_weekend_spacing=False)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -1237,7 +1237,7 @@ class ORToolsSoftConstraintsTests(TestCase):
         data = extract_scheduling_data(
             year=2026, month=3, roles=["instructor", "towpilot"]
         )
-        scheduler = DutyRosterScheduler(data)
+        scheduler = DutyRosterScheduler(data, enforce_adjacent_weekend_spacing=False)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -1280,7 +1280,7 @@ class ORToolsSoftConstraintsTests(TestCase):
         )
 
         data = extract_scheduling_data(year=2026, month=3, roles=self.test_roles)
-        scheduler = DutyRosterScheduler(data)
+        scheduler = DutyRosterScheduler(data, enforce_adjacent_weekend_spacing=False)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
