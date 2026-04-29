@@ -6,6 +6,7 @@ from django.test import TestCase, override_settings
 
 from utils.email import (
     DevModeEmailMessage,
+    DevModeEmailMultiAlternatives,
     get_dev_mode_info,
     send_mail,
     send_mass_mail,
@@ -227,6 +228,95 @@ class DevModeEmailTests(TestCase):
                 to=["user@example.com"],
             )
         self.assertIn("EMAIL_DEV_MODE_REDIRECT_TO", str(context.exception))
+
+
+class DevModeEmailMultiAlternativesTests(TestCase):
+    """Tests for DevModeEmailMultiAlternatives dev mode behaviour."""
+
+    @override_settings(
+        EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
+    )
+    def test_redirects_to_dev_address(self):
+        """Dev mode should redirect TO recipients to the configured dev address."""
+        msg = DevModeEmailMultiAlternatives(
+            subject="Roster Published",
+            body="Plain text body",
+            from_email="noreply@example.com",
+            to=["member@example.com"],
+        )
+
+        self.assertEqual(msg.to, ["dev@example.com"])
+
+    @override_settings(
+        EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
+    )
+    def test_clears_cc_and_bcc(self):
+        """Dev mode should clear CC and BCC recipients."""
+        msg = DevModeEmailMultiAlternatives(
+            subject="Test",
+            body="Body",
+            from_email="noreply@example.com",
+            to=["user@example.com"],
+            cc=["cc@example.com"],
+            bcc=["bcc@example.com"],
+        )
+
+        self.assertEqual(msg.cc, [])
+        self.assertEqual(msg.bcc, [])
+
+    @override_settings(
+        EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
+    )
+    def test_annotates_subject_with_dev_mode_prefix(self):
+        """Dev mode should prepend [DEV MODE] and original recipient to subject."""
+        msg = DevModeEmailMultiAlternatives(
+            subject="Roster Published",
+            body="Body",
+            from_email="noreply@example.com",
+            to=["member@example.com"],
+        )
+
+        self.assertIn("[DEV MODE]", msg.subject)
+        self.assertIn("member@example.com", msg.subject)
+
+    @override_settings(EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="")
+    def test_raises_when_redirect_list_is_empty(self):
+        """Dev mode without EMAIL_DEV_MODE_REDIRECT_TO set should raise ValueError."""
+        with self.assertRaises(ValueError) as context:
+            DevModeEmailMultiAlternatives(
+                subject="Test",
+                body="Body",
+                from_email="noreply@example.com",
+                to=["user@example.com"],
+            )
+        self.assertIn("EMAIL_DEV_MODE_REDIRECT_TO", str(context.exception))
+
+    @override_settings(EMAIL_DEV_MODE=False)
+    def test_normal_mode_preserves_recipients(self):
+        """When dev mode is off, recipients and subject should be unchanged."""
+        msg = DevModeEmailMultiAlternatives(
+            subject="Roster Published",
+            body="Body",
+            from_email="noreply@example.com",
+            to=["member@example.com"],
+            cc=["cc@example.com"],
+        )
+
+        self.assertEqual(msg.to, ["member@example.com"])
+        self.assertEqual(msg.cc, ["cc@example.com"])
+        self.assertEqual(msg.subject, "Roster Published")
+
+    @override_settings(EMAIL_DEV_MODE=False)
+    def test_enforces_noreply_from_email(self):
+        """From email should always be normalised to noreply@{domain}."""
+        msg = DevModeEmailMultiAlternatives(
+            subject="Test",
+            body="Body",
+            from_email="Club Name <members@example.com>",
+            to=["user@example.com"],
+        )
+
+        self.assertEqual(msg.from_email, "noreply@example.com")
 
 
 class SendMassMailTests(TestCase):

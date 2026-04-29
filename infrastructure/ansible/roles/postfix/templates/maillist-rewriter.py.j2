@@ -76,36 +76,37 @@ def rewrite_headers(msg, recipient, envelope_sender=None):
     - Save original From to Reply-To
     - Rewrite From to list-bounces address with original name
 
-    Internal/automated senders (same domain as the list, or local-part 'noreply')
-    are passed through unchanged so that transactional notification emails do not
-    appear to come from a bounces address (issue #846).
+    The automated sender ``noreply@<list_domain>`` is passed through unchanged
+    so that transactional notification emails do not appear to come from a
+    bounces address (issue #846).
 
-    The guard uses ``envelope_sender`` (the SMTP envelope sender passed by
-    Postfix, which is verified at the MTA level and cannot be trivially spoofed)
-    when available.  It falls back to parsing the ``From`` header only when no
-    envelope sender is provided (e.g. in unit tests).
+    The guard uses ``envelope_sender`` (the SMTP envelope sender from the
+    ``MAIL FROM`` command as seen by Postfix) when available. This is preferred
+    for the passthrough check because it is SMTP-session metadata rather than a
+    message header, but it is still client-supplied and should not be treated as
+    authenticated or unforgeable. It falls back to parsing the ``From`` header
+    only when no envelope sender is provided (e.g. in unit tests).
     """
     # Determine the effective sender address for the passthrough guard.
-    # Prefer the SMTP envelope sender: it is set by Postfix from the MAIL FROM
-    # command and cannot be overridden by the message body, so an unauthenticated
-    # external sender cannot forge it to bypass list rewriting.
+    # Prefer the SMTP envelope sender because it comes from the SMTP session's
+    # MAIL FROM command rather than the message headers/body. That makes it a
+    # better signal than the From header for this heuristic, but it is still
+    # client-provided SMTP metadata and not inherently trustworthy.
     guard_email = envelope_sender or parseaddr(msg.get('From', ''))[1]
 
     original_from = msg.get('From', '')
     original_name, original_email = parseaddr(original_from)
 
-    # Do not rewrite headers for same-domain or noreply senders — these are
-    # automated/transactional emails from the application, not user posts to
-    # the list.  Rewriting them would make notifications appear to come from
-    # "board-bounces@domain" instead of "noreply@domain".
-    if guard_email:
-        sender_local, _, sender_domain = guard_email.partition('@')
-        _, _, list_domain = recipient.lower().partition('@')
-        if sender_domain.lower() == list_domain or sender_local.lower() == 'noreply':
-            return msg
-
     # Get list address from recipient
     recipient_lower = recipient.lower()
+    _, _, list_domain = recipient_lower.partition('@')
+
+    # Only allow a narrow passthrough for the exact automated sender address
+    # used by the application on the list domain.  Do not exempt arbitrary
+    # same-domain or generic "noreply" senders, because on port 25 the
+    # envelope sender is client-supplied and not inherently trustworthy.
+    if guard_email and guard_email.lower() == f"noreply@{list_domain}":
+        return msg
 
     # Extract list name and domain (e.g., "webmaster" from "webmaster@domain.com")
     list_local, list_domain = recipient_lower.split('@', 1)

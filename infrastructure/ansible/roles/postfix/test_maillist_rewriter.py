@@ -291,13 +291,13 @@ def test_reverse_lookup_uses_exact_alias_token_not_prefix_match():
     assert original_to == "members@skylinesoaring.org"
 
 
-def test_rewrite_headers_skips_same_domain_sender():
-    """Automated emails from the same domain as the list are not rewritten (issue #846).
+def test_rewrite_headers_skips_exact_noreply_at_list_domain():
+    """Only the exact noreply@<list_domain> address is passed through unchanged (issue #846).
 
-    When Django sends a notification to board@skylinesoaring.org the SMTP envelope
-    sender is noreply@skylinesoaring.org (set by Postfix, not the From header).
-    The guard must use envelope_sender, not the From header, so that an external
-    sender cannot spoof their way out of list rewriting.
+    When Django sends a notification from noreply@skylinesoaring.org to
+    board@skylinesoaring.org the envelope sender matches the narrow passthrough
+    condition (noreply@skylinesoaring.org == noreply@skylinesoaring.org) and the
+    headers must not be rewritten.
     """
     ns = load_template_namespace()
     rewrite_headers = get_callable(ns, "rewrite_headers")
@@ -318,12 +318,13 @@ def test_rewrite_headers_skips_same_domain_sender():
     assert result["Reply-To"] is None
 
 
-def test_rewrite_headers_skips_noreply_sender_any_domain():
-    """Any SMTP envelope sender whose local-part is 'noreply' is treated as automated (issue #846).
+def test_rewrite_headers_rewrites_noreply_sender_from_different_domain():
+    """A noreply sender on a *different* domain than the list is still rewritten.
 
-    This catches cases where the application sends from noreply@manage2soar.com
-    to a list address on a different subdomain, e.g. board@ssc.manage2soar.com.
-    The guard uses envelope_sender so a spoofed From header cannot bypass rewriting.
+    The passthrough is intentionally narrow: only noreply@<list_domain> is exempt.
+    If the application sends from noreply@manage2soar.com to a list on
+    ssc.manage2soar.com the envelope sender does not match noreply@ssc.manage2soar.com,
+    so Mailman-style rewriting must still occur.
     """
     ns = load_template_namespace()
     rewrite_headers = get_callable(ns, "rewrite_headers")
@@ -331,15 +332,17 @@ def test_rewrite_headers_skips_noreply_sender_any_domain():
     msg = EmailMessage()
     msg["From"] = "noreply@manage2soar.com"
     msg["To"] = "board@ssc.manage2soar.com"
-    msg["Subject"] = "Cross-domain automated notification"
+    msg["Subject"] = "Cross-domain notification"
     msg.set_content("Notification body")
 
     result = rewrite_headers(
         msg, "board@ssc.manage2soar.com", envelope_sender="noreply@manage2soar.com"
     )
 
-    assert result["From"] == "noreply@manage2soar.com"
-    assert result["Reply-To"] is None
+    # Cross-domain noreply must be rewritten — the envelope sender is not the
+    # list's own noreply address.
+    assert "board-bounces@ssc.manage2soar.com" in result["From"]
+    assert result["Reply-To"] is not None
 
 
 def test_rewrite_headers_still_rewrites_external_sender():

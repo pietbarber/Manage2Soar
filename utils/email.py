@@ -251,35 +251,21 @@ def send_mass_mail(
     )
 
 
-class DevModeEmailMessage(EmailMessage):
-    """EmailMessage subclass with dev mode support.
+class _DevModeApplyMixin:
+    """Mixin that applies EMAIL_DEV_MODE redirection to outbound email objects.
 
-    When EMAIL_DEV_MODE is enabled, emails are redirected to
-    EMAIL_DEV_MODE_REDIRECT_TO address(es).
-
-    Use this class when you need to construct EmailMessage objects directly
-    instead of using send_mail(). This is useful for HTML emails with attachments
-    or when you need more control over the email structure.
-
-    Example:
-        from utils.email import DevModeEmailMessage
-
-        msg = DevModeEmailMessage(
-            subject="Welcome!",
-            body="Your account is ready.",
-            from_email="noreply@example.com",
-            to=["user@example.com"],
-        )
-        msg.send()
+    Both DevModeEmailMessage and DevModeEmailMultiAlternatives share this logic.
+    Centralising it here prevents the two classes from drifting when the
+    redirection behaviour (subject annotation, cc/bcc clearing, redirect list
+    validation) needs to change.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.from_email = enforce_noreply_from_email(self.from_email)
-        self._apply_dev_mode()
-
     def _apply_dev_mode(self):
-        """Apply dev mode redirection if enabled."""
+        """Redirect to EMAIL_DEV_MODE_REDIRECT_TO when dev mode is enabled.
+
+        Raises:
+            ValueError: If dev mode is enabled but no redirect address is configured.
+        """
         dev_mode, redirect_list = get_dev_mode_info()
 
         if dev_mode:
@@ -323,7 +309,35 @@ class DevModeEmailMessage(EmailMessage):
             self.bcc = []
 
 
-class DevModeEmailMultiAlternatives(EmailMultiAlternatives):
+class DevModeEmailMessage(_DevModeApplyMixin, EmailMessage):
+    """EmailMessage subclass with dev mode support.
+
+    When EMAIL_DEV_MODE is enabled, emails are redirected to
+    EMAIL_DEV_MODE_REDIRECT_TO address(es).
+
+    Use this class when you need to construct EmailMessage objects directly
+    instead of using send_mail(). This is useful for HTML emails with attachments
+    or when you need more control over the email structure.
+
+    Example:
+        from utils.email import DevModeEmailMessage
+
+        msg = DevModeEmailMessage(
+            subject="Welcome!",
+            body="Your account is ready.",
+            from_email="noreply@example.com",
+            to=["user@example.com"],
+        )
+        msg.send()
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.from_email = enforce_noreply_from_email(self.from_email)
+        self._apply_dev_mode()
+
+
+class DevModeEmailMultiAlternatives(_DevModeApplyMixin, EmailMultiAlternatives):
     """EmailMultiAlternatives subclass with dev mode support.
 
     Use this in place of EmailMultiAlternatives directly when you need HTML
@@ -347,43 +361,3 @@ class DevModeEmailMultiAlternatives(EmailMultiAlternatives):
         super().__init__(*args, **kwargs)
         self.from_email = enforce_noreply_from_email(self.from_email)
         self._apply_dev_mode()
-
-    def _apply_dev_mode(self):
-        """Apply dev mode redirection if enabled."""
-        dev_mode, redirect_list = get_dev_mode_info()
-
-        if dev_mode:
-            if not redirect_list:
-                raise ValueError(
-                    "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
-                    "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
-                )
-
-            all_recipients = (
-                list(self.to or []) + list(self.cc or []) + list(self.bcc or [])
-            )
-
-            if not all_recipients:
-                recipients_info = "TO: (no recipients)"
-            else:
-                if len(all_recipients) > MAX_RECIPIENTS_IN_SUBJECT:
-                    shown = all_recipients[:MAX_RECIPIENTS_IN_SUBJECT]
-                    remaining = len(all_recipients) - MAX_RECIPIENTS_IN_SUBJECT
-                    recipients_info = (
-                        f"TO: {', '.join(shown)}, ... and {remaining} more"
-                    )
-                else:
-                    original_to = ", ".join(self.to) if self.to else "none"
-                    original_cc = ", ".join(self.cc) if self.cc else ""
-                    original_bcc = ", ".join(self.bcc) if self.bcc else ""
-
-                    recipients_info = f"TO: {original_to}"
-                    if original_cc:
-                        recipients_info += f", CC: {original_cc}"
-                    if original_bcc:
-                        recipients_info += f", BCC: {original_bcc}"
-
-            self.subject = f"[DEV MODE] {self.subject} ({recipients_info})"
-            self.to = redirect_list
-            self.cc = []
-            self.bcc = []
