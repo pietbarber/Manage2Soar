@@ -53,7 +53,7 @@ class ORToolsSchedulerTestBase(TestCase):
         Helper to create a scheduler without enforcing adjacent-weekend spacing.
 
         This disables the adjacent-weekend spacing hard constraint gating in
-        DutyRosterScheduler._add_constraints(). Note that this does NOT disable
+        DutyRosterScheduler._add_hard_constraints(). Note that this does NOT disable
         the separate weekend-spacing soft objective terms (lag penalties), which
         are controlled independently.
 
