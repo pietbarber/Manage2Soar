@@ -14,7 +14,9 @@
 <div class="mb-3">
   <a href="{% url 'instructors:member_logbook_export_csv_member' member.id %}" class="btn btn-success">Export as CSV (Excel/Google Sheets)</a>
   <a href="{% url 'instructors:member_logbook_export_foreflight_member' member.id %}" class="btn btn-info">Export to ForeFlight</a>
-  <small class="text-warning d-block mt-2">⚠️ <strong>Caution:</strong> Do not re-import previously imported entries into ForeFlight to avoid duplicates.</small>
+  <div class="alert alert-warning text-dark mt-2 mb-0" role="alert">
+    ⚠️ <strong>Caution:</strong> Do not re-import previously imported entries into ForeFlight to avoid duplicates.
+  </div>
 </div>
 
 <!-- Show All Years Button -->
