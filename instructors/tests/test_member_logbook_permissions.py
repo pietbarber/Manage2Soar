@@ -657,3 +657,195 @@ def test_logbook_signature_without_lesson_codes_has_no_leading_line_break(client
     assert flight_row is not None
     assert "/s/" in flight_row["signature_html"]
     assert not flight_row["signature_html"].startswith("<br>/s/")
+
+
+@pytest.mark.django_db
+def test_member_can_export_own_logbook_foreflight_csv(client):
+    _ensure_full_member_status()
+    student = _make_member("foreflight_export_self")
+
+    client.force_login(student)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/csv")
+    assert "foreflight" in response["Content-Disposition"]
+
+
+@pytest.mark.django_db
+def test_instructor_can_export_student_logbook_foreflight_csv(client):
+    _ensure_full_member_status()
+    instructor = _make_member("foreflight_export_instructor", instructor=True)
+    student = _make_member("foreflight_export_student")
+
+    client.force_login(instructor)
+    response = client.get(
+        reverse(
+            "instructors:member_logbook_export_foreflight_member", args=[student.pk]
+        )
+    )
+
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/csv")
+
+
+@pytest.mark.django_db
+def test_non_instructor_cannot_export_another_members_logbook_foreflight_csv(client):
+    _ensure_full_member_status()
+    member_a = _make_member("foreflight_export_member_a")
+    member_b = _make_member("foreflight_export_member_b")
+
+    client.force_login(member_a)
+    response = client.get(
+        reverse(
+            "instructors:member_logbook_export_foreflight_member", args=[member_b.pk]
+        )
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_foreflight_csv_uses_decimal_hours(client):
+    _ensure_full_member_status()
+    pilot = _make_member("foreflight_decimal_hours_pilot", glider_rating="rated")
+    pilot.private_glider_checkride_date = date(2020, 1, 1)
+    pilot.save(update_fields=["private_glider_checkride_date"])
+
+    instructor = _make_member(
+        "foreflight_decimal_hours_instructor", instructor=True, glider_rating="rated"
+    )
+    airfield = Airfield.objects.create(name="Decimal Hours Field", identifier="KDEC")
+    glider = Glider.objects.create(
+        n_number="N123DEC",
+        make="Schleicher",
+        model="ASK-21",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 6, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    # 25-minute flight = 0.42 hours (rounded to 2 decimals)
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        instructor=instructor,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 25),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/csv")
+
+    content = response.content.decode()
+    lines = content.strip().split("\n")
+
+    # Find blank line separating aircraft and flights sections
+    blank_idx = None
+    for i, line in enumerate(lines):
+        if line.strip() == "":
+            blank_idx = i
+            break
+
+    assert blank_idx is not None, "CSV should have a blank line separator"
+
+    # Flights section starts after blank line, includes header and data rows
+    flights_section = lines[blank_idx + 1 :]  # Include the header row
+    assert flights_section, "CSV should include a flights section after the separator"
+
+    # Parse flights section with csv reader
+    flight_rows = list(csv.DictReader(io.StringIO("\n".join(flights_section))))
+    assert (
+        len(flight_rows) >= 1
+    ), f"Should have at least one flight row. Lines: {flights_section}"
+    flight_row = flight_rows[0]
+    # 25 min = 0.42 hours
+    assert float(flight_row["TotalTime"]) == 0.42
+    assert float(flight_row["PIC"]) == 0.42
+
+
+@pytest.mark.django_db
+def test_foreflight_csv_has_aircraft_and_flights_sections(client):
+    _ensure_full_member_status()
+    pilot = _make_member("foreflight_sections_pilot")
+
+    airfield = Airfield.objects.create(name="Section Test Field", identifier="KSEC")
+    glider = Glider.objects.create(
+        n_number="N456SEC",
+        make="Sailplane",
+        model="2-33",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 6, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 15),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    # Check for aircraft section header
+    assert "AircraftID,EquipmentType,TypeCode,Year,Make,Model,Category,Class" in content
+    # Check for flights section header
+    assert "Date,AircraftID,From,To,Route,TimeOut,TimeOff,TimeOn,TimeIn" in content
+    # Check for aircraft data
+    assert "N456SEC" in content
+    assert "Sailplane" in content
+    assert "2-33" in content
+    assert "Glider" in content
+
+
+@pytest.mark.django_db
+def test_foreflight_csv_handles_flight_with_no_glider(client):
+    _ensure_full_member_status()
+    pilot = _make_member("foreflight_no_glider_pilot")
+
+    airfield = Airfield.objects.create(name="No Glider Field", identifier="KNGL")
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 7, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    # Flight with glider=None (e.g. offline sync scenario)
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        glider=None,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 15),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    # Flight with no glider should use the placeholder AircraftID
+    assert "UNKNOWN-AIRCRAFT" in content
+    # A corresponding aircraft row should also be present
+    lines = [line for line in content.split("\n") if "UNKNOWN-AIRCRAFT" in line]
+    assert (
+        len(lines) >= 2
+    ), "UNKNOWN-AIRCRAFT should appear in both aircraft and flights sections"

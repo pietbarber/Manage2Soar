@@ -182,7 +182,7 @@ def duty_badge_legend():
         else "Assistant Duty Officer"
     )
     # Dynamic content is properly escaped above - safe to use mark_safe
-    return mark_safe(  # nosec
+    return mark_safe(
         f"""
         <div class='accordion mb-4' id='badgeLegendAccordion'>
             <div class='accordion-item'>

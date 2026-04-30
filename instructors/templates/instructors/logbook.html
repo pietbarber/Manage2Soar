@@ -11,7 +11,13 @@
 <div id="top"></div>
 <h2>Logbook for {{ member.full_display_name }}</h2>
 
-<a href="{% url 'instructors:member_logbook_export_csv_member' member.id %}" class="btn btn-success mb-3">Export as CSV (Excel/Google Sheets)</a>
+<div class="mb-3">
+  <a href="{% url 'instructors:member_logbook_export_csv_member' member.id %}" class="btn btn-success">Export as CSV (Excel/Google Sheets)</a>
+  <a href="{% url 'instructors:member_logbook_export_foreflight_member' member.id %}" class="btn btn-info">Export to ForeFlight</a>
+  <div class="alert alert-warning text-dark mt-2 mb-0" role="alert">
+    ⚠️ <strong>Caution:</strong> Do not re-import previously imported entries into ForeFlight to avoid duplicates.
+  </div>
+</div>
 
 <!-- Show All Years Button -->
 <form method="post" action="{% url 'instructors:logbook_loading' %}" id="show-all-years-form" style="margin-bottom: 1em;">
