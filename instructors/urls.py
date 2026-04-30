@@ -62,6 +62,16 @@ urlpatterns = [
         name="member_logbook_export_csv_member",
     ),
     path(
+        "logbook/export/foreflight/",
+        views.export_member_logbook_foreflight_csv,
+        name="member_logbook_export_foreflight",
+    ),
+    path(
+        "logbook/<int:member_id>/export/foreflight/",
+        views.export_member_logbook_foreflight_csv,
+        name="member_logbook_export_foreflight_member",
+    ),
+    path(
         "students/<int:member_id>/needed-for-solo/",
         views.needed_for_solo,
         name="needed_for_solo",

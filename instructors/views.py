@@ -68,7 +68,7 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from knowledgetest.views import get_presets
-from logsheet.models import Flight
+from logsheet.models import Flight, Glider
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -2766,6 +2766,352 @@ def export_member_logbook_csv(request, member_id=None):
     writer.writeheader()
     for row in rows:
         writer.writerow(row)
+    return response
+
+
+def export_member_logbook_foreflight_csv(request, member_id=None):
+    """Export the member's logbook as CSV in ForeFlight import template format.
+
+    ForeFlight format is a two-section CSV:
+    1. Aircraft table: unique aircraft with make, model, category, class, etc.
+    2. Flights table: flights with decimal hours, ForeFlight column names
+    """
+    from io import StringIO
+
+    member = request.user
+    if member_id is not None:
+        member = get_object_or_404(Member, pk=member_id)
+        if request.user != member and not request.user.instructor:
+            raise PermissionDenied
+
+    def decimal_hours(duration):
+        """Convert timedelta to decimal hours (e.g., 90 min = 1.5)"""
+        if not duration:
+            return 0.0
+        total_minutes = int(duration.total_seconds() // 60)
+        return round(total_minutes / 60, 2)
+
+    # Query flights and ground instruction
+    flights = (
+        Flight.objects.filter(
+            Q(pilot=member) | Q(instructor=member) | Q(passenger=member)
+        )
+        .select_related(
+            "glider", "instructor", "pilot", "passenger", "airfield", "logsheet"
+        )
+        .order_by("logsheet__log_date")
+    )
+    grounds = (
+        GroundInstruction.objects.filter(student=member)
+        .prefetch_related("lesson_scores__lesson")
+        .order_by("date")
+    )
+
+    rating_date = getattr(member, "private_glider_checkride_date", None)
+    instruction_reports = (
+        InstructionReport.objects.filter(student=member)
+        .select_related("instructor")
+        .prefetch_related("lesson_scores__lesson")
+    )
+    report_lookup = {}
+    for rpt in instruction_reports:
+        report_lookup[(rpt.instructor_id, rpt.report_date)] = [
+            ls.lesson.code for ls in rpt.lesson_scores.all()
+        ]
+
+    # Build unique aircraft list
+    aircraft_map = {}  # {glider_id: glider_obj}
+    for f in flights:
+        if f.glider and f.glider.id not in aircraft_map:
+            aircraft_map[f.glider.id] = f.glider
+
+    # Build events timeline
+    events = []
+    for f in flights:
+        events.append(
+            {
+                "type": "flight",
+                "obj": f,
+                "date": f.logsheet.log_date,
+                "time": f.launch_time or time(0, 0),
+            }
+        )
+    for g in grounds:
+        events.append({"type": "ground", "obj": g, "date": g.date, "time": time(0, 0)})
+    events.sort(key=lambda e: (e["date"], e["time"]))
+
+    # Build flight rows
+    flight_rows = []
+    for ev in events:
+        if ev["type"] == "flight":
+            f = ev["obj"]
+            date_val = ev["date"]
+            classification = classify_logbook_flight_minutes(
+                f,
+                member.id,
+                rating_date,
+            )
+            is_pilot = classification["is_pilot"]
+            is_instructor = classification["is_instructor"]
+            is_passenger = classification["is_passenger"]
+            dur_m = classification["duration_m"]
+            dual_m = classification["dual_m"]
+            solo_m = classification["solo_m"]
+            pic_m = classification["pic_m"]
+            inst_m = classification["inst_m"]
+
+            # Determine time columns
+            time_out_str = ""
+            time_off_str = ""
+            time_on_str = ""
+            time_in_str = ""
+            if f.launch_time:
+                hours, mins = f.launch_time.hour, f.launch_time.minute
+                time_out_str = f"{hours:02d}:{mins:02d}"
+                time_off_str = f"{hours:02d}:{mins:02d}"
+            if f.landing_time:
+                hours, mins = f.landing_time.hour, f.landing_time.minute
+                time_on_str = f"{hours:02d}:{mins:02d}"
+                time_in_str = f"{hours:02d}:{mins:02d}"
+
+            # Determine pilot names and times
+            pic_hours = decimal_hours(timedelta(minutes=pic_m)) if pic_m else 0.0
+            sic_hours = (
+                decimal_hours(timedelta(minutes=dual_m))
+                if (dual_m and is_pilot)
+                else 0.0
+            )
+            dual_received = (
+                decimal_hours(timedelta(minutes=dual_m)) if is_pilot else 0.0
+            )
+            dual_given = (
+                decimal_hours(timedelta(minutes=inst_m)) if is_instructor else 0.0
+            )
+            total_hours = decimal_hours(timedelta(minutes=dur_m)) if dur_m else 0.0
+            solo_hours = decimal_hours(timedelta(minutes=solo_m)) if solo_m else 0.0
+
+            # Get instructor comments from instruction report
+            instructor_name = f.instructor.full_display_name if f.instructor else ""
+            instructor_comments = ""
+            if is_pilot and has_logbook_instructor_context(f):
+                codes = []
+                if f.instructor_id:
+                    codes = report_lookup.get((f.instructor_id, date_val), [])
+                if codes:
+                    instructor_comments = ", ".join(codes)
+
+            row = {
+                "Date": date_val.strftime("%Y-%m-%d"),
+                "AircraftID": f.glider.n_number if f.glider else "",
+                "From": f.airfield.identifier if f.airfield else "",
+                "To": f.airfield.identifier if f.airfield else "",
+                "Route": "",
+                "TimeOut": time_out_str,
+                "TimeOff": time_off_str,
+                "TimeOn": time_on_str,
+                "TimeIn": time_in_str,
+                "OnDuty": "",
+                "OffDuty": "",
+                "TotalTime": str(total_hours),
+                "PIC": str(pic_hours),
+                "SIC": str(sic_hours),
+                "Night": "0",
+                "Solo": str(solo_hours),
+                "CrossCountry": "0",
+                "NVG": "0",
+                "NVGOps": "0",
+                "Distance": "",
+                "DayTakeoffs": "1" if (is_pilot or is_instructor) else "0",
+                "DayLandingsFullStop": "1" if (is_pilot or is_instructor) else "0",
+                "NightTakeoffs": "0",
+                "NightLandingsFullStop": "0",
+                "AllLandings": "1" if (is_pilot or is_instructor) else "0",
+                "ActualInstrument": "0",
+                "SimulatedInstrument": "0",
+                "HobbsStart": "",
+                "HobbsEnd": "",
+                "TachStart": "",
+                "TachEnd": "",
+                "Holds": "0",
+                "DualGiven": str(dual_given),
+                "DualReceived": str(dual_received),
+                "SimulatedFlight": "0",
+                "GroundTraining": "0",
+                "InstructorName": instructor_name,
+                "InstructorComments": instructor_comments,
+                "FlightReview": "",
+                "Checkride": "",
+                "IPC": "",
+                "NVGProficiency": "",
+                "PilotComments": f.notes if f.notes else "",
+            }
+            flight_rows.append(row)
+        else:
+            # Ground instruction row
+            g = ev["obj"]
+            gm = int(g.duration.total_seconds() // 60) if g.duration else 0
+            ground_hours = decimal_hours(timedelta(minutes=gm))
+            codes = [ls.lesson.code for ls in g.lesson_scores.all()]
+            instructor_comments = ", ".join(codes) if codes else ""
+            instructor_name = (
+                g.instructor.full_display_name
+                if g.instructor and hasattr(g.instructor, "full_display_name")
+                else ""
+            )
+
+            row = {
+                "Date": g.date.strftime("%Y-%m-%d"),
+                "AircraftID": "",
+                "From": "",
+                "To": "",
+                "Route": "",
+                "TimeOut": "",
+                "TimeOff": "",
+                "TimeOn": "",
+                "TimeIn": "",
+                "OnDuty": "",
+                "OffDuty": "",
+                "TotalTime": "0",
+                "PIC": "0",
+                "SIC": "0",
+                "Night": "0",
+                "Solo": "0",
+                "CrossCountry": "0",
+                "NVG": "0",
+                "NVGOps": "0",
+                "Distance": "",
+                "DayTakeoffs": "0",
+                "DayLandingsFullStop": "0",
+                "NightTakeoffs": "0",
+                "NightLandingsFullStop": "0",
+                "AllLandings": "0",
+                "ActualInstrument": "0",
+                "SimulatedInstrument": "0",
+                "HobbsStart": "",
+                "HobbsEnd": "",
+                "TachStart": "",
+                "TachEnd": "",
+                "Holds": "0",
+                "DualGiven": "0",
+                "DualReceived": "0",
+                "SimulatedFlight": "0",
+                "GroundTraining": str(ground_hours),
+                "InstructorName": instructor_name,
+                "InstructorComments": instructor_comments,
+                "FlightReview": "",
+                "Checkride": "",
+                "IPC": "",
+                "NVGProficiency": "",
+                "PilotComments": "",
+            }
+            flight_rows.append(row)
+
+    # Build CSV content in memory
+    csv_buffer = StringIO()
+
+    # Write aircraft section header
+    aircraft_fieldnames = [
+        "AircraftID",
+        "EquipmentType",
+        "TypeCode",
+        "Year",
+        "Make",
+        "Model",
+        "Category",
+        "Class",
+        "GearType",
+        "EngType",
+        "Complex",
+        "HighPerf",
+        "Pressurized",
+        "TAA",
+    ]
+    aircraft_writer = csv.DictWriter(csv_buffer, fieldnames=aircraft_fieldnames)
+    aircraft_writer.writeheader()
+
+    # Write aircraft rows
+    for glider in aircraft_map.values():
+        aircraft_row = {
+            "AircraftID": glider.n_number,
+            "EquipmentType": "",
+            "TypeCode": "",
+            "Year": "",
+            "Make": glider.make,
+            "Model": glider.model,
+            "Category": "Glider",
+            "Class": "Glider",
+            "GearType": "Fixed Gear",
+            "EngType": "None",
+            "Complex": "False",
+            "HighPerf": "False",
+            "Pressurized": "False",
+            "TAA": "False",
+        }
+        aircraft_writer.writerow(aircraft_row)
+
+    # Write blank line separator
+    csv_buffer.write("\n")
+
+    # Write flights section header
+    flight_fieldnames = [
+        "Date",
+        "AircraftID",
+        "From",
+        "To",
+        "Route",
+        "TimeOut",
+        "TimeOff",
+        "TimeOn",
+        "TimeIn",
+        "OnDuty",
+        "OffDuty",
+        "TotalTime",
+        "PIC",
+        "SIC",
+        "Night",
+        "Solo",
+        "CrossCountry",
+        "NVG",
+        "NVGOps",
+        "Distance",
+        "DayTakeoffs",
+        "DayLandingsFullStop",
+        "NightTakeoffs",
+        "NightLandingsFullStop",
+        "AllLandings",
+        "ActualInstrument",
+        "SimulatedInstrument",
+        "HobbsStart",
+        "HobbsEnd",
+        "TachStart",
+        "TachEnd",
+        "Holds",
+        "DualGiven",
+        "DualReceived",
+        "SimulatedFlight",
+        "GroundTraining",
+        "InstructorName",
+        "InstructorComments",
+        "FlightReview",
+        "Checkride",
+        "IPC",
+        "NVGProficiency",
+        "PilotComments",
+    ]
+    flight_writer = csv.DictWriter(csv_buffer, fieldnames=flight_fieldnames)
+    flight_writer.writeheader()
+
+    # Write flight rows
+    for row in flight_rows:
+        flight_writer.writerow(row)
+
+    # Create response
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="logbook_{member.username}_foreflight.csv"'
+    )
+    response.write(csv_buffer.getvalue())
+
     return response
 
 
