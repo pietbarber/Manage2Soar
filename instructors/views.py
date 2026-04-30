@@ -69,6 +69,7 @@ from knowledgetest.models import (
 )
 from knowledgetest.views import get_presets
 from logsheet.models import Flight
+from logsheet.views import _sanitize_csv_cell
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -2987,14 +2988,16 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             total_hours = decimal_hours(timedelta(minutes=dur_m)) if dur_m else 0.0
             solo_hours = decimal_hours(timedelta(minutes=solo_m)) if solo_m else 0.0
 
-            instructor_name = f.instructor.full_display_name if f.instructor else ""
+            instructor_name = _sanitize_csv_cell(
+                f.instructor.full_display_name if f.instructor else ""
+            )
             instructor_comments = ""
             if is_pilot and has_logbook_instructor_context(f):
                 codes = []
                 if f.instructor_id:
                     codes = report_lookup.get((f.instructor_id, date_val), [])
                 if codes:
-                    instructor_comments = ", ".join(codes)
+                    instructor_comments = _sanitize_csv_cell(", ".join(codes))
 
             aircraft_id = f.glider.n_number if f.glider else _UNKNOWN_AIRCRAFT_ID
             flight_writer.writerow(
@@ -3041,7 +3044,7 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                     "Checkride": "",
                     "IPC": "",
                     "NVGProficiency": "",
-                    "PilotComments": f.notes if f.notes else "",
+                    "PilotComments": _sanitize_csv_cell(f.notes) if f.notes else "",
                 }
             )
         else:
@@ -3050,8 +3053,8 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             gm = int(g.duration.total_seconds() // 60) if g.duration else 0
             ground_hours = decimal_hours(timedelta(minutes=gm))
             codes = [ls.lesson.code for ls in g.lesson_scores.all()]
-            instructor_comments = ", ".join(codes) if codes else ""
-            instructor_name = (
+            instructor_comments = _sanitize_csv_cell(", ".join(codes)) if codes else ""
+            instructor_name = _sanitize_csv_cell(
                 g.instructor.full_display_name
                 if g.instructor and hasattr(g.instructor, "full_display_name")
                 else ""
