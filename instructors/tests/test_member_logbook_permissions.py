@@ -759,17 +759,17 @@ def test_foreflight_csv_uses_decimal_hours(client):
 
     # Flights section starts after blank line, includes header and data rows
     flights_section = lines[blank_idx + 1 :]  # Include the header row
+    assert flights_section, "CSV should include a flights section after the separator"
 
     # Parse flights section with csv reader
-    if flights_section and len(flights_section) > 1:
-        flight_rows = list(csv.DictReader(io.StringIO("\n".join(flights_section))))
-        assert (
-            len(flight_rows) >= 1
-        ), f"Should have at least one flight row. Lines: {flights_section}"
-        flight_row = flight_rows[0]
-        # 25 min = 0.42 hours
-        assert float(flight_row["TotalTime"]) == 0.42
-        assert float(flight_row["PIC"]) == 0.42
+    flight_rows = list(csv.DictReader(io.StringIO("\n".join(flights_section))))
+    assert (
+        len(flight_rows) >= 1
+    ), f"Should have at least one flight row. Lines: {flights_section}"
+    flight_row = flight_rows[0]
+    # 25 min = 0.42 hours
+    assert float(flight_row["TotalTime"]) == 0.42
+    assert float(flight_row["PIC"]) == 0.42
 
 
 @pytest.mark.django_db
