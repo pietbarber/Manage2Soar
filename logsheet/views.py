@@ -28,6 +28,7 @@ from duty_roster.models import GliderReservation
 from members.decorators import active_member_required
 from members.models import Member
 from siteconfig.models import SiteConfiguration
+from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 
 from .forms import (
     CommercialTicketEditForm,
@@ -219,7 +220,6 @@ def edit_commercial_ticket(request, pk):
 
 
 # Re-exported for backward compatibility; canonical definition lives in utils.csv
-from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 
 
 def _format_charge_csv_number(value):

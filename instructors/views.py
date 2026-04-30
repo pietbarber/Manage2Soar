@@ -3004,13 +3004,18 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                 if codes:
                     instructor_comments = _sanitize_csv_cell(", ".join(codes))
 
-            aircraft_id = f.glider.n_number if f.glider else _UNKNOWN_AIRCRAFT_ID
+            aircraft_id = _sanitize_csv_cell(
+                f.glider.n_number if f.glider else _UNKNOWN_AIRCRAFT_ID
+            )
+            airfield_identifier = _sanitize_csv_cell(
+                f.airfield.identifier if f.airfield else ""
+            )
             flight_writer.writerow(
                 {
                     "Date": date_val.strftime("%Y-%m-%d"),
                     "AircraftID": aircraft_id,
-                    "From": f.airfield.identifier if f.airfield else "",
-                    "To": f.airfield.identifier if f.airfield else "",
+                    "From": airfield_identifier,
+                    "To": airfield_identifier,
                     "Route": "",
                     "TimeOut": time_out_str,
                     "TimeOff": time_off_str,
