@@ -2954,7 +2954,6 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             )
             is_pilot = classification["is_pilot"]
             is_instructor = classification["is_instructor"]
-            is_passenger = classification["is_passenger"]
             dur_m = classification["duration_m"]
             dual_m = classification["dual_m"]
             solo_m = classification["solo_m"]
