@@ -69,10 +69,10 @@ from knowledgetest.models import (
 )
 from knowledgetest.views import get_presets
 from logsheet.models import Flight
-from logsheet.views import _sanitize_csv_cell
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
+from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 from utils.url_helpers import build_absolute_url
 
 try:
@@ -2988,9 +2988,14 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             total_hours = decimal_hours(timedelta(minutes=dur_m)) if dur_m else 0.0
             solo_hours = decimal_hours(timedelta(minutes=solo_m)) if solo_m else 0.0
 
-            instructor_name = _sanitize_csv_cell(
-                f.instructor.full_display_name if f.instructor else ""
-            )
+            raw_instructor_name = ""
+            if f.instructor:
+                raw_instructor_name = f.instructor.full_display_name
+            elif f.guest_instructor_name and f.guest_instructor_name.strip():
+                raw_instructor_name = f.guest_instructor_name.strip()
+            elif f.legacy_instructor_name and f.legacy_instructor_name.strip():
+                raw_instructor_name = f.legacy_instructor_name.strip()
+            instructor_name = _sanitize_csv_cell(raw_instructor_name)
             instructor_comments = ""
             if is_pilot and has_logbook_instructor_context(f):
                 codes = []

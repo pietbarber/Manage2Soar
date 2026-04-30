@@ -218,15 +218,8 @@ def edit_commercial_ticket(request, pk):
     )
 
 
-def _sanitize_csv_cell(value):
-    """Neutralize spreadsheet-formula strings in CSV cells."""
-    if not isinstance(value, str):
-        return value
-
-    stripped = value.lstrip()
-    if stripped.startswith(("=", "+", "-", "@")):
-        return f"'{value}"
-    return value
+# Re-exported for backward compatibility; canonical definition lives in utils.csv
+from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 
 
 def _format_charge_csv_number(value):
