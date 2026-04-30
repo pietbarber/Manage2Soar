@@ -240,7 +240,7 @@ def duty_badge_legend():
             </div>
         </div>
         """
-    )  # nosec B308, B703
+    )
 
 
 # Keep the old function name for backward compatibility
