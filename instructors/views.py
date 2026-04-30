@@ -68,7 +68,7 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from knowledgetest.views import get_presets
-from logsheet.models import Flight, Glider
+from logsheet.models import Flight
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -2580,22 +2580,18 @@ class WrittenTestReviewView(DjangoView):
         )
 
 
-@active_member_required
-def export_member_logbook_csv(request, member_id=None):
-    """Export the member's logbook as CSV for Excel/Google Sheets with explicit instructor, pilot, passenger columns and constructed comments."""
-    member = request.user
-    if member_id is not None:
-        member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
-            raise PermissionDenied
+def _build_logbook_events(member):
+    """Build a sorted timeline of logbook events (flights + ground instruction) for *member*.
 
-    def format_hhmm(duration):
-        if not duration:
-            return ""
-        total_minutes = int(duration.total_seconds() // 60)
-        h, m = divmod(total_minutes, 60)
-        return f"{h}:{m:02d}"
+    Returns a tuple ``(events, report_lookup, rating_date)`` where:
 
+    * **events** – list of dicts sorted by ``(date, time)``; each has keys
+      ``type`` ("flight" or "ground"), ``obj``, ``date``, and ``time``.
+    * **report_lookup** – ``{(instructor_id, date): [lesson_codes]}`` for the
+      member's instruction reports.
+    * **rating_date** – the member's ``private_glider_checkride_date`` (or
+      ``None`` if not set), used for logbook classification.
+    """
     flights = (
         Flight.objects.filter(
             Q(pilot=member) | Q(instructor=member) | Q(passenger=member)
@@ -2636,6 +2632,27 @@ def export_member_logbook_csv(request, member_id=None):
     for g in grounds:
         events.append({"type": "ground", "obj": g, "date": g.date, "time": time(0, 0)})
     events.sort(key=lambda e: (e["date"], e["time"]))
+
+    return events, report_lookup, rating_date
+
+
+@active_member_required
+def export_member_logbook_csv(request, member_id=None):
+    """Export the member's logbook as CSV for Excel/Google Sheets with explicit instructor, pilot, passenger columns and constructed comments."""
+    member = request.user
+    if member_id is not None:
+        member = get_object_or_404(Member, pk=member_id)
+        if request.user != member and not request.user.instructor:
+            raise PermissionDenied
+
+    def format_hhmm(duration):
+        if not duration:
+            return ""
+        total_minutes = int(duration.total_seconds() // 60)
+        h, m = divmod(total_minutes, 60)
+        return f"{h}:{m:02d}"
+
+    events, report_lookup, rating_date = _build_logbook_events(member)
 
     rows = []
     flight_no = 0
@@ -2769,6 +2786,7 @@ def export_member_logbook_csv(request, member_id=None):
     return response
 
 
+@active_member_required
 def export_member_logbook_foreflight_csv(request, member_id=None):
     """Export the member's logbook as CSV in ForeFlight import template format.
 
@@ -2776,7 +2794,7 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     1. Aircraft table: unique aircraft with make, model, category, class, etc.
     2. Flights table: flights with decimal hours, ForeFlight column names
     """
-    from io import StringIO
+    _UNKNOWN_AIRCRAFT_ID = "UNKNOWN-AIRCRAFT"
 
     member = request.user
     if member_id is not None:
@@ -2791,56 +2809,21 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
         total_minutes = int(duration.total_seconds() // 60)
         return round(total_minutes / 60, 2)
 
-    # Query flights and ground instruction
-    flights = (
-        Flight.objects.filter(
-            Q(pilot=member) | Q(instructor=member) | Q(passenger=member)
-        )
-        .select_related(
-            "glider", "instructor", "pilot", "passenger", "airfield", "logsheet"
-        )
-        .order_by("logsheet__log_date")
-    )
-    grounds = (
-        GroundInstruction.objects.filter(student=member)
-        .prefetch_related("lesson_scores__lesson")
-        .order_by("date")
-    )
+    events, report_lookup, rating_date = _build_logbook_events(member)
 
-    rating_date = getattr(member, "private_glider_checkride_date", None)
-    instruction_reports = (
-        InstructionReport.objects.filter(student=member)
-        .select_related("instructor")
-        .prefetch_related("lesson_scores__lesson")
-    )
-    report_lookup = {}
-    for rpt in instruction_reports:
-        report_lookup[(rpt.instructor_id, rpt.report_date)] = [
-            ls.lesson.code for ls in rpt.lesson_scores.all()
-        ]
-
-    # Build unique aircraft list
+    # Build unique aircraft set from flight events (preserving insertion order)
     aircraft_map = {}  # {glider_id: glider_obj}
-    for f in flights:
-        if f.glider and f.glider.id not in aircraft_map:
-            aircraft_map[f.glider.id] = f.glider
+    has_unknown_aircraft = False
+    for ev in events:
+        if ev["type"] == "flight":
+            f = ev["obj"]
+            if f.glider:
+                if f.glider.id not in aircraft_map:
+                    aircraft_map[f.glider.id] = f.glider
+            else:
+                has_unknown_aircraft = True
 
-    # Build events timeline
-    events = []
-    for f in flights:
-        events.append(
-            {
-                "type": "flight",
-                "obj": f,
-                "date": f.logsheet.log_date,
-                "time": f.launch_time or time(0, 0),
-            }
-        )
-    for g in grounds:
-        events.append({"type": "ground", "obj": g, "date": g.date, "time": time(0, 0)})
-    events.sort(key=lambda e: (e["date"], e["time"]))
-
-    # Build flight rows
+    # Build flight/ground rows
     flight_rows = []
     for ev in events:
         if ev["type"] == "flight":
@@ -2860,7 +2843,6 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             pic_m = classification["pic_m"]
             inst_m = classification["inst_m"]
 
-            # Determine time columns
             time_out_str = ""
             time_off_str = ""
             time_on_str = ""
@@ -2874,7 +2856,6 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                 time_on_str = f"{hours:02d}:{mins:02d}"
                 time_in_str = f"{hours:02d}:{mins:02d}"
 
-            # Determine pilot names and times
             pic_hours = decimal_hours(timedelta(minutes=pic_m)) if pic_m else 0.0
             sic_hours = (
                 decimal_hours(timedelta(minutes=dual_m))
@@ -2890,7 +2871,6 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             total_hours = decimal_hours(timedelta(minutes=dur_m)) if dur_m else 0.0
             solo_hours = decimal_hours(timedelta(minutes=solo_m)) if solo_m else 0.0
 
-            # Get instructor comments from instruction report
             instructor_name = f.instructor.full_display_name if f.instructor else ""
             instructor_comments = ""
             if is_pilot and has_logbook_instructor_context(f):
@@ -2900,9 +2880,10 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                 if codes:
                     instructor_comments = ", ".join(codes)
 
+            aircraft_id = f.glider.n_number if f.glider else _UNKNOWN_AIRCRAFT_ID
             row = {
                 "Date": date_val.strftime("%Y-%m-%d"),
-                "AircraftID": f.glider.n_number if f.glider else "",
+                "AircraftID": aircraft_id,
                 "From": f.airfield.identifier if f.airfield else "",
                 "To": f.airfield.identifier if f.airfield else "",
                 "Route": "",
@@ -3006,10 +2987,14 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             }
             flight_rows.append(row)
 
-    # Build CSV content in memory
-    csv_buffer = StringIO()
+    # Build response — write both sections directly to HttpResponse to avoid
+    # buffering the entire CSV in memory.
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="logbook_{member.username}_foreflight.csv"'
+    )
 
-    # Write aircraft section header
+    # Section 1 — Aircraft table
     aircraft_fieldnames = [
         "AircraftID",
         "EquipmentType",
@@ -3026,33 +3011,53 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
         "Pressurized",
         "TAA",
     ]
-    aircraft_writer = csv.DictWriter(csv_buffer, fieldnames=aircraft_fieldnames)
+    aircraft_writer = csv.DictWriter(response, fieldnames=aircraft_fieldnames)
     aircraft_writer.writeheader()
 
-    # Write aircraft rows
     for glider in aircraft_map.values():
-        aircraft_row = {
-            "AircraftID": glider.n_number,
-            "EquipmentType": "",
-            "TypeCode": "",
-            "Year": "",
-            "Make": glider.make,
-            "Model": glider.model,
-            "Category": "Glider",
-            "Class": "Glider",
-            "GearType": "Fixed Gear",
-            "EngType": "None",
-            "Complex": "False",
-            "HighPerf": "False",
-            "Pressurized": "False",
-            "TAA": "False",
-        }
-        aircraft_writer.writerow(aircraft_row)
+        aircraft_writer.writerow(
+            {
+                "AircraftID": glider.n_number,
+                "EquipmentType": "",
+                "TypeCode": "",
+                "Year": "",
+                "Make": glider.make,
+                "Model": glider.model,
+                "Category": "Glider",
+                "Class": "Glider",
+                "GearType": "Fixed Gear",
+                "EngType": "None",
+                "Complex": "False",
+                "HighPerf": "False",
+                "Pressurized": "False",
+                "TAA": "False",
+            }
+        )
 
-    # Write blank line separator
-    csv_buffer.write("\n")
+    if has_unknown_aircraft:
+        aircraft_writer.writerow(
+            {
+                "AircraftID": _UNKNOWN_AIRCRAFT_ID,
+                "EquipmentType": "",
+                "TypeCode": "",
+                "Year": "",
+                "Make": "",
+                "Model": "",
+                "Category": "Glider",
+                "Class": "Glider",
+                "GearType": "",
+                "EngType": "None",
+                "Complex": "False",
+                "HighPerf": "False",
+                "Pressurized": "False",
+                "TAA": "False",
+            }
+        )
 
-    # Write flights section header
+    # Blank line separates the two sections (ForeFlight convention)
+    response.write("\n")
+
+    # Section 2 — Flights table
     flight_fieldnames = [
         "Date",
         "AircraftID",
@@ -3098,19 +3103,11 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
         "NVGProficiency",
         "PilotComments",
     ]
-    flight_writer = csv.DictWriter(csv_buffer, fieldnames=flight_fieldnames)
+    flight_writer = csv.DictWriter(response, fieldnames=flight_fieldnames)
     flight_writer.writeheader()
 
-    # Write flight rows
     for row in flight_rows:
         flight_writer.writerow(row)
-
-    # Create response
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = (
-        f'attachment; filename="logbook_{member.username}_foreflight.csv"'
-    )
-    response.write(csv_buffer.getvalue())
 
     return response
 

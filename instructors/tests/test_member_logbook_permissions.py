@@ -814,3 +814,38 @@ def test_foreflight_csv_has_aircraft_and_flights_sections(client):
     assert "Sailplane" in content
     assert "2-33" in content
     assert "Glider" in content
+
+
+@pytest.mark.django_db
+def test_foreflight_csv_handles_flight_with_no_glider(client):
+    _ensure_full_member_status()
+    pilot = _make_member("foreflight_no_glider_pilot")
+
+    airfield = Airfield.objects.create(name="No Glider Field", identifier="KNGL")
+    logsheet = Logsheet.objects.create(
+        log_date=date(2024, 7, 1),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    # Flight with glider=None (e.g. offline sync scenario)
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        glider=None,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 15),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    # Flight with no glider should use the placeholder AircraftID
+    assert "UNKNOWN-AIRCRAFT" in content
+    # A corresponding aircraft row should also be present
+    lines = [line for line in content.split("\n") if "UNKNOWN-AIRCRAFT" in line]
+    assert (
+        len(lines) >= 2
+    ), "UNKNOWN-AIRCRAFT should appear in both aircraft and flights sections"
