@@ -1694,6 +1694,8 @@ def edit_flight(request, logsheet_pk, flight_pk):
 
                 flight = form.save(commit=False)
                 flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
+                if not flight.airfield_id:
+                    flight.airfield = logsheet.airfield
                 if flight.commercial_ride:
                     flight.passenger = None
                     flight.passenger_name = ""
@@ -1857,6 +1859,8 @@ def add_flight(request, logsheet_pk):
                 flight = form.save(commit=False)
                 flight.logsheet = logsheet
                 flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
+                if not flight.airfield_id:
+                    flight.airfield = logsheet.airfield
                 if flight.commercial_ride:
                     flight.passenger = None
                     flight.passenger_name = ""

@@ -3007,8 +3007,11 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             aircraft_id = _sanitize_csv_cell(
                 f.glider.n_number if f.glider else _UNKNOWN_AIRCRAFT_ID
             )
+            flight_airfield = f.airfield or (
+                f.logsheet.airfield if f.logsheet else None
+            )
             airfield_identifier = _sanitize_csv_cell(
-                f.airfield.identifier if f.airfield else ""
+                flight_airfield.identifier if flight_airfield else ""
             )
             flight_writer.writerow(
                 {
