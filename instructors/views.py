@@ -2598,7 +2598,13 @@ def _build_logbook_events(member):
             Q(pilot=member) | Q(instructor=member) | Q(passenger=member)
         )
         .select_related(
-            "glider", "instructor", "pilot", "passenger", "airfield", "logsheet"
+            "glider",
+            "instructor",
+            "pilot",
+            "passenger",
+            "airfield",
+            "logsheet",
+            "logsheet__airfield",
         )
         .order_by("logsheet__log_date")
     )
