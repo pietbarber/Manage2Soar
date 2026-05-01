@@ -316,6 +316,96 @@ def test_launch_now_redeems_soft_locked_ticket(client, active_member, glider, ai
 
 
 @pytest.mark.django_db
+def test_add_flight_copies_logsheet_airfield_when_missing(
+    client, active_member, glider
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+
+    from logsheet.models import Airfield, Logsheet
+
+    logsheet_airfield = Airfield.objects.create(
+        name="Skyline",
+        identifier="KSKY",
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=logsheet_airfield,
+        created_by=active_member,
+    )
+
+    client.force_login(active_member)
+    url = reverse("logsheet:add_flight", args=[logsheet.pk])
+    response = client.post(
+        url,
+        data={
+            "pilot": active_member.pk,
+            "glider": glider.pk,
+            "launch_time": "09:00",
+            "landing_time": "09:25",
+            "release_altitude": "3000",
+        },
+    )
+
+    assert response.status_code == 302
+    flight = Flight.objects.get(logsheet=logsheet)
+    assert flight.airfield == logsheet_airfield
+
+
+@pytest.mark.django_db
+def test_edit_flight_copies_logsheet_airfield_when_missing(
+    client, active_member, glider
+):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        commercial_rides_enabled=True,
+    )
+
+    from logsheet.models import Airfield, Logsheet
+
+    logsheet_airfield = Airfield.objects.create(
+        name="Front Royal",
+        identifier="KFRR",
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=logsheet_airfield,
+        created_by=active_member,
+    )
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        airfield=None,
+        launch_time=time(8, 30),
+        landing_time=time(8, 55),
+    )
+
+    client.force_login(active_member)
+    url = reverse("logsheet:edit_flight", args=[logsheet.pk, flight.pk])
+    response = client.post(
+        url,
+        data={
+            "pilot": active_member.pk,
+            "glider": glider.pk,
+            "launch_time": "09:00",
+            "landing_time": "09:25",
+            "release_altitude": "3000",
+        },
+    )
+
+    assert response.status_code == 302
+    flight.refresh_from_db()
+    assert flight.airfield == logsheet_airfield
+
+
+@pytest.mark.django_db
 def test_launch_now_rolls_back_launch_time_when_ticket_link_fails(
     client, active_member, glider, airfield, monkeypatch
 ):

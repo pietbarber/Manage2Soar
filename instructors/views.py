@@ -2598,7 +2598,13 @@ def _build_logbook_events(member):
             Q(pilot=member) | Q(instructor=member) | Q(passenger=member)
         )
         .select_related(
-            "glider", "instructor", "pilot", "passenger", "airfield", "logsheet"
+            "glider",
+            "instructor",
+            "pilot",
+            "passenger",
+            "airfield",
+            "logsheet",
+            "logsheet__airfield",
         )
         .order_by("logsheet__log_date")
     )
@@ -3007,8 +3013,11 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             aircraft_id = _sanitize_csv_cell(
                 f.glider.n_number if f.glider else _UNKNOWN_AIRCRAFT_ID
             )
+            flight_airfield = f.airfield or (
+                f.logsheet.airfield if f.logsheet else None
+            )
             airfield_identifier = _sanitize_csv_cell(
-                f.airfield.identifier if f.airfield else ""
+                flight_airfield.identifier if flight_airfield else ""
             )
             flight_writer.writerow(
                 {

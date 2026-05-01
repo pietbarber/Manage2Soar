@@ -849,3 +849,48 @@ def test_foreflight_csv_handles_flight_with_no_glider(client):
     assert (
         len(lines) >= 2
     ), "UNKNOWN-AIRCRAFT should appear in both aircraft and flights sections"
+
+
+@pytest.mark.django_db
+def test_foreflight_csv_uses_logsheet_airfield_when_flight_airfield_missing(client):
+    _ensure_full_member_status()
+    pilot = _make_member("foreflight_airfield_fallback_pilot")
+
+    logsheet_airfield = Airfield.objects.create(
+        name="Fallback Field",
+        identifier="KFBK",
+    )
+    glider = Glider.objects.create(
+        n_number="N999FBK",
+        make="Schempp-Hirth",
+        model="Discus",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2026, 4, 25),
+        airfield=logsheet_airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        glider=glider,
+        airfield=None,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 15),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    lines = response.content.decode().splitlines()
+    blank_idx = lines.index("")
+    flights_section = lines[blank_idx + 1 :]
+    rows = list(csv.DictReader(io.StringIO("\n".join(flights_section))))
+
+    assert rows
+    assert rows[0]["From"] == "KFBK"
+    assert rows[0]["To"] == "KFBK"
