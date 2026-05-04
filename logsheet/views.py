@@ -92,8 +92,11 @@ def _missing_towplane_pricing_setup(limit=3):
 
 
 def _flight_form_setup_error_message(exc, *, unexpected=False):
-    """Build a user-facing setup error message for flight form initialization."""
-    base = str(exc)
+    """Build a user-facing setup error message for flight form initialization.
+
+    Never include exc details in the returned string — those are logged server-side
+    to avoid information exposure (CWE-209 / CodeQL python/stack-trace-exposure).
+    """
     suffix = _missing_towplane_pricing_setup()
     if unexpected:
         return (
@@ -101,13 +104,18 @@ def _flight_form_setup_error_message(exc, *, unexpected=False):
             "An admin should check the server logs, Site Configuration, and towplane charge tiers."
             + suffix
         )
-    if "Site configuration is missing" in base:
+    if "Site configuration is missing" in str(exc):
         return (
             "Flight form setup is incomplete: Site Configuration is missing. "
             "An admin should create it in Admin > Siteconfig > Site Configuration."
             + suffix
         )
-    return f"Flight form setup is incomplete. {base}{suffix}"
+    # ImproperlyConfigured with an unrecognised message — log detail, show generic text.
+    logger.error("FlightForm setup error (ImproperlyConfigured): %s", exc)
+    return (
+        "Flight form setup is incomplete due to a configuration error. "
+        "An admin should check the server logs and Site Configuration." + suffix
+    )
 
 
 @active_member_required
