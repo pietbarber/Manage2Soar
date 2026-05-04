@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.contrib import messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Value
@@ -71,6 +71,43 @@ def _can_issue_commercial_ticket(user):
     return bool(
         getattr(user, "duty_officer", False) or getattr(user, "treasurer", False)
     )
+
+
+def _missing_towplane_pricing_setup(limit=3):
+    """Return a short list of active towplanes missing active charge tier setup."""
+    missing = list(
+        Towplane.objects.filter(is_active=True)
+        .exclude(
+            charge_scheme__is_active=True,
+            charge_scheme__charge_tiers__is_active=True,
+        )
+        .order_by("name", "n_number")[:limit]
+    )
+    if not missing:
+        return ""
+
+    names = ", ".join(f"{tp.name} ({tp.n_number})" for tp in missing)
+    suffix = "" if len(missing) < limit else ", ..."
+    return " Active towplanes missing charge tiers: " f"{names}{suffix}."
+
+
+def _flight_form_setup_error_message(exc, *, unexpected=False):
+    """Build a user-facing setup error message for flight form initialization."""
+    base = str(exc)
+    suffix = _missing_towplane_pricing_setup()
+    if unexpected:
+        return (
+            "Flight form could not be loaded due to an unexpected server error. "
+            "An admin should check the server logs, Site Configuration, and towplane charge tiers."
+            + suffix
+        )
+    if "Site configuration is missing" in base:
+        return (
+            "Flight form setup is incomplete: Site Configuration is missing. "
+            "An admin should create it in Admin > Siteconfig > Site Configuration."
+            + suffix
+        )
+    return f"Flight form setup is incomplete. {base}{suffix}"
 
 
 @active_member_required
@@ -1681,8 +1718,30 @@ def edit_flight(request, logsheet_pk, flight_pk):
     config = SiteConfiguration.objects.first()
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
+    def _setup_error_response(exc, *, unexpected=False):
+        message = _flight_form_setup_error_message(exc, unexpected=unexpected)
+        if unexpected:
+            logger.exception(
+                "Unexpected error initialising FlightForm in edit_flight: %s", exc
+            )
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "error": message,
+                    "error_code": "flight_form_setup_incomplete",
+                },
+                status=500,
+            )
+        messages.error(request, message)
+        return redirect("logsheet:manage", pk=logsheet.pk)
+
     if request.method == "POST":
-        form = FlightForm(request.POST, instance=flight, logsheet=logsheet)
+        try:
+            form = FlightForm(request.POST, instance=flight, logsheet=logsheet)
+        except ImproperlyConfigured as exc:
+            return _setup_error_response(exc)
+        except Exception as exc:
+            return _setup_error_response(exc, unexpected=True)
         if form.is_valid():
             ticket_link_error = None
             with transaction.atomic():
@@ -1783,7 +1842,12 @@ def edit_flight(request, logsheet_pk, flight_pk):
                 status=400,
             )
     else:
-        form = FlightForm(instance=flight, logsheet=logsheet)
+        try:
+            form = FlightForm(instance=flight, logsheet=logsheet)
+        except ImproperlyConfigured as exc:
+            return _setup_error_response(exc)
+        except Exception as exc:
+            return _setup_error_response(exc, unexpected=True)
 
     return render(
         request,
@@ -1851,8 +1915,30 @@ def add_flight(request, logsheet_pk):
     config = SiteConfiguration.objects.first()
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
+    def _setup_error_response(exc, *, unexpected=False):
+        message = _flight_form_setup_error_message(exc, unexpected=unexpected)
+        if unexpected:
+            logger.exception(
+                "Unexpected error initialising FlightForm in add_flight: %s", exc
+            )
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "error": message,
+                    "error_code": "flight_form_setup_incomplete",
+                },
+                status=500,
+            )
+        messages.error(request, message)
+        return redirect("logsheet:manage", pk=logsheet.pk)
+
     if request.method == "POST":
-        form = FlightForm(request.POST, logsheet=logsheet)
+        try:
+            form = FlightForm(request.POST, logsheet=logsheet)
+        except ImproperlyConfigured as exc:
+            return _setup_error_response(exc)
+        except Exception as exc:
+            return _setup_error_response(exc, unexpected=True)
         if form.is_valid():
             ticket_link_error = None
             with transaction.atomic():
@@ -1932,7 +2018,12 @@ def add_flight(request, logsheet_pk):
             initial["tow_pilot"] = logsheet.tow_pilot_id
         if logsheet.default_towplane_id:
             initial["towplane"] = logsheet.default_towplane_id
-        form = FlightForm(initial=initial, logsheet=logsheet)
+        try:
+            form = FlightForm(initial=initial, logsheet=logsheet)
+        except ImproperlyConfigured as exc:
+            return _setup_error_response(exc)
+        except Exception as exc:
+            return _setup_error_response(exc, unexpected=True)
 
     return render(
         request,

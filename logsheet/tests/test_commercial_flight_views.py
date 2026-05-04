@@ -51,7 +51,7 @@ def test_add_commercial_flight_redeems_ticket_and_creates_ride(
     assert response.status_code == 302
 
     flight = Flight.objects.get(logsheet=logsheet)
-    ticket.refresh_from_db()
+    ticket.refresh_from_db(from_queryset=None)
 
     assert flight.commercial_ride is True
     assert flight.passenger is None
@@ -210,7 +210,7 @@ def test_edit_commercial_flight_rolls_back_when_ticket_link_fails(
 
     assert response.status_code == 200
     assert "ticket_number" in response.context["form"].errors
-    flight.refresh_from_db()
+    flight.refresh_from_db(from_queryset=None)
     assert flight.commercial_ride is False
     assert flight.passenger_name == "Keep Me"
 
@@ -256,7 +256,7 @@ def test_add_pending_commercial_flight_soft_locks_ticket_without_redeeming(
     assert response.status_code == 302
 
     flight = Flight.objects.get(logsheet=logsheet)
-    ticket.refresh_from_db()
+    ticket.refresh_from_db(from_queryset=None)
 
     assert flight.launch_time is None
     assert ticket.status == CommercialTicket.Status.AVAILABLE
@@ -298,7 +298,7 @@ def test_launch_now_redeems_soft_locked_ticket(client, active_member, glider, ai
         revenue_amount=ticket.amount_paid,
     )
 
-    ticket.refresh_from_db()
+    ticket.refresh_from_db(from_queryset=None)
     assert ticket.status == CommercialTicket.Status.AVAILABLE
 
     client.force_login(active_member)
@@ -310,7 +310,7 @@ def test_launch_now_redeems_soft_locked_ticket(client, active_member, glider, ai
     )
 
     assert response.status_code == 200
-    ticket.refresh_from_db()
+    ticket.refresh_from_db(from_queryset=None)
     assert ticket.status == CommercialTicket.Status.REDEEMED
     assert ticket.flight == flight
 
@@ -401,8 +401,61 @@ def test_edit_flight_copies_logsheet_airfield_when_missing(
     )
 
     assert response.status_code == 302
-    flight.refresh_from_db()
+    flight.refresh_from_db(from_queryset=None)
     assert flight.airfield == logsheet_airfield
+
+
+@pytest.mark.django_db
+def test_add_flight_ajax_returns_setup_error_when_site_configuration_missing(
+    client, active_member, glider, airfield
+):
+    from logsheet.models import Logsheet
+
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=airfield,
+        created_by=active_member,
+    )
+
+    client.force_login(active_member)
+    response = client.get(
+        reverse("logsheet:add_flight", args=[logsheet.pk]),
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 500
+    payload = response.json()
+    assert payload["error_code"] == "flight_form_setup_incomplete"
+    assert "Site Configuration is missing" in payload["error"]
+
+
+@pytest.mark.django_db
+def test_edit_flight_ajax_returns_setup_error_when_site_configuration_missing(
+    client, active_member, glider, airfield
+):
+    from logsheet.models import Flight, Logsheet
+
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=airfield,
+        created_by=active_member,
+    )
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+    )
+
+    client.force_login(active_member)
+    response = client.get(
+        reverse("logsheet:edit_flight", args=[logsheet.pk, flight.pk]),
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 500
+    payload = response.json()
+    assert payload["error_code"] == "flight_form_setup_incomplete"
+    assert "Site Configuration is missing" in payload["error"]
 
 
 @pytest.mark.django_db
@@ -457,7 +510,7 @@ def test_launch_now_rolls_back_launch_time_when_ticket_link_fails(
     )
 
     assert response.status_code == 400
-    flight.refresh_from_db()
-    ticket.refresh_from_db()
+    flight.refresh_from_db(from_queryset=None)
+    ticket.refresh_from_db(from_queryset=None)
     assert flight.launch_time is None
     assert ticket.status == CommercialTicket.Status.AVAILABLE

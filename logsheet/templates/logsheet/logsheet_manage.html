@@ -2047,13 +2047,27 @@ document.addEventListener("click", async function(e) {
         "X-Requested-With": "XMLHttpRequest"
       }
     })
-    .then(response => {
+    .then(async response => {
       if (!response.ok) {
         // Handle offline/error responses
         if (!navigator.onLine || response.status === 503) {
           throw new Error('offline');
         }
-        throw new Error('server_error');
+
+        const contentType = response.headers.get("content-type") || "";
+        let serverMessage = "";
+        if (contentType.includes("application/json")) {
+          try {
+            const payload = await response.json();
+            serverMessage = payload.error || payload.message || "";
+          } catch (e) {
+            console.warn("Unable to parse JSON error payload", e);
+          }
+        }
+
+        const error = new Error(serverMessage || 'server_error');
+        error.httpStatus = response.status;
+        throw error;
       }
       return response.text();
     })
@@ -2343,11 +2357,20 @@ document.addEventListener("click", async function(e) {
       }
     })
     .catch(async error => {
+      const escapeHtml = (unsafe) => {
+        const div = document.createElement('div');
+        div.textContent = unsafe || '';
+        return div.innerHTML;
+      };
+
       // Handle offline/network errors gracefully
       const isOffline = error.message === 'offline' || !navigator.onLine;
       const isAddFlight = url && url.includes('/add-flight/');
       const isEditFlight = url && url.includes('/edit-flight/');
       const modalContent = document.getElementById("flightModalContent");
+      const serverMessage = !isOffline && error.message && error.message !== 'server_error'
+        ? error.message
+        : "The server could not load the flight form. Check Site Configuration and towplane charge tiers in Admin, then retry.";
 
       // If offline and adding/editing a flight, try to use offline form
       if (isOffline && (isAddFlight || isEditFlight) && window.M2SOffline) {
@@ -2390,7 +2413,7 @@ document.addEventListener("click", async function(e) {
                 ? "No cached data available for offline entry. Please connect to the internet at least once to cache flight data."
                 : isOffline
                   ? "This action requires an internet connection."
-                  : "There was a problem connecting to the server. Please try again."}
+                  : escapeHtml(serverMessage)}
             </p>
           </div>
           <div id="offline-modal-status" class="text-muted small">
