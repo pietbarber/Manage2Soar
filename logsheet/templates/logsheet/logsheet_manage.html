@@ -2112,7 +2112,19 @@ document.addEventListener("click", async function(e) {
                 document.body.innerHTML = html;
               }
             } else {
-              throw new Error('server_error');
+              // Non-OK, non-HTML response — try to extract a structured JSON error message.
+              let serverMessage = "";
+              if (contentType.includes("application/json")) {
+                try {
+                  const payload = await response.json();
+                  serverMessage = payload.error || payload.message || "";
+                } catch (e) {
+                  console.warn("Unable to parse JSON error payload from submit response", e);
+                }
+              }
+              const submitError = new Error(serverMessage || "server_error");
+              submitError.httpStatus = response.status;
+              throw submitError;
             }
           })
           .catch(async error => {
@@ -2175,7 +2187,15 @@ document.addEventListener("click", async function(e) {
                 alert("Could not save the flight offline. Please try again when online.");
               }
             } else {
-              alert("Could not save the flight. Please check your connection and try again.");
+              const escapeHtml = (unsafe) => {
+                const div = document.createElement('div');
+                div.textContent = unsafe || '';
+                return div.innerHTML;
+              };
+              const serverMessage = error.message && error.message !== 'server_error'
+                ? error.message
+                : "Could not save the flight. Please check your connection and try again.";
+              alert(escapeHtml(serverMessage));
             }
           });
         });

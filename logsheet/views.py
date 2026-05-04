@@ -74,28 +74,37 @@ def _can_issue_commercial_ticket(user):
 
 
 def _missing_towplane_pricing_setup(limit=3):
-    """Return a short list of active towplanes missing active charge tier setup."""
+    """Return a short list of active towplanes with no charge scheme configured.
+
+    Towplanes with a charge scheme but no active tiers are valid (hookup-fee-only
+    pricing is supported); only towplanes with no charge_scheme at all are flagged.
+    """
     missing = list(
-        Towplane.objects.filter(is_active=True)
-        .exclude(
-            charge_scheme__is_active=True,
-            charge_scheme__charge_tiers__is_active=True,
-        )
-        .order_by("name", "n_number")[:limit]
+        Towplane.objects.filter(is_active=True, charge_scheme__isnull=True).order_by(
+            "name", "n_number"
+        )[:limit]
     )
     if not missing:
         return ""
 
     names = ", ".join(f"{tp.name} ({tp.n_number})" for tp in missing)
     suffix = "" if len(missing) < limit else ", ..."
-    return " Active towplanes missing charge tiers: " f"{names}{suffix}."
+    return f" Active towplanes with no charge scheme configured: {names}{suffix}."
 
 
-def _flight_form_setup_error_message(exc, *, unexpected=False):
+def _flight_form_setup_error_message(
+    exc, *, unexpected=False, site_config_missing=False
+):
     """Build a user-facing setup error message for flight form initialization.
 
     Never include exc details in the returned string — those are logged server-side
     to avoid information exposure (CWE-209 / CodeQL python/stack-trace-exposure).
+
+    Args:
+        exc: The caught exception (used only for server-side logging).
+        unexpected: True when the exception is not ImproperlyConfigured.
+        site_config_missing: True when SiteConfiguration.objects.first() is None;
+            detected by the caller via a direct DB check, not by parsing exc.args.
     """
     suffix = _missing_towplane_pricing_setup()
     if unexpected:
@@ -104,13 +113,13 @@ def _flight_form_setup_error_message(exc, *, unexpected=False):
             "An admin should check the server logs, Site Configuration, and towplane charge tiers."
             + suffix
         )
-    if "Site configuration is missing" in str(exc):
+    if site_config_missing:
         return (
             "Flight form setup is incomplete: Site Configuration is missing. "
             "An admin should create it in Admin > Siteconfig > Site Configuration."
             + suffix
         )
-    # ImproperlyConfigured with an unrecognised message — log detail, show generic text.
+    # ImproperlyConfigured with an unrecognised cause — log detail, show generic text.
     logger.error("FlightForm setup error (ImproperlyConfigured): %s", exc)
     return (
         "Flight form setup is incomplete due to a configuration error. "
@@ -1727,17 +1736,24 @@ def edit_flight(request, logsheet_pk, flight_pk):
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
     def _setup_error_response(exc, *, unexpected=False):
-        message = _flight_form_setup_error_message(exc, unexpected=unexpected)
+        site_config_missing = (
+            not unexpected and SiteConfiguration.objects.first() is None
+        )
+        message = _flight_form_setup_error_message(
+            exc, unexpected=unexpected, site_config_missing=site_config_missing
+        )
         if unexpected:
             logger.exception(
                 "Unexpected error initialising FlightForm in edit_flight: %s", exc
             )
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            error_code = (
+                "flight_form_unexpected_error"
+                if unexpected
+                else "flight_form_setup_incomplete"
+            )
             return JsonResponse(
-                {
-                    "error": message,
-                    "error_code": "flight_form_setup_incomplete",
-                },
+                {"error": message, "error_code": error_code},
                 status=500,
             )
         messages.error(request, message)
@@ -1924,17 +1940,24 @@ def add_flight(request, logsheet_pk):
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
     def _setup_error_response(exc, *, unexpected=False):
-        message = _flight_form_setup_error_message(exc, unexpected=unexpected)
+        site_config_missing = (
+            not unexpected and SiteConfiguration.objects.first() is None
+        )
+        message = _flight_form_setup_error_message(
+            exc, unexpected=unexpected, site_config_missing=site_config_missing
+        )
         if unexpected:
             logger.exception(
                 "Unexpected error initialising FlightForm in add_flight: %s", exc
             )
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            error_code = (
+                "flight_form_unexpected_error"
+                if unexpected
+                else "flight_form_setup_incomplete"
+            )
             return JsonResponse(
-                {
-                    "error": message,
-                    "error_code": "flight_form_setup_incomplete",
-                },
+                {"error": message, "error_code": error_code},
                 status=500,
             )
         messages.error(request, message)
