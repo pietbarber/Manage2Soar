@@ -731,6 +731,14 @@ window.getCsrfToken = window.getCsrfToken || function() {
   return domToken ? domToken.value : '';
 };
 
+// Shared helper — defined at global scope so both script blocks can use it.
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Shared function to attach NOW and 2K/3K button handlers to flight modal form
 // This must be called after any modal content is loaded (normal open, clone, etc.)
 // Uses clone-and-replace pattern to prevent duplicate event listeners
@@ -1114,14 +1122,6 @@ document.addEventListener("click", async function(e) {
         const landingTimeInput = form.querySelector('input[name="landing_time"]');
         if (landingTimeInput) landingTimeInput.value = '';
       }
-    }
-
-    // Helper function to escape HTML special characters
-    function escapeHtml(text) {
-      if (!text) return '';
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
     }
 
     // Helper to add clone notice to modal
@@ -2047,13 +2047,27 @@ document.addEventListener("click", async function(e) {
         "X-Requested-With": "XMLHttpRequest"
       }
     })
-    .then(response => {
+    .then(async response => {
       if (!response.ok) {
         // Handle offline/error responses
         if (!navigator.onLine || response.status === 503) {
           throw new Error('offline');
         }
-        throw new Error('server_error');
+
+        const contentType = response.headers.get("content-type") || "";
+        let serverMessage = "";
+        if (contentType.includes("application/json")) {
+          try {
+            const payload = await response.json();
+            serverMessage = payload.error || payload.message || "";
+          } catch (e) {
+            console.warn("Unable to parse JSON error payload", e);
+          }
+        }
+
+        const error = new Error(serverMessage || 'server_error');
+        error.httpStatus = response.status;
+        throw error;
       }
       return response.text();
     })
@@ -2098,7 +2112,19 @@ document.addEventListener("click", async function(e) {
                 document.body.innerHTML = html;
               }
             } else {
-              throw new Error('server_error');
+              // Non-OK, non-HTML response — try to extract a structured JSON error message.
+              let serverMessage = "";
+              if (contentType.includes("application/json")) {
+                try {
+                  const payload = await response.json();
+                  serverMessage = payload.error || payload.message || "";
+                } catch (e) {
+                  console.warn("Unable to parse JSON error payload from submit response", e);
+                }
+              }
+              const submitError = new Error(serverMessage || "server_error");
+              submitError.httpStatus = response.status;
+              throw submitError;
             }
           })
           .catch(async error => {
@@ -2161,7 +2187,12 @@ document.addEventListener("click", async function(e) {
                 alert("Could not save the flight offline. Please try again when online.");
               }
             } else {
-              alert("Could not save the flight. Please check your connection and try again.");
+              // alert() displays plain text — do NOT pass HTML-escaped content or
+              // characters like '>' will show as '&gt;'. escapeHtml is only for innerHTML.
+              const serverMessage = error.message && error.message !== 'server_error'
+                ? error.message
+                : "Could not save the flight. Please check your connection and try again.";
+              alert(serverMessage);
             }
           });
         });
@@ -2348,6 +2379,9 @@ document.addEventListener("click", async function(e) {
       const isAddFlight = url && url.includes('/add-flight/');
       const isEditFlight = url && url.includes('/edit-flight/');
       const modalContent = document.getElementById("flightModalContent");
+      const serverMessage = !isOffline && error.message && error.message !== 'server_error'
+        ? error.message
+        : "The server could not load the flight form. Check Site Configuration and towplane charge tiers in Admin, then retry.";
 
       // If offline and adding/editing a flight, try to use offline form
       if (isOffline && (isAddFlight || isEditFlight) && window.M2SOffline) {
@@ -2390,7 +2424,7 @@ document.addEventListener("click", async function(e) {
                 ? "No cached data available for offline entry. Please connect to the internet at least once to cache flight data."
                 : isOffline
                   ? "This action requires an internet connection."
-                  : "There was a problem connecting to the server. Please try again."}
+                  : escapeHtml(serverMessage)}
             </p>
           </div>
           <div id="offline-modal-status" class="text-muted small">

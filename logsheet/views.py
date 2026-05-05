@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.contrib import messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Value
@@ -70,6 +70,78 @@ TOW_LOGBOOK_ESTIMATED_HOBBS_PER_TOW = Decimal("0.2")
 def _can_issue_commercial_ticket(user):
     return bool(
         getattr(user, "duty_officer", False) or getattr(user, "treasurer", False)
+    )
+
+
+def _missing_towplane_pricing_setup(limit=3):
+    """Return a short list of active towplanes with no charge scheme configured.
+
+    Towplanes with a charge scheme but no active tiers are valid (hookup-fee-only
+    pricing is supported); only towplanes with no charge_scheme at all are flagged.
+    """
+    # Fetch limit+1 so we can reliably detect whether more results exist beyond
+    # the display limit (len == limit after slicing does NOT imply overflow).
+    rows = list(
+        Towplane.objects.filter(is_active=True, charge_scheme__isnull=True).order_by(
+            "name", "n_number"
+        )[: limit + 1]
+    )
+    if not rows:
+        return ""
+
+    has_more = len(rows) > limit
+    display = rows[:limit]
+    names = ", ".join(f"{tp.name} ({tp.n_number})" for tp in display)
+    suffix = ", ..." if has_more else ""
+    return f" Active towplanes with no charge scheme configured: {names}{suffix}."
+
+
+def _flight_form_setup_error_message(
+    exc, *, unexpected=False, site_config_missing=False
+):
+    """Build a user-facing setup error message for flight form initialization.
+
+    Never include exc details in the returned string — those are logged server-side
+    to avoid information exposure (CWE-209 / CodeQL python/stack-trace-exposure).
+    The caller is responsible for logging unexpected exceptions via logger.exception.
+
+    Args:
+        exc: The caught exception (used only for server-side logging).
+        unexpected: True when the exception is not ImproperlyConfigured.
+        site_config_missing: True when SiteConfiguration.objects.first() is None;
+            detected by the caller via a direct DB check, not by parsing exc.args.
+    """
+    try:
+        suffix = _missing_towplane_pricing_setup()
+    except Exception:
+        # If the hint query itself fails (e.g., DB connection issue that triggered
+        # the original FlightForm error), swallow it gracefully so the caller's
+        # JSON/flash-message error handling is not bypassed.
+        logger.warning(
+            "Could not retrieve towplane pricing hint for error message.",
+            exc_info=True,
+        )
+        suffix = ""
+    if unexpected:
+        return (
+            "Flight form could not be loaded due to an unexpected server error. "
+            "An admin should check the server logs, Site Configuration, and towplane charge tiers."
+            + suffix
+        )
+    if site_config_missing:
+        logger.warning(
+            "FlightForm init failed: SiteConfiguration row is missing for this tenant."
+        )
+        return (
+            "Flight form setup is incomplete: Site Configuration is missing. "
+            "An admin should create it in Admin > Siteconfig > Site Configuration."
+            + suffix
+        )
+    # ImproperlyConfigured with an unrecognised cause — log detail, show generic text.
+    logger.exception("FlightForm setup error (ImproperlyConfigured): %s", exc)
+    return (
+        "Flight form setup is incomplete due to a configuration error. "
+        "An admin should check the server logs and Site Configuration." + suffix
     )
 
 
@@ -1681,8 +1753,37 @@ def edit_flight(request, logsheet_pk, flight_pk):
     config = SiteConfiguration.objects.first()
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
+    def _setup_error_response(exc, *, unexpected=False):
+        # Use the already-fetched config to avoid an extra DB query and potential
+        # inconsistency if a row is created between the two calls.
+        site_config_missing = not unexpected and config is None
+        message = _flight_form_setup_error_message(
+            exc, unexpected=unexpected, site_config_missing=site_config_missing
+        )
+        if unexpected:
+            logger.exception(
+                "Unexpected error initialising FlightForm in edit_flight: %s", exc
+            )
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            error_code = (
+                "flight_form_unexpected_error"
+                if unexpected
+                else "flight_form_setup_incomplete"
+            )
+            return JsonResponse(
+                {"error": message, "error_code": error_code},
+                status=500,
+            )
+        messages.error(request, message)
+        return redirect("logsheet:manage", pk=logsheet.pk)
+
     if request.method == "POST":
-        form = FlightForm(request.POST, instance=flight, logsheet=logsheet)
+        try:
+            form = FlightForm(request.POST, instance=flight, logsheet=logsheet)
+        except ImproperlyConfigured as exc:
+            return _setup_error_response(exc)
+        except Exception as exc:
+            return _setup_error_response(exc, unexpected=True)
         if form.is_valid():
             ticket_link_error = None
             with transaction.atomic():
@@ -1783,7 +1884,12 @@ def edit_flight(request, logsheet_pk, flight_pk):
                 status=400,
             )
     else:
-        form = FlightForm(instance=flight, logsheet=logsheet)
+        try:
+            form = FlightForm(instance=flight, logsheet=logsheet)
+        except ImproperlyConfigured as exc:
+            return _setup_error_response(exc)
+        except Exception as exc:
+            return _setup_error_response(exc, unexpected=True)
 
     return render(
         request,
@@ -1851,8 +1957,37 @@ def add_flight(request, logsheet_pk):
     config = SiteConfiguration.objects.first()
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
+    def _setup_error_response(exc, *, unexpected=False):
+        # Use the already-fetched config to avoid an extra DB query and potential
+        # inconsistency if a row is created between the two calls.
+        site_config_missing = not unexpected and config is None
+        message = _flight_form_setup_error_message(
+            exc, unexpected=unexpected, site_config_missing=site_config_missing
+        )
+        if unexpected:
+            logger.exception(
+                "Unexpected error initialising FlightForm in add_flight: %s", exc
+            )
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            error_code = (
+                "flight_form_unexpected_error"
+                if unexpected
+                else "flight_form_setup_incomplete"
+            )
+            return JsonResponse(
+                {"error": message, "error_code": error_code},
+                status=500,
+            )
+        messages.error(request, message)
+        return redirect("logsheet:manage", pk=logsheet.pk)
+
     if request.method == "POST":
-        form = FlightForm(request.POST, logsheet=logsheet)
+        try:
+            form = FlightForm(request.POST, logsheet=logsheet)
+        except ImproperlyConfigured as exc:
+            return _setup_error_response(exc)
+        except Exception as exc:
+            return _setup_error_response(exc, unexpected=True)
         if form.is_valid():
             ticket_link_error = None
             with transaction.atomic():
@@ -1932,7 +2067,12 @@ def add_flight(request, logsheet_pk):
             initial["tow_pilot"] = logsheet.tow_pilot_id
         if logsheet.default_towplane_id:
             initial["towplane"] = logsheet.default_towplane_id
-        form = FlightForm(initial=initial, logsheet=logsheet)
+        try:
+            form = FlightForm(initial=initial, logsheet=logsheet)
+        except ImproperlyConfigured as exc:
+            return _setup_error_response(exc)
+        except Exception as exc:
+            return _setup_error_response(exc, unexpected=True)
 
     return render(
         request,
