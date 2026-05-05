@@ -731,6 +731,14 @@ window.getCsrfToken = window.getCsrfToken || function() {
   return domToken ? domToken.value : '';
 };
 
+// Shared helper — defined at global scope so both script blocks can use it.
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Shared function to attach NOW and 2K/3K button handlers to flight modal form
 // This must be called after any modal content is loaded (normal open, clone, etc.)
 // Uses clone-and-replace pattern to prevent duplicate event listeners
@@ -1114,14 +1122,6 @@ document.addEventListener("click", async function(e) {
         const landingTimeInput = form.querySelector('input[name="landing_time"]');
         if (landingTimeInput) landingTimeInput.value = '';
       }
-    }
-
-    // Helper function to escape HTML special characters
-    function escapeHtml(text) {
-      if (!text) return '';
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
     }
 
     // Helper to add clone notice to modal
@@ -2374,12 +2374,6 @@ document.addEventListener("click", async function(e) {
       }
     })
     .catch(async error => {
-      const escapeHtml = (unsafe) => {
-        const div = document.createElement('div');
-        div.textContent = unsafe || '';
-        return div.innerHTML;
-      };
-
       // Handle offline/network errors gracefully
       const isOffline = error.message === 'offline' || !navigator.onLine;
       const isAddFlight = url && url.includes('/add-flight/');

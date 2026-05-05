@@ -117,7 +117,10 @@ def _flight_form_setup_error_message(
         # If the hint query itself fails (e.g., DB connection issue that triggered
         # the original FlightForm error), swallow it gracefully so the caller's
         # JSON/flash-message error handling is not bypassed.
-        logger.warning("Could not retrieve towplane pricing hint for error message.")
+        logger.warning(
+            "Could not retrieve towplane pricing hint for error message.",
+            exc_info=True,
+        )
         suffix = ""
     if unexpected:
         return (
@@ -135,7 +138,7 @@ def _flight_form_setup_error_message(
             + suffix
         )
     # ImproperlyConfigured with an unrecognised cause — log detail, show generic text.
-    logger.error("FlightForm setup error (ImproperlyConfigured): %s", exc)
+    logger.exception("FlightForm setup error (ImproperlyConfigured): %s", exc)
     return (
         "Flight form setup is incomplete due to a configuration error. "
         "An admin should check the server logs and Site Configuration." + suffix
