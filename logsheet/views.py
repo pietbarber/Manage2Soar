@@ -111,7 +111,14 @@ def _flight_form_setup_error_message(
         site_config_missing: True when SiteConfiguration.objects.first() is None;
             detected by the caller via a direct DB check, not by parsing exc.args.
     """
-    suffix = _missing_towplane_pricing_setup()
+    try:
+        suffix = _missing_towplane_pricing_setup()
+    except Exception:
+        # If the hint query itself fails (e.g., DB connection issue that triggered
+        # the original FlightForm error), swallow it gracefully so the caller's
+        # JSON/flash-message error handling is not bypassed.
+        logger.warning("Could not retrieve towplane pricing hint for error message.")
+        suffix = ""
     if unexpected:
         return (
             "Flight form could not be loaded due to an unexpected server error. "
