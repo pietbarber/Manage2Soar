@@ -79,16 +79,20 @@ def _missing_towplane_pricing_setup(limit=3):
     Towplanes with a charge scheme but no active tiers are valid (hookup-fee-only
     pricing is supported); only towplanes with no charge_scheme at all are flagged.
     """
-    missing = list(
+    # Fetch limit+1 so we can reliably detect whether more results exist beyond
+    # the display limit (len == limit after slicing does NOT imply overflow).
+    rows = list(
         Towplane.objects.filter(is_active=True, charge_scheme__isnull=True).order_by(
             "name", "n_number"
-        )[:limit]
+        )[: limit + 1]
     )
-    if not missing:
+    if not rows:
         return ""
 
-    names = ", ".join(f"{tp.name} ({tp.n_number})" for tp in missing)
-    suffix = "" if len(missing) < limit else ", ..."
+    has_more = len(rows) > limit
+    display = rows[:limit]
+    names = ", ".join(f"{tp.name} ({tp.n_number})" for tp in display)
+    suffix = ", ..." if has_more else ""
     return f" Active towplanes with no charge scheme configured: {names}{suffix}."
 
 

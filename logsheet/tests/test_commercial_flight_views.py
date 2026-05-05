@@ -407,7 +407,7 @@ def test_edit_flight_copies_logsheet_airfield_when_missing(
 
 @pytest.mark.django_db
 def test_add_flight_ajax_returns_setup_error_when_site_configuration_missing(
-    client, active_member, glider, airfield
+    client, active_member, airfield
 ):
     from logsheet.models import Logsheet
 
@@ -518,7 +518,7 @@ def test_launch_now_rolls_back_launch_time_when_ticket_link_fails(
 
 @pytest.mark.django_db
 def test_add_flight_ajax_returns_unexpected_error_code_on_generic_exception(
-    client, active_member, glider, airfield, monkeypatch
+    client, active_member, airfield, monkeypatch
 ):
     """Unexpected exceptions during FlightForm init return error_code='flight_form_unexpected_error'."""
     from logsheet.models import Logsheet
