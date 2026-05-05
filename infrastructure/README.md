@@ -39,6 +39,8 @@ infrastructure/
 │       ├── rspamd/              # Spam filtering
 │       └── m2s-mail-sync/       # M2S alias sync script
 ├── scripts/
+│   ├── pushy.sh                    # Deploy app to one/all tenants via Ansible
+│   ├── rollbacky.sh                # Roll back one/all tenants to prior image tag
 │   ├── setup-admin-ubuntu.sh        # Setup admin workstation (Ubuntu/Debian)
 │   ├── setup-admin-homebrew.sh      # Setup admin workstation (macOS)
 │   ├── setup-dev.sh                 # Setup development environment
@@ -97,6 +99,64 @@ Use the provided scripts to generate secure secrets:
    ```bash
    ansible-playbook playbooks/mail-server.yml
    ```
+
+## GKE Deploy And Rollback
+
+This repo uses script wrappers in `infrastructure/scripts/` to keep routine
+operations consistent and reproducible.
+
+### Deploy wrapper (`pushy.sh`)
+
+```bash
+# Default: tenant-demo (safe default)
+./infrastructure/scripts/pushy.sh
+
+# Single tenant
+./infrastructure/scripts/pushy.sh svs
+
+# All tenants
+./infrastructure/scripts/pushy.sh --all
+```
+
+### Rollback wrapper (`rollbacky.sh`)
+
+`rollbacky.sh` replays the Ansible deploy playbook with:
+- `gke_build_image=false`
+- `gke_push_image=false`
+- `gke_run_migrations=false`
+- `gke_run_backfill_document_sizes=false`
+- `gke_image_tag=<target>`
+
+This keeps rollback IaC-driven while avoiding accidental forward schema changes.
+
+```bash
+# Single tenant to explicit known-good image tag
+./infrastructure/scripts/rollbacky.sh svs --tag 20260504-1015-abcd123
+
+# All tenants to explicit known-good image tag
+./infrastructure/scripts/rollbacky.sh --all --tag 20260504-1015-abcd123 --yes
+
+# Single tenant: auto-detect previous deployed revision tag from rollout history
+./infrastructure/scripts/rollbacky.sh svs --previous
+
+# Preview command only
+./infrastructure/scripts/rollbacky.sh svs --previous --dry-run
+```
+
+### Incident rollback procedure (recommended)
+
+1. Identify impact scope (single tenant vs all tenants).
+2. Prefer single-tenant rollback first unless impact is global.
+3. Roll back to an explicit known-good tag when available.
+4. Use `--previous` only for single-tenant emergency rollback when needed.
+5. Verify rollout and health checks per tenant after rollback.
+6. Record the rollback tag and reason in incident notes.
+
+### Safety notes
+
+- Do not run rollbacks from `main` branch changes directly; use reproducible script commands.
+- For `--all`, always require an explicit `--tag` and use the confirmation prompt (or `--yes` in automation).
+- If a previous revision uses digest-only image references, pass an explicit `--tag`.
 
 ## Mail Server Architecture
 
