@@ -99,6 +99,7 @@ def _flight_form_setup_error_message(
 
     Never include exc details in the returned string — those are logged server-side
     to avoid information exposure (CWE-209 / CodeQL python/stack-trace-exposure).
+    The caller is responsible for logging unexpected exceptions via logger.exception.
 
     Args:
         exc: The caught exception (used only for server-side logging).
@@ -114,6 +115,9 @@ def _flight_form_setup_error_message(
             + suffix
         )
     if site_config_missing:
+        logger.warning(
+            "FlightForm init failed: SiteConfiguration row is missing for this tenant."
+        )
         return (
             "Flight form setup is incomplete: Site Configuration is missing. "
             "An admin should create it in Admin > Siteconfig > Site Configuration."
@@ -1736,9 +1740,9 @@ def edit_flight(request, logsheet_pk, flight_pk):
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
     def _setup_error_response(exc, *, unexpected=False):
-        site_config_missing = (
-            not unexpected and SiteConfiguration.objects.first() is None
-        )
+        # Use the already-fetched config to avoid an extra DB query and potential
+        # inconsistency if a row is created between the two calls.
+        site_config_missing = not unexpected and config is None
         message = _flight_form_setup_error_message(
             exc, unexpected=unexpected, site_config_missing=site_config_missing
         )
@@ -1940,9 +1944,9 @@ def add_flight(request, logsheet_pk):
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
 
     def _setup_error_response(exc, *, unexpected=False):
-        site_config_missing = (
-            not unexpected and SiteConfiguration.objects.first() is None
-        )
+        # Use the already-fetched config to avoid an extra DB query and potential
+        # inconsistency if a row is created between the two calls.
+        site_config_missing = not unexpected and config is None
         message = _flight_form_setup_error_message(
             exc, unexpected=unexpected, site_config_missing=site_config_missing
         )

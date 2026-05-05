@@ -514,3 +514,78 @@ def test_launch_now_rolls_back_launch_time_when_ticket_link_fails(
     ticket.refresh_from_db(from_queryset=None)
     assert flight.launch_time is None
     assert ticket.status == CommercialTicket.Status.AVAILABLE
+
+
+@pytest.mark.django_db
+def test_add_flight_ajax_returns_unexpected_error_code_on_generic_exception(
+    client, active_member, glider, airfield, monkeypatch
+):
+    """Unexpected exceptions during FlightForm init return error_code='flight_form_unexpected_error'."""
+    from logsheet.models import Logsheet
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=airfield,
+        created_by=active_member,
+    )
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated unexpected form init failure")
+
+    monkeypatch.setattr("logsheet.views.FlightForm", _boom)
+
+    client.force_login(active_member)
+    response = client.get(
+        reverse("logsheet:add_flight", args=[logsheet.pk]),
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 500
+    payload = response.json()
+    assert payload["error_code"] == "flight_form_unexpected_error"
+    assert "unexpected server error" in payload["error"]
+
+
+@pytest.mark.django_db
+def test_edit_flight_ajax_returns_unexpected_error_code_on_generic_exception(
+    client, active_member, glider, airfield, monkeypatch
+):
+    """Unexpected exceptions during FlightForm init return error_code='flight_form_unexpected_error'."""
+    from logsheet.models import Flight, Logsheet
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=airfield,
+        created_by=active_member,
+    )
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+    )
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated unexpected form init failure")
+
+    monkeypatch.setattr("logsheet.views.FlightForm", _boom)
+
+    client.force_login(active_member)
+    response = client.get(
+        reverse("logsheet:edit_flight", args=[logsheet.pk, flight.pk]),
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 500
+    payload = response.json()
+    assert payload["error_code"] == "flight_form_unexpected_error"
+    assert "unexpected server error" in payload["error"]
