@@ -376,10 +376,10 @@
           --cluster-secondary-range-name=pods
           --services-secondary-range-name=services
           {%- endif %}
-          {%- if gke_private_nodes | default(false) %}
+          {%- if gke_private_nodes | default(false) | bool %}
           --enable-private-nodes
           --master-ipv4-cidr={{ gke_master_ipv4_cidr_block }}
-          {%- if gke_private_endpoint | default(false) %}
+          {%- if gke_private_endpoint | default(false) | bool %}
           --enable-private-endpoint
           {%- endif %}
           {%- endif %}
@@ -400,6 +400,7 @@
       when:
         - gke_cluster_type == 'standard'
         - existing_standard_cluster.rc != 0
+        - not ansible_check_mode
       tags: [cluster]
 
     - name: Get actual node pool name from Standard cluster
