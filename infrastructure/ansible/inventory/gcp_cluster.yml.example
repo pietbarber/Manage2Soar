@@ -52,7 +52,8 @@ all:
     # Create new VPC or use existing
     # Set to true to create a dedicated VPC for the cluster
     # Set to false to use the default VPC
-    gke_create_vpc: false
+    # NOTE: private nodes and Cloud NAT require gke_create_vpc: true
+    gke_create_vpc: true
 
     # VPC configuration (only used if gke_create_vpc: true)
     gke_vpc_name: "manage2soar-vpc"

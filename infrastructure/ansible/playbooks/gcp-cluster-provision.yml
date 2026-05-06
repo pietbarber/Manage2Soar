@@ -130,6 +130,26 @@
           Cloud NAT provisioning in this playbook requires a custom VPC.
           Please set gke_create_vpc: true when gke_enable_cloud_nat: true
 
+    - name: Validate private endpoint requires private nodes
+      ansible.builtin.assert:
+        that:
+          - not (gke_private_endpoint | default(false) | bool) or (gke_private_nodes | default(false) | bool)
+        fail_msg: |
+          gke_private_endpoint: true requires gke_private_nodes: true.
+          Please set gke_private_nodes: true when gke_private_endpoint: true
+
+    - name: Validate Cloud NAT router and NAT names are set
+      ansible.builtin.assert:
+        that:
+          - gke_cloud_router_name is defined and gke_cloud_router_name | length > 0
+          - gke_cloud_nat_name is defined and gke_cloud_nat_name | length > 0
+        fail_msg: |
+          Cloud NAT requires both gke_cloud_router_name and gke_cloud_nat_name to be set.
+          Example:
+            gke_cloud_router_name: "manage2soar-router"
+            gke_cloud_nat_name: "manage2soar-nat"
+      when: gke_enable_cloud_nat | default(false) | bool
+
     - name: Verify GCP project exists and user has access
       ansible.builtin.command:
         cmd: "gcloud projects describe {{ gcp_project }}"
@@ -260,6 +280,7 @@
       when:
         - gke_enable_cloud_nat | default(false) | bool
         - gke_create_vpc | bool
+        - not ansible_check_mode
       tags: [network, nat]
 
     - name: Check if Cloud NAT exists
@@ -291,7 +312,8 @@
       when:
         - gke_enable_cloud_nat | default(false) | bool
         - gke_create_vpc | bool
-        - cloud_nat_check.rc != 0
+        - not ansible_check_mode
+        - cloud_nat_check is defined and cloud_nat_check.rc != 0
       tags: [network, nat]
 
     - name: Update Cloud NAT gateway settings
@@ -304,11 +326,12 @@
           --nat-all-subnet-ip-ranges
           --auto-allocate-nat-external-ips
       register: cloud_nat_update
-      changed_when: cloud_nat_update.rc == 0
+      changed_when: false
       when:
         - gke_enable_cloud_nat | default(false) | bool
         - gke_create_vpc | bool
-        - cloud_nat_check.rc == 0
+        - not ansible_check_mode
+        - cloud_nat_check is defined and cloud_nat_check.rc == 0
       tags: [network, nat]
 
     # ============================================================
