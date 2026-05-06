@@ -42,7 +42,12 @@
 # gke_machine_type: "e2-standard-4"
 # gke_min_nodes: 2
 # gke_max_nodes: 10
-# gke_private_cluster: true
+# gke_private_nodes: true
+# gke_private_endpoint: false
+# gke_master_ipv4_cidr_block: "172.16.0.0/28"
+# gke_enable_cloud_nat: true
+# gke_cloud_router_name: "manage2soar-router"
+# gke_cloud_nat_name: "manage2soar-nat"
 
 # ============================================================
 # LABELS AND TAGS
@@ -59,6 +64,5 @@ gke_cluster_labels:
 # The following features are planned but not yet implemented:
 # - Maintenance windows
 # - Resource quotas
-# - Private clusters
 # - VPA (Vertical Pod Autoscaling)
 # See https://github.com/pietbarber/Manage2Soar/issues for status

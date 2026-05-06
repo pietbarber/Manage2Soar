@@ -61,6 +61,18 @@ all:
     gke_pods_cidr: "10.4.0.0/14"
     gke_services_cidr: "10.8.0.0/20"
 
+    # Private nodes (recommended to avoid per-node public IPv4 charges)
+    # - Nodes get no external/public IPv4 addresses
+    # - Keep private endpoint disabled unless private control-plane access is configured
+    gke_private_nodes: true
+    gke_private_endpoint: false
+    gke_master_ipv4_cidr_block: "172.16.0.0/28"
+
+    # Cloud NAT for outbound internet from private nodes
+    gke_enable_cloud_nat: true
+    gke_cloud_router_name: "manage2soar-router"
+    gke_cloud_nat_name: "manage2soar-nat"
+
     # ============================================================
     # NODE POOL CONFIGURATION (Standard clusters only)
     # ============================================================
