@@ -668,11 +668,30 @@ def member_training_grid(request, member_id):
     # Build column metadata for template headers using get_instructor_meta_for_date
     column_metadata = []
     for d in report_dates:
+        meta = get_instructor_meta_for_date(d)
+
+        # Get the instructor for this column (first instructor on the date)
+        metas_for_date = flights_by_date.get(d, [])
+        column_instructor = None
+        if metas_for_date:
+            # Find the instructor object that matches the first instructor's name
+            for f in flights.filter(logsheet__log_date=d):
+                if f.instructor:
+                    column_instructor = f.instructor
+                    break
+
+        # Count flights for THIS specific instructor on this date
         flights_on_day = flights.filter(logsheet__log_date=d)
-        num_flights = flights_on_day.count()
-        # Build tooltip string
+        if column_instructor:
+            flights_for_instructor = flights_on_day.filter(instructor=column_instructor)
+        else:
+            flights_for_instructor = flights_on_day
+
+        num_flights = flights_for_instructor.count()
+
+        # Build tooltip string with flights for this specific instructor
         tooltip_lines = [f"{num_flights} flight{'s' if num_flights != 1 else ''}"]
-        for f in flights_on_day:
+        for f in flights_for_instructor:
             tow = (
                 f.release_altitude
                 if hasattr(f, "release_altitude") and f.release_altitude
@@ -690,7 +709,7 @@ def member_training_grid(request, member_id):
                 duration_str = "?"
             tooltip_lines.append(f"{tow_str} feet, {duration_str}")
         flights_tooltip = "\n".join(tooltip_lines)
-        meta = get_instructor_meta_for_date(d)
+
         column_metadata.append(
             {
                 "date": d,
