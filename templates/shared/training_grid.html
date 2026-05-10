@@ -71,7 +71,7 @@
     <tr>
   <th rowspan="3" class="sticky-col training-grid-lesson-col">Lesson</th>
       {% for meta in column_metadata %}
-        <th class="training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}">
+        <th class="training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}{% if meta.is_pending %} table-warning{% endif %}">
           {{ meta.date|date:"M d" }}<br>
           <span class="text-muted small">{{ meta.date|date:"Y" }}</span>
         </th>
@@ -80,22 +80,25 @@
     </tr>
     <tr>
         {% for meta in column_metadata %}
-          <th class="small text-muted training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}" data-bs-toggle="tooltip" data-bs-placement="top"{% if meta.instructor_name %} title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}"{% endif %}>
+          <th class="small text-muted training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}{% if meta.is_pending %} table-warning{% endif %}" data-bs-toggle="tooltip" data-bs-placement="top"{% if meta.instructor_name %} title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}{% if meta.is_pending %} — pending report{% endif %}"{% endif %}>
             {% if meta.initials %}
               {{ meta.initials }}<br>
             {% else %}
               &mdash;<br>
             {% endif %}
             {{ meta.days_ago }}<br>
+            {% if meta.is_pending %}
+              <span class="small fw-semibold text-dark">Pending</span>
+            {% endif %}
             {% if meta.altitudes %}{{ meta.altitudes }}{% endif %}
           </th>
         {% endfor %}
     </tr>
     <tr>
         {% for meta in column_metadata %}
-          <th class="training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}">
+          <th class="training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}{% if meta.is_pending %} table-warning{% endif %}">
             {% if meta.num_flights > 0 %}
-              <span class="badge bg-secondary text-light fs-6" style="min-width:2em;"{% if meta.flights_tooltip %} title="{{ meta.flights_tooltip }}"{% endif %}>{{ meta.num_flights }}</span>
+              <span class="badge {% if meta.is_pending %}bg-warning text-dark{% else %}bg-secondary text-light{% endif %} fs-6" style="min-width:2em;"{% if meta.flights_tooltip %} title="{{ meta.flights_tooltip }}"{% endif %}>{{ meta.num_flights }}</span>
             {% endif %}
           </th>
         {% endfor %}
@@ -123,7 +126,7 @@
               {% endif %}
             </td>
             {% for cell in row.scores %}
-            <td class="text-center training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}
+            <td class="text-center training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}{% if cell.is_pending %} table-warning{% endif %}
                 {% if cell.score == '1' %}score-1
                 {% elif cell.score == '2' %}score-2
                 {% elif cell.score == '3' %}score-3
