@@ -570,20 +570,21 @@ def member_training_grid(request, member_id):
     # Fetch all reports and prefetch lesson scores and instructors
     reports = (
         InstructionReport.objects.filter(student=member)
-        .order_by("report_date")
+        .order_by("report_date", "id")
         .prefetch_related("lesson_scores__lesson", "instructor")
     )
     if request.user != member and not request.user.instructor:
         raise PermissionDenied
 
-    # Extract sorted report dates
-    report_dates = [r.report_date for r in reports]
+    # Keep one grid column per report (date + instructor), ordered deterministically.
+    report_entries = list(reports)
+    report_dates = [r.report_date for r in report_entries]
     lessons = TrainingLesson.objects.all().order_by("sort_key")
 
-    # Build lookup for scores by (lesson_id, date)
+    # Build lookup for scores by (lesson_id, report_id)
     scores_lookup = {
-        (sc.lesson_id, rep.report_date): sc.score
-        for rep in reports
+        (sc.lesson_id, rep.id): sc.score
+        for rep in report_entries
         for sc in rep.lesson_scores.all()
     }
 
@@ -600,7 +601,6 @@ def member_training_grid(request, member_id):
     flights_all_by_date = defaultdict(list)
     flights_by_date_instructor = defaultdict(lambda: defaultdict(list))
     ground_by_date = {g.date: g for g in ground_sessions}
-    report_by_date = {r.report_date: r for r in reports}
     today = now().date()
 
     for f in flights:
@@ -624,8 +624,40 @@ def member_training_grid(request, member_id):
             }
         )
 
+    # Compose instructor initials/name per report column.
+    def get_instructor_meta(report):
+        d = report.report_date
+
+        # Prefer the instructor attached to this specific instruction report.
+        if report.instructor:
+            initials = get_instructor_initials(report.instructor)
+            full_name = str(report.instructor.full_display_name or "")
+            instructor_id = report.instructor_id
+        # Fall back to first flight instructor for the date when report has none.
+        elif d in flights_by_date:
+            metas = flights_by_date.get(d, [])
+            initials = metas[0]["initials"]
+            full_name = metas[0]["full_name"]
+            instructor_id = metas[0].get("instructor_id")
+        elif d in ground_by_date:
+            ground_instr = ground_by_date[d].instructor
+            initials = get_instructor_initials(ground_instr)
+            full_name = str(ground_instr.full_display_name or "")
+            instructor_id = ground_instr.id if ground_instr else None
+        else:
+            initials = ""
+            full_name = ""
+            instructor_id = None
+
+        return {
+            "initials": initials,
+            "full_name": full_name,
+            "days_ago": (today - d).days,
+            "instructor_id": instructor_id,
+        }
+
     # Compose instructor initials/name for each date (flight or ground)
-    def get_instructor_meta_for_date(d):
+    def get_fallback_meta_for_date(d):
         # Prefer flight instructor if present
         metas = flights_by_date.get(d, [])
         if metas:
@@ -638,15 +670,9 @@ def member_training_grid(request, member_id):
             full_name = str(ground_instr.full_display_name or "")
             instructor_id = ground_instr.id if ground_instr else None
         else:
-            report = report_by_date.get(d)
-            if report and report.instructor:
-                initials = get_instructor_initials(report.instructor)
-                full_name = report.instructor.full_display_name
-                instructor_id = report.instructor_id
-            else:
-                initials = ""
-                full_name = ""
-                instructor_id = None
+            initials = ""
+            full_name = ""
+            instructor_id = None
         return {
             "initials": initials,
             "full_name": full_name,
@@ -666,25 +692,33 @@ def member_training_grid(request, member_id):
             "code": lesson.code,
         }
         max_scores = []
-        for d in report_dates:
-            score = scores_lookup.get((lesson.id, d), "")
+        for rep in report_entries:
+            d = rep.report_date
+            score = scores_lookup.get((lesson.id, rep.id), "")
             if score.isdigit():
                 max_scores.append(int(score))
-            meta = flights_by_date.get(d, [])
-            if meta:
-                info = meta[0]
+            info = get_instructor_meta(rep)
+            if info.get("initials"):
                 label = f"{info['initials']}<br>{info['days_ago']}"
                 tooltip = f"{info['full_name']} – {info['days_ago']} days ago"
             else:
-                label = tooltip = ""
+                fallback = get_fallback_meta_for_date(d)
+                if fallback.get("initials"):
+                    label = f"{fallback['initials']}<br>{fallback['days_ago']}"
+                    tooltip = (
+                        f"{fallback['full_name']} – {fallback['days_ago']} days ago"
+                    )
+                else:
+                    label = tooltip = ""
             row["scores"].append({"score": score, "label": label, "tooltip": tooltip})
         row["max_score"] = str(max(max_scores)) if max_scores else ""
         lesson_data.append(row)
 
     # Build column metadata for template headers using get_instructor_meta_for_date
     column_metadata = []
-    for d in report_dates:
-        meta = get_instructor_meta_for_date(d)
+    for rep in report_entries:
+        d = rep.report_date
+        meta = get_instructor_meta(rep)
 
         # Count/display flights for the instructor represented in this column.
         instructor_id = meta.get("instructor_id")

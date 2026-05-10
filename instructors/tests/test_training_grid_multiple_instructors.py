@@ -11,7 +11,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from instructors.models import InstructionReport, TrainingLesson
+from instructors.models import InstructionReport, LessonScore, TrainingLesson
 from logsheet.models import Airfield, Flight, Glider, Logsheet, Towplane
 from members.models import Member
 
@@ -228,3 +228,47 @@ class TestTrainingGridMultipleInstructors(TestCase):
             column["num_flights"] == 3
         ), f"Should show 3 flights, got {column['num_flights']}"
         assert "3 flights" in column["flights_tooltip"]
+
+    def test_training_grid_same_date_multiple_reports_use_report_instructor(self):
+        """Verify each same-date report column uses that report's instructor and score."""
+        report_1 = InstructionReport.objects.get(
+            student=self.student,
+            instructor=self.instructor1,
+            report_date=self.log_date,
+        )
+        report_2 = InstructionReport.objects.create(
+            student=self.student,
+            instructor=self.instructor2,
+            report_date=self.log_date,
+        )
+
+        LessonScore.objects.create(report=report_1, lesson=self.lesson, score="2")
+        LessonScore.objects.create(report=report_2, lesson=self.lesson, score="4")
+
+        self.client.force_login(self.student)
+        url = reverse("instructors:member_training_grid", args=[self.student.id])
+        response = self.client.get(url)
+
+        assert response.status_code == 200
+
+        column_metadata = response.context.get("column_metadata", [])
+        same_day_columns = [m for m in column_metadata if m["date"] == self.log_date]
+        assert len(same_day_columns) == 2, "Expected two columns for same-day reports"
+
+        first_col = same_day_columns[0]
+        second_col = same_day_columns[1]
+
+        assert first_col["instructor_name"] == "Manny Serrano"
+        assert first_col["num_flights"] == 2
+        assert "2 flights" in first_col["flights_tooltip"]
+
+        assert second_col["instructor_name"] == "Rufus Decker"
+        assert second_col["num_flights"] == 1
+        assert "1 flight" in second_col["flights_tooltip"]
+
+        lesson_data = response.context.get("lesson_data", [])
+        lesson_row = next(
+            (r for r in lesson_data if r["lesson_id"] == self.lesson.id), None
+        )
+        assert lesson_row is not None
+        assert [c["score"] for c in lesson_row["scores"]] == ["2", "4"]
