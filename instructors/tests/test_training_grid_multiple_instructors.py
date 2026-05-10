@@ -6,6 +6,8 @@ instructors flew with the same student on the same day. The grid would
 show the combined flight count next to the first instructor's name.
 """
 
+from datetime import timedelta
+
 import pytest
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -185,12 +187,8 @@ class TestTrainingGridMultipleInstructors(TestCase):
 
     def test_training_grid_single_instructor_unchanged(self):
         """Verify that single-instructor flights still work correctly (regression test)."""
-        # Create another date with only instructor 1
-        log_date_2 = (
-            self.log_date.replace(day=1)
-            if self.log_date.day > 1
-            else self.log_date.replace(day=15)
-        )
+        # Create another guaranteed-past date with only instructor 1
+        log_date_2 = self.log_date - timedelta(days=1)
         logsheet_2 = Logsheet.objects.create(
             log_date=log_date_2,
             airfield=self.airfield,

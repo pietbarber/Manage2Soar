@@ -588,7 +588,7 @@ def member_training_grid(request, member_id):
         for sc in rep.lesson_scores.all()
     }
 
-    # Fetch flights for metadata (instructor initials, days ago)
+    # Fetch flights for per-column flight counts and tooltip details.
     flights = (
         Flight.objects.filter(pilot=member, logsheet__log_date__in=report_dates)
         .select_related("logsheet", "instructor")
@@ -603,10 +603,6 @@ def member_training_grid(request, member_id):
         if not f.instructor:
             continue
 
-        initials = "".join(
-            [n[0] for n in str(f.instructor.full_display_name or "").split()]
-        )
-        full_name = str(f.instructor.full_display_name or "")
         flights_by_date_instructor[d][f.instructor_id].append(f)
 
     # Compose instructor initials/name per report column.
