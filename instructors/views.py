@@ -588,55 +588,71 @@ def member_training_grid(request, member_id):
     }
 
     # Fetch flights for metadata (instructor initials, days ago)
-    flights = Flight.objects.filter(
-        pilot=member, logsheet__log_date__in=report_dates
-    ).select_related("logsheet", "instructor")
+    flights = (
+        Flight.objects.filter(pilot=member, logsheet__log_date__in=report_dates)
+        .select_related("logsheet", "instructor")
+        .order_by("logsheet__log_date", "id")
+    )
     ground_sessions = GroundInstruction.objects.filter(
         student=member, date__in=report_dates
     ).select_related("instructor")
     flights_by_date = defaultdict(list)
+    flights_all_by_date = defaultdict(list)
+    flights_by_date_instructor = defaultdict(lambda: defaultdict(list))
     ground_by_date = {g.date: g for g in ground_sessions}
+    report_by_date = {r.report_date: r for r in reports}
     today = now().date()
+
     for f in flights:
+        d = f.logsheet.log_date
+        flights_all_by_date[d].append(f)
+
         if not f.instructor:
             continue
-        d = f.logsheet.log_date
+
         initials = "".join(
             [n[0] for n in str(f.instructor.full_display_name or "").split()]
         )
         full_name = str(f.instructor.full_display_name or "")
+        flights_by_date_instructor[d][f.instructor_id].append(f)
         flights_by_date[d].append(
             {
                 "days_ago": (today - d).days,
                 "initials": initials,
                 "full_name": full_name,
+                "instructor_id": f.instructor_id,
             }
         )
 
-        # Compose instructor initials/name for each date (flight or ground)
-        def get_instructor_meta_for_date(d):
-            # Prefer flight instructor if present
-            metas = flights_by_date.get(d, [])
-            if metas:
-                initials = metas[0]["initials"]
-                full_name = metas[0]["full_name"]
-            elif d in ground_by_date:
-                ground_instr = ground_by_date[d].instructor
-                initials = get_instructor_initials(ground_instr)
-                full_name = str(ground_instr.full_display_name or "")
+    # Compose instructor initials/name for each date (flight or ground)
+    def get_instructor_meta_for_date(d):
+        # Prefer flight instructor if present
+        metas = flights_by_date.get(d, [])
+        if metas:
+            initials = metas[0]["initials"]
+            full_name = metas[0]["full_name"]
+            instructor_id = metas[0].get("instructor_id")
+        elif d in ground_by_date:
+            ground_instr = ground_by_date[d].instructor
+            initials = get_instructor_initials(ground_instr)
+            full_name = str(ground_instr.full_display_name or "")
+            instructor_id = ground_instr.id if ground_instr else None
+        else:
+            report = report_by_date.get(d)
+            if report and report.instructor:
+                initials = get_instructor_initials(report.instructor)
+                full_name = report.instructor.full_display_name
+                instructor_id = report.instructor_id
             else:
-                report = reports.filter(report_date=d).first()
-                if report and report.instructor:
-                    initials = get_instructor_initials(report.instructor)
-                    full_name = report.instructor.full_display_name
-                else:
-                    initials = ""
-                    full_name = ""
-            return {
-                "initials": initials,
-                "full_name": full_name,
-                "days_ago": (today - d).days,
-            }
+                initials = ""
+                full_name = ""
+                instructor_id = None
+        return {
+            "initials": initials,
+            "full_name": full_name,
+            "days_ago": (today - d).days,
+            "instructor_id": instructor_id,
+        }
 
     # Compose grid rows per lesson
     lesson_data = []
@@ -670,24 +686,16 @@ def member_training_grid(request, member_id):
     for d in report_dates:
         meta = get_instructor_meta_for_date(d)
 
-        # Get the instructor for this column (first instructor on the date)
-        metas_for_date = flights_by_date.get(d, [])
-        column_instructor = None
-        if metas_for_date:
-            # Find the instructor object that matches the first instructor's name
-            for f in flights.filter(logsheet__log_date=d):
-                if f.instructor:
-                    column_instructor = f.instructor
-                    break
-
-        # Count flights for THIS specific instructor on this date
-        flights_on_day = flights.filter(logsheet__log_date=d)
-        if column_instructor:
-            flights_for_instructor = flights_on_day.filter(instructor=column_instructor)
+        # Count/display flights for the instructor represented in this column.
+        instructor_id = meta.get("instructor_id")
+        if instructor_id:
+            flights_for_instructor = flights_by_date_instructor.get(d, {}).get(
+                instructor_id, []
+            )
         else:
-            flights_for_instructor = flights_on_day
+            flights_for_instructor = flights_all_by_date.get(d, [])
 
-        num_flights = flights_for_instructor.count()
+        num_flights = len(flights_for_instructor)
 
         # Build tooltip string with flights for this specific instructor
         tooltip_lines = [f"{num_flights} flight{'s' if num_flights != 1 else ''}"]
