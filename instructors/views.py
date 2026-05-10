@@ -571,7 +571,8 @@ def member_training_grid(request, member_id):
     reports = (
         InstructionReport.objects.filter(student=member)
         .order_by("report_date", "id")
-        .prefetch_related("lesson_scores__lesson", "instructor")
+        .select_related("instructor")
+        .prefetch_related("lesson_scores__lesson")
     )
     if request.user != member and not request.user.instructor:
         raise PermissionDenied
@@ -638,9 +639,8 @@ def member_training_grid(request, member_id):
             if score.isdigit():
                 max_scores.append(int(score))
             info = get_instructor_meta(rep)
-            label = f"{info['initials']}<br>{info['days_ago']}"
             tooltip = f"{info['full_name']} – {info['days_ago']} days ago"
-            row["scores"].append({"score": score, "label": label, "tooltip": tooltip})
+            row["scores"].append({"score": score, "tooltip": tooltip})
         row["max_score"] = str(max(max_scores)) if max_scores else ""
         lesson_data.append(row)
 
