@@ -589,47 +589,67 @@ def member_training_grid(request, member_id):
         for sc in rep.lesson_scores.all()
     }
 
+    today = now().date()
+    pending_cutoff = today - timedelta(days=30)
+
     report_entries_by_date = defaultdict(list)
     existing_report_keys = set()
     for report in report_entries:
         report_entries_by_date[report.report_date].append(report)
         existing_report_keys.add((report.report_date, report.instructor_id))
 
-    # Fetch flights for pending-column detection and per-column flight metadata.
-    flights = (
+    # Build pending columns from distinct instructor/date flight pairs, bounded to
+    # a recent window to avoid scanning/loading a student's full flight history.
+    pending_candidate_pairs = (
         Flight.objects.filter(pilot=member, instructor__isnull=False)
-        .select_related("logsheet", "instructor")
+        .filter(logsheet__log_date__gte=pending_cutoff)
+        .values_list("logsheet__log_date", "instructor_id")
+        .distinct()
         .order_by(
             "logsheet__log_date",
             "instructor__last_name",
             "instructor__first_name",
-            "id",
+            "instructor_id",
         )
     )
-    flights_by_date_instructor = defaultdict(lambda: defaultdict(list))
+
     pending_entries_by_date = defaultdict(list)
-    seen_pending_keys = set()
-    today = now().date()
+    pending_instructor_ids = set()
 
-    for f in flights:
-        d = f.logsheet.log_date
-
-        flights_by_date_instructor[d][f.instructor_id].append(f)
-
-        pending_key = (d, f.instructor_id)
-        if pending_key in existing_report_keys or pending_key in seen_pending_keys:
+    for report_date, instructor_id in pending_candidate_pairs:
+        pending_key = (report_date, instructor_id)
+        if pending_key in existing_report_keys:
             continue
 
-        seen_pending_keys.add(pending_key)
-        pending_entries_by_date[d].append(
+        pending_instructor_ids.add(instructor_id)
+        pending_entries_by_date[report_date].append(
             {
-                "date": d,
-                "instructor": f.instructor,
-                "instructor_id": f.instructor_id,
+                "date": report_date,
+                "instructor_id": instructor_id,
                 "is_pending": True,
                 "report_id": None,
             }
         )
+
+    pending_instructors_by_id = Member.objects.filter(
+        id__in=pending_instructor_ids
+    ).in_bulk()
+    for report_date, pending_entries in pending_entries_by_date.items():
+        resolved_entries = []
+        for entry in pending_entries:
+            instructor = pending_instructors_by_id.get(entry["instructor_id"])
+            if not instructor:
+                continue
+            resolved_entries.append(
+                {
+                    "date": report_date,
+                    "instructor": instructor,
+                    "instructor_id": entry["instructor_id"],
+                    "is_pending": True,
+                    "report_id": None,
+                }
+            )
+        pending_entries_by_date[report_date] = resolved_entries
 
     column_entries = []
     all_column_dates = sorted(
@@ -657,6 +677,22 @@ def member_training_grid(request, member_id):
         column_entries.extend(pending_columns)
 
     report_dates = [entry["date"] for entry in column_entries]
+
+    # Fetch only flights needed for currently rendered columns and tooltip counts.
+    column_dates = {entry["date"] for entry in column_entries}
+    column_instructor_ids = {entry["instructor_id"] for entry in column_entries}
+    flights = (
+        Flight.objects.filter(pilot=member, instructor__isnull=False)
+        .filter(
+            logsheet__log_date__in=column_dates,
+            instructor_id__in=column_instructor_ids,
+        )
+        .select_related("logsheet", "instructor")
+        .order_by("logsheet__log_date", "id")
+    )
+    flights_by_date_instructor = defaultdict(lambda: defaultdict(list))
+    for f in flights:
+        flights_by_date_instructor[f.logsheet.log_date][f.instructor_id].append(f)
 
     # Compose instructor initials/name per report column.
     def get_column_meta(column_entry):
