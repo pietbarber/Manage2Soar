@@ -80,7 +80,7 @@
     </tr>
     <tr>
         {% for meta in column_metadata %}
-          <th class="small text-muted training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}{% if meta.is_pending %} table-warning{% endif %}" data-bs-toggle="tooltip" data-bs-placement="top"{% if meta.instructor_name %} title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}{% if meta.is_pending %} — pending report{% endif %}"{% endif %}>
+          <th class="small text-muted training-grid-date-col{% if forloop.revcounter > 10 %} print-hide-old-col{% endif %}{% if meta.is_pending %} table-warning{% endif %}" data-bs-toggle="tooltip" data-bs-placement="top"{% if meta.instructor_name %} title="{{ meta.instructor_name }}{% if meta.days_ago is not None %} — {{ meta.days_ago }} days ago{% endif %}{% if meta.is_pending %} — pending report{% endif %}"{% endif %}>
             {% if meta.initials %}
               {{ meta.initials }}<br>
             {% else %}
