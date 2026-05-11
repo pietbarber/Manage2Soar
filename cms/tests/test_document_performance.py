@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -5,6 +6,7 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.urls import reverse
+from django.utils import timezone
 
 from cms.models import Document, Page
 
@@ -56,6 +58,30 @@ def test_document_save_refreshes_file_size_when_file_replaced(settings, tmp_path
     doc.refresh_from_db()
 
     assert doc.file_size_bytes == len(replacement)
+
+
+@pytest.mark.django_db
+def test_document_save_updates_updated_at_when_file_replaced(settings, tmp_path):
+    _use_filesystem_storage(settings)
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "original.pdf").write_bytes(b"%PDF-1.4 original")
+    (docs_dir / "replacement.pdf").write_bytes(b"%PDF-1.4 replacement")
+
+    page = Page.objects.create(title="Docs", slug="docs-updated-at", is_public=True)
+    doc = Document.objects.create(page=page, title="Doc", file="docs/original.pdf")
+
+    original_updated_at = timezone.make_aware(datetime(2026, 1, 1, 12, 0, 0))
+    Document.objects.filter(pk=doc.pk).update(updated_at=original_updated_at)
+
+    doc.refresh_from_db()
+    doc.file = "docs/replacement.pdf"
+    doc.save()
+    doc.refresh_from_db()
+
+    assert doc.updated_at > original_updated_at
 
 
 @pytest.mark.django_db
@@ -122,6 +148,43 @@ def test_cms_page_hides_documents_section_when_no_pdfs(client, settings, tmp_pat
 
     assert response.status_code == 200
     assert b"<h2>Documents</h2>" not in response.content
+
+
+@pytest.mark.django_db
+def test_cms_page_uses_document_updated_at_for_last_updated(client, settings, tmp_path):
+    _use_filesystem_storage(settings)
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "handbook.pdf").write_bytes(b"%PDF-1.4 handbook")
+
+    parent = Page.objects.create(title="Docs Home", slug="docs-home", is_public=True)
+    child = Page.objects.create(
+        title="SSC Documents", slug="ssc-documents", parent=parent, is_public=True
+    )
+    doc = Document.objects.create(
+        page=child, title="Handbook", file="docs/handbook.pdf"
+    )
+
+    child_updated_at = timezone.make_aware(datetime(2026, 1, 1, 10, 0, 0))
+    document_updated_at = timezone.make_aware(datetime(2026, 2, 3, 15, 20, 0))
+    Page.objects.filter(pk=child.pk).update(updated_at=child_updated_at)
+    Document.objects.filter(pk=doc.pk).update(updated_at=document_updated_at)
+
+    response = client.get(reverse("cms:cms_page", kwargs={"path": parent.slug}))
+
+    assert response.status_code == 200
+    subpages = response.context["subpages"]
+    child_entry = next(item for item in subpages if item["page"].pk == child.pk)
+    assert child_entry["last_updated"] == document_updated_at
+
+    response = client.get(
+        reverse("cms:cms_page", kwargs={"path": f"{parent.slug}/{child.slug}"})
+    )
+
+    assert response.status_code == 200
+    assert b"Last updated 2026-02-03 15:20" in response.content
 
 
 @pytest.mark.django_db

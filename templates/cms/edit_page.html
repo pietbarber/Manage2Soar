@@ -155,7 +155,7 @@
                                                     {{ form.instance.title|default:form.instance.file.name }}
                                                 </h6>
                                                 <small class="text-muted">
-                                                    Uploaded {{ form.instance.uploaded_at|date:"M d, Y H:i" }}
+                                                    Last updated {{ form.instance.updated_at|date:"M d, Y H:i" }}
                                                     {% if form.instance.uploaded_by %}
                                                         by {{ form.instance.uploaded_by.get_full_name|default:form.instance.uploaded_by.username }}
                                                     {% endif %}

@@ -161,7 +161,7 @@ def cms_page(request, **kwargs):
     subpages = []
     children = (
         page.children.annotate(
-            doc_count=Count("documents"), doc_max=Max("documents__uploaded_at")
+            doc_count=Count("documents"), doc_max=Max("documents__updated_at")
         )
         .prefetch_related("role_permissions")
         .order_by("title")
@@ -171,7 +171,7 @@ def cms_page(request, **kwargs):
         if not child.can_user_access(request.user, request):
             continue
 
-        # last updated is the later of the page's updated_at and latest document upload
+        # last updated is the later of the page's updated_at and latest document update
         last_updated = child.updated_at
         if getattr(child, "doc_max", None) and child.doc_max > last_updated:
             last_updated = child.doc_max
