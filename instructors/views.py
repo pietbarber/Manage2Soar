@@ -605,12 +605,7 @@ def member_training_grid(request, member_id):
         .filter(logsheet__log_date__gte=pending_cutoff)
         .values_list("logsheet__log_date", "instructor_id")
         .distinct()
-        .order_by(
-            "logsheet__log_date",
-            "instructor__last_name",
-            "instructor__first_name",
-            "instructor_id",
-        )
+        .order_by("logsheet__log_date", "instructor_id")
     )
 
     pending_entries_by_date = defaultdict(list)
