@@ -602,7 +602,7 @@ def member_training_grid(request, member_id):
     # a recent window to avoid scanning/loading a student's full flight history.
     pending_candidate_pairs = (
         Flight.objects.filter(pilot=member, instructor__isnull=False)
-        .filter(logsheet__log_date__gte=pending_cutoff)
+        .filter(logsheet__log_date__gte=pending_cutoff, logsheet__log_date__lte=today)
         .values_list("logsheet__log_date", "instructor_id")
         .distinct()
         .order_by("logsheet__log_date", "instructor_id")
