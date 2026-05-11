@@ -577,9 +577,9 @@ def member_training_grid(request, member_id):
     if request.user != member and not request.user.instructor:
         raise PermissionDenied
 
-    # Keep one grid column per report (date + instructor), ordered deterministically.
+    # Keep one grid column per saved report and add a pending column for
+    # any flight instructor/date pair that does not yet have a report.
     report_entries = list(reports)
-    report_dates = [r.report_date for r in report_entries]
     lessons = TrainingLesson.objects.all().order_by("sort_key")
 
     # Build lookup for scores by (lesson_id, report_id)
@@ -589,37 +589,117 @@ def member_training_grid(request, member_id):
         for sc in rep.lesson_scores.all()
     }
 
-    # Fetch flights for per-column flight counts and tooltip details.
+    today = now().date()
+    pending_cutoff = today - timedelta(days=30)
+
+    report_entries_by_date = defaultdict(list)
+    existing_report_keys = set()
+    for report in report_entries:
+        report_entries_by_date[report.report_date].append(report)
+        existing_report_keys.add((report.report_date, report.instructor_id))
+
+    # Build pending columns from distinct instructor/date flight pairs, bounded to
+    # a recent window to avoid scanning/loading a student's full flight history.
+    pending_candidate_pairs = (
+        Flight.objects.filter(pilot=member, instructor__isnull=False)
+        .filter(logsheet__log_date__gte=pending_cutoff, logsheet__log_date__lte=today)
+        .values_list("logsheet__log_date", "instructor_id")
+        .distinct()
+        .order_by("logsheet__log_date", "instructor_id")
+    )
+
+    pending_entries_by_date = defaultdict(list)
+    pending_instructor_ids = set()
+
+    for report_date, instructor_id in pending_candidate_pairs:
+        pending_key = (report_date, instructor_id)
+        if pending_key in existing_report_keys:
+            continue
+
+        pending_instructor_ids.add(instructor_id)
+        pending_entries_by_date[report_date].append(
+            {
+                "date": report_date,
+                "instructor_id": instructor_id,
+                "is_pending": True,
+                "report_id": None,
+            }
+        )
+
+    pending_instructors_by_id = Member.objects.filter(
+        id__in=pending_instructor_ids
+    ).in_bulk()
+    for report_date, pending_entries in pending_entries_by_date.items():
+        resolved_entries = []
+        for entry in pending_entries:
+            instructor = pending_instructors_by_id.get(entry["instructor_id"])
+            if not instructor:
+                continue
+            resolved_entries.append(
+                {
+                    "date": report_date,
+                    "instructor": instructor,
+                    "instructor_id": entry["instructor_id"],
+                    "is_pending": True,
+                    "report_id": None,
+                }
+            )
+        pending_entries_by_date[report_date] = resolved_entries
+
+    column_entries = []
+    all_column_dates = sorted(
+        set(report_entries_by_date) | set(pending_entries_by_date)
+    )
+    for report_date in all_column_dates:
+        for report in report_entries_by_date.get(report_date, []):
+            column_entries.append(
+                {
+                    "date": report.report_date,
+                    "instructor": report.instructor,
+                    "instructor_id": report.instructor_id,
+                    "is_pending": False,
+                    "report_id": report.id,
+                }
+            )
+
+        pending_columns = sorted(
+            pending_entries_by_date.get(report_date, []),
+            key=lambda entry: (
+                str(entry["instructor"].full_display_name or ""),
+                entry["instructor_id"],
+            ),
+        )
+        column_entries.extend(pending_columns)
+
+    report_dates = [entry["date"] for entry in column_entries]
+
+    # Fetch only flights needed for currently rendered columns and tooltip counts.
+    column_dates = {entry["date"] for entry in column_entries}
+    column_instructor_ids = {entry["instructor_id"] for entry in column_entries}
     flights = (
-        Flight.objects.filter(pilot=member, logsheet__log_date__in=report_dates)
+        Flight.objects.filter(pilot=member, instructor__isnull=False)
+        .filter(
+            logsheet__log_date__in=column_dates,
+            instructor_id__in=column_instructor_ids,
+        )
         .select_related("logsheet", "instructor")
         .order_by("logsheet__log_date", "id")
     )
     flights_by_date_instructor = defaultdict(lambda: defaultdict(list))
-    today = now().date()
-
     for f in flights:
-        d = f.logsheet.log_date
-
-        if not f.instructor:
-            continue
-
-        flights_by_date_instructor[d][f.instructor_id].append(f)
+        flights_by_date_instructor[f.logsheet.log_date][f.instructor_id].append(f)
 
     # Compose instructor initials/name per report column.
-    def get_instructor_meta(report):
-        d = report.report_date
-
-        # InstructionReport.instructor is required; map each column directly.
-        initials = get_instructor_initials(report.instructor)
-        full_name = str(report.instructor.full_display_name or "")
-        instructor_id = report.instructor_id
+    def get_column_meta(column_entry):
+        d = column_entry["date"]
+        instructor = column_entry["instructor"]
 
         return {
-            "initials": initials,
-            "full_name": full_name,
+            "initials": get_instructor_initials(instructor),
+            "full_name": str(instructor.full_display_name or ""),
             "days_ago": (today - d).days,
-            "instructor_id": instructor_id,
+            "instructor_id": column_entry["instructor_id"],
+            "is_pending": column_entry["is_pending"],
         }
 
     # Compose grid rows per lesson
@@ -634,24 +714,34 @@ def member_training_grid(request, member_id):
             "code": lesson.code,
         }
         max_scores = []
-        for rep in report_entries:
-            score = scores_lookup.get((lesson.id, rep.id), "")
+        for column_entry in column_entries:
+            score = ""
+            if column_entry["report_id"] is not None:
+                score = scores_lookup.get((lesson.id, column_entry["report_id"]), "")
             if score.isdigit():
                 max_scores.append(int(score))
-            info = get_instructor_meta(rep)
+            info = get_column_meta(column_entry)
             tooltip = f"{info['full_name']} – {info['days_ago']} days ago"
-            row["scores"].append({"score": score, "tooltip": tooltip})
+            if info["is_pending"]:
+                tooltip = f"Pending report: {tooltip}"
+            row["scores"].append(
+                {
+                    "score": score,
+                    "tooltip": tooltip,
+                    "is_pending": info["is_pending"],
+                }
+            )
         row["max_score"] = str(max(max_scores)) if max_scores else ""
         lesson_data.append(row)
 
-    # Build column metadata for template headers using per-report instructor metadata.
+    # Build column metadata for template headers using unified column metadata.
     column_metadata = []
-    for rep in report_entries:
-        d = rep.report_date
-        meta = get_instructor_meta(rep)
+    for column_entry in column_entries:
+        d = column_entry["date"]
+        meta = get_column_meta(column_entry)
 
         # Count/display flights for the instructor represented in this column.
-        instructor_id = meta.get("instructor_id")
+        instructor_id = meta["instructor_id"]
         flights_for_instructor = flights_by_date_instructor.get(d, {}).get(
             instructor_id, []
         )
@@ -660,6 +750,8 @@ def member_training_grid(request, member_id):
 
         # Build tooltip string with flights for this specific instructor
         tooltip_lines = [f"{num_flights} flight{'s' if num_flights != 1 else ''}"]
+        if meta["is_pending"]:
+            tooltip_lines.append("Pending report")
         for f in flights_for_instructor:
             tow = (
                 f.release_altitude
@@ -682,11 +774,12 @@ def member_training_grid(request, member_id):
         column_metadata.append(
             {
                 "date": d,
-                "initials": meta.get("initials", ""),
-                "days_ago": meta.get("days_ago", ""),
-                "instructor_name": meta.get("full_name", ""),
+                "initials": meta["initials"],
+                "days_ago": meta["days_ago"],
+                "instructor_name": meta["full_name"],
                 "num_flights": num_flights,
                 "flights_tooltip": flights_tooltip,
+                "is_pending": meta["is_pending"],
             }
         )
 

@@ -120,13 +120,14 @@ class TestTrainingGridMultipleInstructors(TestCase):
         """Set up for each test."""
         self.client = Client()
 
-    def test_training_grid_shows_correct_instructor_flight_counts(self):
+    def test_training_grid_shows_report_and_pending_columns_for_same_day(self):
         """
-        Verify that the training grid shows correct flight counts per instructor
-        when multiple instructors fly on the same day.
+        Verify that the training grid keeps the saved report column and adds
+        a blank pending column for the same-day instructor who has no report.
 
-        Expected: Instructor 1 (Manny) should show 2 flights, Instructor 2 (Rufus)
-        should show 1 flight, NOT 3 flights each.
+        Expected: Instructor 1 (Manny) shows the saved report column with
+        2 flights, and Instructor 2 (Rufus) gets a second pending column
+        with 1 flight.
         """
         # Login as student
         self.client.force_login(self.student)
@@ -143,18 +144,23 @@ class TestTrainingGridMultipleInstructors(TestCase):
 
         # Find the column for our date
         date_columns = [m for m in column_metadata if m["date"] == self.log_date]
-        assert len(date_columns) == 1, "Should have exactly one column for our date"
+        assert len(date_columns) == 2, "Should have a saved and pending column"
 
-        column = date_columns[0]
+        saved_column = date_columns[0]
+        pending_column = date_columns[1]
 
-        # The column should show the first instructor's flight count (2, not 3)
-        # This is the key fix: it should only count flights for that specific instructor
         assert (
-            column["num_flights"] == 2
-        ), f"First instructor column should show 2 flights, got {column['num_flights']}"
+            saved_column["num_flights"] == 2
+        ), f"Saved instructor column should show 2 flights, got {saved_column['num_flights']}"
         assert (
-            column["instructor_name"] == "Manny Serrano"
-        ), f"Column should show Manny Serrano, got {column['instructor_name']}"
+            saved_column["instructor_name"] == "Manny Serrano"
+        ), f"Saved column should show Manny Serrano, got {saved_column['instructor_name']}"
+        assert saved_column["is_pending"] is False
+
+        assert pending_column["instructor_name"] == "Rufus Decker"
+        assert pending_column["num_flights"] == 1
+        assert pending_column["is_pending"] is True
+        assert "Pending report" in pending_column["flights_tooltip"]
 
     def test_training_grid_instructor_initials_correct(self):
         """Verify that instructor initials are correctly displayed."""
@@ -270,3 +276,50 @@ class TestTrainingGridMultipleInstructors(TestCase):
         )
         assert lesson_row is not None
         assert [c["score"] for c in lesson_row["scores"]] == ["2", "4"]
+
+    def test_training_grid_shows_pending_only_date_without_saved_report(self):
+        """A date with flights but no saved report should still produce a blank column."""
+        pending_date = self.log_date - timedelta(days=2)
+        pending_logsheet = Logsheet.objects.create(
+            log_date=pending_date,
+            airfield=self.airfield,
+            created_by=self.student,
+            finalized=False,
+        )
+
+        for _ in range(2):
+            Flight.objects.create(
+                logsheet=pending_logsheet,
+                pilot=self.student,
+                glider=self.glider,
+                towplane=self.towplane,
+                instructor=self.instructor2,
+            )
+
+        self.client.force_login(self.student)
+        url = reverse("instructors:member_training_grid", args=[self.student.id])
+        response = self.client.get(url)
+
+        assert response.status_code == 200
+
+        pending_columns = [
+            m for m in response.context["column_metadata"] if m["date"] == pending_date
+        ]
+        assert len(pending_columns) == 1
+
+        pending_column = pending_columns[0]
+        assert pending_column["instructor_name"] == "Rufus Decker"
+        assert pending_column["is_pending"] is True
+        assert pending_column["num_flights"] == 2
+
+        lesson_data = response.context["lesson_data"]
+        lesson_row = next(
+            (row for row in lesson_data if row["lesson_id"] == self.lesson.id), None
+        )
+        assert lesson_row is not None
+
+        pending_index = response.context["column_metadata"].index(pending_column)
+        pending_cell = lesson_row["scores"][pending_index]
+        assert pending_cell["score"] == ""
+        assert pending_cell["is_pending"] is True
+        assert "Pending report" in pending_cell["tooltip"]
