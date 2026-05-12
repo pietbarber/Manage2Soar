@@ -646,6 +646,7 @@ class Document(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     file_size_bytes = models.BigIntegerField(
         null=True,
         blank=True,
@@ -682,6 +683,12 @@ class Document(models.Model):
                 update_fields_set = set(update_fields)
                 # Recompute only when the file itself is being updated.
                 refresh_size = "file" in update_fields_set
+
+        if update_fields is not None:
+            update_fields_set = set(update_fields)
+            update_fields_set.add("updated_at")
+            kwargs["update_fields"] = tuple(update_fields_set)
+            update_fields = kwargs["update_fields"]
 
         if refresh_size:
             try:
