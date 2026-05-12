@@ -85,6 +85,33 @@ def test_document_save_updates_updated_at_when_file_replaced(settings, tmp_path)
 
 
 @pytest.mark.django_db
+def test_document_save_with_update_fields_advances_updated_at(settings, tmp_path):
+    _use_filesystem_storage(settings)
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "update-fields.pdf").write_bytes(b"%PDF-1.4 update fields")
+
+    page = Page.objects.create(title="Docs", slug="docs-update-fields", is_public=True)
+    doc = Document.objects.create(
+        page=page,
+        title="Original Title",
+        file="docs/update-fields.pdf",
+    )
+
+    original_updated_at = timezone.make_aware(datetime(2026, 1, 1, 12, 0, 0))
+    Document.objects.filter(pk=doc.pk).update(updated_at=original_updated_at)
+
+    doc.refresh_from_db()
+    doc.title = "Updated Title"
+    doc.save(update_fields=["title"])
+    doc.refresh_from_db()
+
+    assert doc.updated_at > original_updated_at
+
+
+@pytest.mark.django_db
 def test_cms_page_does_not_call_storage_size_when_file_size_cached(
     client, settings, tmp_path
 ):

@@ -4,7 +4,10 @@ from django.db.models import F
 
 def backfill_document_updated_at(apps, schema_editor):
     Document = apps.get_model("cms", "Document")
-    Document.objects.filter(updated_at__isnull=True).update(updated_at=F("uploaded_at"))
+    db_alias = schema_editor.connection.alias
+    Document.objects.using(db_alias).filter(updated_at__isnull=True).update(
+        updated_at=F("uploaded_at")
+    )
 
 
 class Migration(migrations.Migration):
