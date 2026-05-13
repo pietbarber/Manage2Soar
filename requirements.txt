@@ -20,7 +20,7 @@ cyclonedx-python-lib==9.1.0
 defusedxml==0.7.1
 diff-match-patch==20241021
 distlib==0.4.0
-Django==5.2.13
+Django==5.2.14
 django-crispy-forms==2.4
 django-extensions==4.1
 django-htmx==1.23.2
@@ -136,6 +136,6 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2025.2
 uritemplate==4.2.0
-urllib3==2.6.3
+urllib3==2.7.0
 virtualenv==20.36.1
 wheel>=0.46.3
