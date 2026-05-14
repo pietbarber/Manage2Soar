@@ -289,7 +289,7 @@
           gcloud compute routers nats describe {{ gke_cloud_nat_name }}
           --project={{ gcp_project }}
           --router={{ gke_cloud_router_name }}
-          --region={{ gcp_region }}
+          --router-region={{ gcp_region }}
       register: cloud_nat_check
       changed_when: false
       failed_when: false
