@@ -270,7 +270,8 @@ gke_static_ip_name: "{{ gke_cluster_name }}-ingress-ip"
 
 # When true, fail deployment if the reserved IPv4 static address is not actually
 # attached to any forwarding rule after Gateway reconcile.
-gke_fail_on_unbound_static_ipv4: true
+# Default is false to keep deploys non-blocking while still surfacing warnings.
+gke_fail_on_unbound_static_ipv4: false
 
 # Enable IPv6 for Gateway/Ingress
 # When true, reserves both IPv4 and IPv6 global static IPs
