@@ -98,6 +98,58 @@
           Autopilot clusters may support IPv6, but the flags are not yet configured.
           Please use gke_cluster_type: standard when gke_enable_ipv6: true
 
+    - name: Validate private nodes only for Standard clusters
+      ansible.builtin.assert:
+        that:
+          - not (gke_private_nodes | default(false) | bool) or (gke_cluster_type | default('standard')) == 'standard'
+        fail_msg: |
+          Private nodes are only supported for Standard clusters in this playbook.
+          Please use gke_cluster_type: standard when gke_private_nodes: true
+
+    - name: Validate private nodes require custom VPC
+      ansible.builtin.assert:
+        that:
+          - not (gke_private_nodes | default(false) | bool) or (gke_create_vpc | default(false) | bool)
+        fail_msg: |
+          Private nodes require a custom VPC/subnet in this playbook.
+          Please set gke_create_vpc: true when gke_private_nodes: true
+
+    - name: Validate private nodes require control plane CIDR
+      ansible.builtin.assert:
+        that:
+          - not (gke_private_nodes | default(false) | bool) or (gke_master_ipv4_cidr_block is defined and gke_master_ipv4_cidr_block | length > 0)
+        fail_msg: |
+          Private nodes require gke_master_ipv4_cidr_block.
+          Example: gke_master_ipv4_cidr_block: "172.16.0.0/28"
+
+    - name: Validate Cloud NAT requires custom VPC
+      ansible.builtin.assert:
+        that:
+          - not (gke_enable_cloud_nat | default(false) | bool) or (gke_create_vpc | default(false) | bool)
+        fail_msg: |
+          Cloud NAT provisioning in this playbook requires a custom VPC.
+          Please set gke_create_vpc: true when gke_enable_cloud_nat: true
+
+    - name: Validate private endpoint requires private nodes
+      ansible.builtin.assert:
+        that:
+          - not (gke_private_endpoint | default(false) | bool) or (gke_private_nodes | default(false) | bool)
+        fail_msg: |
+          gke_private_endpoint: true requires gke_private_nodes: true.
+          Please set gke_private_nodes: true when gke_private_endpoint: true
+
+    - name: Validate Cloud NAT router and NAT names are set
+      ansible.builtin.assert:
+        that:
+          - gke_cloud_router_name is defined and gke_cloud_router_name | length > 0
+          - gke_cloud_nat_name is defined and gke_cloud_nat_name | length > 0
+        fail_msg: |
+          Cloud NAT requires both gke_cloud_router_name and gke_cloud_nat_name to be set.
+          Example:
+            gke_cloud_router_name: "manage2soar-router"
+            gke_cloud_nat_name: "manage2soar-nat"
+      when: gke_enable_cloud_nat | default(false) | bool
+
     - name: Verify GCP project exists and user has access
       ansible.builtin.command:
         cmd: "gcloud projects describe {{ gcp_project }}"
@@ -121,8 +173,14 @@
           Initial Nodes: {{ gke_initial_node_count }}
           Autoscaling: {{ gke_enable_autoscaling }} ({{ gke_min_nodes }}-{{ gke_max_nodes }})
           Spot VMs: {{ gke_use_spot_vms }}
+          Private Nodes: {{ gke_private_nodes | default(false) }}
+          Private Endpoint: {{ gke_private_endpoint | default(false) }}
+          Master CIDR: {{ gke_master_ipv4_cidr_block | default('N/A') }}
           {% endif %}
           Create VPC: {{ gke_create_vpc }}
+          Cloud NAT: {{ gke_enable_cloud_nat | default(false) }}
+          Cloud Router: {{ gke_cloud_router_name | default('N/A') }}
+          Cloud NAT Name: {{ gke_cloud_nat_name | default('N/A') }}
           Workload Identity: {{ gke_enable_workload_identity }}
           ========================================
 
@@ -207,6 +265,75 @@
         - not (gke_enable_ipv6 | default(false) | bool)
       tags: [network]
 
+    - name: Create Cloud Router for NAT
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute routers create {{ gke_cloud_router_name }}
+          --project={{ gcp_project }}
+          --region={{ gcp_region }}
+          --network={{ gke_vpc_name }}
+      register: cloud_router_create
+      changed_when: cloud_router_create.rc == 0
+      failed_when: >
+        cloud_router_create.rc != 0 and
+        'already exists' not in (cloud_router_create.stderr | default('') | lower)
+      when:
+        - gke_enable_cloud_nat | default(false) | bool
+        - gke_create_vpc | bool
+        - not ansible_check_mode
+      tags: [network, nat]
+
+    - name: Check if Cloud NAT exists
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute routers nats describe {{ gke_cloud_nat_name }}
+          --project={{ gcp_project }}
+          --router={{ gke_cloud_router_name }}
+          --router-region={{ gcp_region }}
+      register: cloud_nat_check
+      changed_when: false
+      failed_when: false
+      when:
+        - gke_enable_cloud_nat | default(false) | bool
+        - gke_create_vpc | bool
+      tags: [network, nat]
+
+    - name: Create Cloud NAT gateway
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute routers nats create {{ gke_cloud_nat_name }}
+          --project={{ gcp_project }}
+          --router={{ gke_cloud_router_name }}
+          --router-region={{ gcp_region }}
+          --nat-all-subnet-ip-ranges
+          --auto-allocate-nat-external-ips
+      register: cloud_nat_create
+      changed_when: cloud_nat_create.rc == 0
+      when:
+        - gke_enable_cloud_nat | default(false) | bool
+        - gke_create_vpc | bool
+        - not ansible_check_mode
+        - cloud_nat_check is defined and cloud_nat_check.rc != 0
+      tags: [network, nat]
+
+    - name: Update Cloud NAT gateway settings
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute routers nats update {{ gke_cloud_nat_name }}
+          --project={{ gcp_project }}
+          --router={{ gke_cloud_router_name }}
+          --router-region={{ gcp_region }}
+          --nat-all-subnet-ip-ranges
+          --auto-allocate-nat-external-ips
+      register: cloud_nat_update
+      changed_when: false
+      when:
+        - gke_enable_cloud_nat | default(false) | bool
+        - gke_create_vpc | bool
+        - not ansible_check_mode
+        - cloud_nat_check is defined and cloud_nat_check.rc == 0
+      tags: [network, nat]
+
     # ============================================================
     # GKE CLUSTER CREATION
     # ============================================================
@@ -249,6 +376,13 @@
           --cluster-secondary-range-name=pods
           --services-secondary-range-name=services
           {%- endif %}
+          {%- if gke_private_nodes | default(false) | bool %}
+          --enable-private-nodes
+          --master-ipv4-cidr={{ gke_master_ipv4_cidr_block }}
+          {%- if gke_private_endpoint | default(false) | bool %}
+          --enable-private-endpoint
+          {%- endif %}
+          {%- endif %}
           --enable-ip-alias
           {%- if gke_enable_ipv6 | default(false) %}
           --enable-dataplane-v2
@@ -266,6 +400,53 @@
       when:
         - gke_cluster_type == 'standard'
         - existing_standard_cluster.rc != 0
+        - not ansible_check_mode
+      tags: [cluster]
+
+    - name: Check for public IPs on existing cluster worker nodes
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute instances list
+          --project={{ gcp_project }}
+          --filter="name~^gke-{{ gke_cluster_name }}-"
+          --format="value(networkInterfaces[0].accessConfigs[0].natIP)"
+      register: cluster_node_nat_ips
+      changed_when: false
+      when:
+        - gke_cluster_type == 'standard'
+        - existing_standard_cluster.rc == 0
+      tags: [cluster]
+
+    - name: Determine if existing worker nodes still have public IPs
+      ansible.builtin.set_fact:
+        gke_nodes_have_public_ips: >-
+          {{
+            (cluster_node_nat_ips.stdout_lines | default([])
+            | map('trim') | reject('equalto', '') | list | length) > 0
+          }}
+      when:
+        - gke_cluster_type == 'standard'
+        - existing_standard_cluster.rc == 0
+      tags: [cluster]
+
+    - name: Migrate existing Standard cluster to private nodes
+      ansible.builtin.command:
+        cmd: >
+          gcloud container clusters update {{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+          --enable-private-nodes
+          {%- if gke_private_endpoint | default(false) | bool %}
+          --enable-private-endpoint
+          {%- endif %}
+      register: private_nodes_update
+      changed_when: private_nodes_update.rc == 0
+      when:
+        - gke_cluster_type == 'standard'
+        - gke_private_nodes | default(false) | bool
+        - existing_standard_cluster.rc == 0
+        - gke_nodes_have_public_ips | default(false)
+        - not ansible_check_mode
       tags: [cluster]
 
     - name: Get actual node pool name from Standard cluster

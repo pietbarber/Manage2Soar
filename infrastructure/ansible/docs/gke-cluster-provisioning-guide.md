@@ -203,6 +203,28 @@ gke_pods_cidr: "10.4.0.0/14"
 gke_services_cidr: "10.8.0.0/20"
 ```
 
+### Private Nodes + Cloud NAT (Recommended)
+
+Avoid per-node public IPv4 charges by running worker nodes without external IPs and using Cloud NAT for outbound internet access.
+
+```yaml
+gke_create_vpc: true
+
+# Private worker nodes (no external/public IPv4 on nodes)
+gke_private_nodes: true
+gke_private_endpoint: false
+gke_master_ipv4_cidr_block: "172.16.0.0/28"
+
+# Outbound internet egress for private nodes
+gke_enable_cloud_nat: true
+gke_cloud_router_name: "manage2soar-router"
+gke_cloud_nat_name: "manage2soar-nat"
+```
+
+Notes:
+- Keep `gke_private_endpoint: false` unless you have private control-plane connectivity configured.
+- With this setup, clients can still access your load balancer over IPv4 and/or IPv6, while nodes remain private.
+
 ## Configuration Reference
 
 ### Required Variables
@@ -244,6 +266,22 @@ gke_services_cidr: "10.8.0.0/20"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `gke_enable_workload_identity` | `true` | Enable Workload Identity |
+
+### Private Nodes (Standard only)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `gke_private_nodes` | `false` | Enable private GKE nodes (no external IPs) |
+| `gke_private_endpoint` | `false` | Use private control-plane endpoint |
+| `gke_master_ipv4_cidr_block` | unset | Control-plane IPv4 CIDR (required for private nodes) |
+
+### Cloud NAT (for private nodes)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `gke_enable_cloud_nat` | `false` | Create/manage Cloud NAT for node egress |
+| `gke_cloud_router_name` | unset | Cloud Router name used by NAT |
+| `gke_cloud_nat_name` | unset | Cloud NAT name |
 
 ## Playbook Tags
 

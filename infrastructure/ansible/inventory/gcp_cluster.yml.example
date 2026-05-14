@@ -52,7 +52,8 @@ all:
     # Create new VPC or use existing
     # Set to true to create a dedicated VPC for the cluster
     # Set to false to use the default VPC
-    gke_create_vpc: false
+    # NOTE: private nodes and Cloud NAT require gke_create_vpc: true
+    gke_create_vpc: true
 
     # VPC configuration (only used if gke_create_vpc: true)
     gke_vpc_name: "manage2soar-vpc"
@@ -60,6 +61,18 @@ all:
     gke_subnet_cidr: "10.0.0.0/20"
     gke_pods_cidr: "10.4.0.0/14"
     gke_services_cidr: "10.8.0.0/20"
+
+    # Private nodes (recommended to avoid per-node public IPv4 charges)
+    # - Nodes get no external/public IPv4 addresses
+    # - Keep private endpoint disabled unless private control-plane access is configured
+    gke_private_nodes: true
+    gke_private_endpoint: false
+    gke_master_ipv4_cidr_block: "172.16.0.0/28"
+
+    # Cloud NAT for outbound internet from private nodes
+    gke_enable_cloud_nat: true
+    gke_cloud_router_name: "manage2soar-router"
+    gke_cloud_nat_name: "manage2soar-nat"
 
     # ============================================================
     # NODE POOL CONFIGURATION (Standard clusters only)
