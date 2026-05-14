@@ -603,6 +603,62 @@
     - gateway_ip.stdout | trim | length > 0
   tags: [ingress, verify]
 
+- name: Get static IPv4 users (forwarding rules) for reserved address
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses describe {{ gke_static_ip_name }}
+      --global
+      --project={{ gcp_project }}
+      --format="value(users)"
+  register: static_ip_users
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - gke_static_ip_name is defined
+    - gke_static_ip_name | trim | length > 0
+  tags: [ingress, verify, ip]
+
+- name: Determine whether reserved static IPv4 is currently bound
+  ansible.builtin.set_fact:
+    gke_static_ipv4_bound: "{{ (static_ip_users.stdout | default('') | trim) | length > 0 }}"
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - static_ip_users is defined
+  tags: [ingress, verify, ip]
+
+- name: Warn when reserved static IPv4 is unbound
+  ansible.builtin.debug:
+    msg: |
+      WARNING: Reserved static IPv4 '{{ gke_static_ip_name }}' appears unbound (no forwarding rule users).
+      Reserved IP: {{ gke_ingress_ip | default('unknown') }}
+      Gateway status IPv4: {{ gateway_ip.stdout | default('unknown') | trim }}
+      This can cause unnecessary monthly IPv4 charges.
+      Consider deleting the unused address or re-attaching the Gateway to it.
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - static_ip_users is defined
+    - not (gke_static_ipv4_bound | default(false))
+  tags: [ingress, verify, ip]
+
+- name: Enforce static IPv4 binding when configured
+  ansible.builtin.fail:
+    msg: |
+      Reserved static IPv4 '{{ gke_static_ip_name }}' is unbound after Gateway deployment.
+      This indicates address drift and may incur unnecessary IPv4 charges.
+      To bypass this guard (not recommended), set gke_fail_on_unbound_static_ipv4: false.
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - gke_fail_on_unbound_static_ipv4 | default(true) | bool
+    - static_ip_users is defined
+    - not (gke_static_ipv4_bound | default(false))
+  tags: [ingress, verify, ip]
+
 - name: Get Gateway status
   ansible.builtin.command:
     cmd: kubectl get gateway {{ gke_app_name }}-gateway -n default -o wide
