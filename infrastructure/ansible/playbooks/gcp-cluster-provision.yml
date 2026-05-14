@@ -403,6 +403,52 @@
         - not ansible_check_mode
       tags: [cluster]
 
+    - name: Check for public IPs on existing cluster worker nodes
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute instances list
+          --project={{ gcp_project }}
+          --filter="name~^gke-{{ gke_cluster_name }}-"
+          --format="value(networkInterfaces[0].accessConfigs[0].natIP)"
+      register: cluster_node_nat_ips
+      changed_when: false
+      when:
+        - gke_cluster_type == 'standard'
+        - existing_standard_cluster.rc == 0
+      tags: [cluster]
+
+    - name: Determine if existing worker nodes still have public IPs
+      ansible.builtin.set_fact:
+        gke_nodes_have_public_ips: >-
+          {{
+            (cluster_node_nat_ips.stdout_lines | default([])
+            | map('trim') | reject('equalto', '') | list | length) > 0
+          }}
+      when:
+        - gke_cluster_type == 'standard'
+        - existing_standard_cluster.rc == 0
+      tags: [cluster]
+
+    - name: Migrate existing Standard cluster to private nodes
+      ansible.builtin.command:
+        cmd: >
+          gcloud container clusters update {{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+          --enable-private-nodes
+          {%- if gke_private_endpoint | default(false) | bool %}
+          --enable-private-endpoint
+          {%- endif %}
+      register: private_nodes_update
+      changed_when: private_nodes_update.rc == 0
+      when:
+        - gke_cluster_type == 'standard'
+        - gke_private_nodes | default(false) | bool
+        - existing_standard_cluster.rc == 0
+        - gke_nodes_have_public_ips | default(false)
+        - not ansible_check_mode
+      tags: [cluster]
+
     - name: Get actual node pool name from Standard cluster
       ansible.builtin.command:
         cmd: >
