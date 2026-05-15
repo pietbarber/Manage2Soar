@@ -540,6 +540,109 @@
       tags: [cluster, autoscaling]
 
     # ============================================================
+    # PRIVATE-NODE ROLLOUT HARDENING (Issue #913)
+    # ============================================================
+    - name: Trigger node pool rollout to replace legacy public-IP nodes
+      ansible.builtin.command:
+        cmd: >
+          gcloud container node-pools update {{ gke_node_pool_name }}
+          --cluster={{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+          --enable-private-nodes
+      register: nodepool_private_nodes_update
+      changed_when: nodepool_private_nodes_update.rc == 0
+      failed_when: >
+        nodepool_private_nodes_update.rc != 0 and
+        'already has private nodes enabled' not in (nodepool_private_nodes_update.stderr | default('') | lower) and
+        'already configured' not in (nodepool_private_nodes_update.stderr | default('') | lower)
+      when:
+        - gke_cluster_type == 'standard'
+        - gke_private_nodes | default(false) | bool
+        - existing_standard_cluster.rc == 0
+        - gke_nodes_have_public_ips | default(false)
+        - gke_enable_private_node_pool_rollout | default(true) | bool
+        - not ansible_check_mode
+      tags: [cluster, nodepool]
+
+    - name: Wait for node pool rollout operations to complete
+      ansible.builtin.command:
+        cmd: >
+          gcloud container operations list
+          --project={{ gcp_project }}
+          --location={{ gcp_zone }}
+          --filter="targetLink~clusters/{{ gke_cluster_name }} AND status!=DONE AND (operationType=UPDATE_CLUSTER OR operationType=UPGRADE_NODES)"
+          --format="value(name)"
+      register: nodepool_rollout_pending_ops
+      changed_when: false
+      retries: "{{ gke_node_pool_rollout_wait_retries | default(60) }}"
+      delay: "{{ gke_node_pool_rollout_wait_delay | default(20) }}"
+      until: >-
+        (nodepool_rollout_pending_ops.stdout_lines | default([])
+        | map('trim') | reject('equalto', '') | list | length) == 0
+      when:
+        - gke_cluster_type == 'standard'
+        - gke_private_nodes | default(false) | bool
+        - existing_standard_cluster is defined
+        - existing_standard_cluster.rc == 0
+        - gke_nodes_have_public_ips | default(false)
+        - gke_enable_private_node_pool_rollout | default(true) | bool
+        - gke_wait_for_node_pool_rollout | default(true) | bool
+        - not ansible_check_mode
+      tags: [cluster, nodepool, verify]
+
+    - name: Re-check worker node public IPs after private-node rollout
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute instances list
+          --project={{ gcp_project }}
+          --filter="name~^gke-{{ gke_cluster_name }}-"
+          --format="value(networkInterfaces[0].accessConfigs[0].natIP)"
+      register: post_rollout_node_nat_ips
+      changed_when: false
+      when:
+        - gke_cluster_type == 'standard'
+        - gke_private_nodes | default(false) | bool
+        - existing_standard_cluster is defined
+        - existing_standard_cluster.rc == 0
+        - gke_enable_private_node_pool_rollout | default(true) | bool
+        - not ansible_check_mode
+      tags: [cluster, verify]
+
+    - name: Build remaining worker public IPv4 list
+      ansible.builtin.set_fact:
+        gke_remaining_worker_public_ipv4s: >-
+          {{
+            post_rollout_node_nat_ips.stdout_lines | default([])
+            | map('trim') | reject('equalto', '') | list
+          }}
+      when:
+        - gke_cluster_type == 'standard'
+        - gke_private_nodes | default(false) | bool
+        - existing_standard_cluster is defined
+        - existing_standard_cluster.rc == 0
+        - gke_enable_private_node_pool_rollout | default(true) | bool
+        - not ansible_check_mode
+      tags: [cluster, verify]
+
+    - name: Assert zero worker public IPv4 after private-node rollout
+      ansible.builtin.assert:
+        that:
+          - (gke_remaining_worker_public_ipv4s | default([]) | length) == 0
+        fail_msg: |
+          Worker nodes still expose public IPv4 after private-node rollout.
+          Remaining public IPv4 addresses: {{ gke_remaining_worker_public_ipv4s | default([]) | join(', ') }}
+          Investigate node pool rollout status and rerun playbook once rollout completes.
+      when:
+        - gke_cluster_type == 'standard'
+        - gke_private_nodes | default(false) | bool
+        - existing_standard_cluster is defined
+        - existing_standard_cluster.rc == 0
+        - gke_assert_zero_public_worker_ipv4 | default(true) | bool
+        - not ansible_check_mode
+      tags: [cluster, verify]
+
+    # ============================================================
     # GET CREDENTIALS
     # ============================================================
     - name: Get cluster credentials
@@ -571,6 +674,92 @@
       register: nodes_result
       changed_when: false
       tags: [verify]
+
+    - name: Validate NAT smoke test inputs
+      ansible.builtin.assert:
+        that:
+          - gke_nat_smoke_test_namespace | default('') | length > 0
+          - >-
+            (gke_nat_smoke_test_pod_name | default('') | length > 0) or
+            (gke_nat_smoke_test_pod_selector | default('') | length > 0)
+        fail_msg: |
+          NAT smoke test requires explicit target inputs.
+          Set gke_nat_smoke_test_namespace and either:
+          - gke_nat_smoke_test_pod_name, or
+          - gke_nat_smoke_test_pod_selector
+      when:
+        - gke_run_nat_egress_smoke_test | default(false) | bool
+      tags: [verify, nat]
+
+    - name: Discover NAT smoke test pod by selector
+      ansible.builtin.command:
+        cmd: >
+          kubectl get pods
+          -n {{ gke_nat_smoke_test_namespace }}
+          -l {{ gke_nat_smoke_test_pod_selector }}
+          --field-selector=status.phase=Running
+          --no-headers
+          -o custom-columns=:metadata.name
+      register: nat_smoke_test_pods
+      changed_when: false
+      when:
+        - gke_run_nat_egress_smoke_test | default(false) | bool
+        - gke_nat_smoke_test_pod_name | default('') | length == 0
+      tags: [verify, nat]
+
+    - name: Set selected NAT smoke test pod
+      ansible.builtin.set_fact:
+        gke_nat_smoke_selected_pod: >-
+          {{
+            gke_nat_smoke_test_pod_name | default('')
+            if (gke_nat_smoke_test_pod_name | default('') | length > 0)
+            else (nat_smoke_test_pods.stdout_lines | default([]) | first | default(''))
+          }}
+      when:
+        - gke_run_nat_egress_smoke_test | default(false) | bool
+      tags: [verify, nat]
+
+    - name: Assert NAT smoke test pod is available
+      ansible.builtin.assert:
+        that:
+          - gke_nat_smoke_selected_pod | default('') | length > 0
+        fail_msg: |
+          NAT smoke test could not find a running pod.
+          Namespace: {{ gke_nat_smoke_test_namespace | default('unset') }}
+          Selector: {{ gke_nat_smoke_test_pod_selector | default('unset') }}
+          Pod name override: {{ gke_nat_smoke_test_pod_name | default('unset') }}
+      when:
+        - gke_run_nat_egress_smoke_test | default(false) | bool
+      tags: [verify, nat]
+
+    - name: Run optional NAT egress smoke test
+      ansible.builtin.command:
+        cmd: >
+          kubectl exec
+          -n {{ gke_nat_smoke_test_namespace }}
+          {{ gke_nat_smoke_selected_pod }}
+          -- python -c "import urllib.request; print(urllib.request.urlopen('{{ gke_nat_smoke_test_url | default('https://api.ipify.org') }}', timeout={{ gke_nat_smoke_test_timeout_seconds | default(10) }}).read().decode())"
+      register: nat_smoke_test_result
+      changed_when: false
+      failed_when: >
+        nat_smoke_test_result.rc != 0 or
+        (nat_smoke_test_result.stdout | default('') | trim | length) == 0
+      when:
+        - gke_run_nat_egress_smoke_test | default(false) | bool
+        - not ansible_check_mode
+      tags: [verify, nat]
+
+    - name: Display NAT smoke test result
+      ansible.builtin.debug:
+        msg: |
+          NAT egress smoke test passed.
+          Namespace: {{ gke_nat_smoke_test_namespace }}
+          Pod: {{ gke_nat_smoke_selected_pod }}
+          Observed outbound IP: {{ nat_smoke_test_result.stdout | trim }}
+      when:
+        - gke_run_nat_egress_smoke_test | default(false) | bool
+        - nat_smoke_test_result is defined
+      tags: [verify, nat]
 
     - name: Display cluster status
       ansible.builtin.debug:

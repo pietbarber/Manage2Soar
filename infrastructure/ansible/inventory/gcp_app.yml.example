@@ -99,6 +99,18 @@ all:
     # Enable to expose the application via domain names
     gke_enable_ingress: false
 
+    # Reserved static IPv4 drift guard behavior:
+    # - false (default): warn only when reserved IPv4 is unbound
+    # - true: fail deployment when reserved IPv4 is unbound
+    # Recommended: true in strict production workflows
+    gke_fail_on_unbound_static_ipv4: false
+
+    # Optional cleanup for unbound reserved static IPv4 (Issue #913)
+    # SAFETY: deletion requires BOTH flags to be true
+    gke_cleanup_unbound_static_ipv4: false
+    gke_cleanup_unbound_static_ipv4_execute: false
+    gke_cleanup_unbound_static_ipv4_grace_seconds: 60
+
     # TLS is enabled by default using Google-managed SSL certificates
     # These are free, automatic, and don't require cert-manager or Let's Encrypt
     # gke_enable_tls: true  # Default
