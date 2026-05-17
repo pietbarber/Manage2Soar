@@ -596,6 +596,7 @@
         cmd: >
           gcloud compute instances list
           --project={{ gcp_project }}
+          --zones={{ gcp_zone }}
           --filter="name~^gke-{{ gke_cluster_name }}-"
           --format="value(networkInterfaces[0].accessConfigs[0].natIP)"
       register: post_rollout_node_nat_ips
