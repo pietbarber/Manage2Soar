@@ -271,7 +271,16 @@ gke_static_ip_name: "{{ gke_cluster_name }}-ingress-ip"
 # When true, fail deployment if the reserved IPv4 static address is not actually
 # attached to any forwarding rule after Gateway reconcile.
 # Default is false to keep deploys non-blocking while still surfacing warnings.
+# Set to true in inventory for strict enforcement in production.
 gke_fail_on_unbound_static_ipv4: false
+
+# Opt-in cleanup for unbound reserved static IPv4 addresses.
+# SAFETY: Deletion requires BOTH flags to be true.
+gke_cleanup_unbound_static_ipv4: false
+gke_cleanup_unbound_static_ipv4_execute: false
+
+# Grace period before re-check + delete to avoid racing Gateway reconciliation.
+gke_cleanup_unbound_static_ipv4_grace_seconds: 60
 
 # Enable IPv6 for Gateway/Ingress
 # When true, reserves both IPv4 and IPv6 global static IPs

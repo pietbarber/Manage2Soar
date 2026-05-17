@@ -107,6 +107,32 @@ all:
     gke_use_spot_vms: false
 
     # ============================================================
+    # PRIVATE-NODE ROLLOUT HARDENING (Issue #913)
+    # ============================================================
+
+    # Run node-pool rollout command during migration when legacy worker nodes
+    # still have public IPv4 addresses.
+    gke_enable_private_node_pool_rollout: true
+
+    # Wait/poll settings for rollout completion gate
+    gke_wait_for_node_pool_rollout: true
+    gke_node_pool_rollout_wait_retries: 60
+    gke_node_pool_rollout_wait_delay: 20
+
+    # Fail if any worker public IPv4 remains after migration and rollout.
+    gke_assert_zero_public_worker_ipv4: true
+
+    # Optional outbound NAT smoke test (disabled by default).
+    # This test requires explicit target inputs and is intended for maintenance
+    # verification runs, not every routine apply.
+    gke_run_nat_egress_smoke_test: false
+    gke_nat_smoke_test_namespace: ""
+    gke_nat_smoke_test_pod_selector: ""
+    gke_nat_smoke_test_pod_name: ""
+    gke_nat_smoke_test_url: "https://api.ipify.org"
+    gke_nat_smoke_test_timeout_seconds: 10
+
+    # ============================================================
     # SECURITY & ACCESS
     # ============================================================
 

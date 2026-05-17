@@ -659,6 +659,120 @@
     - not (gke_static_ipv4_bound | default(false))
   tags: [ingress, verify, ip]
 
+- name: Preview cleanup for unbound reserved static IPv4
+  ansible.builtin.debug:
+    msg: |
+      Unbound reserved static IPv4 cleanup is enabled in preview mode.
+      Address: {{ gke_static_ip_name }}
+      IP: {{ gke_ingress_ip | default('unknown') }}
+      No deletion performed because gke_cleanup_unbound_static_ipv4_execute is false.
+      To execute deletion, set BOTH:
+        gke_cleanup_unbound_static_ipv4: true
+        gke_cleanup_unbound_static_ipv4_execute: true
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - gke_cleanup_unbound_static_ipv4 | default(false) | bool
+    - not (gke_cleanup_unbound_static_ipv4_execute | default(false) | bool)
+    - static_ip_users is defined
+    - static_ip_users.rc == 0
+    - not (gke_static_ipv4_bound | default(false))
+  tags: [ingress, verify, ip, cleanup]
+
+- name: Wait before unbound static IPv4 cleanup re-check
+  ansible.builtin.pause:
+    seconds: "{{ gke_cleanup_unbound_static_ipv4_grace_seconds | default(60) }}"
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - gke_cleanup_unbound_static_ipv4 | default(false) | bool
+    - gke_cleanup_unbound_static_ipv4_execute | default(false) | bool
+    - static_ip_users is defined
+    - static_ip_users.rc == 0
+    - not (gke_static_ipv4_bound | default(false))
+  tags: [ingress, verify, ip, cleanup]
+
+- name: Re-check static IPv4 users before cleanup delete
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses describe {{ gke_static_ip_name }}
+      --global
+      --project={{ gcp_project }}
+      --format="value(users)"
+  register: static_ip_users_recheck
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - gke_cleanup_unbound_static_ipv4 | default(false) | bool
+    - gke_cleanup_unbound_static_ipv4_execute | default(false) | bool
+    - static_ip_users is defined
+    - static_ip_users.rc == 0
+    - not (gke_static_ipv4_bound | default(false))
+  tags: [ingress, verify, ip, cleanup]
+
+- name: Determine whether reserved static IPv4 is still unbound before delete
+  ansible.builtin.set_fact:
+    gke_static_ipv4_still_unbound: >-
+      {{
+        static_ip_users_recheck.rc == 0 and
+        (static_ip_users_recheck.stdout | default('') | trim) | length == 0
+      }}
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - static_ip_users_recheck is defined
+  tags: [ingress, verify, ip, cleanup]
+
+- name: Skip cleanup delete because static IPv4 was re-bound
+  ansible.builtin.debug:
+    msg: |
+      Skipping static IPv4 deletion because it became bound during re-check.
+      Address: {{ gke_static_ip_name }}
+      Current users: {{ static_ip_users_recheck.stdout | trim }}
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - gke_cleanup_unbound_static_ipv4 | default(false) | bool
+    - gke_cleanup_unbound_static_ipv4_execute | default(false) | bool
+    - static_ip_users_recheck is defined
+    - not (gke_static_ipv4_still_unbound | default(false))
+  tags: [ingress, verify, ip, cleanup]
+
+- name: Delete unbound reserved static IPv4 (opt-in)
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses delete {{ gke_static_ip_name }}
+      --global
+      --project={{ gcp_project }}
+      --quiet
+  register: static_ip_cleanup_delete
+  changed_when: static_ip_cleanup_delete.rc == 0
+  failed_when: static_ip_cleanup_delete.rc != 0
+  delegate_to: localhost
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - gke_cleanup_unbound_static_ipv4 | default(false) | bool
+    - gke_cleanup_unbound_static_ipv4_execute | default(false) | bool
+    - static_ip_users_recheck is defined
+    - gke_static_ipv4_still_unbound | default(false)
+  tags: [ingress, verify, ip, cleanup]
+
+- name: Report unbound static IPv4 cleanup result
+  ansible.builtin.debug:
+    msg: |
+      Deleted unbound reserved static IPv4.
+      Address: {{ gke_static_ip_name }}
+      IP: {{ gke_ingress_ip | default('unknown') }}
+  run_once: true
+  when:
+    - not ansible_check_mode
+    - (static_ip_cleanup_delete.rc | default(1)) == 0
+  tags: [ingress, verify, ip, cleanup]
+
 - name: Get Gateway status
   ansible.builtin.command:
     cmd: kubectl get gateway {{ gke_app_name }}-gateway -n default -o wide
