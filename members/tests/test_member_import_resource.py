@@ -124,3 +124,41 @@ class MemberImportResourceTests(TestCase):
         existing.refresh_from_db()
         self.assertEqual(existing.username, "pilot.new")
         self.assertEqual(Member.objects.filter(username="pilot.old").count(), 1)
+
+    def test_update_by_id_blank_username_preserves_existing_username(self):
+        existing = Member.objects.create_user(
+            username="stable.user", email="stable@example.com"
+        )
+
+        dataset = Dataset(headers=["id", "username", "first_name", "last_name"])
+        dataset.append((str(existing.pk), "", "Stable", "Updated"))
+
+        result = MemberResource().import_data(dataset, dry_run=False)
+
+        self.assertFalse(result.has_errors())
+        existing.refresh_from_db()
+        self.assertEqual(existing.username, "stable.user")
+
+    def test_update_by_id_invalid_username_preserves_existing_username(self):
+        existing = Member.objects.create_user(
+            username="kept.user", email="kept@example.com"
+        )
+
+        dataset = Dataset(headers=["id", "username", "first_name", "last_name"])
+        dataset.append((str(existing.pk), "!!!", "Kept", "Updated"))
+
+        result = MemberResource().import_data(dataset, dry_run=False)
+
+        self.assertFalse(result.has_errors())
+        existing.refresh_from_db()
+        self.assertEqual(existing.username, "kept.user")
+
+    def test_new_imported_member_gets_unusable_password(self):
+        dataset = Dataset(headers=["username", "email"])
+        dataset.append(("new.import", "new.import@example.com"))
+
+        result = MemberResource().import_data(dataset, dry_run=False)
+
+        self.assertFalse(result.has_errors())
+        member = Member.objects.get(username="new.import")
+        self.assertFalse(member.has_usable_password())

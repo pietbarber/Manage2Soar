@@ -68,6 +68,7 @@ class MemberResource(resources.ModelResource):
         )  # row_token -> currently reserved username_key
         self._existing_usernames = defaultdict(set)
         self._pk_current_username_key: dict = {}
+        self._pk_current_username: dict = {}
         for pk, username in (
             Member.objects.exclude(username__isnull=True)
             .exclude(username="")
@@ -76,6 +77,7 @@ class MemberResource(resources.ModelResource):
             username_key = self._username_key(username)
             self._existing_usernames[username_key].add(pk)
             self._pk_current_username_key[pk] = username_key
+            self._pk_current_username[pk] = username
 
     @staticmethod
     def _username_key(username):
@@ -139,6 +141,24 @@ class MemberResource(resources.ModelResource):
                 self._existing_usernames[prev_existing_key].discard(current_pk)
             self._existing_usernames[new_key].add(current_pk)
             self._pk_current_username_key[current_pk] = new_key
+            self._pk_current_username[current_pk] = username
+
+    def _preserve_existing_username_if_missing(self, instance):
+        """Keep username stable for updates when incoming value normalizes to empty."""
+        if instance.pk is None:
+            return False
+
+        candidate = self._normalize_username(instance.username)
+        if candidate:
+            return False
+
+        preserved_username = self._pk_current_username.get(instance.pk)
+        if not preserved_username:
+            return False
+
+        self._reserve_in_batch(instance.pk, preserved_username, current_pk=instance.pk)
+        instance.username = preserved_username
+        return True
 
     def _username_is_taken(self, username, current_pk=None, row_token=None):
         username_key = self._username_key(username)
@@ -222,7 +242,16 @@ class MemberResource(resources.ModelResource):
 
     def before_save_instance(self, instance, row, **kwargs):
         """Enforce NULL (not empty string) for missing values on final save path."""
-        instance.username = self._reserve_unique_username(instance, instance.username)
+        if not self._preserve_existing_username_if_missing(instance):
+            instance.username = self._reserve_unique_username(
+                instance, instance.username
+            )
+
+        # Imported users bypass create_user(); ensure new accounts cannot auth
+        # until credentials are explicitly configured.
+        if instance._state.adding and not instance.password:
+            instance.set_unusable_password()
+
         instance.SSA_member_number = self._normalize_nullable_value(
             instance.SSA_member_number,
             self._SSA_NULL_TOKENS,
