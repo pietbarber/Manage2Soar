@@ -1,3 +1,7 @@
+import re
+from collections import defaultdict
+
+from django.core.exceptions import ValidationError
 from import_export import resources
 
 from .models import Member
@@ -14,20 +18,50 @@ class MemberResource(resources.ModelResource):
         model = Member
 
     def before_import(self, dataset, **kwargs):
-        """Track usernames assigned in this import run to avoid same-batch collisions."""
+        """Preload usernames once to avoid per-row existence queries during import."""
         self._batch_usernames = set()
+        self._existing_usernames = defaultdict(set)
+        for pk, username in (
+            Member.objects.exclude(username__isnull=True)
+            .exclude(username="")
+            .values_list("pk", "username")
+        ):
+            self._existing_usernames[self._username_key(username)].add(pk)
 
     @staticmethod
-    def _normalize_username(raw_value):
+    def _username_key(username):
+        return username.casefold()
+
+    def _normalize_username(self, raw_value):
         if raw_value is None:
             return ""
-        return str(raw_value).strip()
+
+        username = str(raw_value).strip().lower()
+        max_length = Member._meta.get_field("username").max_length
+        username = username[:max_length]
+        if not username:
+            return ""
+
+        # Keep imported usernames in the same lower-case ASCII family used by
+        # generated usernames and reject malformed values.
+        if not re.fullmatch(r"[a-z0-9._@+-]+", username):
+            return ""
+
+        try:
+            Member._meta.get_field("username").run_validators(username)
+        except ValidationError:
+            return ""
+
+        return username
 
     def _username_is_taken(self, username, current_pk=None):
-        query = Member.objects.filter(username=username)
+        username_key = self._username_key(username)
+        existing_with_key = self._existing_usernames.get(username_key, set())
+
         if current_pk is not None:
-            query = query.exclude(pk=current_pk)
-        return query.exists() or username in self._batch_usernames
+            existing_with_key = existing_with_key - {current_pk}
+
+        return bool(existing_with_key) or username_key in self._batch_usernames
 
     @staticmethod
     def _append_suffix(base_username, counter):
@@ -41,7 +75,7 @@ class MemberResource(resources.ModelResource):
         current_pk = instance.pk
 
         if candidate and not self._username_is_taken(candidate, current_pk=current_pk):
-            self._batch_usernames.add(candidate)
+            self._batch_usernames.add(self._username_key(candidate))
             return candidate
 
         # Reuse the canonical first.last generator used by account creation.
@@ -51,7 +85,7 @@ class MemberResource(resources.ModelResource):
         )
 
         if not self._username_is_taken(base_candidate, current_pk=current_pk):
-            self._batch_usernames.add(base_candidate)
+            self._batch_usernames.add(self._username_key(base_candidate))
             return base_candidate
 
         counter = 1
@@ -60,7 +94,7 @@ class MemberResource(resources.ModelResource):
             counter += 1
             username = self._append_suffix(base_candidate, counter)
 
-        self._batch_usernames.add(username)
+        self._batch_usernames.add(self._username_key(username))
         return username
 
     @staticmethod

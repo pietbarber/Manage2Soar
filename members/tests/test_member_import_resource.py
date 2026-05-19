@@ -63,3 +63,23 @@ class MemberImportResourceTests(TestCase):
         self.assertEqual(Member.objects.filter(username="jane.doe").count(), 1)
         self.assertTrue(Member.objects.filter(username="jane.doe1").exists())
         self.assertTrue(Member.objects.filter(username="jane.doe2").exists())
+
+    def test_case_variant_username_is_normalized_and_deduplicated(self):
+        Member.objects.create_user(username="jane.doe", email="existing@example.com")
+
+        dataset = Dataset(headers=["username", "first_name", "last_name"])
+        dataset.append(("Jane.Doe", "Jane", "Doe"))
+
+        result = MemberResource().import_data(dataset, dry_run=False)
+
+        self.assertFalse(result.has_errors())
+        self.assertTrue(Member.objects.filter(username="jane.doe1").exists())
+
+    def test_invalid_username_falls_back_to_generated_username(self):
+        dataset = Dataset(headers=["username", "first_name", "last_name"])
+        dataset.append(("!!!", "Chris", "Pine"))
+
+        result = MemberResource().import_data(dataset, dry_run=False)
+
+        self.assertFalse(result.has_errors())
+        self.assertTrue(Member.objects.filter(username="chris.pine").exists())
