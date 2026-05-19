@@ -54,20 +54,18 @@ class MemberResource(resources.ModelResource):
 
         return username
 
-    def _username_is_taken(self, username, current_pk=None):
+    def _username_is_taken(self, username, current_pk=None, row_token=None):
         username_key = self._username_key(username)
         existing_with_key = self._existing_usernames.get(username_key, set())
 
         if current_pk is not None:
             existing_with_key = existing_with_key - {current_pk}
 
-        batch_reserved_by_pks = self._batch_usernames.get(username_key, set())
-        if current_pk is not None:
-            batch_reserved_by_pks = batch_reserved_by_pks - {current_pk, None}
-        else:
-            batch_reserved_by_pks = batch_reserved_by_pks - {None}
+        batch_reserved_by = self._batch_usernames.get(username_key, set())
+        if row_token is not None:
+            batch_reserved_by = batch_reserved_by - {row_token}
 
-        return bool(existing_with_key) or bool(batch_reserved_by_pks)
+        return bool(existing_with_key) or bool(batch_reserved_by)
 
     @staticmethod
     def _append_suffix(base_username, counter):
@@ -79,9 +77,15 @@ class MemberResource(resources.ModelResource):
     def _reserve_unique_username(self, instance, requested_username):
         candidate = self._normalize_username(requested_username)
         current_pk = instance.pk
+        # Use pk for existing instances, id(instance) for new ones — each new
+        # instance object has a unique id() so same-file new-row collisions
+        # are correctly detected rather than blindly excluded.
+        row_token = current_pk if current_pk is not None else id(instance)
 
-        if candidate and not self._username_is_taken(candidate, current_pk=current_pk):
-            self._batch_usernames[self._username_key(candidate)].add(current_pk or None)
+        if candidate and not self._username_is_taken(
+            candidate, current_pk=current_pk, row_token=row_token
+        ):
+            self._batch_usernames[self._username_key(candidate)].add(row_token)
             return candidate
 
         # Reuse the canonical first.last generator used by account creation.
@@ -90,19 +94,21 @@ class MemberResource(resources.ModelResource):
             instance.last_name or "",
         )
 
-        if not self._username_is_taken(base_candidate, current_pk=current_pk):
-            self._batch_usernames[self._username_key(base_candidate)].add(
-                current_pk or None
-            )
+        if not self._username_is_taken(
+            base_candidate, current_pk=current_pk, row_token=row_token
+        ):
+            self._batch_usernames[self._username_key(base_candidate)].add(row_token)
             return base_candidate
 
         counter = 1
         username = self._append_suffix(base_candidate, counter)
-        while self._username_is_taken(username, current_pk=current_pk):
+        while self._username_is_taken(
+            username, current_pk=current_pk, row_token=row_token
+        ):
             counter += 1
             username = self._append_suffix(base_candidate, counter)
 
-        self._batch_usernames[self._username_key(username)].add(current_pk or None)
+        self._batch_usernames[self._username_key(username)].add(row_token)
         return username
 
     @staticmethod

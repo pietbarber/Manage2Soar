@@ -83,3 +83,20 @@ class MemberImportResourceTests(TestCase):
 
         self.assertFalse(result.has_errors())
         self.assertTrue(Member.objects.filter(username="chris.pine").exists())
+
+    def test_same_file_new_rows_with_identical_username_are_auto_suffixed(self):
+        """Two brand-new rows sharing the same explicit username must not collide.
+
+        This exercises the batch-reservation logic for new instances (pk=None):
+        the second row must detect the first row's reservation and be assigned
+        a suffixed username instead of failing the DB unique constraint.
+        """
+        dataset = Dataset(headers=["username", "first_name", "last_name"])
+        dataset.append(("sam.jones", "Sam", "Jones"))
+        dataset.append(("sam.jones", "Sam", "Jones"))
+
+        result = MemberResource().import_data(dataset, dry_run=False)
+
+        self.assertFalse(result.has_errors())
+        self.assertEqual(Member.objects.filter(username="sam.jones").count(), 1)
+        self.assertTrue(Member.objects.filter(username="sam.jones1").exists())
