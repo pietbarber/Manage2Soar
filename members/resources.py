@@ -6,6 +6,49 @@ from import_export import resources
 
 from .models import Member
 
+# Shared safe member CSV schema used by both import-export resource and
+# custom admin CSV action to avoid schema drift across export paths.
+MEMBER_CSV_FIELDS = (
+    "id",
+    "username",
+    "first_name",
+    "middle_initial",
+    "last_name",
+    "name_suffix",
+    "nickname",
+    "email",
+    "phone",
+    "mobile_phone",
+    "emergency_contact",
+    "membership_status",
+    "date_joined",
+    "private_glider_checkride_date",
+    "instructor",
+    "towpilot",
+    "duty_officer",
+    "assistant_duty_officer",
+    "director",
+    "member_manager",
+    "rostermeister",
+    "webmaster",
+    "secretary",
+    "treasurer",
+    "safety_officer",
+    "address",
+    "city",
+    "state_code",
+    "state_freeform",
+    "zip_code",
+    "country",
+    "pilot_certificate_number",
+    "SSA_member_number",
+    "legacy_username",
+    "ssa_url",
+    "glider_rating",
+    "public_notes",
+    "private_notes",
+)
+
 
 class MemberResource(resources.ModelResource):
     """Normalize imported member fields before persistence."""
@@ -15,18 +58,7 @@ class MemberResource(resources.ModelResource):
 
     class Meta:
         model = Member
-        exclude = (
-            "password",
-            "user_permissions",
-            "groups",
-            "last_login",
-            "is_active",
-            "is_staff",
-            "is_superuser",
-            "profile_photo",
-            "profile_photo_small",
-            "profile_photo_medium",
-        )
+        fields = MEMBER_CSV_FIELDS
 
     def before_import(self, dataset, **kwargs):
         """Preload usernames once to avoid per-row existence queries during import."""

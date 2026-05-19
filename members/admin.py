@@ -25,7 +25,7 @@ from .models import (
     SafetyReport,
 )
 from .models_applications import MembershipApplication
-from .resources import MemberResource
+from .resources import MEMBER_CSV_FIELDS, MemberResource
 from .utils.image_processing import generate_profile_thumbnails
 
 # --- Register or replace social_django admin entries with helpful admin banners ---
@@ -250,48 +250,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
 
     @admin.action(description="Export selected members to CSV")
     def export_members_csv(self, request, queryset):
-        # Define fields to export (exclude password, profile_photo, legacy name, badges, biography)
-        fields = [
-            "username",
-            "first_name",
-            "middle_initial",
-            "last_name",
-            "name_suffix",
-            "nickname",
-            "email",
-            "phone",
-            "mobile_phone",
-            "emergency_contact",
-            "membership_status",
-            "date_joined",
-            "private_glider_checkride_date",
-            "instructor",
-            "towpilot",
-            "duty_officer",
-            "assistant_duty_officer",
-            "director",
-            "member_manager",
-            "rostermeister",
-            "webmaster",
-            "secretary",
-            "treasurer",
-            "safety_officer",
-            "address",
-            "city",
-            "state_code",
-            "state_freeform",
-            "zip_code",
-            "country",
-            "pilot_certificate_number",
-            "SSA_member_number",
-            "ssa_url",
-            "glider_rating",
-            "public_notes",
-            "private_notes",
-            "is_active",
-            "is_staff",
-            "is_superuser",
-        ]
+        fields = list(MEMBER_CSV_FIELDS)
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=members_export.csv"
         writer = csv.writer(response)
