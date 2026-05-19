@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 from import_export import resources
 
 from .models import Member
-from .utils.username import generate_username
 
 
 class MemberResource(resources.ModelResource):
@@ -20,6 +19,9 @@ class MemberResource(resources.ModelResource):
     def before_import(self, dataset, **kwargs):
         """Preload usernames once to avoid per-row existence queries during import."""
         self._batch_usernames = defaultdict(set)
+        self._token_reservations: dict = (
+            {}
+        )  # row_token -> currently reserved username_key
         self._existing_usernames = defaultdict(set)
         for pk, username in (
             Member.objects.exclude(username__isnull=True)
@@ -54,6 +56,33 @@ class MemberResource(resources.ModelResource):
 
         return username
 
+    @staticmethod
+    def _make_base_username(first_name: str, last_name: str) -> str:
+        """Build the canonical first.last base username without any DB lookups."""
+        first_clean = re.sub(r"[^A-Za-z]", "", first_name).lower()
+        last_clean = re.sub(r"[^A-Za-z]", "", last_name).lower()
+
+        if not first_clean and not last_clean:
+            base = "user"
+        elif not first_clean:
+            base = last_clean
+        elif not last_clean:
+            base = first_clean
+        else:
+            base = f"{first_clean}.{last_clean}"
+
+        max_length = Member._meta.get_field("username").max_length
+        return base[:max_length]
+
+    def _reserve_in_batch(self, row_token, username):
+        """Reserve a username for a row token, releasing any prior reservation."""
+        new_key = self._username_key(username)
+        prev_key = self._token_reservations.get(row_token)
+        if prev_key is not None and prev_key != new_key:
+            self._batch_usernames[prev_key].discard(row_token)
+        self._batch_usernames[new_key].add(row_token)
+        self._token_reservations[row_token] = new_key
+
     def _username_is_taken(self, username, current_pk=None, row_token=None):
         username_key = self._username_key(username)
         existing_with_key = self._existing_usernames.get(username_key, set())
@@ -85,11 +114,12 @@ class MemberResource(resources.ModelResource):
         if candidate and not self._username_is_taken(
             candidate, current_pk=current_pk, row_token=row_token
         ):
-            self._batch_usernames[self._username_key(candidate)].add(row_token)
+            self._reserve_in_batch(row_token, candidate)
             return candidate
 
-        # Reuse the canonical first.last generator used by account creation.
-        base_candidate = generate_username(
+        # Build the canonical first.last base without DB queries; uniqueness
+        # is enforced entirely by the in-memory preloaded set + batch tracking.
+        base_candidate = self._make_base_username(
             instance.first_name or "",
             instance.last_name or "",
         )
@@ -97,7 +127,7 @@ class MemberResource(resources.ModelResource):
         if not self._username_is_taken(
             base_candidate, current_pk=current_pk, row_token=row_token
         ):
-            self._batch_usernames[self._username_key(base_candidate)].add(row_token)
+            self._reserve_in_batch(row_token, base_candidate)
             return base_candidate
 
         counter = 1
@@ -108,7 +138,7 @@ class MemberResource(resources.ModelResource):
             counter += 1
             username = self._append_suffix(base_candidate, counter)
 
-        self._batch_usernames[self._username_key(username)].add(row_token)
+        self._reserve_in_batch(row_token, username)
         return username
 
     @staticmethod
