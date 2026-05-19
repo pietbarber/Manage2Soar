@@ -717,7 +717,7 @@
   ansible.builtin.set_fact:
     gke_static_ipv4_still_unbound: >-
       {{
-        static_ip_users_recheck.rc == 0 and
+        static_ip_users_recheck.get('rc', 1) == 0 and
         (static_ip_users_recheck.stdout | default('') | trim) | length == 0
       }}
   run_once: true
