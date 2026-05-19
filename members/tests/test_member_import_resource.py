@@ -34,12 +34,14 @@ class MemberImportResourceTests(TestCase):
         dataset = Dataset(headers=["username", "legacy_username"])
         dataset.append(("pilot.delta", "NULL"))
         dataset.append(("pilot.echo", ""))
+        dataset.append(("pilot.foxtrot", "0"))
 
         result = MemberResource().import_data(dataset, dry_run=False)
 
         self.assertFalse(result.has_errors())
         self.assertIsNone(Member.objects.get(username="pilot.delta").legacy_username)
         self.assertIsNone(Member.objects.get(username="pilot.echo").legacy_username)
+        self.assertIsNone(Member.objects.get(username="pilot.foxtrot").legacy_username)
 
     def test_blank_username_is_generated_from_names(self):
         dataset = Dataset(headers=["username", "first_name", "last_name"])

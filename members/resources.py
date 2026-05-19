@@ -11,10 +11,16 @@ class MemberResource(resources.ModelResource):
     """Normalize imported member fields before persistence."""
 
     _SSA_NULL_TOKENS = {"", "0", "null", "none", "na", "n/a", "unknown"}
-    _LEGACY_USERNAME_NULL_TOKENS = {"", "null", "none", "na", "n/a", "unknown"}
+    _LEGACY_USERNAME_NULL_TOKENS = {"", "0", "null", "none", "na", "n/a", "unknown"}
 
     class Meta:
         model = Member
+        exclude = (
+            "password",
+            "user_permissions",
+            "groups",
+            "last_login",
+        )
 
     def before_import(self, dataset, **kwargs):
         """Preload usernames once to avoid per-row existence queries during import."""
