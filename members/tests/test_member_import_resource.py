@@ -102,3 +102,25 @@ class MemberImportResourceTests(TestCase):
         self.assertFalse(result.has_errors())
         self.assertEqual(Member.objects.filter(username="sam.jones").count(), 1)
         self.assertTrue(Member.objects.filter(username="sam.jones1").exists())
+
+    def test_update_by_id_rename_releases_old_username_in_same_import(self):
+        """Renaming an existing member by id should free the old username key.
+
+        This verifies in-memory username tracking stays consistent when an
+        existing member is renamed and a later row in the same file claims the
+        just-freed username.
+        """
+        existing = Member.objects.create_user(
+            username="pilot.old", email="existing@example.com"
+        )
+
+        dataset = Dataset(headers=["id", "username", "first_name", "last_name"])
+        dataset.append((str(existing.pk), "pilot.new", "Pilot", "Renamed"))
+        dataset.append(("", "pilot.old", "New", "Member"))
+
+        result = MemberResource().import_data(dataset, dry_run=False)
+
+        self.assertFalse(result.has_errors())
+        existing.refresh_from_db()
+        self.assertEqual(existing.username, "pilot.new")
+        self.assertEqual(Member.objects.filter(username="pilot.old").count(), 1)

@@ -20,6 +20,9 @@ class MemberResource(resources.ModelResource):
             "user_permissions",
             "groups",
             "last_login",
+            "profile_photo",
+            "profile_photo_small",
+            "profile_photo_medium",
         )
 
     def before_import(self, dataset, **kwargs):
@@ -29,12 +32,15 @@ class MemberResource(resources.ModelResource):
             {}
         )  # row_token -> currently reserved username_key
         self._existing_usernames = defaultdict(set)
+        self._pk_current_username_key: dict = {}
         for pk, username in (
             Member.objects.exclude(username__isnull=True)
             .exclude(username="")
             .values_list("pk", "username")
         ):
-            self._existing_usernames[self._username_key(username)].add(pk)
+            username_key = self._username_key(username)
+            self._existing_usernames[username_key].add(pk)
+            self._pk_current_username_key[pk] = username_key
 
     @staticmethod
     def _username_key(username):
@@ -80,7 +86,7 @@ class MemberResource(resources.ModelResource):
         max_length = Member._meta.get_field("username").max_length
         return base[:max_length]
 
-    def _reserve_in_batch(self, row_token, username):
+    def _reserve_in_batch(self, row_token, username, current_pk=None):
         """Reserve a username for a row token, releasing any prior reservation."""
         new_key = self._username_key(username)
         prev_key = self._token_reservations.get(row_token)
@@ -88,6 +94,16 @@ class MemberResource(resources.ModelResource):
             self._batch_usernames[prev_key].discard(row_token)
         self._batch_usernames[new_key].add(row_token)
         self._token_reservations[row_token] = new_key
+
+        # Keep the preloaded existing-username index aligned with in-batch
+        # renames for existing members so freed names can be reclaimed later
+        # in the same import run.
+        if current_pk is not None:
+            prev_existing_key = self._pk_current_username_key.get(current_pk)
+            if prev_existing_key is not None and prev_existing_key != new_key:
+                self._existing_usernames[prev_existing_key].discard(current_pk)
+            self._existing_usernames[new_key].add(current_pk)
+            self._pk_current_username_key[current_pk] = new_key
 
     def _username_is_taken(self, username, current_pk=None, row_token=None):
         username_key = self._username_key(username)
@@ -120,7 +136,7 @@ class MemberResource(resources.ModelResource):
         if candidate and not self._username_is_taken(
             candidate, current_pk=current_pk, row_token=row_token
         ):
-            self._reserve_in_batch(row_token, candidate)
+            self._reserve_in_batch(row_token, candidate, current_pk=current_pk)
             return candidate
 
         # Build the canonical first.last base without DB queries; uniqueness
@@ -133,7 +149,7 @@ class MemberResource(resources.ModelResource):
         if not self._username_is_taken(
             base_candidate, current_pk=current_pk, row_token=row_token
         ):
-            self._reserve_in_batch(row_token, base_candidate)
+            self._reserve_in_batch(row_token, base_candidate, current_pk=current_pk)
             return base_candidate
 
         counter = 1
@@ -144,7 +160,7 @@ class MemberResource(resources.ModelResource):
             counter += 1
             username = self._append_suffix(base_candidate, counter)
 
-        self._reserve_in_batch(row_token, username)
+        self._reserve_in_batch(row_token, username, current_pk=current_pk)
         return username
 
     @staticmethod
