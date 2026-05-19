@@ -19,7 +19,7 @@ class MemberResource(resources.ModelResource):
 
     def before_import(self, dataset, **kwargs):
         """Preload usernames once to avoid per-row existence queries during import."""
-        self._batch_usernames = set()
+        self._batch_usernames = defaultdict(set)
         self._existing_usernames = defaultdict(set)
         for pk, username in (
             Member.objects.exclude(username__isnull=True)
@@ -61,7 +61,13 @@ class MemberResource(resources.ModelResource):
         if current_pk is not None:
             existing_with_key = existing_with_key - {current_pk}
 
-        return bool(existing_with_key) or username_key in self._batch_usernames
+        batch_reserved_by_pks = self._batch_usernames.get(username_key, set())
+        if current_pk is not None:
+            batch_reserved_by_pks = batch_reserved_by_pks - {current_pk, None}
+        else:
+            batch_reserved_by_pks = batch_reserved_by_pks - {None}
+
+        return bool(existing_with_key) or bool(batch_reserved_by_pks)
 
     @staticmethod
     def _append_suffix(base_username, counter):
@@ -75,7 +81,7 @@ class MemberResource(resources.ModelResource):
         current_pk = instance.pk
 
         if candidate and not self._username_is_taken(candidate, current_pk=current_pk):
-            self._batch_usernames.add(self._username_key(candidate))
+            self._batch_usernames[self._username_key(candidate)].add(current_pk or None)
             return candidate
 
         # Reuse the canonical first.last generator used by account creation.
@@ -85,7 +91,9 @@ class MemberResource(resources.ModelResource):
         )
 
         if not self._username_is_taken(base_candidate, current_pk=current_pk):
-            self._batch_usernames.add(self._username_key(base_candidate))
+            self._batch_usernames[self._username_key(base_candidate)].add(
+                current_pk or None
+            )
             return base_candidate
 
         counter = 1
@@ -94,7 +102,7 @@ class MemberResource(resources.ModelResource):
             counter += 1
             username = self._append_suffix(base_candidate, counter)
 
-        self._batch_usernames.add(self._username_key(username))
+        self._batch_usernames[self._username_key(username)].add(current_pk or None)
         return username
 
     @staticmethod
