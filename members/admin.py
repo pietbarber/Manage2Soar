@@ -25,6 +25,7 @@ from .models import (
     SafetyReport,
 )
 from .models_applications import MembershipApplication
+from .resources import MemberResource
 from .utils.image_processing import generate_profile_thumbnails
 
 # --- Register or replace social_django admin entries with helpful admin banners ---
@@ -244,6 +245,7 @@ class CustomMemberCreationForm(UserCreationForm):
 
 @admin.register(Member)
 class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAdmin):
+    resource_classes = [MemberResource]
     actions = ["export_members_csv", "mark_inactive"]
 
     @admin.action(description="Export selected members to CSV")
