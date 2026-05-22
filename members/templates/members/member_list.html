@@ -62,11 +62,17 @@
       >
         <div class="accordion-body">
           <form method="get" id="filterForm">
+            <input type="hidden" name="status_filter_applied" value="1">
             <div class="row g-3">
               <div class="col-md-6">
-                <h6 class="fw-bold text-primary mb-3">
-                  <i class="bi bi-funnel me-2"></i>Filter by Status
-                </h6>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <h6 class="fw-bold text-primary mb-0">
+                    <i class="bi bi-funnel me-2"></i>Filter by Status
+                  </h6>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="clearStatusFilters">
+                    Clear Statuses
+                  </button>
+                </div>
                 <div class="d-flex flex-wrap gap-3">
                   {% for status in status_options %}
                   <div class="form-check">
@@ -302,6 +308,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Auto-submit form on role filter changes only (not status filters)
     const roleCheckboxes = document.querySelectorAll('#filterForm input[name="role"]');
+    const statusCheckboxes = document.querySelectorAll('#filterForm input[name="status"]');
+    const clearStatusButton = document.getElementById('clearStatusFilters');
     let memberListFilterTimeout;
     roleCheckboxes.forEach(function(checkbox) {
         checkbox.addEventListener('change', function() {
@@ -312,6 +320,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300);
         });
     });
+
+    if (clearStatusButton) {
+      clearStatusButton.addEventListener('click', function() {
+        statusCheckboxes.forEach(function(checkbox) {
+          checkbox.checked = false;
+        });
+      });
+    }
 });
 </script>
 {% endblock %}

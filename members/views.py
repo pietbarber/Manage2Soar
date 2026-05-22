@@ -66,19 +66,21 @@ def member_list(request):
     status_options = [value for value, _label in Member.get_membership_status_choices()]
 
     raw_statuses = request.GET.getlist("status")
+    status_filter_applied = request.GET.get("status_filter_applied") == "1"
 
     # Default to currently configured active statuses.
     if raw_statuses:
         selected_statuses = [s for s in raw_statuses if s in status_options]
+    elif status_filter_applied:
+        selected_statuses = []
     else:
         active_statuses = set(get_active_membership_statuses())
         selected_statuses = [s for s in status_options if s in active_statuses]
 
-    # If all selected statuses were invalid (e.g., stale URL params), return no rows.
-    if not selected_statuses and raw_statuses:
-        members = Member.objects.none()
-    else:
+    if selected_statuses:
         members = Member.objects.filter(membership_status__in=selected_statuses)
+    else:
+        members = Member.objects.none()
     active_statuses = set(get_active_membership_statuses())
 
     config = SiteConfiguration.objects.first()

@@ -288,3 +288,34 @@ def test_member_list_hides_roles_without_members(client):
     assert response.status_code == 200
     assert b'value="member_manager"' in response.content
     assert b'value="towpilot"' not in response.content
+
+
+@pytest.mark.django_db
+def test_member_list_explicit_empty_status_selection_shows_no_members(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer6",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="activevisible",
+        password="password",
+        first_name="Active",
+        last_name="Visible",
+        membership_status="Aero Member",
+    )
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse("members:member_list"),
+        {"status_filter_applied": "1"},
+    )
+
+    assert response.status_code == 200
+    assert b"Active Visible" not in response.content
+    assert b"No members found" in response.content
