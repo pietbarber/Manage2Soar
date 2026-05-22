@@ -7,7 +7,7 @@
 import re
 
 from django import template
-from django.utils.html import escape
+from django.utils.html import escape, format_html, format_html_join
 from django.utils.safestring import mark_safe
 
 from members.utils.kiosk import is_kiosk_session as check_kiosk_session
@@ -59,14 +59,22 @@ def render_duties(member):
             continue
         if getattr(member, role["field"], False):
             duties.append(
-                f'<span class="badge {role["badge_class"]} me-1" title="{role["label"]}"><i class="bi {role["icon"]}"></i> {role["label"]}</span>'
+                (
+                    role["badge_class"],
+                    role["label"],
+                    role["icon"],
+                    role["label"],
+                )
             )
 
-    return (
-        " ".join(duties)
-        if duties
-        else '<span class="text-muted fst-italic">None assigned</span>'
-    )
+    if duties:
+        return format_html_join(
+            "",
+            '<span class="badge {} me-1" title="{}"><i class="bi {}"></i> {}</span>',
+            duties,
+        )
+
+    return format_html('<span class="text-muted fst-italic">None assigned</span>')
 
 
 @register.filter

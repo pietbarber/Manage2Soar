@@ -1,9 +1,23 @@
+from django.core.cache import cache
+
 from siteconfig.models import SiteConfiguration
+
+SITE_CONFIGURATION_CACHE_KEY = "site_configuration"
+SITE_CONFIGURATION_CACHE_TTL_SECONDS = 3600
+
+
+def _get_cached_site_configuration() -> SiteConfiguration | None:
+    # Use cache-backed lookup to avoid repeated per-call DB queries from templates.
+    return cache.get_or_set(
+        SITE_CONFIGURATION_CACHE_KEY,
+        SiteConfiguration.objects.first,
+        SITE_CONFIGURATION_CACHE_TTL_SECONDS,
+    )
 
 
 def get_member_role_metadata(config: SiteConfiguration | None = None):
     if config is None:
-        config = SiteConfiguration.objects.first()
+        config = _get_cached_site_configuration()
 
     return [
         {
