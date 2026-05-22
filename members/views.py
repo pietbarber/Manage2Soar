@@ -64,14 +64,35 @@ except ImportError:
 def member_list(request):
     # Build status options from configured membership statuses.
     status_options = [value for value, _label in Member.get_membership_status_choices()]
+    status_options_set = set(status_options)
     active_statuses = set(get_active_membership_statuses())
 
     raw_statuses = request.GET.getlist("status")
     status_filter_applied = request.GET.get("status_filter_applied") == "1"
 
+    legacy_status_map = {
+        "active": [status for status in status_options if status in active_statuses],
+        "inactive": ["Inactive"],
+        "pending": ["Pending"],
+        "nonmember": ["Non-Member"],
+        "non-member": ["Non-Member"],
+        "deceased": ["Deceased"],
+    }
+
+    expanded_statuses = []
+    for raw_status in raw_statuses:
+        legacy_values = legacy_status_map.get(raw_status.strip().lower())
+        if legacy_values is not None:
+            expanded_statuses.extend(legacy_values)
+        else:
+            expanded_statuses.append(raw_status)
+
+    # Preserve request order while removing duplicates.
+    expanded_statuses = list(dict.fromkeys(expanded_statuses))
+
     # Default to currently configured active statuses.
     if raw_statuses:
-        selected_statuses = [s for s in raw_statuses if s in status_options]
+        selected_statuses = [s for s in expanded_statuses if s in status_options_set]
     elif status_filter_applied:
         selected_statuses = []
     else:
@@ -181,10 +202,15 @@ def member_list(request):
         },
     ]
 
+    role_aliases = {
+        "dutyofficer": "duty_officer",
+    }
     allowed_role_values = {role["value"] for role in role_options}
-    selected_roles = [
-        r for r in request.GET.getlist("role") if r in allowed_role_values
-    ]
+    selected_roles = []
+    for raw_role in request.GET.getlist("role"):
+        normalized_role = role_aliases.get(raw_role, raw_role)
+        if normalized_role in allowed_role_values:
+            selected_roles.append(normalized_role)
     selected_roles_set = set(selected_roles)
 
     role_counts = members.aggregate(

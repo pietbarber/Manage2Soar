@@ -197,6 +197,42 @@ def test_member_list_filters_by_custom_status_value(client):
 
 
 @pytest.mark.django_db
+def test_member_list_supports_legacy_active_status_filter_value(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    MembershipStatus.objects.create(name="Guest Pilot", is_active=False, sort_order=20)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer_legacy_active",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="legacyactive",
+        password="password",
+        first_name="Legacy",
+        last_name="Active",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="legacyinactive",
+        password="password",
+        first_name="Legacy",
+        last_name="Inactive",
+        membership_status="Guest Pilot",
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"), {"status": "active"})
+
+    assert response.status_code == 200
+    assert b"Legacy Active" in response.content
+    assert b"Legacy Inactive" not in response.content
+
+
+@pytest.mark.django_db
 def test_member_list_uses_dynamic_role_checkboxes(client):
     MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
     clear_active_membership_statuses_cache()
@@ -259,6 +295,43 @@ def test_member_list_filters_by_dynamic_role_value(client):
     assert response.status_code == 200
     assert b"Manager Only" in response.content
     assert b"No Role" not in response.content
+
+
+@pytest.mark.django_db
+def test_member_list_supports_legacy_dutyofficer_role_filter_value(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer_legacy_role",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="legacyduty",
+        password="password",
+        first_name="Legacy",
+        last_name="Duty",
+        membership_status="Aero Member",
+        duty_officer=True,
+    )
+    User.objects.create_user(
+        username="legacynotduty",
+        password="password",
+        first_name="Legacy",
+        last_name="Not Duty",
+        membership_status="Aero Member",
+        duty_officer=False,
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"), {"role": "dutyofficer"})
+
+    assert response.status_code == 200
+    assert b"Legacy Duty" in response.content
+    assert b"Legacy Not Duty" not in response.content
 
 
 @pytest.mark.django_db
