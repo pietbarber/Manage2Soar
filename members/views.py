@@ -64,6 +64,7 @@ except ImportError:
 def member_list(request):
     # Build status options from configured membership statuses.
     status_options = [value for value, _label in Member.get_membership_status_choices()]
+    active_statuses = set(get_active_membership_statuses())
 
     raw_statuses = request.GET.getlist("status")
     status_filter_applied = request.GET.get("status_filter_applied") == "1"
@@ -74,14 +75,12 @@ def member_list(request):
     elif status_filter_applied:
         selected_statuses = []
     else:
-        active_statuses = set(get_active_membership_statuses())
         selected_statuses = [s for s in status_options if s in active_statuses]
 
     if selected_statuses:
         members = Member.objects.filter(membership_status__in=selected_statuses)
     else:
         members = Member.objects.none()
-    active_statuses = set(get_active_membership_statuses())
 
     config = SiteConfiguration.objects.first()
     role_options = [
