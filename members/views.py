@@ -65,6 +65,7 @@ def member_list(request):
     # Build status options from configured membership statuses.
     status_options = [value for value, _label in Member.get_membership_status_choices()]
     status_options_set = set(status_options)
+    status_options_lower_map = {status.lower(): status for status in status_options}
     active_statuses = set(get_active_membership_statuses())
 
     raw_statuses = request.GET.getlist("status")
@@ -72,20 +73,21 @@ def member_list(request):
 
     legacy_status_map = {
         "active": [status for status in status_options if status in active_statuses],
-        "inactive": ["Inactive"],
-        "pending": ["Pending"],
-        "nonmember": ["Non-Member"],
-        "non-member": ["Non-Member"],
-        "deceased": ["Deceased"],
+        "inactive": [
+            status for status in status_options if status not in active_statuses
+        ],
     }
 
     expanded_statuses = []
     for raw_status in raw_statuses:
-        legacy_values = legacy_status_map.get(raw_status.strip().lower())
+        normalized_status = raw_status.strip().lower()
+        legacy_values = legacy_status_map.get(normalized_status)
         if legacy_values is not None:
             expanded_statuses.extend(legacy_values)
         else:
-            expanded_statuses.append(raw_status)
+            expanded_statuses.append(
+                status_options_lower_map.get(normalized_status, raw_status)
+            )
 
     # Preserve request order while removing duplicates.
     expanded_statuses = list(dict.fromkeys(expanded_statuses))

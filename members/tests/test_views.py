@@ -233,6 +233,51 @@ def test_member_list_supports_legacy_active_status_filter_value(client):
 
 
 @pytest.mark.django_db
+def test_member_list_supports_legacy_inactive_status_filter_value(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    MembershipStatus.objects.create(name="Guest Pilot", is_active=False, sort_order=20)
+    MembershipStatus.objects.create(name="Visitor", is_active=False, sort_order=30)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer_legacy_inactive",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="legacyactive2",
+        password="password",
+        first_name="Legacy",
+        last_name="Active Two",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="legacyguest",
+        password="password",
+        first_name="Legacy",
+        last_name="Guest",
+        membership_status="Guest Pilot",
+    )
+    User.objects.create_user(
+        username="legacyvisitor",
+        password="password",
+        first_name="Legacy",
+        last_name="Visitor",
+        membership_status="Visitor",
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"), {"status": "inactive"})
+
+    assert response.status_code == 200
+    assert b"Legacy Active Two" not in response.content
+    assert b"Legacy Guest" in response.content
+    assert b"Legacy Visitor" in response.content
+
+
+@pytest.mark.django_db
 def test_member_list_uses_dynamic_role_checkboxes(client):
     MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
     clear_active_membership_statuses_cache()
@@ -392,3 +437,48 @@ def test_member_list_explicit_empty_status_selection_shows_no_members(client):
     assert response.status_code == 200
     assert b"Active Visible" not in response.content
     assert b"No members found" in response.content
+
+
+@pytest.mark.django_db
+def test_member_view_status_badge_uses_configured_active_statuses(client):
+    MembershipStatus.objects.create(name="Club Pilot", is_active=True, sort_order=10)
+    MembershipStatus.objects.create(name="Grounded", is_active=False, sort_order=20)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="memberviewviewer",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Club Pilot",
+    )
+    active_member = User.objects.create_user(
+        username="activeprofile",
+        password="password",
+        first_name="Active",
+        last_name="Profile",
+        membership_status="Club Pilot",
+    )
+    inactive_member = User.objects.create_user(
+        username="inactiveprofile",
+        password="password",
+        first_name="Inactive",
+        last_name="Profile",
+        membership_status="Grounded",
+    )
+
+    client.force_login(viewer)
+
+    active_response = client.get(
+        reverse("members:member_view", args=[active_member.pk])
+    )
+    assert active_response.status_code == 200
+    assert b"badge bg-light text-dark fs-6" in active_response.content
+    assert b"Club Pilot" in active_response.content
+
+    inactive_response = client.get(
+        reverse("members:member_view", args=[inactive_member.pk])
+    )
+    assert inactive_response.status_code == 200
+    assert b"badge bg-secondary fs-6" in inactive_response.content
+    assert b"Grounded" in inactive_response.content
