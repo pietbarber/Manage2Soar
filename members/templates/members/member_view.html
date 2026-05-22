@@ -43,14 +43,10 @@
           <div>
             <h1 class="mb-1">{{ member.full_display_name }}</h1>
             <p class="mb-0 opacity-75">
-              {% if member.membership_status == "Full Member" %}
+              {% if member.membership_status in active_statuses %}
               <span class="badge bg-light text-dark fs-6">{{ member.membership_status }}</span>
-              {% elif member.membership_status == "Pending" %}
-              <span class="badge bg-warning text-dark fs-6">{{ member.membership_status }}</span>
-              {% elif member.membership_status == "Inactive" %}
-              <span class="badge bg-secondary fs-6">{{ member.membership_status }}</span>
               {% else %}
-              <span class="badge bg-danger fs-6">{{ member.membership_status }}</span>
+              <span class="badge bg-secondary fs-6">{{ member.membership_status }}</span>
               {% endif %}
               {% if member.joined_club %}
               • Member since {{ member.joined_club|date:"M Y" }}
@@ -266,14 +262,10 @@
               <div class="mb-3">
                 <strong class="text-primary">Membership Status</strong>
                 <div class="mt-1">
-                  {% if member.membership_status == "Full Member" %}
+                  {% if member.membership_status in active_statuses %}
                   <span class="badge bg-success fs-6">{{ member.membership_status }}</span>
-                  {% elif member.membership_status == "Pending" %}
-                  <span class="badge bg-warning text-dark fs-6">{{ member.membership_status }}</span>
-                  {% elif member.membership_status == "Inactive" %}
-                  <span class="badge bg-secondary fs-6">{{ member.membership_status }}</span>
                   {% else %}
-                  <span class="badge bg-danger fs-6">{{ member.membership_status }}</span>
+                  <span class="badge bg-secondary fs-6">{{ member.membership_status }}</span>
                   {% endif %}
                 </div>
               </div>

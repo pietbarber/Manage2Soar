@@ -113,7 +113,7 @@ class Member(AbstractUser):
 
     membership_status = models.CharField(
         max_length=50,  # Increased length to accommodate longer status names
-        choices=MEMBERSHIP_STATUS_CHOICES,  # Fallback for migrations
+        choices=get_membership_status_choices,
         default="Non-Member",
         blank=True,
         null=True,

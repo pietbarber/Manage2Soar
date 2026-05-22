@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 
+from django import forms
 from django.test import TestCase
 from django.urls import reverse
 
@@ -202,6 +203,22 @@ class MembershipStatusIntegrationTests(TestCase):
         active_index = choice_names.index("Test Active Member")
         inactive_index = choice_names.index("Test Inactive Member")
         self.assertLess(active_index, inactive_index)
+
+    def test_member_modelform_uses_dynamic_membership_choices(self):
+        """Member ModelForm should expose status choices from MembershipStatus records."""
+
+        class MemberStatusForm(forms.ModelForm):
+            class Meta:
+                model = Member
+                fields = ("membership_status",)
+
+        form = MemberStatusForm()
+        choice_names = [
+            value for value, _label in form.fields["membership_status"].choices
+        ]
+
+        self.assertIn("Test Active Member", choice_names)
+        self.assertIn("Test Inactive Member", choice_names)
 
     def test_member_with_updated_status_activity(self):
         """Test that changing a MembershipStatus affects Member.is_active_member()."""

@@ -4,6 +4,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
 from members.models import Biography
+from members.utils.membership import clear_active_membership_statuses_cache
+from siteconfig.models import MembershipStatus
 
 User = get_user_model()
 
@@ -118,3 +120,171 @@ def test_tinymce_upload_accepts_image(client, django_user_model, settings):
         or location.startswith("http://")
         or location.startswith("https://")
     )
+
+
+@pytest.mark.django_db
+def test_member_list_uses_dynamic_configured_status_checkboxes(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    MembershipStatus.objects.create(name="Guest Pilot", is_active=False, sort_order=20)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="activeperson",
+        password="password",
+        first_name="Active",
+        last_name="Person",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="guestperson",
+        password="password",
+        first_name="Guest",
+        last_name="Person",
+        membership_status="Guest Pilot",
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"))
+
+    assert response.status_code == 200
+    assert b'value="Aero Member"' in response.content
+    assert b'value="Guest Pilot"' in response.content
+    assert b"Active Person" in response.content
+    assert b"Guest Person" not in response.content
+
+
+@pytest.mark.django_db
+def test_member_list_filters_by_custom_status_value(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    MembershipStatus.objects.create(name="Guest Pilot", is_active=False, sort_order=20)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer2",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="activeonly",
+        password="password",
+        first_name="Active",
+        last_name="Only",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="guestonly",
+        password="password",
+        first_name="Guest",
+        last_name="Only",
+        membership_status="Guest Pilot",
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"), {"status": "Guest Pilot"})
+
+    assert response.status_code == 200
+    assert b"Guest Only" in response.content
+    assert b"Active Only" not in response.content
+
+
+@pytest.mark.django_db
+def test_member_list_uses_dynamic_role_checkboxes(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer3",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="mgruser",
+        password="password",
+        first_name="Manager",
+        last_name="Person",
+        membership_status="Aero Member",
+        member_manager=True,
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"))
+
+    assert response.status_code == 200
+    assert b'value="member_manager"' in response.content
+
+
+@pytest.mark.django_db
+def test_member_list_filters_by_dynamic_role_value(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer4",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="mgronly",
+        password="password",
+        first_name="Manager",
+        last_name="Only",
+        membership_status="Aero Member",
+        member_manager=True,
+    )
+    User.objects.create_user(
+        username="norole",
+        password="password",
+        first_name="No",
+        last_name="Role",
+        membership_status="Aero Member",
+        member_manager=False,
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"), {"role": "member_manager"})
+
+    assert response.status_code == 200
+    assert b"Manager Only" in response.content
+    assert b"No Role" not in response.content
+
+
+@pytest.mark.django_db
+def test_member_list_hides_roles_without_members(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer5",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="mgrpresent",
+        password="password",
+        first_name="Manager",
+        last_name="Present",
+        membership_status="Aero Member",
+        member_manager=True,
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"))
+
+    assert response.status_code == 200
+    assert b'value="member_manager"' in response.content
+    assert b'value="towpilot"' not in response.content

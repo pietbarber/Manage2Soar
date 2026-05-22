@@ -12,7 +12,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import IntegrityError
-from django.db.models import F, Func, Prefetch
+from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
@@ -22,7 +22,6 @@ from django.views.decorators.http import require_http_methods
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
-from members.constants.membership import STATUS_ALIASES
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
@@ -63,29 +62,153 @@ except ImportError:
 
 @active_member_required
 def member_list(request):
-    selected_statuses = request.GET.getlist("status")
+    # Build status options from configured membership statuses.
+    status_options = [value for value, _label in Member.get_membership_status_choices()]
 
     raw_statuses = request.GET.getlist("status")
 
-    # If no status selected, default to "Active"
-    if not raw_statuses:
-        raw_statuses = ["active"]
+    # Default to currently configured active statuses.
+    if raw_statuses:
+        selected_statuses = [s for s in raw_statuses if s in status_options]
+    else:
+        active_statuses = set(get_active_membership_statuses())
+        selected_statuses = [s for s in status_options if s in active_statuses]
 
-    selected_statuses = []
-    for s in raw_statuses:
-        selected_statuses.extend(STATUS_ALIASES.get(s, [s]))
+    # If all selected statuses were invalid (e.g., stale URL params), return no rows.
+    if not selected_statuses and raw_statuses:
+        members = Member.objects.none()
+    else:
+        members = Member.objects.filter(membership_status__in=selected_statuses)
+    active_statuses = set(get_active_membership_statuses())
 
-    members = Member.objects.filter(membership_status__in=selected_statuses)
+    config = SiteConfiguration.objects.first()
+    role_options = [
+        {
+            "value": "towpilot",
+            "field": "towpilot",
+            "label": (
+                getattr(config, "towpilot_title", "Tow Pilot")
+                if config
+                else "Tow Pilot"
+            ),
+            "icon": "bi-airplane",
+            "badge_class": "bg-success",
+        },
+        {
+            "value": "instructor",
+            "field": "instructor",
+            "label": (
+                getattr(config, "instructor_title", "Instructor")
+                if config
+                else "Instructor"
+            ),
+            "icon": "bi-mortarboard",
+            "badge_class": "bg-primary",
+        },
+        {
+            "value": "duty_officer",
+            "field": "duty_officer",
+            "label": (
+                getattr(config, "duty_officer_title", "Duty Officer")
+                if config
+                else "Duty Officer"
+            ),
+            "icon": "bi-clipboard-check",
+            "badge_class": "bg-warning text-dark",
+        },
+        {
+            "value": "assistant_duty_officer",
+            "field": "assistant_duty_officer",
+            "label": (
+                getattr(
+                    config, "assistant_duty_officer_title", "Assistant Duty Officer"
+                )
+                if config
+                else "Assistant Duty Officer"
+            ),
+            "icon": "bi-person-check",
+            "badge_class": "bg-info",
+        },
+        {
+            "value": "director",
+            "field": "director",
+            "label": "Director",
+            "icon": "bi-person-badge",
+            "badge_class": "bg-danger",
+        },
+        {
+            "value": "member_manager",
+            "field": "member_manager",
+            "label": "Member Manager",
+            "icon": "bi-person-rolodex",
+            "badge_class": "bg-purple",
+        },
+        {
+            "value": "webmaster",
+            "field": "webmaster",
+            "label": "Webmaster",
+            "icon": "bi-globe",
+            "badge_class": "bg-dark",
+        },
+        {
+            "value": "secretary",
+            "field": "secretary",
+            "label": "Secretary",
+            "icon": "bi-pen",
+            "badge_class": "bg-secondary",
+        },
+        {
+            "value": "treasurer",
+            "field": "treasurer",
+            "label": "Treasurer",
+            "icon": "bi-cash-coin",
+            "badge_class": "bg-success",
+        },
+        {
+            "value": "rostermeister",
+            "field": "rostermeister",
+            "label": "Rostermeister",
+            "icon": "bi-calendar-check",
+            "badge_class": "bg-info text-dark",
+        },
+        {
+            "value": "safety_officer",
+            "field": "safety_officer",
+            "label": "Safety Officer",
+            "icon": "bi-shield-check",
+            "badge_class": "bg-warning text-dark",
+        },
+    ]
 
-    selected_roles = request.GET.getlist("role")
-    if "towpilot" in selected_roles:
-        members = members.filter(towpilot=True)
-    if "instructor" in selected_roles:
-        members = members.filter(instructor=True)
-    if "director" in selected_roles:
-        members = members.filter(director=True)
-    if "dutyofficer" in selected_roles:
-        members = members.filter(duty_officer=True)
+    allowed_role_values = {role["value"] for role in role_options}
+    selected_roles = [
+        r for r in request.GET.getlist("role") if r in allowed_role_values
+    ]
+    selected_roles_set = set(selected_roles)
+
+    role_counts = members.aggregate(
+        towpilot_count=Count("id", filter=Q(towpilot=True)),
+        instructor_count=Count("id", filter=Q(instructor=True)),
+        duty_officer_count=Count("id", filter=Q(duty_officer=True)),
+        assistant_duty_officer_count=Count("id", filter=Q(assistant_duty_officer=True)),
+        director_count=Count("id", filter=Q(director=True)),
+        member_manager_count=Count("id", filter=Q(member_manager=True)),
+        webmaster_count=Count("id", filter=Q(webmaster=True)),
+        secretary_count=Count("id", filter=Q(secretary=True)),
+        treasurer_count=Count("id", filter=Q(treasurer=True)),
+        rostermeister_count=Count("id", filter=Q(rostermeister=True)),
+        safety_officer_count=Count("id", filter=Q(safety_officer=True)),
+    )
+
+    filtered_role_options = []
+    for role in role_options:
+        role_count = role_counts.get(f'{role["field"]}_count', 0)
+        if role_count > 0 or role["value"] in selected_roles_set:
+            filtered_role_options.append(role)
+
+    for role in role_options:
+        if role["value"] in selected_roles_set:
+            members = members.filter(**{role["field"]: True})
 
     members = members.annotate(
         last_name_lower=Func(F("last_name"), function="LOWER")
@@ -102,6 +225,9 @@ def member_list(request):
             "page_obj": page_obj,
             "paginator": paginator,
             "members": page_obj.object_list,
+            "status_options": status_options,
+            "active_statuses": active_statuses,
+            "role_options": filtered_role_options,
             "selected_statuses": selected_statuses,
             "selected_roles": selected_roles,
         },
@@ -190,6 +316,7 @@ def member_view(request, member_id):
 
     context = {
         "member": member,
+        "active_statuses": set(get_active_membership_statuses()),
         "qr_base64": qr_base64,
         "can_view_personal_info": can_view_personal,
         "form": form,

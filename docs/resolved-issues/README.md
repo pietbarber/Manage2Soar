@@ -8,6 +8,22 @@ Each document provides detailed technical analysis, implementation details, test
 
 ## Resolved Issues
 
+### [Issue #922 - Membership Status Dynamic Fixes](issue-922-membership-status-dynamic-fixes.md)
+**Status**: Complete ✅ | **Date**: May 2026 | **Branch**: `feature/issue-922-membership-status-dynamic-fixes`
+
+Eliminated remaining hard-coded membership status checks in runtime views/templates, aligned behavior with `siteconfig.MembershipStatus` active-status configuration, improved members-directory filter UX with an accordion, and resolved migration Pylance diagnostics.
+
+**Key Achievements**:
+- ✅ Replaced hard-coded homepage membership checks with dynamic active-membership helper
+- ✅ Updated member profile status rendering to use configured active statuses
+- ✅ Removed `Full Member` assumptions in duty delinquent detail template text/rendering
+- ✅ Converted members list status/role filters into an accordion for better space usage
+- ✅ Cleared migration typing diagnostics without changing migration runtime behavior
+
+**Technologies**: Django views/templates, dynamic status helpers, Bootstrap accordion UI, pytest, Pylance typing compatibility
+
+---
+
 ### [Issue #808 - Commercial Rides Workflow (Phase 1, PR #860)](issue-808-commercial-rides-phase1-pr860.md)
 **Status**: Implemented on branch, in PR review ✅ | **Date**: April 2026 | **Branch**: `feature/issue-808-commercial-rides-phase1` | **PR**: #860
 

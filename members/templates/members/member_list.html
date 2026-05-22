@@ -40,82 +40,79 @@
 
 <!-- Filter Section -->
 <div class="filter-section">
-  <form method="get" id="filterForm">
-    <div class="row g-3">
-      <div class="col-md-6">
-        <h6 class="fw-bold text-primary mb-3">
-          <i class="bi bi-funnel me-2"></i>Filter by Status
-        </h6>
-        <div class="d-flex flex-wrap gap-3">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="status" value="active" id="statusActive" checked>
-            <label class="form-check-label" for="statusActive">
-              <span class="badge bg-success me-1">Active</span>
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="status" value="pending" id="statusPending">
-            <label class="form-check-label" for="statusPending">
-              <span class="badge bg-warning text-dark me-1">Pending</span>
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="status" value="inactive" id="statusInactive">
-            <label class="form-check-label" for="statusInactive">
-              <span class="badge bg-secondary me-1">Inactive</span>
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="status" value="nonmember" id="statusNonmember">
-            <label class="form-check-label" for="statusNonmember">
-              <span class="badge bg-danger me-1">Non-member</span>
-            </label>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <h6 class="fw-bold text-primary mb-3">
-          <i class="bi bi-person-badge me-2"></i>Filter by Role
-        </h6>
-        <div class="d-flex flex-wrap gap-3">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="role" value="towpilot" id="roleTowpilot" {% if 'towpilot' in selected_roles %}checked{% endif %}>
-            <label class="form-check-label" for="roleTowpilot">
-              <span class="badge bg-success me-1"><i class="bi bi-airplane"></i> Tow Pilot</span>
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="role" value="instructor" id="roleInstructor" {% if 'instructor' in selected_roles %}checked{% endif %}>
-            <label class="form-check-label" for="roleInstructor">
-              <span class="badge bg-primary me-1"><i class="bi bi-mortarboard"></i> Instructor</span>
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="role" value="director" id="roleDirector" {% if 'director' in selected_roles %}checked{% endif %}>
-            <label class="form-check-label" for="roleDirector">
-              <span class="badge bg-danger me-1"><i class="bi bi-person-badge"></i> Director</span>
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="role" value="dutyofficer" id="roleDutyOfficer" {% if 'duty_officer' in selected_roles %}checked{% endif %}>
-            <label class="form-check-label" for="roleDutyOfficer">
-              <span class="badge bg-warning text-dark me-1"><i class="bi bi-clipboard-check"></i> Duty Officer</span>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="row mt-3">
-      <div class="col-12 text-center">
-        <button type="submit" class="btn btn-primary btn-modern me-2">
-          <i class="bi bi-funnel me-2"></i>Apply Filters
+  <div class="accordion" id="memberFiltersAccordion">
+    <div class="accordion-item border-0 shadow-sm">
+      <h2 class="accordion-header" id="memberFiltersHeading">
+        <button
+          class="accordion-button collapsed fw-semibold"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#memberFiltersCollapse"
+          aria-expanded="false"
+          aria-controls="memberFiltersCollapse"
+        >
+          <i class="bi bi-funnel me-2"></i>Filter Members
         </button>
-        <a href="{% url 'members:member_list' %}" class="btn btn-outline-secondary btn-modern">
-          <i class="bi bi-arrow-clockwise me-2"></i>Reset
-        </a>
+      </h2>
+      <div
+        id="memberFiltersCollapse"
+        class="accordion-collapse collapse"
+        aria-labelledby="memberFiltersHeading"
+        data-bs-parent="#memberFiltersAccordion"
+      >
+        <div class="accordion-body">
+          <form method="get" id="filterForm">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <h6 class="fw-bold text-primary mb-3">
+                  <i class="bi bi-funnel me-2"></i>Filter by Status
+                </h6>
+                <div class="d-flex flex-wrap gap-3">
+                  {% for status in status_options %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="status" value="{{ status }}" id="status{{ forloop.counter }}" {% if status in selected_statuses %}checked{% endif %}>
+                    <label class="form-check-label" for="status{{ forloop.counter }}">
+                      {% if status in active_statuses %}
+                      <span class="badge bg-success me-1">{{ status }}</span>
+                      {% else %}
+                      <span class="badge bg-secondary me-1">{{ status }}</span>
+                      {% endif %}
+                    </label>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="col-md-6">
+                <h6 class="fw-bold text-primary mb-3">
+                  <i class="bi bi-person-badge me-2"></i>Filter by Role
+                </h6>
+                <div class="d-flex flex-wrap gap-3">
+                  {% for role in role_options %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="role" value="{{ role.value }}" id="role{{ forloop.counter }}" {% if role.value in selected_roles %}checked{% endif %}>
+                    <label class="form-check-label" for="role{{ forloop.counter }}">
+                      <span class="badge {{ role.badge_class }} me-1"><i class="bi {{ role.icon }}"></i> {{ role.label }}</span>
+                    </label>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <div class="row mt-3">
+              <div class="col-12 text-center">
+                <button type="submit" class="btn btn-primary btn-modern me-2">
+                  <i class="bi bi-funnel me-2"></i>Apply Filters
+                </button>
+                <a href="{% url 'members:member_list' %}" class="btn btn-outline-secondary btn-modern">
+                  <i class="bi bi-arrow-clockwise me-2"></i>Reset
+                </a>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
-  </form>
+  </div>
 </div>
 <!-- Members Grid -->
 <div class="row g-4" id="membersGrid">
@@ -144,14 +141,10 @@
 
             <!-- Membership Status -->
             <div class="mb-2">
-              {% if member.membership_status == "Full Member" %}
+              {% if member.membership_status in active_statuses %}
               <span class="badge bg-success">{{ member.membership_status }}</span>
-              {% elif member.membership_status == "Pending" %}
-              <span class="badge bg-warning text-dark">{{ member.membership_status }}</span>
-              {% elif member.membership_status == "Inactive" %}
-              <span class="badge bg-secondary">{{ member.membership_status }}</span>
               {% else %}
-              <span class="badge bg-danger">{{ member.membership_status }}</span>
+              <span class="badge bg-secondary">{{ member.membership_status }}</span>
               {% endif %}
             </div>
 
