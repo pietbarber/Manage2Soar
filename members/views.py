@@ -78,9 +78,11 @@ def member_list(request):
 
     legacy_status_map = {
         "active": [status for status in status_options if status in active_statuses],
-        "inactive": [
-            status for status in status_options if status not in active_statuses
-        ],
+        "inactive": (
+            [status_options_lower_map["inactive"]]
+            if "inactive" in status_options_lower_map
+            else [status for status in status_options if status not in active_statuses]
+        ),
         "nonmember": (
             [status_options_compact_map["nonmember"]]
             if "nonmember" in status_options_compact_map

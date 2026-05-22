@@ -1,18 +1,19 @@
 from django.core.cache import cache
 
+from siteconfig.cache_contract import (
+    SITECONFIG_DEFERRED_CACHE_KEY,
+    SITECONFIG_DEFERRED_CACHE_TTL_SECONDS,
+)
 from siteconfig.models import SiteConfiguration
-
-SITE_CONFIGURATION_CACHE_KEY = "siteconfig_deferred"
-SITE_CONFIGURATION_CACHE_TTL_SECONDS = 60
 
 
 def _get_cached_site_configuration() -> SiteConfiguration | None:
     # Reuse the existing deferred SiteConfiguration cache pattern so cache
     # invalidation in SiteConfiguration.save()/delete() stays in sync.
     return cache.get_or_set(
-        SITE_CONFIGURATION_CACHE_KEY,
+        SITECONFIG_DEFERRED_CACHE_KEY,
         lambda: SiteConfiguration.objects.defer("webcam_snapshot_url").first(),
-        SITE_CONFIGURATION_CACHE_TTL_SECONDS,
+        SITECONFIG_DEFERRED_CACHE_TTL_SECONDS,
     )
 
 

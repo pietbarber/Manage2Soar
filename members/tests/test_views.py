@@ -234,6 +234,7 @@ def test_member_list_supports_legacy_active_status_filter_value(client):
 
 @pytest.mark.django_db
 def test_member_list_supports_legacy_inactive_status_filter_value(client):
+    MembershipStatus.objects.filter(name="Inactive").delete()
     MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
     MembershipStatus.objects.create(name="Guest Pilot", is_active=False, sort_order=20)
     MembershipStatus.objects.create(name="Visitor", is_active=False, sort_order=30)
@@ -275,6 +276,47 @@ def test_member_list_supports_legacy_inactive_status_filter_value(client):
     assert b"Legacy Active Two" not in response.content
     assert b"Legacy Guest" in response.content
     assert b"Legacy Visitor" in response.content
+
+
+@pytest.mark.django_db
+def test_member_list_legacy_inactive_prefers_literal_inactive_status(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    MembershipStatus.objects.get_or_create(
+        name="Inactive", defaults={"is_active": False, "sort_order": 20}
+    )
+    MembershipStatus.objects.get_or_create(
+        name="Pending", defaults={"is_active": False, "sort_order": 30}
+    )
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer_legacy_literal_inactive",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="legacyliteralinactive",
+        password="password",
+        first_name="Legacy",
+        last_name="Literal Inactive",
+        membership_status="Inactive",
+    )
+    User.objects.create_user(
+        username="legacypending",
+        password="password",
+        first_name="Legacy",
+        last_name="Pending",
+        membership_status="Pending",
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"), {"status": "inactive"})
+
+    assert response.status_code == 200
+    assert b"Legacy Literal Inactive" in response.content
+    assert b"Legacy Pending" not in response.content
 
 
 @pytest.mark.django_db
