@@ -2,7 +2,7 @@
 
 **Resolution Date**: May 21, 2026
 **Branch**: `feature/issue-922-membership-status-dynamic-fixes`
-**PR**: (to be created)
+**PR**: #923
 **Status**: Complete ✅
 
 ## Problem
