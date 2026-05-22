@@ -3,6 +3,7 @@ from django.core.cache import cache
 
 from members.templatetags import member_extras
 from members.utils.roles import get_member_role_metadata
+from siteconfig.cache_contract import SITECONFIG_DEFERRED_CACHE_KEY
 from siteconfig.models import SiteConfiguration
 
 
@@ -14,7 +15,7 @@ class DummyMember:
 def test_get_member_role_metadata_uses_cached_site_configuration(
     django_assert_num_queries,
 ):
-    cache.delete("siteconfig_deferred")
+    cache.delete(SITECONFIG_DEFERRED_CACHE_KEY)
     SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.example.com",
@@ -33,7 +34,7 @@ def test_get_member_role_metadata_uses_cached_site_configuration(
 
 @pytest.mark.django_db
 def test_get_member_role_metadata_uses_deferred_siteconfig_cache_key():
-    cache.delete("siteconfig_deferred")
+    cache.delete(SITECONFIG_DEFERRED_CACHE_KEY)
     SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.example.com",
@@ -44,7 +45,23 @@ def test_get_member_role_metadata_uses_deferred_siteconfig_cache_key():
 
     get_member_role_metadata()
 
-    assert cache.get("siteconfig_deferred") is not None
+    assert cache.get(SITECONFIG_DEFERRED_CACHE_KEY) is not None
+
+
+@pytest.mark.django_db
+def test_get_member_role_metadata_caches_missing_configuration(
+    django_assert_num_queries,
+):
+    SiteConfiguration.objects.all().delete()
+    cache.delete(SITECONFIG_DEFERRED_CACHE_KEY)
+
+    with django_assert_num_queries(1):
+        first = get_member_role_metadata()
+    with django_assert_num_queries(0):
+        second = get_member_role_metadata()
+
+    assert first[0]["label"] == "Tow Pilot"
+    assert second[0]["label"] == "Tow Pilot"
 
 
 @pytest.mark.django_db

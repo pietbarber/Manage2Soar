@@ -6,15 +6,21 @@ from siteconfig.cache_contract import (
 )
 from siteconfig.models import SiteConfiguration
 
+_MISS = object()
+
 
 def _get_cached_site_configuration() -> SiteConfiguration | None:
     # Reuse the existing deferred SiteConfiguration cache pattern so cache
     # invalidation in SiteConfiguration.save()/delete() stays in sync.
-    return cache.get_or_set(
-        SITECONFIG_DEFERRED_CACHE_KEY,
-        lambda: SiteConfiguration.objects.defer("webcam_snapshot_url").first(),
-        SITECONFIG_DEFERRED_CACHE_TTL_SECONDS,
-    )
+    config = cache.get(SITECONFIG_DEFERRED_CACHE_KEY, _MISS)
+    if config is _MISS:
+        config = SiteConfiguration.objects.defer("webcam_snapshot_url").first()
+        cache.set(
+            SITECONFIG_DEFERRED_CACHE_KEY,
+            config,
+            SITECONFIG_DEFERRED_CACHE_TTL_SECONDS,
+        )
+    return config
 
 
 def get_member_role_metadata(config: SiteConfiguration | None = None):
