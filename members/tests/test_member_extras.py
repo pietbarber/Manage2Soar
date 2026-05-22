@@ -14,7 +14,7 @@ class DummyMember:
 def test_get_member_role_metadata_uses_cached_site_configuration(
     django_assert_num_queries,
 ):
-    cache.delete("site_configuration")
+    cache.delete("siteconfig_deferred")
     SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.example.com",
@@ -29,6 +29,22 @@ def test_get_member_role_metadata_uses_cached_site_configuration(
 
     assert first[1]["label"] == "Chief Instructor"
     assert second[1]["label"] == "Chief Instructor"
+
+
+@pytest.mark.django_db
+def test_get_member_role_metadata_uses_deferred_siteconfig_cache_key():
+    cache.delete("siteconfig_deferred")
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        instructor_title="Chief Instructor",
+        webcam_snapshot_url="https://user:pass@example.com/webcam.jpg",
+    )
+
+    get_member_role_metadata()
+
+    assert cache.get("siteconfig_deferred") is not None
 
 
 @pytest.mark.django_db

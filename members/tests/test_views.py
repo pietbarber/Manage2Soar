@@ -278,6 +278,44 @@ def test_member_list_supports_legacy_inactive_status_filter_value(client):
 
 
 @pytest.mark.django_db
+def test_member_list_supports_legacy_nonmember_status_filter_value(client):
+    MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
+    MembershipStatus.objects.get_or_create(
+        name="Non-Member", defaults={"is_active": False, "sort_order": 20}
+    )
+    clear_active_membership_statuses_cache()
+
+    viewer = User.objects.create_user(
+        username="viewer_legacy_nonmember",
+        password="password",
+        first_name="View",
+        last_name="User",
+        membership_status="Aero Member",
+    )
+    User.objects.create_user(
+        username="legacynonmember",
+        password="password",
+        first_name="Legacy",
+        last_name="NonMember",
+        membership_status="Non-Member",
+    )
+    User.objects.create_user(
+        username="legacyactivemember",
+        password="password",
+        first_name="Legacy",
+        last_name="Active Member",
+        membership_status="Aero Member",
+    )
+
+    client.force_login(viewer)
+    response = client.get(reverse("members:member_list"), {"status": "nonmember"})
+
+    assert response.status_code == 200
+    assert b"Legacy NonMember" in response.content
+    assert b"Legacy Active Member" not in response.content
+
+
+@pytest.mark.django_db
 def test_member_list_uses_dynamic_role_checkboxes(client):
     MembershipStatus.objects.create(name="Aero Member", is_active=True, sort_order=10)
     clear_active_membership_statuses_cache()

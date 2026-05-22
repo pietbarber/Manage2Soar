@@ -67,6 +67,10 @@ def member_list(request):
     status_options = [value for value, _label in Member.get_membership_status_choices()]
     status_options_set = set(status_options)
     status_options_lower_map = {status.lower(): status for status in status_options}
+    status_options_compact_map = {
+        status.lower().replace("-", "").replace(" ", ""): status
+        for status in status_options
+    }
     active_statuses = set(get_active_membership_statuses())
 
     raw_statuses = request.GET.getlist("status")
@@ -77,6 +81,16 @@ def member_list(request):
         "inactive": [
             status for status in status_options if status not in active_statuses
         ],
+        "nonmember": (
+            [status_options_compact_map["nonmember"]]
+            if "nonmember" in status_options_compact_map
+            else []
+        ),
+        "non-member": (
+            [status_options_compact_map["nonmember"]]
+            if "nonmember" in status_options_compact_map
+            else []
+        ),
     }
 
     expanded_statuses = []
@@ -87,7 +101,13 @@ def member_list(request):
             expanded_statuses.extend(legacy_values)
         else:
             expanded_statuses.append(
-                status_options_lower_map.get(normalized_status, raw_status)
+                status_options_lower_map.get(
+                    normalized_status,
+                    status_options_compact_map.get(
+                        normalized_status.replace("-", "").replace(" ", ""),
+                        raw_status,
+                    ),
+                )
             )
 
     # Preserve request order while removing duplicates.

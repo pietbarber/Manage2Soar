@@ -2,15 +2,16 @@ from django.core.cache import cache
 
 from siteconfig.models import SiteConfiguration
 
-SITE_CONFIGURATION_CACHE_KEY = "site_configuration"
-SITE_CONFIGURATION_CACHE_TTL_SECONDS = 3600
+SITE_CONFIGURATION_CACHE_KEY = "siteconfig_deferred"
+SITE_CONFIGURATION_CACHE_TTL_SECONDS = 60
 
 
 def _get_cached_site_configuration() -> SiteConfiguration | None:
-    # Use cache-backed lookup to avoid repeated per-call DB queries from templates.
+    # Reuse the existing deferred SiteConfiguration cache pattern so cache
+    # invalidation in SiteConfiguration.save()/delete() stays in sync.
     return cache.get_or_set(
         SITE_CONFIGURATION_CACHE_KEY,
-        SiteConfiguration.objects.first,
+        lambda: SiteConfiguration.objects.defer("webcam_snapshot_url").first(),
         SITE_CONFIGURATION_CACHE_TTL_SECONDS,
     )
 
