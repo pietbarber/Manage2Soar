@@ -126,7 +126,7 @@ def member_list(request):
     else:
         members = Member.objects.none()
 
-    role_options = get_member_role_metadata(SiteConfiguration.objects.first())
+    role_options = get_member_role_metadata()
 
     role_aliases = {
         "dutyofficer": "duty_officer",
