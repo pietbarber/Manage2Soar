@@ -24,6 +24,7 @@ from cms.models import HomePageContent
 from instructors.models import MemberQualification
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
+from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
 from siteconfig.forms import VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
@@ -105,104 +106,7 @@ def member_list(request):
     else:
         members = Member.objects.none()
 
-    config = SiteConfiguration.objects.first()
-    role_options = [
-        {
-            "value": "towpilot",
-            "field": "towpilot",
-            "label": (
-                getattr(config, "towpilot_title", "Tow Pilot")
-                if config
-                else "Tow Pilot"
-            ),
-            "icon": "bi-airplane",
-            "badge_class": "bg-success",
-        },
-        {
-            "value": "instructor",
-            "field": "instructor",
-            "label": (
-                getattr(config, "instructor_title", "Instructor")
-                if config
-                else "Instructor"
-            ),
-            "icon": "bi-mortarboard",
-            "badge_class": "bg-primary",
-        },
-        {
-            "value": "duty_officer",
-            "field": "duty_officer",
-            "label": (
-                getattr(config, "duty_officer_title", "Duty Officer")
-                if config
-                else "Duty Officer"
-            ),
-            "icon": "bi-clipboard-check",
-            "badge_class": "bg-warning text-dark",
-        },
-        {
-            "value": "assistant_duty_officer",
-            "field": "assistant_duty_officer",
-            "label": (
-                getattr(
-                    config, "assistant_duty_officer_title", "Assistant Duty Officer"
-                )
-                if config
-                else "Assistant Duty Officer"
-            ),
-            "icon": "bi-person-check",
-            "badge_class": "bg-info",
-        },
-        {
-            "value": "director",
-            "field": "director",
-            "label": "Director",
-            "icon": "bi-person-badge",
-            "badge_class": "bg-danger",
-        },
-        {
-            "value": "member_manager",
-            "field": "member_manager",
-            "label": "Member Manager",
-            "icon": "bi-person-rolodex",
-            "badge_class": "bg-purple",
-        },
-        {
-            "value": "webmaster",
-            "field": "webmaster",
-            "label": "Webmaster",
-            "icon": "bi-globe",
-            "badge_class": "bg-dark",
-        },
-        {
-            "value": "secretary",
-            "field": "secretary",
-            "label": "Secretary",
-            "icon": "bi-pen",
-            "badge_class": "bg-secondary",
-        },
-        {
-            "value": "treasurer",
-            "field": "treasurer",
-            "label": "Treasurer",
-            "icon": "bi-cash-coin",
-            "badge_class": "bg-success",
-        },
-        {
-            "value": "rostermeister",
-            "field": "rostermeister",
-            "label": "Rostermeister",
-            "icon": "bi-calendar-check",
-            "badge_class": "bg-info text-dark",
-        },
-        {
-            "value": "safety_officer",
-            "field": "safety_officer",
-            "label": "Safety Officer",
-            "icon": "bi-shield-check",
-            "badge_class": "bg-warning text-dark",
-        },
-    ]
+    role_options = get_member_role_metadata(SiteConfiguration.objects.first())
 
     role_aliases = {
         "dutyofficer": "duty_officer",

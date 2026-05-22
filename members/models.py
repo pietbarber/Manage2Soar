@@ -344,13 +344,7 @@ class Member(AbstractUser):
     @classmethod
     def get_membership_status_choices(cls):
         """Get dynamic membership status choices for forms."""
-        try:
-            from siteconfig.models import MembershipStatus
-
-            return MembershipStatus.get_all_status_choices()
-        except (ImportError, Exception):
-            # Fallback during migrations or if table doesn't exist
-            return MEMBERSHIP_STATUS_CHOICES
+        return get_membership_status_choices()
 
     def save(self, *args, **kwargs):
         # 1) pre-save flags
