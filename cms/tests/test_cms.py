@@ -2,6 +2,8 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from cms.models import HomePageContent
+from members.utils.membership import clear_active_membership_statuses_cache
+from siteconfig.models import MembershipStatus
 
 User = get_user_model()
 
@@ -43,6 +45,28 @@ def test_homepagecontent_view_logged_in(client, django_user_model):
     response = client.get("/")
     assert response.status_code == 200
     assert b"Hi User" in response.content
+
+
+@pytest.mark.django_db
+def test_homepagecontent_view_logged_in_with_custom_active_status(
+    client, django_user_model
+):
+    MembershipStatus.objects.create(name="Club Pilot", is_active=True, sort_order=10)
+    clear_active_membership_statuses_cache()
+
+    django_user_model.objects.create_user(
+        username="custommember", password="pass", membership_status="Club Pilot"
+    )
+    client.login(username="custommember", password="pass")
+    HomePageContent.objects.create(
+        title="Test",
+        slug="member-home",
+        audience="member",
+        content="<p>Hi Custom User</p>",
+    )
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"Hi Custom User" in response.content
 
 
 @pytest.mark.django_db

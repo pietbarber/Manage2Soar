@@ -247,18 +247,6 @@ def homepage(request):
     Shows HomePageContent based on user authentication status.
     """
     user = request.user
-    allowed_statuses = [
-        "Full Member",
-        "Student Member",
-        "Family Member",
-        "Service Member",
-        "Founding Member",
-        "Honorary Member",
-        "Emeritus Member",
-        "SSEF Member",
-        "Temporary Member",
-        "Introductory Member",
-    ]
 
     # Try to render legacy HomePageContent for the appropriate audience
     page = None
@@ -274,9 +262,7 @@ def homepage(request):
     if page is None:
         # Show member content if: authenticated + (kiosk session OR active membership)
         if user.is_authenticated and (
-            kiosk_mode
-            or user.is_superuser
-            or getattr(user, "membership_status", None) in allowed_statuses
+            kiosk_mode or user.is_superuser or is_active_member(user)
         ):
             page = HomePageContent.objects.filter(
                 audience="member", slug="member-home"

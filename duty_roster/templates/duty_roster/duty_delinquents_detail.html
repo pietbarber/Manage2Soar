@@ -21,7 +21,7 @@
             <small>
                 Report generated: {{ report_date|date:"F j, Y" }} |
                 Minimum membership: {{ min_membership_months }} months |
-                Active only (Full/Student/Life members)
+                Active members only (as configured in Site Configuration)
             </small>
         </p>
     </div>
@@ -74,9 +74,7 @@
                                 <div class="member-info">
                                     <h4>
                                         {{ delinquent.member.full_display_name }}
-                                        {% if delinquent.member.membership_status != "Full Member" %}
-                                            <small class="text-muted">({{ delinquent.member.membership_status }})</small>
-                                        {% endif %}
+                                        <small class="text-muted">({{ delinquent.member.membership_status }})</small>
                                     </h4>
                                     <div class="member-contact">
                                         <i class="fas fa-envelope"></i> {{ delinquent.member.email }}

@@ -7,10 +7,11 @@
 import re
 
 from django import template
-from django.utils.html import escape
+from django.utils.html import escape, format_html, format_html_join
 from django.utils.safestring import mark_safe
 
 from members.utils.kiosk import is_kiosk_session as check_kiosk_session
+from members.utils.roles import get_member_role_metadata
 from siteconfig.models import SiteConfiguration
 
 register = template.Library()
@@ -53,65 +54,27 @@ def format_us_phone(value):
 @register.filter
 def render_duties(member):
     duties = []
-    from siteconfig.models import SiteConfiguration
+    for role in get_member_role_metadata():
+        if not role["show_in_duties"]:
+            continue
+        if getattr(member, role["field"], False):
+            duties.append(
+                (
+                    role["badge_class"],
+                    role["label"],
+                    role["icon"],
+                    role["label"],
+                )
+            )
 
-    config = SiteConfiguration.objects.first()
-    instructor = (
-        getattr(config, "instructor_title", "Instructor") if config else "Instructor"
-    )
-    towpilot = getattr(config, "towpilot_title", "Tow Pilot") if config else "Tow Pilot"
-    duty_officer = (
-        getattr(config, "duty_officer_title", "Duty Officer")
-        if config
-        else "Duty Officer"
-    )
-    assistant_duty_officer = (
-        getattr(config, "assistant_duty_officer_title", "Assistant Duty Officer")
-        if config
-        else "Assistant Duty Officer"
-    )
-    if member.instructor:
-        duties.append(
-            f'<span class="badge bg-primary me-1" title="{instructor}"><i class="bi bi-mortarboard"></i> {instructor}</span>'
-        )
-    if member.towpilot:
-        duties.append(
-            f'<span class="badge bg-success me-1" title="{towpilot}"><i class="bi bi-airplane"></i> {towpilot}</span>'
-        )
-    if member.duty_officer:
-        duties.append(
-            f'<span class="badge bg-warning text-dark me-1" title="{duty_officer}"><i class="bi bi-clipboard-check"></i> {duty_officer}</span>'
-        )
-    if member.assistant_duty_officer:
-        duties.append(
-            f'<span class="badge bg-info me-1" title="{assistant_duty_officer}"><i class="bi bi-person-check"></i> {assistant_duty_officer}</span>'
-        )
-    if member.secretary:
-        duties.append(
-            '<span class="badge bg-secondary me-1" title="Secretary"><i class="bi bi-pen"></i> Secretary</span>'
-        )
-    if member.treasurer:
-        duties.append(
-            '<span class="badge bg-success me-1" title="Treasurer"><i class="bi bi-cash-coin"></i> Treasurer</span>'
-        )
-    if member.webmaster:
-        duties.append(
-            '<span class="badge bg-dark me-1" title="Webmaster"><i class="bi bi-globe"></i> Webmaster</span>'
-        )
-    if member.director:
-        duties.append(
-            '<span class="badge bg-danger me-1" title="Director"><i class="bi bi-person-badge"></i> Director</span>'
-        )
-    if member.member_manager:
-        duties.append(
-            '<span class="badge bg-purple me-1" title="Membership Manager"><i class="bi bi-person-rolodex"></i> Member Manager</span>'
+    if duties:
+        return format_html_join(
+            "",
+            '<span class="badge {} me-1" title="{}"><i class="bi {}"></i> {}</span>',
+            duties,
         )
 
-    return (
-        " ".join(duties)
-        if duties
-        else '<span class="text-muted fst-italic">None assigned</span>'
-    )
+    return format_html('<span class="text-muted fst-italic">None assigned</span>')
 
 
 @register.filter

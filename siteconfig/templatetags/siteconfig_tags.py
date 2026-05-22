@@ -1,6 +1,10 @@
 from django import template
 from django.core.cache import cache
 
+from siteconfig.cache_contract import (
+    SITECONFIG_DEFERRED_CACHE_KEY,
+    SITECONFIG_DEFERRED_CACHE_TTL_SECONDS,
+)
 from siteconfig.models import SiteConfiguration
 
 register = template.Library()
@@ -20,10 +24,14 @@ def get_siteconfig():
     ``webcam_enabled`` tag for the simple boolean nav-visibility check to
     avoid that extra query.
     """
-    cfg = cache.get("siteconfig_deferred", _MISS)
+    cfg = cache.get(SITECONFIG_DEFERRED_CACHE_KEY, _MISS)
     if cfg is _MISS:
         cfg = SiteConfiguration.objects.defer("webcam_snapshot_url").first()
-        cache.set("siteconfig_deferred", cfg, timeout=60)
+        cache.set(
+            SITECONFIG_DEFERRED_CACHE_KEY,
+            cfg,
+            timeout=SITECONFIG_DEFERRED_CACHE_TTL_SECONDS,
+        )
     return cfg
 
 

@@ -12,7 +12,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import IntegrityError
-from django.db.models import F, Func, Prefetch
+from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
@@ -22,9 +22,9 @@ from django.views.decorators.http import require_http_methods
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
-from members.constants.membership import STATUS_ALIASES
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
+from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
 from siteconfig.forms import VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
@@ -63,29 +63,107 @@ except ImportError:
 
 @active_member_required
 def member_list(request):
-    selected_statuses = request.GET.getlist("status")
+    # Build status options from configured membership statuses.
+    status_options = [value for value, _label in Member.get_membership_status_choices()]
+    status_options_set = set(status_options)
+    status_options_lower_map = {status.lower(): status for status in status_options}
+    status_options_compact_map = {
+        status.lower().replace("-", "").replace(" ", ""): status
+        for status in status_options
+    }
+    active_statuses = set(get_active_membership_statuses())
 
     raw_statuses = request.GET.getlist("status")
+    status_filter_applied = request.GET.get("status_filter_applied") == "1"
 
-    # If no status selected, default to "Active"
-    if not raw_statuses:
-        raw_statuses = ["active"]
+    legacy_status_map = {
+        "active": [status for status in status_options if status in active_statuses],
+        "inactive": (
+            [status_options_lower_map["inactive"]]
+            if "inactive" in status_options_lower_map
+            else [status for status in status_options if status not in active_statuses]
+        ),
+        "nonmember": (
+            [status_options_compact_map["nonmember"]]
+            if "nonmember" in status_options_compact_map
+            else []
+        ),
+        "non-member": (
+            [status_options_compact_map["nonmember"]]
+            if "nonmember" in status_options_compact_map
+            else []
+        ),
+    }
 
-    selected_statuses = []
-    for s in raw_statuses:
-        selected_statuses.extend(STATUS_ALIASES.get(s, [s]))
+    expanded_statuses = []
+    for raw_status in raw_statuses:
+        normalized_status = raw_status.strip().lower()
+        legacy_values = legacy_status_map.get(normalized_status)
+        if legacy_values is not None:
+            expanded_statuses.extend(legacy_values)
+        else:
+            expanded_statuses.append(
+                status_options_lower_map.get(
+                    normalized_status,
+                    status_options_compact_map.get(
+                        normalized_status.replace("-", "").replace(" ", ""),
+                        raw_status,
+                    ),
+                )
+            )
 
-    members = Member.objects.filter(membership_status__in=selected_statuses)
+    # Preserve request order while removing duplicates.
+    expanded_statuses = list(dict.fromkeys(expanded_statuses))
 
-    selected_roles = request.GET.getlist("role")
-    if "towpilot" in selected_roles:
-        members = members.filter(towpilot=True)
-    if "instructor" in selected_roles:
-        members = members.filter(instructor=True)
-    if "director" in selected_roles:
-        members = members.filter(director=True)
-    if "dutyofficer" in selected_roles:
-        members = members.filter(duty_officer=True)
+    # Default to currently configured active statuses.
+    if raw_statuses:
+        selected_statuses = [s for s in expanded_statuses if s in status_options_set]
+    elif status_filter_applied:
+        selected_statuses = []
+    else:
+        selected_statuses = [s for s in status_options if s in active_statuses]
+
+    if selected_statuses:
+        members = Member.objects.filter(membership_status__in=selected_statuses)
+    else:
+        members = Member.objects.none()
+
+    role_options = get_member_role_metadata()
+
+    role_aliases = {
+        "dutyofficer": "duty_officer",
+    }
+    allowed_role_values = {role["value"] for role in role_options}
+    selected_roles = []
+    for raw_role in request.GET.getlist("role"):
+        normalized_role = role_aliases.get(raw_role, raw_role)
+        if normalized_role in allowed_role_values:
+            selected_roles.append(normalized_role)
+    selected_roles_set = set(selected_roles)
+
+    role_counts = members.aggregate(
+        towpilot_count=Count("id", filter=Q(towpilot=True)),
+        instructor_count=Count("id", filter=Q(instructor=True)),
+        duty_officer_count=Count("id", filter=Q(duty_officer=True)),
+        assistant_duty_officer_count=Count("id", filter=Q(assistant_duty_officer=True)),
+        director_count=Count("id", filter=Q(director=True)),
+        member_manager_count=Count("id", filter=Q(member_manager=True)),
+        webmaster_count=Count("id", filter=Q(webmaster=True)),
+        secretary_count=Count("id", filter=Q(secretary=True)),
+        treasurer_count=Count("id", filter=Q(treasurer=True)),
+        rostermeister_count=Count("id", filter=Q(rostermeister=True)),
+        safety_officer_count=Count("id", filter=Q(safety_officer=True)),
+    )
+
+    filtered_role_options = []
+    for role in role_options:
+        role_count = role_counts.get(f'{role["field"]}_count', 0)
+        if role_count > 0 or role["value"] in selected_roles_set:
+            filtered_role_options.append(role)
+
+    for role in role_options:
+        if role["value"] in selected_roles_set:
+            members = members.filter(**{role["field"]: True})
 
     members = members.annotate(
         last_name_lower=Func(F("last_name"), function="LOWER")
@@ -102,6 +180,9 @@ def member_list(request):
             "page_obj": page_obj,
             "paginator": paginator,
             "members": page_obj.object_list,
+            "status_options": status_options,
+            "active_statuses": active_statuses,
+            "role_options": filtered_role_options,
             "selected_statuses": selected_statuses,
             "selected_roles": selected_roles,
         },
@@ -190,6 +271,7 @@ def member_view(request, member_id):
 
     context = {
         "member": member,
+        "active_statuses": set(get_active_membership_statuses()),
         "qr_base64": qr_base64,
         "can_view_personal_info": can_view_personal,
         "form": form,
