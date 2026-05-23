@@ -23,6 +23,40 @@ def test_get_role_title_commercial_pilot_with_config():
 
 
 @pytest.mark.django_db
+def test_get_role_title_treasurer_without_config():
+    assert get_role_title("treasurer") == "Treasurer"
+
+
+@pytest.mark.django_db
+def test_get_role_title_treasurer_with_config():
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        treasurer_title="Cash",
+    )
+
+    assert get_role_title("treasurer") == "Cash"
+
+
+@pytest.mark.django_db
+def test_get_role_title_secretary_without_config():
+    assert get_role_title("secretary") == "Secretary"
+
+
+@pytest.mark.django_db
+def test_get_role_title_secretary_with_config():
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        secretary_title="Records Officer",
+    )
+
+    assert get_role_title("secretary") == "Records Officer"
+
+
+@pytest.mark.django_db
 def test_get_role_title_dynamic_role_uses_display_name_when_enabled():
     config = SiteConfiguration.objects.create(
         club_name="Test Club",

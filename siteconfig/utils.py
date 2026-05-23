@@ -9,6 +9,8 @@ def get_role_title(role):
         "towpilot": "Tow Pilot",
         "instructor": "Instructor",
         "commercial_pilot": "Commercial Pilot",
+        "secretary": "Secretary",
+        "treasurer": "Treasurer",
         "surge_towpilot": "Surge Tow Pilot",
         "surge_instructor": "Surge Instructor",
     }
@@ -23,6 +25,8 @@ def get_role_title(role):
         "towpilot": config.towpilot_title,
         "instructor": config.instructor_title,
         "commercial_pilot": config.commercial_pilot_title,
+        "secretary": config.secretary_title,
+        "treasurer": config.treasurer_title,
         "surge_towpilot": config.surge_towpilot_title or "Surge Tow Pilot",
         "surge_instructor": config.surge_instructor_title or "Surge Instructor",
     }

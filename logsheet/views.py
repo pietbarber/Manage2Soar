@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_time
+from django.utils.html import format_html
 from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
@@ -28,6 +29,7 @@ from duty_roster.models import GliderReservation
 from members.decorators import active_member_required
 from members.models import Member
 from siteconfig.models import SiteConfiguration
+from siteconfig.utils import get_role_title
 from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 
 from .forms import (
@@ -1504,10 +1506,15 @@ def manage_logsheet(request, pk):
                 )
 
             else:
+                treasurer_title = get_role_title("treasurer")
                 return HttpResponseForbidden(
-                    "You do not have permission to unfinalize this logsheet. "
-                    "Only superusers, treasurers, webmasters, or the duty officer "
-                    "who finalized it can unfinalize a logsheet."
+                    format_html(
+                        "You do not have permission to unfinalize this logsheet. "
+                        "Only superusers, members with the {} role, "
+                        "webmasters, or the duty officer "
+                        "who finalized it can unfinalize a logsheet.",
+                        treasurer_title,
+                    )
                 )
             return redirect("logsheet:manage", pk=logsheet.pk)
 
@@ -2563,9 +2570,9 @@ def manage_logsheet_finances(request, pk):
         ),
     )
 
-    # Check if towplane rentals are enabled (cache config query)
-    config = SiteConfiguration.objects.first()
-    rental_enabled = config.allow_towplane_rental if config else False
+    # Reuse cached SiteConfiguration to avoid extra DB lookups.
+    rental_enabled = site_config.allow_towplane_rental if site_config else False
+    treasurer_title = site_config.treasurer_title if site_config else "Treasurer"
 
     context = {
         "logsheet": logsheet,
@@ -2584,6 +2591,7 @@ def manage_logsheet_finances(request, pk):
         "active_members": active_members,
         "inactive_members": inactive_members,
         "towplane_rental_enabled": rental_enabled,
+        "treasurer_title": treasurer_title,
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)

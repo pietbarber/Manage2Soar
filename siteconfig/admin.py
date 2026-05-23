@@ -225,6 +225,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "surge_towpilot_title",
                     "instructor_title",
                     "commercial_pilot_title",
+                    "secretary_title",
+                    "treasurer_title",
                     "surge_instructor_title",
                     "membership_manager_title",
                     "equipment_manager_title",
