@@ -89,6 +89,7 @@ def test_render_duties_escapes_configured_role_labels(monkeypatch):
 
 @pytest.mark.django_db
 def test_get_member_role_metadata_uses_configured_secretary_and_treasurer_titles():
+    cache.delete(SITECONFIG_DEFERRED_CACHE_KEY)
     SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.example.com",

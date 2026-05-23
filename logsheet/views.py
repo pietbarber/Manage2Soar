@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_time
+from django.utils.html import format_html
 from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
@@ -1507,10 +1508,13 @@ def manage_logsheet(request, pk):
             else:
                 treasurer_title = get_role_title("treasurer")
                 return HttpResponseForbidden(
-                    "You do not have permission to unfinalize this logsheet. "
-                    f"Only superusers, members with the {treasurer_title} role, "
-                    "webmasters, or the duty officer "
-                    "who finalized it can unfinalize a logsheet."
+                    format_html(
+                        "You do not have permission to unfinalize this logsheet. "
+                        "Only superusers, members with the {} role, "
+                        "webmasters, or the duty officer "
+                        "who finalized it can unfinalize a logsheet.",
+                        treasurer_title,
+                    )
                 )
             return redirect("logsheet:manage", pk=logsheet.pk)
 
