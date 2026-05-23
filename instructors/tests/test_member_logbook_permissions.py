@@ -51,13 +51,10 @@ def _parse_foreflight_aircraft_rows(csv_text):
     header_idx = next(
         i for i, line in enumerate(lines) if line.startswith(aircraft_header)
     )
-    flights_header_prefix = (
-        "Date,AircraftID,From,To,Route,TimeOut,TimeOff,TimeOn,TimeIn"
+    flights_table_idx = next(
+        i for i, line in enumerate(lines) if line.startswith("Flights Table")
     )
-    flights_header_idx = next(
-        i for i, line in enumerate(lines) if line.startswith(flights_header_prefix)
-    )
-    aircraft_section = "\n".join(lines[header_idx:flights_header_idx]).strip()
+    aircraft_section = "\n".join(lines[header_idx:flights_table_idx]).strip()
     return list(csv.DictReader(io.StringIO(aircraft_section)))
 
 
