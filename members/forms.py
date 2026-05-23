@@ -1,9 +1,17 @@
+import logging
+
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import PasswordResetForm, _unicode_ci_compare
 from django.core.exceptions import ValidationError
+from django.core.mail import EmailMultiAlternatives
+from django.template import loader
 from tinymce.widgets import TinyMCE
 
 from .models import Biography, Member, SafetyReport
 from .utils.image_processing import generate_profile_thumbnails
+
+logger = logging.getLogger(__name__)
 
 #########################
 # MemberProfilePhotoForm Class
@@ -110,6 +118,67 @@ class SetPasswordForm(forms.Form):
         if p1 and p2 and p1 != p2:
             raise ValidationError("Passwords do not match.")
         return cleaned_data
+
+
+class DevModePasswordResetForm(PasswordResetForm):
+    """Password reset form with OAuth account support.
+
+    Password reset emails intentionally bypass EMAIL_DEV_MODE redirection so the
+    member who requested access always receives the reset link directly.
+    """
+
+    def get_users(self, email):
+        """Return active users matching email, including OAuth-only accounts.
+
+        Django's default PasswordResetForm excludes users with unusable passwords.
+        In this project, many members authenticate via OAuth first and therefore
+        start with an unusable local password. They should still be able to use
+        "Forgot your password?" to bootstrap a local password.
+        """
+        email_field_name = get_user_model().get_email_field_name()
+        active_users = get_user_model()._default_manager.filter(
+            **{
+                f"{email_field_name}__iexact": email,
+                "is_active": True,
+            }
+        )
+        return (
+            user
+            for user in active_users
+            if _unicode_ci_compare(email, getattr(user, email_field_name))
+        )
+
+    def send_mail(
+        self,
+        subject_template_name,
+        email_template_name,
+        context,
+        from_email,
+        to_email,
+        html_email_template_name=None,
+    ):
+        subject = loader.render_to_string(subject_template_name, context)
+        subject = "".join(subject.splitlines())
+        body = loader.render_to_string(email_template_name, context)
+
+        email_message = EmailMultiAlternatives(
+            subject=subject,
+            body=body,
+            from_email=from_email,
+            to=[to_email],
+        )
+
+        if html_email_template_name is not None:
+            html_email = loader.render_to_string(html_email_template_name, context)
+            email_message.attach_alternative(html_email, "text/html")
+
+        try:
+            email_message.send()
+        except Exception:
+            logger.exception(
+                "Failed to send password reset email for recipient: %s",
+                to_email,
+            )
 
 
 #########################
