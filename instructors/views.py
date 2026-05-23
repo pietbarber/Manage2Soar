@@ -2904,11 +2904,16 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
         "This row is required for importing into ForeFlight. Do not delete or modify."
     )
 
+    virtual_towplane_q = Q()
+    for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
+        virtual_towplane_q |= Q(towplane__n_number__iexact=virtual_n_number)
+
     # Tow-pilot rows are exported as one daily summary row per day using the
     # same day-level logic as the tow-pilot logbook view/export.
     tow_day_rows = []
     first_tow_date = (
-        Flight.objects.filter(tow_pilot=member)
+        Flight.objects.filter(tow_pilot=member, towplane__isnull=False)
+        .exclude(virtual_towplane_q)
         .values_list("logsheet__log_date", flat=True)
         .order_by("logsheet__log_date")
         .first()
@@ -2937,18 +2942,14 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             elif not is_tow_pilot_only:
                 has_unknown_aircraft = True
 
-    virtual_towplane_q = Q()
-    for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
-        virtual_towplane_q |= Q(towplane__n_number__iexact=virtual_n_number)
-
-    towplane_flights = (
+    towplane_ids = (
         Flight.objects.filter(tow_pilot=member, towplane__isnull=False)
         .exclude(virtual_towplane_q)
-        .select_related("towplane")
+        .values_list("towplane_id", flat=True)
+        .distinct()
     )
-    for tow_flight in towplane_flights:
-        towplane = tow_flight.towplane
-        if towplane and towplane.id not in towplane_aircraft_map:
+    for towplane in Towplane.objects.filter(id__in=towplane_ids).order_by("id"):
+        if towplane.id not in towplane_aircraft_map:
             towplane_aircraft_map[towplane.id] = towplane
 
     # Build response — write aircraft section first, then stream flights.
