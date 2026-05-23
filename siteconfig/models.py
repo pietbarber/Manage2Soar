@@ -344,6 +344,16 @@ class SiteConfiguration(models.Model):
         default="Commercial Pilot",
         help_text="We refer to the position of Commercial Pilot as ...",
     )
+    secretary_title = models.CharField(
+        max_length=40,
+        default="Secretary",
+        help_text="We refer to the position of Secretary as ...",
+    )
+    treasurer_title = models.CharField(
+        max_length=40,
+        default="Treasurer",
+        help_text="We refer to the position of Treasurer as ...",
+    )
     surge_instructor_title = models.CharField(
         max_length=40,
         default="Surge Instructor",

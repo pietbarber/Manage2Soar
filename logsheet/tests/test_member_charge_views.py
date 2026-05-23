@@ -711,6 +711,23 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.assertContains(response, export_url)
         self.assertContains(response, "Download Treasurer CSV")
 
+    def test_treasurer_csv_button_uses_configured_title_on_finalized(self):
+        """Finalized logsheets should use configured Treasurer title in button text."""
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+        config = SiteConfiguration.objects.first()
+        config.treasurer_title = "Cash"
+        config.save(update_fields=["treasurer_title"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        url = reverse(
+            "logsheet:manage_logsheet_finances",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(url)
+
+        self.assertContains(response, "Download Cash CSV")
+
     def test_charges_displayed_in_finances_view(self):
         """Test that existing charges appear in the finances view."""
         MemberCharge.objects.create(

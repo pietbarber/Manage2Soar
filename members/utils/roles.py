@@ -105,7 +105,11 @@ def get_member_role_metadata(config: SiteConfiguration | None = None):
         {
             "value": "secretary",
             "field": "secretary",
-            "label": "Secretary",
+            "label": (
+                getattr(config, "secretary_title", "Secretary")
+                if config
+                else "Secretary"
+            ),
             "icon": "bi-pen",
             "badge_class": "bg-secondary",
             "show_in_duties": True,
@@ -113,7 +117,11 @@ def get_member_role_metadata(config: SiteConfiguration | None = None):
         {
             "value": "treasurer",
             "field": "treasurer",
-            "label": "Treasurer",
+            "label": (
+                getattr(config, "treasurer_title", "Treasurer")
+                if config
+                else "Treasurer"
+            ),
             "icon": "bi-cash-coin",
             "badge_class": "bg-success",
             "show_in_duties": True,

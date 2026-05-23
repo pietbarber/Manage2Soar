@@ -85,3 +85,38 @@ def test_render_duties_escapes_configured_role_labels(monkeypatch):
 
     assert "<script>" not in rendered
     assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;" in rendered
+
+
+@pytest.mark.django_db
+def test_get_member_role_metadata_uses_configured_secretary_and_treasurer_titles():
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        secretary_title="Records Officer",
+        treasurer_title="Cash",
+    )
+
+    roles = get_member_role_metadata()
+    secretary = next(role for role in roles if role["field"] == "secretary")
+    treasurer = next(role for role in roles if role["field"] == "treasurer")
+
+    assert secretary["label"] == "Records Officer"
+    assert treasurer["label"] == "Cash"
+
+
+@pytest.mark.django_db
+def test_duty_badge_legend_uses_configured_secretary_and_treasurer_titles():
+    cache.delete("site_configuration")
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        secretary_title="Records Officer",
+        treasurer_title="Cash",
+    )
+
+    rendered = str(member_extras.duty_badge_legend())
+
+    assert "Records Officer" in rendered
+    assert "Cash" in rendered

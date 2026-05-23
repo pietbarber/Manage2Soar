@@ -144,6 +144,12 @@ def duty_badge_legend():
         if config
         else "Assistant Duty Officer"
     )
+    secretary = escape(
+        getattr(config, "secretary_title", "Secretary") if config else "Secretary"
+    )
+    treasurer = escape(
+        getattr(config, "treasurer_title", "Treasurer") if config else "Treasurer"
+    )
     # Dynamic content is properly escaped above - safe to use mark_safe
     return mark_safe(
         f"""
@@ -175,13 +181,13 @@ def duty_badge_legend():
                                     <small class='text-muted'>Assistant operations</small>
                                 </div>
                                 <div class='d-flex align-items-center mb-2'>
-                                    <span class='badge bg-secondary me-3'><i class='bi bi-pen'></i> Secretary</span>
+                                    <span class='badge bg-secondary me-3'><i class='bi bi-pen'></i> {secretary}</span>
                                     <small class='text-muted'>Club administration</small>
                                 </div>
                             </div>
                             <div class='col-md-6'>
                                 <div class='d-flex align-items-center mb-2'>
-                                    <span class='badge bg-success me-3'><i class='bi bi-cash-coin'></i> Treasurer</span>
+                                    <span class='badge bg-success me-3'><i class='bi bi-cash-coin'></i> {treasurer}</span>
                                     <small class='text-muted'>Financial management</small>
                                 </div>
                                 <div class='d-flex align-items-center mb-2'>
