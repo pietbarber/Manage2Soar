@@ -8,6 +8,8 @@ from django.core.mail import EmailMultiAlternatives
 from django.template import loader
 from tinymce.widgets import TinyMCE
 
+from utils.email import enforce_noreply_from_email
+
 from .models import Biography, Member, SafetyReport
 from .utils.image_processing import generate_profile_thumbnails
 
@@ -120,7 +122,7 @@ class SetPasswordForm(forms.Form):
         return cleaned_data
 
 
-class DevModePasswordResetForm(PasswordResetForm):
+class DirectRecipientPasswordResetForm(PasswordResetForm):
     """Password reset form with OAuth account support.
 
     Password reset emails intentionally bypass EMAIL_DEV_MODE redirection so the
@@ -160,11 +162,12 @@ class DevModePasswordResetForm(PasswordResetForm):
         subject = loader.render_to_string(subject_template_name, context)
         subject = "".join(subject.splitlines())
         body = loader.render_to_string(email_template_name, context)
+        normalized_from_email = enforce_noreply_from_email(from_email)
 
         email_message = EmailMultiAlternatives(
             subject=subject,
             body=body,
-            from_email=from_email,
+            from_email=normalized_from_email,
             to=[to_email],
         )
 
@@ -172,13 +175,7 @@ class DevModePasswordResetForm(PasswordResetForm):
             html_email = loader.render_to_string(html_email_template_name, context)
             email_message.attach_alternative(html_email, "text/html")
 
-        try:
-            email_message.send()
-        except Exception:
-            logger.exception(
-                "Failed to send password reset email for recipient: %s",
-                to_email,
-            )
+        email_message.send()
 
 
 #########################
