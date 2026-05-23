@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import PasswordResetForm, _unicode_ci_compare
+from django.contrib.auth.forms import PasswordResetForm
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.template import loader
@@ -10,6 +10,12 @@ from utils.email import enforce_noreply_from_email
 
 from .models import Biography, Member, SafetyReport
 from .utils.image_processing import generate_profile_thumbnails
+
+
+def _emails_match_case_insensitive(left, right):
+    """Unicode-safe, case-insensitive email comparison using public APIs."""
+    return (left or "").casefold() == (right or "").casefold()
+
 
 #########################
 # MemberProfilePhotoForm Class
@@ -143,7 +149,9 @@ class DirectRecipientPasswordResetForm(PasswordResetForm):
         return (
             user
             for user in active_users
-            if _unicode_ci_compare(email, getattr(user, email_field_name))
+            if _emails_match_case_insensitive(
+                email, getattr(user, email_field_name, "")
+            )
         )
 
     def send_mail(
