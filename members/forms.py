@@ -1,5 +1,3 @@
-import logging
-
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm, _unicode_ci_compare
@@ -12,8 +10,6 @@ from utils.email import enforce_noreply_from_email
 
 from .models import Biography, Member, SafetyReport
 from .utils.image_processing import generate_profile_thumbnails
-
-logger = logging.getLogger(__name__)
 
 #########################
 # MemberProfilePhotoForm Class
