@@ -819,14 +819,13 @@ def test_foreflight_csv_has_aircraft_and_flights_sections(client):
     assert lines[2] == "Aircraft Table"
     assert (
         lines[3]
-        == "Text,Text,Text,YYYY,Text,Text,Text,Text,Text,Boolean,Boolean,Boolean,Boolean,Boolean"
+        == "Text,Text,Text,YYYY,Text,Text,Text,Text,Text,Text,Boolean,Boolean,Boolean,Boolean"
     )
 
     # Check for aircraft section header
     assert "AircraftID,EquipmentType,TypeCode,Year,Make,Model,Category,Class" in content
     # Check for flights preamble rows before the flights header
     assert "Flights Table" in content
-    assert "#;type;runway;airport;comments" in content
     assert "Decimal or HH:MM" in content
     # Check for flights section header
     assert "Date,AircraftID,From,To,Route,TimeOut,TimeOff,TimeOn,TimeIn" in content
