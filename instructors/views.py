@@ -2662,7 +2662,7 @@ class WrittenTestReviewView(DjangoView):
         )
 
 
-def _build_logbook_events(member):
+def _build_logbook_events(member, include_tow_pilot=False):
     """Build a sorted timeline of logbook events (flights + ground instruction) for *member*.
 
     Returns a tuple ``(events, report_lookup, rating_date)`` where:
@@ -2674,15 +2674,18 @@ def _build_logbook_events(member):
     * **rating_date** – the member's ``private_glider_checkride_date`` (or
       ``None`` if not set), used for logbook classification.
     """
+    flight_filter = Q(pilot=member) | Q(instructor=member) | Q(passenger=member)
+    if include_tow_pilot:
+        flight_filter |= Q(tow_pilot=member)
+
     flights = (
-        Flight.objects.filter(
-            Q(pilot=member) | Q(instructor=member) | Q(passenger=member)
-        )
+        Flight.objects.filter(flight_filter)
         .select_related(
             "glider",
             "instructor",
             "pilot",
             "passenger",
+            "towplane",
             "airfield",
             "logsheet",
             "logsheet__airfield",
@@ -2897,25 +2900,83 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
         total_minutes = int(duration.total_seconds() // 60)
         return round(total_minutes / 60, 2)
 
-    events, report_lookup, rating_date = _build_logbook_events(member)
+    events, report_lookup, rating_date = _build_logbook_events(
+        member,
+        include_tow_pilot=True,
+    )
+
+    required_foreflight_note = _sanitize_csv_cell(
+        "This row is required for importing into ForeFlight. Do not delete or modify."
+    )
+
+    # Tow-pilot rows are exported as one daily summary row per day using the
+    # same day-level logic as the tow-pilot logbook view/export.
+    tow_day_rows = []
+    first_tow_date = (
+        Flight.objects.filter(tow_pilot=member)
+        .values_list("logsheet__log_date", flat=True)
+        .order_by("logsheet__log_date")
+        .first()
+    )
+    if first_tow_date:
+        from logsheet.views import _get_tow_logbook_data
+
+        tow_day_rows = _get_tow_logbook_data(member, first_tow_date).get("day_rows", [])
 
     # Build unique aircraft set from flight events (preserving insertion order)
-    aircraft_map = {}  # {glider_id: glider_obj}
+    glider_aircraft_map = {}  # {glider_id: glider_obj}
+    towplane_aircraft_map = {}  # {towplane_id: towplane_obj}
     has_unknown_aircraft = False
     for ev in events:
         if ev["type"] == "flight":
             f = ev["obj"]
+            classification = classify_logbook_flight_minutes(
+                f,
+                member.id,
+                rating_date,
+            )
+            is_tow_pilot_only = classification["is_tow_pilot"] and not (
+                classification["is_pilot"] or classification["is_instructor"]
+            )
             if f.glider:
-                if f.glider.id not in aircraft_map:
-                    aircraft_map[f.glider.id] = f.glider
-            else:
+                if not is_tow_pilot_only and f.glider.id not in glider_aircraft_map:
+                    glider_aircraft_map[f.glider.id] = f.glider
+            elif not is_tow_pilot_only:
                 has_unknown_aircraft = True
+
+            if classification["is_tow_pilot"] and f.towplane:
+                if f.towplane.id not in towplane_aircraft_map:
+                    towplane_aircraft_map[f.towplane.id] = f.towplane
 
     # Build response — write aircraft section first, then stream flight rows
     # directly to the response writer to avoid holding all rows in memory.
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = (
         f'attachment; filename="logbook_{member.username}_foreflight.csv"'
+    )
+
+    # ForeFlight template preamble lines.
+    template_writer = csv.writer(response)
+    template_writer.writerow(["ForeFlight Logbook Import", required_foreflight_note])
+    template_writer.writerow([])
+    template_writer.writerow(["Aircraft Table"])
+    template_writer.writerow(
+        [
+            "Text",
+            "Text",
+            "Text",
+            "YYYY",
+            "Text",
+            "Text",
+            "Text",
+            "Text",
+            "Text",
+            "Boolean",
+            "Boolean",
+            "Boolean",
+            "Boolean",
+            "Boolean",
+        ]
     )
 
     # Section 1 — Aircraft table
@@ -2938,19 +2999,39 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     aircraft_writer = csv.DictWriter(response, fieldnames=aircraft_fieldnames)
     aircraft_writer.writeheader()
 
-    for glider in aircraft_map.values():
+    for aircraft in glider_aircraft_map.values():
         aircraft_writer.writerow(
             {
-                "AircraftID": glider.n_number,
+                "AircraftID": aircraft.n_number,
                 "EquipmentType": "",
                 "TypeCode": "",
                 "Year": "",
-                "Make": glider.make,
-                "Model": glider.model,
+                "Make": aircraft.make,
+                "Model": aircraft.model,
                 "Category": "Glider",
                 "Class": "Glider",
                 "GearType": "Fixed Gear",
                 "EngType": "None",
+                "Complex": "False",
+                "HighPerf": "False",
+                "Pressurized": "False",
+                "TAA": "False",
+            }
+        )
+
+    for towplane in towplane_aircraft_map.values():
+        aircraft_writer.writerow(
+            {
+                "AircraftID": towplane.n_number,
+                "EquipmentType": "",
+                "TypeCode": "",
+                "Year": "",
+                "Make": towplane.make,
+                "Model": towplane.model,
+                "Category": "Airplane",
+                "Class": "Airplane Single Engine Land",
+                "GearType": "",
+                "EngType": "",
                 "Complex": "False",
                 "HighPerf": "False",
                 "Pressurized": "False",
@@ -2981,6 +3062,154 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     # Blank line separates the two sections (ForeFlight convention).
     # Use the dialect's line terminator to keep the whole file consistent.
     response.write(aircraft_writer.writer.dialect.lineterminator)
+
+    # Flights section preamble rows required by the ForeFlight template.
+    template_writer.writerow(
+        [
+            "Flights Table",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "#;type;runway;airport;comments",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "name;role;email;phone",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
+    template_writer.writerow(
+        [
+            "Date",
+            "Text",
+            "Text",
+            "Text",
+            "Text",
+            "HH:MM",
+            "HH:MM",
+            "HH:MM",
+            "HH:MM",
+            "HH:MM",
+            "HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Number",
+            "Decimal",
+            "Number",
+            "Number",
+            "Number",
+            "Number",
+            "Number",
+            "Number",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal",
+            "Decimal",
+            "Decimal",
+            "Decimal",
+            "Number",
+            "Packed Detail",
+            "Packed Detail",
+            "Packed Detail",
+            "Packed Detail",
+            "Packed Detail",
+            "Packed Detail",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Decimal or HH:MM",
+            "Text",
+            "Text",
+            "Packed Detail",
+            "Packed Detail",
+            "Packed Detail",
+            "Packed Detail",
+            "Packed Detail",
+            "Packed Detail",
+            "Text",
+            "Boolean",
+            "Boolean",
+            "Boolean",
+            "Boolean",
+            "Boolean",
+            "Text",
+            "Decimal",
+            "Decimal or HH:MM",
+            "Number",
+            "Date",
+            "DateTime",
+            "Boolean",
+        ]
+    )
 
     # Section 2 — Flights table (rows are streamed directly to the writer)
     flight_fieldnames = [
@@ -3031,6 +3260,9 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     flight_writer = csv.DictWriter(response, fieldnames=flight_fieldnames)
     flight_writer.writeheader()
 
+    row_items = []
+    sequence = 0
+
     for ev in events:
         if ev["type"] == "flight":
             f = ev["obj"]
@@ -3042,6 +3274,10 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             )
             is_pilot = classification["is_pilot"]
             is_instructor = classification["is_instructor"]
+            is_tow_pilot = classification["is_tow_pilot"]
+            is_tow_pilot_only = is_tow_pilot and not (is_pilot or is_instructor)
+            if is_tow_pilot_only:
+                continue
             dur_m = classification["duration_m"]
             dual_m = classification["dual_m"]
             solo_m = classification["solo_m"]
@@ -3100,53 +3336,65 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             airfield_identifier = _sanitize_csv_cell(
                 flight_airfield.identifier if flight_airfield else ""
             )
-            flight_writer.writerow(
-                {
-                    "Date": date_val.strftime("%Y-%m-%d"),
-                    "AircraftID": aircraft_id,
-                    "From": airfield_identifier,
-                    "To": airfield_identifier,
-                    "Route": "",
-                    "TimeOut": time_out_str,
-                    "TimeOff": time_off_str,
-                    "TimeOn": time_on_str,
-                    "TimeIn": time_in_str,
-                    "OnDuty": "",
-                    "OffDuty": "",
-                    "TotalTime": str(total_hours),
-                    "PIC": str(pic_hours),
-                    "SIC": str(sic_hours),
-                    "Night": "0",
-                    "Solo": str(solo_hours),
-                    "CrossCountry": "0",
-                    "NVG": "0",
-                    "NVGOps": "0",
-                    "Distance": "",
-                    "DayTakeoffs": "1" if (is_pilot or is_instructor) else "0",
-                    "DayLandingsFullStop": "1" if (is_pilot or is_instructor) else "0",
-                    "NightTakeoffs": "0",
-                    "NightLandingsFullStop": "0",
-                    "AllLandings": "1" if (is_pilot or is_instructor) else "0",
-                    "ActualInstrument": "0",
-                    "SimulatedInstrument": "0",
-                    "HobbsStart": "",
-                    "HobbsEnd": "",
-                    "TachStart": "",
-                    "TachEnd": "",
-                    "Holds": "0",
-                    "DualGiven": str(dual_given),
-                    "DualReceived": str(dual_received),
-                    "SimulatedFlight": "0",
-                    "GroundTraining": "0",
-                    "InstructorName": instructor_name,
-                    "InstructorComments": instructor_comments,
-                    "FlightReview": "",
-                    "Checkride": "",
-                    "IPC": "",
-                    "NVGProficiency": "",
-                    "PilotComments": _sanitize_csv_cell(f.notes) if f.notes else "",
-                }
+            row_items.append(
+                (
+                    date_val,
+                    0,
+                    sequence,
+                    {
+                        "Date": date_val.strftime("%Y-%m-%d"),
+                        "AircraftID": aircraft_id,
+                        "From": airfield_identifier,
+                        "To": airfield_identifier,
+                        "Route": "",
+                        "TimeOut": time_out_str,
+                        "TimeOff": time_off_str,
+                        "TimeOn": time_on_str,
+                        "TimeIn": time_in_str,
+                        "OnDuty": "",
+                        "OffDuty": "",
+                        "TotalTime": str(total_hours),
+                        "PIC": str(pic_hours),
+                        "SIC": str(sic_hours),
+                        "Night": "0",
+                        "Solo": str(solo_hours),
+                        "CrossCountry": "0",
+                        "NVG": "0",
+                        "NVGOps": "0",
+                        "Distance": "",
+                        "DayTakeoffs": (
+                            "1" if (is_pilot or is_instructor or is_tow_pilot) else "0"
+                        ),
+                        "DayLandingsFullStop": (
+                            "1" if (is_pilot or is_instructor or is_tow_pilot) else "0"
+                        ),
+                        "NightTakeoffs": "0",
+                        "NightLandingsFullStop": "0",
+                        "AllLandings": (
+                            "1" if (is_pilot or is_instructor or is_tow_pilot) else "0"
+                        ),
+                        "ActualInstrument": "0",
+                        "SimulatedInstrument": "0",
+                        "HobbsStart": "",
+                        "HobbsEnd": "",
+                        "TachStart": "",
+                        "TachEnd": "",
+                        "Holds": "0",
+                        "DualGiven": str(dual_given),
+                        "DualReceived": str(dual_received),
+                        "SimulatedFlight": "0",
+                        "GroundTraining": "0",
+                        "InstructorName": instructor_name,
+                        "InstructorComments": instructor_comments,
+                        "FlightReview": "",
+                        "Checkride": "",
+                        "IPC": "",
+                        "NVGProficiency": "",
+                        "PilotComments": _sanitize_csv_cell(f.notes) if f.notes else "",
+                    },
+                )
             )
+            sequence += 1
         else:
             # Ground instruction row
             g = ev["obj"]
@@ -3159,12 +3407,78 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                 if g.instructor and hasattr(g.instructor, "full_display_name")
                 else ""
             )
-            flight_writer.writerow(
+            row_items.append(
+                (
+                    g.date,
+                    0,
+                    sequence,
+                    {
+                        "Date": g.date.strftime("%Y-%m-%d"),
+                        "AircraftID": "",
+                        "From": "",
+                        "To": "",
+                        "Route": "",
+                        "TimeOut": "",
+                        "TimeOff": "",
+                        "TimeOn": "",
+                        "TimeIn": "",
+                        "OnDuty": "",
+                        "OffDuty": "",
+                        "TotalTime": "0",
+                        "PIC": "0",
+                        "SIC": "0",
+                        "Night": "0",
+                        "Solo": "0",
+                        "CrossCountry": "0",
+                        "NVG": "0",
+                        "NVGOps": "0",
+                        "Distance": "",
+                        "DayTakeoffs": "0",
+                        "DayLandingsFullStop": "0",
+                        "NightTakeoffs": "0",
+                        "NightLandingsFullStop": "0",
+                        "AllLandings": "0",
+                        "ActualInstrument": "0",
+                        "SimulatedInstrument": "0",
+                        "HobbsStart": "",
+                        "HobbsEnd": "",
+                        "TachStart": "",
+                        "TachEnd": "",
+                        "Holds": "0",
+                        "DualGiven": "0",
+                        "DualReceived": "0",
+                        "SimulatedFlight": "0",
+                        "GroundTraining": str(ground_hours),
+                        "InstructorName": instructor_name,
+                        "InstructorComments": instructor_comments,
+                        "FlightReview": "",
+                        "Checkride": "",
+                        "IPC": "",
+                        "NVGProficiency": "",
+                        "PilotComments": "",
+                    },
+                )
+            )
+            sequence += 1
+
+    # Append one tow-pilot daily summary row per day (if any).
+    for tow_day in tow_day_rows:
+        tow_hours = tow_day.get("tow_hours")
+        your_tows = tow_day.get("your_tows", 0)
+        airfield_identifier = _sanitize_csv_cell(tow_day.get("airfield_identifier", ""))
+        if airfield_identifier == "—":
+            airfield_identifier = ""
+
+        row_items.append(
+            (
+                tow_day["tow_date"],
+                1,
+                sequence,
                 {
-                    "Date": g.date.strftime("%Y-%m-%d"),
+                    "Date": tow_day["tow_date"].strftime("%Y-%m-%d"),
                     "AircraftID": "",
-                    "From": "",
-                    "To": "",
+                    "From": airfield_identifier,
+                    "To": airfield_identifier,
                     "Route": "",
                     "TimeOut": "",
                     "TimeOff": "",
@@ -3172,8 +3486,8 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                     "TimeIn": "",
                     "OnDuty": "",
                     "OffDuty": "",
-                    "TotalTime": "0",
-                    "PIC": "0",
+                    "TotalTime": str(tow_hours),
+                    "PIC": str(tow_hours),
                     "SIC": "0",
                     "Night": "0",
                     "Solo": "0",
@@ -3181,11 +3495,11 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                     "NVG": "0",
                     "NVGOps": "0",
                     "Distance": "",
-                    "DayTakeoffs": "0",
-                    "DayLandingsFullStop": "0",
+                    "DayTakeoffs": str(your_tows),
+                    "DayLandingsFullStop": str(your_tows),
                     "NightTakeoffs": "0",
                     "NightLandingsFullStop": "0",
-                    "AllLandings": "0",
+                    "AllLandings": str(your_tows),
                     "ActualInstrument": "0",
                     "SimulatedInstrument": "0",
                     "HobbsStart": "",
@@ -3196,16 +3510,21 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                     "DualGiven": "0",
                     "DualReceived": "0",
                     "SimulatedFlight": "0",
-                    "GroundTraining": str(ground_hours),
-                    "InstructorName": instructor_name,
-                    "InstructorComments": instructor_comments,
+                    "GroundTraining": "0",
+                    "InstructorName": "",
+                    "InstructorComments": "",
                     "FlightReview": "",
                     "Checkride": "",
                     "IPC": "",
                     "NVGProficiency": "",
-                    "PilotComments": "",
-                }
+                    "PilotComments": "Tow pilot daily summary",
+                },
             )
+        )
+        sequence += 1
+
+    for _row_date, _row_type_order, _sequence, row in sorted(row_items):
+        flight_writer.writerow(row)
 
     return response
 

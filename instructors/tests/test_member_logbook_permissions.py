@@ -13,7 +13,7 @@ from instructors.models import (
     LessonScore,
     TrainingLesson,
 )
-from logsheet.models import Airfield, Flight, Glider, Logsheet
+from logsheet.models import Airfield, Flight, Glider, Logsheet, Towplane
 from members.models import Member
 from siteconfig.models import MembershipStatus
 
@@ -34,6 +34,31 @@ def _make_member(username, instructor=False, glider_rating="student"):
         glider_rating=glider_rating,
         email=f"{username}@example.com",
     )
+
+
+def _parse_foreflight_flights_rows(csv_text):
+    lines = csv_text.splitlines()
+    flight_header = "Date,AircraftID,From,To,Route,TimeOut,TimeOff,TimeOn,TimeIn"
+    header_idx = next(
+        i for i, line in enumerate(lines) if line.startswith(flight_header)
+    )
+    return list(csv.DictReader(io.StringIO("\n".join(lines[header_idx:]))))
+
+
+def _parse_foreflight_aircraft_rows(csv_text):
+    lines = csv_text.splitlines()
+    aircraft_header = "AircraftID,EquipmentType,TypeCode,Year,Make,Model,Category,Class"
+    header_idx = next(
+        i for i, line in enumerate(lines) if line.startswith(aircraft_header)
+    )
+    flights_header_prefix = (
+        "Date,AircraftID,From,To,Route,TimeOut,TimeOff,TimeOn,TimeIn"
+    )
+    flights_header_idx = next(
+        i for i, line in enumerate(lines) if line.startswith(flights_header_prefix)
+    )
+    aircraft_section = "\n".join(lines[header_idx:flights_header_idx]).strip()
+    return list(csv.DictReader(io.StringIO(aircraft_section)))
 
 
 @pytest.mark.django_db
@@ -746,26 +771,8 @@ def test_foreflight_csv_uses_decimal_hours(client):
     assert response["Content-Type"].startswith("text/csv")
 
     content = response.content.decode()
-    lines = content.strip().split("\n")
-
-    # Find blank line separating aircraft and flights sections
-    blank_idx = None
-    for i, line in enumerate(lines):
-        if line.strip() == "":
-            blank_idx = i
-            break
-
-    assert blank_idx is not None, "CSV should have a blank line separator"
-
-    # Flights section starts after blank line, includes header and data rows
-    flights_section = lines[blank_idx + 1 :]  # Include the header row
-    assert flights_section, "CSV should include a flights section after the separator"
-
-    # Parse flights section with csv reader
-    flight_rows = list(csv.DictReader(io.StringIO("\n".join(flights_section))))
-    assert (
-        len(flight_rows) >= 1
-    ), f"Should have at least one flight row. Lines: {flights_section}"
+    flight_rows = _parse_foreflight_flights_rows(content)
+    assert len(flight_rows) >= 1, "Should have at least one flight row"
     flight_row = flight_rows[0]
     # 25 min = 0.42 hours
     assert float(flight_row["TotalTime"]) == 0.42
@@ -804,9 +811,26 @@ def test_foreflight_csv_has_aircraft_and_flights_sections(client):
 
     assert response.status_code == 200
     content = response.content.decode()
+    lines = content.splitlines()
+
+    required_text = (
+        "This row is required for importing into ForeFlight. "
+        "Do not delete or modify."
+    )
+    assert lines[0] == f"ForeFlight Logbook Import,{required_text}"
+    assert lines[1] == ""
+    assert lines[2] == "Aircraft Table"
+    assert (
+        lines[3]
+        == "Text,Text,Text,YYYY,Text,Text,Text,Text,Text,Boolean,Boolean,Boolean,Boolean,Boolean"
+    )
 
     # Check for aircraft section header
     assert "AircraftID,EquipmentType,TypeCode,Year,Make,Model,Category,Class" in content
+    # Check for flights preamble rows before the flights header
+    assert "Flights Table" in content
+    assert "#;type;runway;airport;comments" in content
+    assert "Decimal or HH:MM" in content
     # Check for flights section header
     assert "Date,AircraftID,From,To,Route,TimeOut,TimeOff,TimeOn,TimeIn" in content
     # Check for aircraft data
@@ -886,11 +910,212 @@ def test_foreflight_csv_uses_logsheet_airfield_when_flight_airfield_missing(clie
     response = client.get(reverse("instructors:member_logbook_export_foreflight"))
 
     assert response.status_code == 200
-    lines = response.content.decode().splitlines()
-    blank_idx = lines.index("")
-    flights_section = lines[blank_idx + 1 :]
-    rows = list(csv.DictReader(io.StringIO("\n".join(flights_section))))
+    rows = _parse_foreflight_flights_rows(response.content.decode())
 
     assert rows
     assert rows[0]["From"] == "KFBK"
     assert rows[0]["To"] == "KFBK"
+
+
+@pytest.mark.django_db
+def test_foreflight_csv_includes_required_import_preamble_row(client):
+    _ensure_full_member_status()
+    pilot = _make_member("foreflight_required_row_pilot")
+
+    airfield = Airfield.objects.create(name="Marker Field", identifier="KMKR")
+    glider = Glider.objects.create(
+        n_number="N111MKR",
+        make="Schleicher",
+        model="ASK-21",
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2026, 5, 23),
+        airfield=airfield,
+        created_by=pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(9, 0),
+        landing_time=time(9, 15),
+    )
+
+    client.force_login(pilot)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    lines = response.content.decode().splitlines()
+
+    required_text = (
+        "This row is required for importing into ForeFlight. "
+        "Do not delete or modify."
+    )
+    assert lines[0] == f"ForeFlight Logbook Import,{required_text}"
+
+
+@pytest.mark.django_db
+def test_foreflight_csv_aggregates_tow_pilot_daily_summary_rows(client):
+    _ensure_full_member_status()
+    tow_pilot = _make_member("foreflight_towpilot", glider_rating="rated")
+    tow_pilot.towpilot = True
+    tow_pilot.save(update_fields=["towpilot"])
+
+    glider_pilot = _make_member("foreflight_glider_pilot")
+    airfield = Airfield.objects.create(name="Tow Ops Field", identifier="KTOW")
+    glider = Glider.objects.create(
+        n_number="N200TOW",
+        make="DG",
+        model="DG-1000",
+        club_owned=True,
+        is_active=True,
+    )
+    towplane = Towplane.objects.create(
+        n_number="N30TP",
+        make="Piper",
+        model="PA-25",
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2026, 5, 23),
+        airfield=airfield,
+        created_by=tow_pilot,
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=glider_pilot,
+        tow_pilot=tow_pilot,
+        towplane=towplane,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 24),
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=glider_pilot,
+        tow_pilot=tow_pilot,
+        towplane=towplane,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 30),
+        landing_time=time(10, 54),
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=glider_pilot,
+        tow_pilot=tow_pilot,
+        towplane=towplane,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(11, 0),
+        landing_time=time(11, 25),
+    )
+
+    client.force_login(tow_pilot)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    aircraft_rows = _parse_foreflight_aircraft_rows(response.content.decode())
+    towplane_rows = [row for row in aircraft_rows if row.get("AircraftID") == "N30TP"]
+    assert len(towplane_rows) == 1
+    assert towplane_rows[0]["Category"] == "Airplane"
+
+    rows = _parse_foreflight_flights_rows(response.content.decode())
+
+    tow_rows = [
+        row for row in rows if row.get("PilotComments", "") == "Tow pilot daily summary"
+    ]
+
+    assert len(tow_rows) == 1
+    tow_row = tow_rows[0]
+    assert tow_row["Date"] == "2026-05-23"
+    assert tow_row["DayTakeoffs"] == "3"
+    assert tow_row["DayLandingsFullStop"] == "3"
+    assert tow_row["AllLandings"] == "3"
+    assert float(tow_row["PIC"]) > 0
+
+
+@pytest.mark.django_db
+def test_foreflight_csv_sorts_rows_by_date_across_events_and_tow_summaries(client):
+    _ensure_full_member_status()
+    bob = _make_member("foreflight_bob_mixed_dates", glider_rating="rated")
+    bob.towpilot = True
+    bob.save(update_fields=["towpilot"])
+
+    glider_pilot = _make_member("foreflight_bob_glider_pilot")
+    instructor = _make_member(
+        "foreflight_bob_ground_instructor", instructor=True, glider_rating="rated"
+    )
+    airfield = Airfield.objects.create(name="Mixed Date Field", identifier="KMDT")
+    towplane = Towplane.objects.create(
+        n_number="N88TP",
+        make="Piper",
+        model="PA-25",
+        is_active=True,
+    )
+    glider = Glider.objects.create(
+        n_number="N88GLD",
+        make="Schleicher",
+        model="ASK-21",
+        club_owned=True,
+        is_active=True,
+    )
+
+    saturday_logsheet = Logsheet.objects.create(
+        log_date=date(2026, 5, 23),
+        airfield=airfield,
+        created_by=bob,
+    )
+    monday_logsheet = Logsheet.objects.create(
+        log_date=date(2026, 5, 25),
+        airfield=airfield,
+        created_by=bob,
+    )
+
+    Flight.objects.create(
+        logsheet=saturday_logsheet,
+        pilot=glider_pilot,
+        tow_pilot=bob,
+        towplane=towplane,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(9, 0),
+        landing_time=time(9, 20),
+    )
+    Flight.objects.create(
+        logsheet=monday_logsheet,
+        pilot=glider_pilot,
+        tow_pilot=bob,
+        towplane=towplane,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(9, 0),
+        landing_time=time(9, 20),
+    )
+
+    GroundInstruction.objects.create(
+        student=bob,
+        instructor=instructor,
+        date=date(2026, 5, 24),
+        duration=timedelta(minutes=45),
+        notes="Sunday instruction",
+    )
+
+    client.force_login(bob)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    rows = _parse_foreflight_flights_rows(response.content.decode())
+
+    observed_dates = [
+        row["Date"]
+        for row in rows
+        if row.get("PilotComments", "") == "Tow pilot daily summary"
+        or float(row.get("GroundTraining", "0") or 0) > 0
+    ]
+
+    assert observed_dates == ["2026-05-23", "2026-05-24", "2026-05-25"]
