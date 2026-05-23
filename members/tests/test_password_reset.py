@@ -1,5 +1,6 @@
 import pytest
 from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
 
 from members.models import Member
@@ -27,6 +28,27 @@ def test_password_reset_with_unknown_email_does_not_send(client):
     response = client.post(reverse("password_reset"), {"email": "ghost@example.com"})
     assert response.status_code == 302
     assert len(mail.outbox) == 0  # Silent fail, don't reveal user existence
+
+
+@pytest.mark.django_db
+def test_password_reset_sends_email_for_user_with_unusable_password(client):
+    member = Member.objects.create_user(
+        username="oauthonly",
+        email="oauthonly@example.com",
+        password="initialpassword",
+        membership_status="Full Member",
+    )
+    member.set_unusable_password()
+    member.save(update_fields=["password"])
+
+    response = client.post(
+        reverse("password_reset"),
+        {"email": "oauthonly@example.com"},
+    )
+
+    assert response.status_code == 302
+    assert len(mail.outbox) == 1
+    assert "Password reset" in mail.outbox[0].subject
 
 
 @pytest.mark.django_db
@@ -76,3 +98,27 @@ def test_password_reset_uses_canonical_url(client):
     if hasattr(mail.outbox[0], "alternatives") and mail.outbox[0].alternatives:
         html_body = mail.outbox[0].alternatives[0][0]
         assert "https://www.skylinesoaring.org/reset/" in html_body
+
+
+@pytest.mark.django_db
+@override_settings(
+    EMAIL_DEV_MODE=True,
+    EMAIL_DEV_MODE_REDIRECT_TO="dev1@example.com,dev2@example.com",
+)
+def test_password_reset_bypasses_dev_mode_recipients(client):
+    Member.objects.create_user(
+        username="devmodeuser",
+        email="realmember@example.com",
+        password="oldpassword",
+        membership_status="Full Member",
+    )
+
+    response = client.post(
+        reverse("password_reset"),
+        {"email": "realmember@example.com"},
+    )
+
+    assert response.status_code == 302
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ["realmember@example.com"]
+    assert "[DEV MODE]" not in mail.outbox[0].subject

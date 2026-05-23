@@ -33,6 +33,7 @@ from utils.url_helpers import build_absolute_url, get_canonical_url
 from .decorators import active_member_required
 from .forms import (
     BiographyForm,
+    DirectRecipientPasswordResetForm,
     MemberProfilePhotoForm,
     SafetyReportForm,
     SetPasswordForm,
@@ -1108,6 +1109,8 @@ class CustomPasswordResetView(auth_views.PasswordResetView):
 
     Issue #612: Fixes password manager domain mismatch between login and email URLs.
     """
+
+    form_class = DirectRecipientPasswordResetForm
 
     def form_valid(self, form):
         """Override to inject canonical URL before sending email."""
