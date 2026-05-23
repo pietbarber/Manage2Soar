@@ -2570,9 +2570,9 @@ def manage_logsheet_finances(request, pk):
         ),
     )
 
-    # Check if towplane rentals are enabled (cache config query)
-    config = SiteConfiguration.objects.first()
-    rental_enabled = config.allow_towplane_rental if config else False
+    # Reuse cached SiteConfiguration to avoid extra DB lookups.
+    rental_enabled = site_config.allow_towplane_rental if site_config else False
+    treasurer_title = site_config.treasurer_title if site_config else "Treasurer"
 
     context = {
         "logsheet": logsheet,
@@ -2591,7 +2591,7 @@ def manage_logsheet_finances(request, pk):
         "active_members": active_members,
         "inactive_members": inactive_members,
         "towplane_rental_enabled": rental_enabled,
-        "treasurer_title": get_role_title("treasurer"),
+        "treasurer_title": treasurer_title,
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)
