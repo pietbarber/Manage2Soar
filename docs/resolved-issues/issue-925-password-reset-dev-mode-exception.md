@@ -33,7 +33,7 @@ During investigation, password-reset email sending was aligned with the dev-mode
 
 ### 1. Include active OAuth-first accounts in password reset eligibility
 
-`DevModePasswordResetForm.get_users()` now returns active users matching the submitted email using case-insensitive Unicode-safe comparison, including those with unusable local passwords.
+`DirectRecipientPasswordResetForm.get_users()` now returns active users matching the submitted email using case-insensitive Unicode-safe comparison, including those with unusable local passwords.
 
 ### 2. Bypass dev-mode redirection for forgot-password emails
 
