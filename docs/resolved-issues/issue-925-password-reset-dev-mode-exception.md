@@ -2,7 +2,7 @@
 
 **Resolution Date**: May 22, 2026
 **Branch**: `bugfix/issue-925-password-reset-dev-mode-exception`
-**PR**: TBD
+**PR**: #926
 **Status**: Complete ✅
 
 ## Problem
