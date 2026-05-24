@@ -716,6 +716,8 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.logsheet.finalized = True
         self.logsheet.save(update_fields=["finalized"])
         config = SiteConfiguration.objects.first()
+        if config is None:
+            self.fail("SiteConfiguration should exist for test setup")
         config.treasurer_title = "Cash"
         config.save(update_fields=["treasurer_title"])
 
