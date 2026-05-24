@@ -3005,12 +3005,12 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     for aircraft in glider_aircraft_map.values():
         aircraft_writer.writerow(
             {
-                "AircraftID": aircraft.n_number,
+                "AircraftID": _sanitize_csv_cell(aircraft.n_number),
                 "EquipmentType": "",
                 "TypeCode": "",
                 "Year": "",
-                "Make": aircraft.make,
-                "Model": aircraft.model,
+                "Make": _sanitize_csv_cell(aircraft.make),
+                "Model": _sanitize_csv_cell(aircraft.model),
                 "Category": "Glider",
                 "Class": "Glider",
                 "GearType": "Fixed Gear",
@@ -3025,12 +3025,12 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     for towplane in towplane_aircraft_map.values():
         aircraft_writer.writerow(
             {
-                "AircraftID": towplane.n_number,
+                "AircraftID": _sanitize_csv_cell(towplane.n_number),
                 "EquipmentType": "",
                 "TypeCode": "",
                 "Year": "",
-                "Make": towplane.make,
-                "Model": towplane.model,
+                "Make": _sanitize_csv_cell(towplane.make),
+                "Model": _sanitize_csv_cell(towplane.model),
                 "Category": "Airplane",
                 "Class": "Airplane Single Engine Land",
                 "GearType": "",

@@ -1115,3 +1115,74 @@ def test_foreflight_csv_sorts_rows_by_date_across_events_and_tow_summaries(clien
     ]
 
     assert observed_dates == ["2026-05-23", "2026-05-24", "2026-05-25"]
+
+
+@pytest.mark.django_db
+def test_foreflight_aircraft_rows_sanitize_formula_cells(client):
+    _ensure_full_member_status()
+    member = _make_member("foreflight_aircraft_sanitize", glider_rating="rated")
+    member.towpilot = True
+    member.save(update_fields=["towpilot"])
+
+    other_pilot = _make_member("foreflight_aircraft_sanitize_other")
+    airfield = Airfield.objects.create(name="CSV Safety Field", identifier="KCSV")
+    glider = Glider.objects.create(
+        n_number="=NGLDR",
+        make="+GliderMake",
+        model="-GliderModel",
+        club_owned=True,
+        is_active=True,
+    )
+    towplane = Towplane.objects.create(
+        n_number="@NTOW",
+        make="=TowMake",
+        model="+TowModel",
+        is_active=True,
+    )
+
+    pilot_logsheet = Logsheet.objects.create(
+        log_date=date(2026, 5, 23),
+        airfield=airfield,
+        created_by=member,
+    )
+    Flight.objects.create(
+        logsheet=pilot_logsheet,
+        pilot=member,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(9, 0),
+        landing_time=time(9, 20),
+    )
+
+    tow_logsheet = Logsheet.objects.create(
+        log_date=date(2026, 5, 24),
+        airfield=airfield,
+        created_by=member,
+    )
+    Flight.objects.create(
+        logsheet=tow_logsheet,
+        pilot=other_pilot,
+        tow_pilot=member,
+        towplane=towplane,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 20),
+    )
+
+    client.force_login(member)
+    response = client.get(reverse("instructors:member_logbook_export_foreflight"))
+
+    assert response.status_code == 200
+    aircraft_rows = _parse_foreflight_aircraft_rows(response.content.decode())
+
+    glider_row = next(row for row in aircraft_rows if row["Category"] == "Glider")
+    towplane_row = next(row for row in aircraft_rows if row["Category"] == "Airplane")
+
+    assert glider_row["AircraftID"] == "'=NGLDR"
+    assert glider_row["Make"] == "'+GliderMake"
+    assert glider_row["Model"] == "'-GliderModel"
+
+    assert towplane_row["AircraftID"] == "'@NTOW"
+    assert towplane_row["Make"] == "'=TowMake"
+    assert towplane_row["Model"] == "'+TowModel"
