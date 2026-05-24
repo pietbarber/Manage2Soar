@@ -357,6 +357,7 @@ def classify_logbook_flight_minutes(flight, member_id, rating_date):
 
     is_pilot = flight.pilot_id == member_id
     is_instructor = flight.instructor_id == member_id
+    is_tow_pilot = flight.tow_pilot_id == member_id
     is_passenger = flight.passenger_id == member_id
 
     dual_m = 0
@@ -376,10 +377,14 @@ def classify_logbook_flight_minutes(flight, member_id, rating_date):
     elif is_instructor:
         inst_m += duration_m
         pic_m += duration_m
+    elif is_tow_pilot:
+        # Tow pilot time is command time in the tow aircraft.
+        pic_m += duration_m
 
     return {
         "is_pilot": is_pilot,
         "is_instructor": is_instructor,
+        "is_tow_pilot": is_tow_pilot,
         "is_passenger": is_passenger,
         "duration_m": duration_m,
         "dual_m": dual_m,
