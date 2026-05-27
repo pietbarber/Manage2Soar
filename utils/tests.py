@@ -1,11 +1,20 @@
+import json
+import tempfile
 from datetime import timedelta
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command
-from django.test import TransactionTestCase
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
+from knowledgetest.models import (
+    Question,
+    QuestionCategory,
+    WrittenTestTemplate,
+    WrittenTestTemplateQuestion,
+)
+from members.models import Badge
 from utils.models import CronJobLock
 
 
@@ -229,3 +238,150 @@ def expected_hostname_prefix():
     import socket
 
     return socket.gethostname().split("-")[0]  # Get hostname without random suffix
+
+
+class BootstrapTenantStarterDataCommandTest(TestCase):
+    def _write_manifest_and_fixture(self, fixture_rows):
+        temp_dir = tempfile.TemporaryDirectory()
+        fixture_path = f"{temp_dir.name}/fixture.json"
+        manifest_path = f"{temp_dir.name}/manifest.json"
+
+        with open(fixture_path, "w", encoding="utf-8") as fixture_file:
+            json.dump(fixture_rows, fixture_file)
+
+        with open(manifest_path, "w", encoding="utf-8") as manifest_file:
+            json.dump({"name": "test", "fixtures": [fixture_path]}, manifest_file)
+
+        return temp_dir, manifest_path
+
+    def test_bootstrap_dry_run_does_not_write_data(self):
+        fixture_rows = [
+            {
+                "model": "members.badge",
+                "pk": 1,
+                "fields": {
+                    "name": "Dry Run Badge",
+                    "image": "",
+                    "description": "Should not be created",
+                    "order": 1,
+                },
+            }
+        ]
+        temp_dir, manifest_path = self._write_manifest_and_fixture(fixture_rows)
+
+        try:
+            call_command(
+                "bootstrap_tenant_starter_data",
+                "--manifest",
+                manifest_path,
+                "--dry-run",
+            )
+        finally:
+            temp_dir.cleanup()
+
+        self.assertFalse(Badge.objects.filter(name="Dry Run Badge").exists())
+
+    def test_bootstrap_is_idempotent_and_does_not_overwrite_existing(self):
+        Badge.objects.create(
+            name="A Badge",
+            image="",
+            description="Local customized description",
+            order=999,
+        )
+
+        fixture_rows = [
+            {
+                "model": "members.badge",
+                "pk": 1,
+                "fields": {
+                    "name": "A Badge",
+                    "image": "",
+                    "description": "Fixture description",
+                    "order": 1,
+                },
+            }
+        ]
+        temp_dir, manifest_path = self._write_manifest_and_fixture(fixture_rows)
+
+        try:
+            call_command(
+                "bootstrap_tenant_starter_data", "--manifest", manifest_path, "--strict"
+            )
+            call_command(
+                "bootstrap_tenant_starter_data", "--manifest", manifest_path, "--strict"
+            )
+        finally:
+            temp_dir.cleanup()
+
+        badge = Badge.objects.get(name="A Badge")
+        self.assertEqual(badge.description, "Local customized description")
+        self.assertEqual(Badge.objects.filter(name="A Badge").count(), 1)
+
+    def test_bootstrap_loads_written_test_templates_and_questions(self):
+        fixture_rows = [
+            {
+                "model": "knowledgetest.questioncategory",
+                "pk": "GFH",
+                "fields": {"description": "Glider Flying General Knowledge"},
+            },
+            {
+                "model": "knowledgetest.question",
+                "pk": 101,
+                "fields": {
+                    "category": "GFH",
+                    "question_text": "What is best glide speed?",
+                    "option_a": "Option A",
+                    "option_b": "Option B",
+                    "option_c": "Option C",
+                    "option_d": "Option D",
+                    "correct_answer": "A",
+                    "explanation": "Because it is.",
+                    "last_updated": "2025-01-01",
+                    "updated_by": None,
+                    "media": "",
+                },
+            },
+            {
+                "model": "knowledgetest.writtentesttemplate",
+                "pk": 501,
+                "fields": {
+                    "name": "Presolo Test",
+                    "description": "Starter presolo quiz",
+                    "pass_percentage": "80.00",
+                    "time_limit": None,
+                    "created_by": None,
+                },
+            },
+            {
+                "model": "knowledgetest.writtentesttemplatequestion",
+                "pk": 9001,
+                "fields": {
+                    "template": 501,
+                    "question": 101,
+                    "order": 1,
+                },
+            },
+        ]
+        temp_dir, manifest_path = self._write_manifest_and_fixture(fixture_rows)
+
+        try:
+            call_command(
+                "bootstrap_tenant_starter_data", "--manifest", manifest_path, "--strict"
+            )
+        finally:
+            temp_dir.cleanup()
+
+        self.assertTrue(QuestionCategory.objects.filter(pk="GFH").exists())
+        self.assertTrue(Question.objects.filter(pk=101).exists())
+        self.assertTrue(
+            WrittenTestTemplate.objects.filter(name="Presolo Test").exists()
+        )
+        template = WrittenTestTemplate.objects.get(name="Presolo Test")
+        question = Question.objects.get(pk=101)
+        self.assertTrue(
+            WrittenTestTemplateQuestion.objects.filter(
+                template=template,
+                question=question,
+                order=1,
+            ).exists()
+        )

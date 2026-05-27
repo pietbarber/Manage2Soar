@@ -1,0 +1,12 @@
+{
+  "name": "skyline-default",
+  "description": "Starter seed data for a new tenant (create-missing-only)",
+  "fixtures": [
+    "loaddata/members.Badge.json",
+    "loaddata/instructors.ClubQualificationType.json",
+    "loaddata/instructors.TrainingPhase.json",
+    "loaddata/instructors.TrainingLesson.json",
+    "loaddata/instructors.SyllabusDocument.json",
+    "loaddata/knowledgetest_dump.json"
+  ]
+}
