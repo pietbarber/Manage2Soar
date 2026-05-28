@@ -187,12 +187,19 @@ When someone offers a **swap** (not a cover), the system checks if the proposed 
 ### 5. Resolution Paths
 - Requester accepts an offer → swap/cover completed
 - Requester cancels request → **all originally notified members** get "all clear" email (whether they made an offer or not)
+- Nightly system job expires stale requests (`open` with duty date in the past) → request marked `expired`, pending offers marked `auto_declined`, and expiry notifications sent
 - No offers by deadline → Duty Officer decides based on role:
   - **Critical roles (Tow Pilot, Duty Officer)**: Operations MUST be cancelled
     - No tow pilot = can't fly
     - No duty officer = no one in charge
   - **Optional roles (Instructor, ADO)**: Operations can proceed without role, or DO can cancel, or DO can manually assign someone
 - Request stays open until resolved or duty day arrives
+
+### 8. Automatic Expiry of Stale Requests
+- A scheduled backend command runs nightly to close stale open requests whose duty date has already passed.
+- This path uses status `expired` (not `cancelled`) so historical records clearly distinguish system expiry from member-initiated cancellation.
+- Any pending offers on expired requests are set to `auto_declined`.
+- Requester and impacted offerers receive expiry-specific notifications.
 
 ### 6. Roles Covered
 - Instructor
