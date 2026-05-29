@@ -519,6 +519,7 @@ class FlightTowCostIntegrationTestCase(TestCase):
         """Rental billing should floor duration to configured minimum minutes."""
         config = SiteConfiguration.objects.first()
         self.assertIsNotNone(config)
+        config.billing_rules_enabled = True
         config.minimum_billable_rental_minutes = 20
         config.save()
 
@@ -534,6 +535,27 @@ class FlightTowCostIntegrationTestCase(TestCase):
 
         # Glider rate $12/hr with 20-minute floor => $4.00
         self.assertEqual(flight.rental_cost_calculated, Decimal("4.00"))
+
+    def test_minimum_billable_rental_minutes_ignored_when_billing_rules_disabled(self):
+        """Minimum rental floor should not apply when billing rules are disabled."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = False
+        config.minimum_billable_rental_minutes = 20
+        config.save()
+
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+            launch_time=time(9, 0),
+            landing_time=time(9, 10),
+        )
+
+        # Base behavior with 10-minute flight and $12/hr rate => $2.00.
+        self.assertEqual(flight.rental_cost_calculated, Decimal("2.00"))
 
     def test_matrix_mode_glider_specific_override_precedence(self):
         """Per-glider status override should take precedence over status-wide hourly override."""

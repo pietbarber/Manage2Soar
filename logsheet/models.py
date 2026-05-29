@@ -275,7 +275,11 @@ class Flight(models.Model):
         config = self._get_site_config()
 
         billable_seconds = Decimal(str(duration.total_seconds()))
-        if config and config.minimum_billable_rental_minutes:
+        if (
+            config
+            and config.billing_rules_enabled
+            and config.minimum_billable_rental_minutes
+        ):
             minimum_seconds = Decimal(
                 str(config.minimum_billable_rental_minutes)
             ) * Decimal("60")
