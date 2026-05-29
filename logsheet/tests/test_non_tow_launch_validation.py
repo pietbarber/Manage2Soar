@@ -10,6 +10,7 @@ Issue #623: Logsheet: Self-Launch or Winch, no towpilots
 """
 
 from datetime import date, time
+from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
@@ -27,6 +28,12 @@ from logsheet.models import (
     TowplaneCloseout,
 )
 from members.models import Member
+from siteconfig.models import (
+    BillingPricingMode,
+    MembershipBillingRule,
+    MembershipStatus,
+    SiteConfiguration,
+)
 
 
 @pytest.fixture
@@ -402,6 +409,75 @@ class TestFinalizationWithNonTowFlights:
         logsheet.refresh_from_db()
         assert logsheet.finalized is True
         mock_enqueue.assert_called_once_with(logsheet.pk)
+
+    def test_manage_finalize_locks_instruction_fee_actual(
+        self,
+        client,
+        logsheet,
+        pilot,
+        glider,
+        virtual_towplane_winch,
+        duty_officer,
+        duty_instructor,
+    ):
+        """Manage-view finalization should snapshot instruction_fee_actual."""
+        status, _ = MembershipStatus.objects.get_or_create(
+            name="Full Member",
+            defaults={"is_active": True},
+        )
+        MembershipBillingRule.objects.update_or_create(
+            membership_status=status,
+            defaults={
+                "is_active": True,
+                "charge_instruction_per_instructed_flight": True,
+                "instruction_flat_fee_per_flight": Decimal("18.00"),
+            },
+        )
+
+        config = SiteConfiguration.objects.first() or SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.org",
+            club_abbreviation="TC",
+        )
+        config.billing_rules_enabled = True
+        config.instructor_time_charges_enabled = True
+        config.billing_pricing_mode = BillingPricingMode.MATRIX
+        config.save(
+            update_fields=[
+                "billing_rules_enabled",
+                "instructor_time_charges_enabled",
+                "billing_pricing_mode",
+            ]
+        )
+
+        flight = Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            instructor=duty_instructor,
+            glider=glider,
+            launch_method=Flight.LaunchMethod.WINCH,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            release_altitude=1000,
+            towplane=virtual_towplane_winch,
+        )
+
+        LogsheetCloseout.objects.create(logsheet=logsheet)
+        LogsheetPayment.objects.create(
+            logsheet=logsheet, member=pilot, payment_method="cash"
+        )
+
+        client.force_login(duty_officer)
+        client.post(
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
+        )
+
+        logsheet.refresh_from_db()
+        flight.refresh_from_db()
+        assert logsheet.finalized is True
+        assert flight.instruction_fee_actual == Decimal("18.00")
 
     def test_manage_finalize_already_finalized_does_not_reenqueue(
         self,

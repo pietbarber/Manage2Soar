@@ -1330,6 +1330,8 @@ def manage_logsheet(request, pk):
                     flight.tow_cost_actual = flight.tow_cost_calculated
                 if flight.rental_cost_actual is None:
                     flight.rental_cost_actual = flight.rental_cost_calculated
+                if flight.instruction_fee_actual is None:
+                    flight.instruction_fee_actual = flight.instruction_fee_calculated
                 flight.save()
 
             locked_logsheet.finalized = True
