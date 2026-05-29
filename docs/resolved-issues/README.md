@@ -9,16 +9,18 @@ Each document provides detailed technical analysis, implementation details, test
 ## Resolved Issues
 
 ### [Issue #935 - Configurable Billing Rules (Membership Tow Discounts + Instructor-Time Billing)](issue-935-configurable-billing-rules.md)
-**Status**: Phase 1 Complete ✅ | **Date**: May 2026 | **Branch**: `feature/issue-936-configurable-billing-rules`
+**Status**: Phases 1-2 Complete ✅ | **Date**: May 2026 | **Branch**: `feature/issue-936-configurable-billing-rules`
 
-Implemented the foundation for tenant-configurable billing policies using site configuration and structured membership-status billing rules, with tow-discount integration delivered behind safe feature toggles. Club identities are intentionally anonymized in the issue summary.
+Implemented tenant-configurable billing policies using site configuration and structured membership-status rules, including matrix-mode pricing, per-glider rental exceptions, and minimum billable rental floor support. Club identities are intentionally anonymized in the issue summary.
 
 **Key Achievements**:
 - ✅ Added site-level billing flags/defaults for configurable policy behavior
 - ✅ Added structured `MembershipBillingRule` model keyed to membership status
 - ✅ Added admin management UX for billing configuration and rules
-- ✅ Integrated optional tow discount modifier into tow cost calculation path
-- ✅ Added migration and focused test coverage for defaults and rule application
+- ✅ Integrated optional matrix-mode tow/rental/instruction calculations with finalized snapshots
+- ✅ Added `MembershipGliderRentalRule` for status+glider rental overrides (for selective $0/hr cases)
+- ✅ Added configurable minimum billable rental minutes floor (for example, 20-minute minimum)
+- ✅ Added migrations and focused test coverage for matrix behavior and rental-floor logic
 
 **Technologies**: Django models/admin/migrations, configurable feature flags, pricing-rule composition, pytest
 

@@ -349,9 +349,9 @@ def _csv_towplane_product_name(towplane):
 
 
 def _member_flight_charge_breakdown(flight, member):
-    """Return (tow, rental, total) owed by `member` for a single flight."""
+    """Return (tow, rental, instruction, total) owed by `member` for a flight."""
     if flight.commercial_ride:
-        return Decimal("0.00"), Decimal("0.00"), Decimal("0.00")
+        return Decimal("0.00"), Decimal("0.00"), Decimal("0.00"), Decimal("0.00")
 
     # Prefer locked-in actual values for finalized logsheets, but fall back to
     # calculated values when legacy rows have NULL actuals.
@@ -365,22 +365,33 @@ def _member_flight_charge_breakdown(flight, member):
     else:
         rental_base = flight.rental_cost or Decimal("0.00")
 
+    if flight.logsheet.finalized and flight.instruction_fee_actual is not None:
+        instruction_base = flight.instruction_fee_actual
+    else:
+        instruction_base = flight.instruction_fee_calculated or Decimal("0.00")
+
     allocations = split_flight_costs(
         flight.pilot,
         flight.split_with,
         flight.split_type,
         tow_base,
         rental_base,
+        instruction_base,
     )
     member_alloc = allocations.get(
         member,
-        {"tow": Decimal("0.00"), "rental": Decimal("0.00")},
+        {
+            "tow": Decimal("0.00"),
+            "rental": Decimal("0.00"),
+            "instruction": Decimal("0.00"),
+        },
     )
 
     owed_tow = quantize_currency(member_alloc["tow"])
     owed_rental = quantize_currency(member_alloc["rental"])
-    total = quantize_currency(owed_tow + owed_rental)
-    return owed_tow, owed_rental, total
+    owed_instruction = quantize_currency(member_alloc.get("instruction"))
+    total = quantize_currency(owed_tow + owed_rental + owed_instruction)
+    return owed_tow, owed_rental, owed_instruction, total
 
 
 def _get_personal_charge_data(member, start_date):
@@ -424,8 +435,8 @@ def _get_personal_charge_data(member, start_date):
                     key=lambda tier: tier.altitude_start,
                 )
 
-        tow_cost, rental_cost, total_cost = _member_flight_charge_breakdown(
-            flight, member
+        tow_cost, rental_cost, instruction_cost, total_cost = (
+            _member_flight_charge_breakdown(flight, member)
         )
         if total_cost <= Decimal("0.00"):
             continue
@@ -436,6 +447,7 @@ def _get_personal_charge_data(member, start_date):
                 "glider": flight.glider,
                 "tow_cost": tow_cost,
                 "rental_cost": rental_cost,
+                "instruction_cost": instruction_cost,
                 "total_cost": total_cost,
             }
         )
@@ -711,6 +723,11 @@ def export_logsheet_finances_csv(request, pk):
             if flight.rental_cost_actual is not None
             else (flight.rental_cost or Decimal("0.00"))
         )
+        instruction_base = (
+            flight.instruction_fee_actual
+            if flight.instruction_fee_actual is not None
+            else (flight.instruction_fee_calculated or Decimal("0.00"))
+        )
 
         allocations = split_flight_costs(
             flight.pilot,
@@ -718,6 +735,7 @@ def export_logsheet_finances_csv(request, pk):
             flight.split_type,
             tow_base,
             rental_base,
+            instruction_base,
         )
 
         member_allocations = [
@@ -791,6 +809,21 @@ def export_logsheet_finances_csv(request, pk):
                         "1",
                         _format_charge_csv_number(tow_amount),
                         _format_charge_csv_number(tow_amount),
+                    ]
+                )
+
+            instruction_amount = quantize_currency(split_values.get("instruction"))
+            if instruction_amount > Decimal("0.00"):
+                writer.writerow(
+                    [
+                        invoice_num,
+                        customer_name,
+                        invoice_date,
+                        service_date,
+                        "Instruction Fee",
+                        "1",
+                        _format_charge_csv_number(instruction_amount),
+                        _format_charge_csv_number(instruction_amount),
                     ]
                 )
 
@@ -2137,21 +2170,31 @@ def manage_logsheet_finances(request, pk):
         return {
             "tow": f.tow_cost_actual if logsheet.finalized else f.tow_cost_calculated,
             "rental": f.rental_cost_actual if logsheet.finalized else f.rental_cost,
+            "instruction": (
+                f.instruction_fee_actual
+                if logsheet.finalized
+                else f.instruction_fee_calculated
+            ),
             "total": (
                 f.total_cost
                 if logsheet.finalized
-                else ((f.tow_cost_calculated or 0) + (f.rental_cost or 0))
+                else (
+                    (f.tow_cost_calculated or 0)
+                    + (f.rental_cost or 0)
+                    + (f.instruction_fee_calculated or 0)
+                )
             ),
         }
 
     flight_data = []
-    total_tow = total_rental = total_towplane_rental = total_sum = 0
+    total_tow = total_rental = total_instruction = total_towplane_rental = total_sum = 0
 
     for flight in flights:
         costs = flight_costs(flight)
         flight_data.append((flight, costs))
         total_tow += costs["tow"] or 0
         total_rental += costs["rental"] or 0
+        total_instruction += costs["instruction"] or 0
         total_sum += costs["total"] or 0
 
     # Add towplane rental costs
@@ -2169,7 +2212,9 @@ def manage_logsheet_finances(request, pk):
     from .models import LogsheetPayment
 
     # Summary per pilot
-    pilot_summary = defaultdict(lambda: {"count": 0, "tow": 0, "rental": 0, "total": 0})
+    pilot_summary = defaultdict(
+        lambda: {"count": 0, "tow": 0, "rental": 0, "instruction": 0, "total": 0}
+    )
     for flight, costs in flight_data:
         pilot = flight.pilot
         if pilot:
@@ -2177,6 +2222,7 @@ def manage_logsheet_finances(request, pk):
             summary["count"] += 1
             summary["tow"] += costs["tow"] or 0
             summary["rental"] += costs["rental"] or 0
+            summary["instruction"] += costs["instruction"] or 0
             summary["total"] += costs["total"] or 0
 
     # Who pays what?
@@ -2184,6 +2230,7 @@ def manage_logsheet_finances(request, pk):
         lambda: {
             "tow": Decimal("0.00"),
             "rental": Decimal("0.00"),
+            "instruction": Decimal("0.00"),
             "towplane_rental": Decimal("0.00"),
             "misc_charges": Decimal("0.00"),
             "total": Decimal("0.00"),
@@ -2192,6 +2239,7 @@ def manage_logsheet_finances(request, pk):
     for flight, costs in flight_data:
         tow = costs["tow"] or Decimal("0.00")
         rental = costs["rental"] or Decimal("0.00")
+        instruction = costs["instruction"] or Decimal("0.00")
 
         # IMPORTANT: Equivalent split logic is still implemented in
         # manage_logsheet_finances.html (JavaScript) for client-side preview
@@ -2202,14 +2250,17 @@ def manage_logsheet_finances(request, pk):
             flight.split_type,
             tow,
             rental,
+            instruction,
         )
         for charged_member, split_values in allocations.items():
             if not charged_member:
                 continue
             tow_split = quantize_currency(split_values["tow"])
             rental_split = quantize_currency(split_values["rental"])
+            instruction_split = quantize_currency(split_values.get("instruction"))
             member_charges[charged_member]["tow"] += tow_split
             member_charges[charged_member]["rental"] += rental_split
+            member_charges[charged_member]["instruction"] += instruction_split
 
     # Add towplane rental costs to member charges
     for closeout, rental_cost in towplane_data:
@@ -2233,6 +2284,7 @@ def manage_logsheet_finances(request, pk):
         summary["total"] = (
             summary["tow"]
             + summary["rental"]
+            + summary["instruction"]
             + summary["towplane_rental"]
             + summary["misc_charges"]
         )
@@ -2346,6 +2398,10 @@ def manage_logsheet_finances(request, pk):
                         flight.tow_cost_actual = flight.tow_cost_calculated
                     if flight.rental_cost_actual is None:
                         flight.rental_cost_actual = flight.rental_cost_calculated
+                    if flight.instruction_fee_actual is None:
+                        flight.instruction_fee_actual = (
+                            flight.instruction_fee_calculated
+                        )
                     flight.save()
 
                 locked_logsheet.finalized = True
@@ -2418,6 +2474,10 @@ def manage_logsheet_finances(request, pk):
     # Reuse cached SiteConfiguration to avoid extra DB lookups.
     rental_enabled = site_config.allow_towplane_rental if site_config else False
     treasurer_title = site_config.treasurer_title if site_config else "Treasurer"
+    instruction_fees_present = any(
+        (costs.get("instruction") or Decimal("0.00")) > Decimal("0.00")
+        for _, costs in flight_data
+    )
 
     context = {
         "logsheet": logsheet,
@@ -2426,6 +2486,7 @@ def manage_logsheet_finances(request, pk):
         "towplane_data": towplane_data,
         "total_tow": total_tow,
         "total_rental": total_rental,
+        "total_instruction": total_instruction,
         "total_towplane_rental": total_towplane_rental,
         "total_misc_charges": total_misc_charges,
         "total_sum": total_sum + total_misc_charges,
@@ -2437,6 +2498,7 @@ def manage_logsheet_finances(request, pk):
         "inactive_members": inactive_members,
         "towplane_rental_enabled": rental_enabled,
         "treasurer_title": treasurer_title,
+        "instruction_fees_present": instruction_fees_present,
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)

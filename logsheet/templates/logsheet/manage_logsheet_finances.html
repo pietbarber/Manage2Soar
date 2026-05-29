@@ -85,6 +85,7 @@
         <th data-sort-method="number"># Flights</th>
         <th class="text-end" data-sort-method="number">Tow Total</th>
         <th class="text-end" data-sort-method="number">Rental Total</th>
+        {% if instruction_fees_present %}<th class="text-end" data-sort-method="number">Instruction Total</th>{% endif %}
         <th class="text-end" data-sort-method="number">Grand Total</th>
       </tr>
     </thead>
@@ -95,6 +96,7 @@
       <td>{{ summary.count }}</td>
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
       <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
+      {% if instruction_fees_present %}<td class="text-end">${{ summary.instruction|floatformat:2 }}</td>{% endif %}
       <td class="text-end fw-bold">${{ summary.total|floatformat:2 }}</td>
     </tr>
     {% endfor %}
@@ -115,6 +117,7 @@
         <th data-sort-method="string">Member</th>
         <th class="text-end" data-sort-method="number">Tow</th>
         <th class="text-end" data-sort-method="number">Rental</th>
+        {% if instruction_fees_present %}<th class="text-end" data-sort-method="number">Instruction</th>{% endif %}
         {% if towplane_rental_enabled %}<th class="text-end" data-sort-method="number">Towplane Rental</th>{% endif %}
         {% if misc_charges_data %}<th class="text-end" data-sort-method="number">Misc</th>{% endif %}
         <th class="text-end" data-sort-method="number">Total</th>
@@ -126,6 +129,7 @@
       <td data-sort-value="{{ member.last_name|default:'' }}">{{ member|full_display_name }}</td>
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
       <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
+      {% if instruction_fees_present %}<td class="text-end">${{ summary.instruction|floatformat:2 }}</td>{% endif %}
       {% if towplane_rental_enabled %}<td class="text-end">${{ summary.towplane_rental|floatformat:2 }}</td>{% endif %}
       {% if misc_charges_data %}<td class="text-end">${{ summary.misc_charges|floatformat:2 }}</td>{% endif %}
       <td class="text-end fw-bold">${{ summary.total|floatformat:2 }}</td>
@@ -290,6 +294,7 @@
         <th data-sort-method="duration">Duration</th>
         <th class="text-end" data-sort-method="number">Tow Cost</th>
         <th class="text-end" data-sort-method="number">Rental Cost</th>
+        {% if instruction_fees_present %}<th class="text-end" data-sort-method="number">Instruction Fee</th>{% endif %}
         <th class="text-end" data-sort-method="number">Total</th>
         <th class="text-end no-sort">Split</th>
         {# Only show the Splits column for Payment Method Tracker, not Member Charges #}
@@ -303,6 +308,7 @@
           <td>{{ flight.computed_duration|default_if_none:"—" }}</td>
           <td class="text-end">${{ costs.tow|floatformat:2 }}</td>
           <td class="text-end">${{ costs.rental|floatformat:2 }}</td>
+          {% if instruction_fees_present %}<td class="text-end">${{ costs.instruction|floatformat:2 }}</td>{% endif %}
           <td class="text-end fw-bold">${{ costs.total|floatformat:2 }}</td>
           <td>
             {% if not logsheet.finalized %}

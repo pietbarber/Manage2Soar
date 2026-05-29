@@ -9,6 +9,8 @@ from .models import (
     ChargeableItem,
     MailingList,
     MailingListCriterion,
+    MembershipBillingRule,
+    MembershipGliderRentalRule,
     MembershipStatus,
     SiteConfiguration,
 )
@@ -282,6 +284,31 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Billing Rules",
+            {
+                "fields": (
+                    "billing_rules_enabled",
+                    "instructor_time_charges_enabled",
+                    "billing_pricing_mode",
+                    "minimum_billable_rental_minutes",
+                    "default_tow_discount_percent",
+                    "default_instructor_rate_multiplier",
+                ),
+                "description": (
+                    "Enable configurable billing rules keyed by membership status. "
+                    "When enabled, membership-specific modifiers can adjust tow, "
+                    "rental, and instruction billing behavior. "
+                    "<br><br>"
+                    "<strong>Example setup</strong>: set pricing mode to <em>Matrix</em>, "
+                    "set minimum billable rental minutes to <strong>20</strong>, then "
+                    "configure status + glider overrides so a junior status can be "
+                    "<strong>$0.00/hr</strong> on selected gliders while other gliders keep "
+                    "their normal rates."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Visiting Pilot Management",
             {
                 "fields": (
@@ -456,6 +483,153 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
         "Active statuses allow members to access member-only features. "
         "Sort order controls the display order in dropdowns (lower numbers first). "
         "⚠️ Be careful when deleting statuses - existing members may be using them!"
+    )
+
+
+@admin.register(MembershipBillingRule)
+class MembershipBillingRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "membership_status",
+        "tow_discount_percent",
+        "tow_hookup_fee_override",
+        "tow_rate_per_1000ft_override",
+        "glider_rental_rate_per_hour_override",
+        "instruction_flat_fee_per_flight",
+        "charge_instruction_per_instructed_flight",
+        "instructor_rate_multiplier",
+        "is_active",
+        "updated_at",
+    )
+    list_editable = (
+        "tow_discount_percent",
+        "tow_hookup_fee_override",
+        "tow_rate_per_1000ft_override",
+        "glider_rental_rate_per_hour_override",
+        "instruction_flat_fee_per_flight",
+        "charge_instruction_per_instructed_flight",
+        "instructor_rate_multiplier",
+        "is_active",
+    )
+    list_filter = ("is_active",)
+    search_fields = ("membership_status__name",)
+    ordering = ("membership_status__sort_order", "membership_status__name")
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "membership_status",
+                    "is_active",
+                )
+            },
+        ),
+        (
+            "Billing Modifiers",
+            {
+                "fields": (
+                    "tow_discount_percent",
+                    "instructor_rate_multiplier",
+                    "tow_hookup_fee_override",
+                    "tow_rate_per_1000ft_override",
+                    "glider_rental_rate_per_hour_override",
+                    "instruction_flat_fee_per_flight",
+                    "charge_instruction_per_instructed_flight",
+                )
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    readonly_fields = ("created_at", "updated_at")
+
+    def _has_webmaster_permission(self, request):
+        return (
+            request.user.is_superuser
+            or request.user.groups.filter(name="Webmasters").exists()
+        )
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    def has_add_permission(self, request):
+        return self._has_webmaster_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    admin_helper_message = (
+        "Membership Billing Rules: Optional per-membership-status pricing modifiers "
+        "for tow discounts and matrix-mode absolute tow/rental/instruction rules."
+    )
+
+
+@admin.register(MembershipGliderRentalRule)
+class MembershipGliderRentalRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "membership_status",
+        "glider",
+        "hourly_rate_override",
+        "is_active",
+        "updated_at",
+    )
+    list_editable = ("hourly_rate_override", "is_active")
+    list_filter = ("is_active", "membership_status")
+    search_fields = ("membership_status__name", "glider__n_number", "glider__model")
+    ordering = (
+        "membership_status__sort_order",
+        "membership_status__name",
+        "glider__n_number",
+    )
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "membership_status",
+                    "glider",
+                    "hourly_rate_override",
+                    "is_active",
+                )
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    readonly_fields = ("created_at", "updated_at")
+
+    def _has_webmaster_permission(self, request):
+        return (
+            request.user.is_superuser
+            or request.user.groups.filter(name="Webmasters").exists()
+        )
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    def has_add_permission(self, request):
+        return self._has_webmaster_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    admin_helper_message = (
+        "Membership Glider Rental Rules: Optional per-status per-glider hourly "
+        "rental overrides for matrix billing mode. Example: Junior + Glider X = "
+        "$0.00/hr while other junior gliders still use status-wide or base rates."
     )
 
 

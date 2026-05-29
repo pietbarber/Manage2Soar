@@ -1,10 +1,18 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 
-def split_flight_costs(pilot, partner, split_type, tow_cost, rental_cost):
-    """Return per-member tow/rental allocations for a flight."""
+def split_flight_costs(
+    pilot,
+    partner,
+    split_type,
+    tow_cost,
+    rental_cost,
+    instruction_cost=Decimal("0.00"),
+):
+    """Return per-member tow/rental/instruction allocations for a flight."""
     tow = Decimal(str(tow_cost or Decimal("0.00")))
     rental = Decimal(str(rental_cost or Decimal("0.00")))
+    instruction = Decimal(str(instruction_cost or Decimal("0.00")))
 
     allocations = {}
     primary = pilot or partner
@@ -13,20 +21,57 @@ def split_flight_costs(pilot, partner, split_type, tow_cost, rental_cost):
         if pilot and partner and split_type == "even":
             half_tow = tow / 2
             half_rental = rental / 2
-            allocations[pilot] = {"tow": half_tow, "rental": half_rental}
-            allocations[partner] = {"tow": half_tow, "rental": half_rental}
+            half_instruction = instruction / 2
+            allocations[pilot] = {
+                "tow": half_tow,
+                "rental": half_rental,
+                "instruction": half_instruction,
+            }
+            allocations[partner] = {
+                "tow": half_tow,
+                "rental": half_rental,
+                "instruction": half_instruction,
+            }
         elif pilot and partner and split_type == "tow":
-            allocations[pilot] = {"tow": Decimal("0.00"), "rental": rental}
-            allocations[partner] = {"tow": tow, "rental": Decimal("0.00")}
+            allocations[pilot] = {
+                "tow": Decimal("0.00"),
+                "rental": rental,
+                "instruction": instruction,
+            }
+            allocations[partner] = {
+                "tow": tow,
+                "rental": Decimal("0.00"),
+                "instruction": Decimal("0.00"),
+            }
         elif pilot and partner and split_type == "rental":
-            allocations[pilot] = {"tow": tow, "rental": Decimal("0.00")}
-            allocations[partner] = {"tow": Decimal("0.00"), "rental": rental}
+            allocations[pilot] = {
+                "tow": tow,
+                "rental": Decimal("0.00"),
+                "instruction": instruction,
+            }
+            allocations[partner] = {
+                "tow": Decimal("0.00"),
+                "rental": rental,
+                "instruction": Decimal("0.00"),
+            }
         elif pilot and partner and split_type == "full":
-            allocations[partner] = {"tow": tow, "rental": rental}
+            allocations[partner] = {
+                "tow": tow,
+                "rental": rental,
+                "instruction": instruction,
+            }
         elif primary:
-            allocations[primary] = {"tow": tow, "rental": rental}
+            allocations[primary] = {
+                "tow": tow,
+                "rental": rental,
+                "instruction": instruction,
+            }
     elif pilot:
-        allocations[pilot] = {"tow": tow, "rental": rental}
+        allocations[pilot] = {
+            "tow": tow,
+            "rental": rental,
+            "instruction": instruction,
+        }
 
     return allocations
 
