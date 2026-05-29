@@ -8,6 +8,22 @@ Each document provides detailed technical analysis, implementation details, test
 
 ## Resolved Issues
 
+### [Issue #935 - Configurable Billing Rules (Membership Tow Discounts + Instructor-Time Billing)](issue-935-configurable-billing-rules.md)
+**Status**: Phase 1 Complete ✅ | **Date**: May 2026 | **Branch**: `feature/issue-936-configurable-billing-rules`
+
+Implemented the foundation for tenant-configurable billing policies using site configuration and structured membership-status billing rules, with tow-discount integration delivered behind safe feature toggles. Club identities are intentionally anonymized in the issue summary.
+
+**Key Achievements**:
+- ✅ Added site-level billing flags/defaults for configurable policy behavior
+- ✅ Added structured `MembershipBillingRule` model keyed to membership status
+- ✅ Added admin management UX for billing configuration and rules
+- ✅ Integrated optional tow discount modifier into tow cost calculation path
+- ✅ Added migration and focused test coverage for defaults and rule application
+
+**Technologies**: Django models/admin/migrations, configurable feature flags, pricing-rule composition, pytest
+
+---
+
 ### [Issue #922 - Membership Status Dynamic Fixes](issue-922-membership-status-dynamic-fixes.md)
 **Status**: Complete ✅ | **Date**: May 2026 | **Branch**: `feature/issue-922-membership-status-dynamic-fixes`
 
