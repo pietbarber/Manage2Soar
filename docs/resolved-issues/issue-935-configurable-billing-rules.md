@@ -217,8 +217,8 @@ Use this when a club wants:
 - Go to Admin -> Membership Glider Rental Rules.
 - Create two active rows for membership status `Junior` with rental rate `0.00` for the two selected gliders.
 - Example:
-  - Junior + Glider SGS 1-34 A -> `rental_rate_per_hour_override = 0.00`, `is_active = true`
-  - Junior + Glider SGS 1-26 B -> `rental_rate_per_hour_override = 0.00`, `is_active = true`
+  - Junior + Glider SGS 1-34 A -> `hourly_rate_override = 0.00`, `is_active = true`
+  - Junior + Glider SGS 1-26 B -> `hourly_rate_override = 0.00`, `is_active = true`
 
 5. Verify rule precedence behavior
 - Expected precedence in matrix mode:

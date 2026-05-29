@@ -353,8 +353,9 @@ def _member_flight_charge_breakdown(flight, member):
     if flight.commercial_ride:
         return Decimal("0.00"), Decimal("0.00"), Decimal("0.00"), Decimal("0.00")
 
-    # Prefer locked-in actual values for finalized logsheets, but fall back to
-    # calculated values when legacy rows have NULL actuals.
+    # Prefer locked-in actual values for finalized logsheets.
+    # For instruction fees, finalized legacy rows with NULL snapshot should
+    # remain historically zero rather than recalculating from current rules.
     if flight.logsheet.finalized and flight.tow_cost_actual is not None:
         tow_base = flight.tow_cost_actual
     else:
@@ -365,8 +366,8 @@ def _member_flight_charge_breakdown(flight, member):
     else:
         rental_base = flight.rental_cost or Decimal("0.00")
 
-    if flight.logsheet.finalized and flight.instruction_fee_actual is not None:
-        instruction_base = flight.instruction_fee_actual
+    if flight.logsheet.finalized:
+        instruction_base = flight.instruction_fee_actual or Decimal("0.00")
     else:
         instruction_base = flight.instruction_fee_calculated or Decimal("0.00")
 
@@ -619,6 +620,7 @@ def personal_charges_summary_csv(request):
             "Item",
             "Tow Cost",
             "Rental Cost",
+            "Instruction Cost",
             "Misc Cost",
             "Total",
             "Notes",
@@ -634,6 +636,7 @@ def personal_charges_summary_csv(request):
                 "",
                 f"{row['tow_cost']:.2f}",
                 f"{row['rental_cost']:.2f}",
+                f"{row['instruction_cost']:.2f}",
                 "",
                 f"{row['total_cost']:.2f}",
                 "",
@@ -647,6 +650,7 @@ def personal_charges_summary_csv(request):
                 "Misc",
                 "",
                 _sanitize_csv_cell(charge.chargeable_item.name),
+                "",
                 "",
                 "",
                 f"{charge.total_price:.2f}",
@@ -723,11 +727,7 @@ def export_logsheet_finances_csv(request, pk):
             if flight.rental_cost_actual is not None
             else (flight.rental_cost or Decimal("0.00"))
         )
-        instruction_base = (
-            flight.instruction_fee_actual
-            if flight.instruction_fee_actual is not None
-            else (flight.instruction_fee_calculated or Decimal("0.00"))
-        )
+        instruction_base = flight.instruction_fee_actual or Decimal("0.00")
 
         allocations = split_flight_costs(
             flight.pilot,
@@ -2167,16 +2167,22 @@ def manage_logsheet_finances(request, pk):
 
     # Use locked-in values if finalized, else use capped property
     def flight_costs(f):
+        finalized_instruction = f.instruction_fee_actual or 0
+        finalized_total = (
+            (f.tow_cost_actual or 0)
+            + (f.rental_cost_actual or 0)
+            + (finalized_instruction or 0)
+        )
         return {
             "tow": f.tow_cost_actual if logsheet.finalized else f.tow_cost_calculated,
             "rental": f.rental_cost_actual if logsheet.finalized else f.rental_cost,
             "instruction": (
-                f.instruction_fee_actual
+                finalized_instruction
                 if logsheet.finalized
                 else f.instruction_fee_calculated
             ),
             "total": (
-                f.total_cost
+                finalized_total
                 if logsheet.finalized
                 else (
                     (f.tow_cost_calculated or 0)
