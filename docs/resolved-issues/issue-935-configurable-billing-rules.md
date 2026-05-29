@@ -134,6 +134,8 @@ Added migrations:
 
 ## Files Changed
 
+- `docs/resolved-issues/README.md`
+- `docs/resolved-issues/issue-935-configurable-billing-rules.md`
 - `siteconfig/models.py`
 - `siteconfig/admin.py`
 - `siteconfig/tests/test_siteconfig.py`
@@ -141,8 +143,12 @@ Added migrations:
 - `logsheet/views.py`
 - `logsheet/utils/flight_charges.py`
 - `logsheet/templates/logsheet/manage_logsheet_finances.html`
+- `logsheet/templates/logsheet/personal_charges_summary.html`
+- `logsheet/tests/test_finances_ui_and_split.py`
+- `logsheet/tests/test_non_tow_launch_validation.py`
+- `logsheet/tests/test_personal_charges_view.py`
 - `logsheet/tests/test_towplane_charging.py`
-- `logsheet/tests/test_member_charge_views.py`
+- `e2e_tests/e2e/test_finances_split_modal_instruction.py`
 - `siteconfig/migrations/0044_siteconfiguration_billing_rules_enabled_and_more.py`
 - `siteconfig/migrations/0045_membershipbillingrule_charge_instruction_per_instructed_flight_and_more.py`
 - `logsheet/migrations/0022_flight_instruction_fee_actual.py`
