@@ -169,6 +169,13 @@ The requester can still accept despite the warning (maybe plans changed).
 3. Click **"Cancel Request"**
 4. All offerers are notified
 
+### Automatic Expiry of Old Open Requests
+- If a request is still open after its duty date passes, the system automatically marks it as **Expired** during nightly processing.
+- This is different from **Cancelled**:
+  - **Cancelled** means you manually cancelled the request.
+  - **Expired** means the system closed it because the date passed.
+- Any pending offers on that request are automatically closed.
+
 ### Convert Direct to General
 If your direct request is declined:
 1. Go to **"My Swap Requests"**
@@ -192,9 +199,10 @@ You'll receive emails for:
 - **Offers accepted** by requesters
 - **Offers declined** by requesters
 - **Requests cancelled** by requesters
+- **Requests expired** automatically after the duty date has passed
 - **Emergency escalations** (if you're Duty Officer)
 
-All emails include direct links to the relevant pages.
+Most emails include direct links to the relevant pages; expiry notices provide summary context and direct users back to Duty Swap history.
 
 ---
 

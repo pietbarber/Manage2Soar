@@ -8,10 +8,12 @@ Tests the duty swap workflow including:
 - Email notifications
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from datetime import timezone as dt_timezone
 
 import pytest
 from django.core import mail
+from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import override_settings
 from django.urls import reverse
@@ -28,6 +30,7 @@ from duty_roster.models import (
 from duty_roster.views_swap import (
     _accept_offer_and_finalize,
     get_eligible_members_for_role,
+    send_request_expired_notifications,
     update_duty_assignments,
 )
 from members.models import Member
@@ -1758,6 +1761,252 @@ class TestVolunteerOpportunities:
         assert matching, "Expected a tow-pilot hole opportunity for the future day"
         role_labels = {o["role_label"] for o in matching}
         assert any("tow" in label.lower() for label in role_labels)
+
+
+@pytest.mark.django_db
+class TestSwapRequestExpiryCronjob:
+    """Tests for nightly expiry of stale duty swap requests."""
+
+    def test_expires_past_open_request_and_auto_declines_pending_offers(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=2),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+            status="pending",
+        )
+
+        notified = []
+
+        def _mock_notify(request_obj, auto_declined_offers=None):
+            notified.append((request_obj.pk, len(auto_declined_offers or [])))
+
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
+            _mock_notify,
+        )
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.transaction.on_commit",
+            lambda callback, using=None, robust=False: callback(),
+        )
+
+        call_command("expire_past_swap_requests", verbosity=0)
+
+        swap_request.refresh_from_db()
+        offer.refresh_from_db()
+
+        assert swap_request.status == "expired"
+        assert offer.status == "auto_declined"
+        assert offer.responded_at is not None
+        assert notified == [(swap_request.pk, 1)]
+
+    def test_uses_utc_cutoff_date_for_nightly_run(
+        self, site_config, alice, monkeypatch
+    ):
+        """03:10 UTC run should expire requests from the prior UTC day."""
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date(2026, 5, 29),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        fixed_now = datetime(2026, 5, 30, 3, 10, tzinfo=dt_timezone.utc)
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.timezone.now",
+            lambda: fixed_now,
+        )
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
+            lambda *_args, **_kwargs: None,
+        )
+
+        call_command("expire_past_swap_requests", verbosity=0)
+
+        swap_request.refresh_from_db()
+        assert swap_request.status == "expired"
+
+    def test_dry_run_does_not_mutate_records(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=3),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+            status="pending",
+        )
+
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
+            lambda *_args, **_kwargs: pytest.fail(
+                "Expiry notifications should not be sent during dry-run"
+            ),
+        )
+
+        call_command("expire_past_swap_requests", "--dry-run", verbosity=0)
+
+        swap_request.refresh_from_db()
+        offer.refresh_from_db()
+
+        assert swap_request.status == "open"
+        assert offer.status == "pending"
+        assert offer.responded_at is None
+
+    def test_expiry_notifications_are_deferred_until_transaction_commit(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=1),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+            status="pending",
+        )
+
+        scheduled_callbacks = []
+        notified = []
+
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.transaction.on_commit",
+            lambda callback, using=None, robust=False: scheduled_callbacks.append(
+                callback
+            ),
+        )
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
+            lambda request_obj, auto_declined_offers=None: notified.append(
+                (request_obj.pk, len(auto_declined_offers or []))
+            ),
+        )
+
+        call_command("expire_past_swap_requests", verbosity=0)
+
+        swap_request.refresh_from_db()
+        assert swap_request.status == "expired"
+        assert notified == []
+        assert len(scheduled_callbacks) == 1
+
+        scheduled_callbacks[0]()
+        assert notified == [(swap_request.pk, 1)]
+
+    def test_leaves_future_or_non_open_requests_unchanged(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        stale_open = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=1),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        future_open = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() + timedelta(days=1),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        past_cancelled = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=4),
+            role="TOW",
+            request_type="general",
+            status="cancelled",
+        )
+        past_fulfilled = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=5),
+            role="TOW",
+            request_type="general",
+            status="fulfilled",
+        )
+
+        notified_ids = []
+
+        def _mock_notify(request_obj, auto_declined_offers=None):
+            notified_ids.append(request_obj.pk)
+
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
+            _mock_notify,
+        )
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.transaction.on_commit",
+            lambda callback, using=None, robust=False: callback(),
+        )
+
+        call_command("expire_past_swap_requests", verbosity=0)
+
+        stale_open.refresh_from_db()
+        future_open.refresh_from_db()
+        past_cancelled.refresh_from_db()
+        past_fulfilled.refresh_from_db()
+
+        assert stale_open.status == "expired"
+        assert future_open.status == "open"
+        assert past_cancelled.status == "cancelled"
+        assert past_fulfilled.status == "fulfilled"
+        assert notified_ids == [stale_open.pk]
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_expiry_notifications_render_and_send_requester_and_offerer_templates(
+        self, site_config, alice, bob
+    ):
+        """Expiry notification helper should render both templates without errors."""
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=1),
+            role="TOW",
+            request_type="general",
+            status="expired",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+            status="auto_declined",
+        )
+
+        mail.outbox.clear()
+        send_request_expired_notifications(swap_request, auto_declined_offers=[offer])
+
+        assert len(mail.outbox) == 2
+        assert all(msg.alternatives for msg in mail.outbox)
+        html_payloads = [msg.alternatives[0][0] for msg in mail.outbox]
+        assert any("has expired" in html for html in html_payloads)
+        assert any("Hi Alice" in html for html in html_payloads)
+        assert any("Hi Bob" in html for html in html_payloads)
+        assert any(
+            "pending offer has been automatically closed" in html
+            for html in html_payloads
+        )
+
+
+@pytest.mark.django_db
+class TestVolunteerOpportunitiesEdgeCases:
+    """Additional edge-case coverage for volunteer opportunities context."""
 
     def test_no_opportunity_when_slot_filled(self, client, alice, site_config):
         """No opportunity is shown for a role that is already filled."""
