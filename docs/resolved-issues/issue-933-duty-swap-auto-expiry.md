@@ -40,7 +40,7 @@ Validation run:
 - Result: passing.
 
 ### Performance Impact
-The command executes a filtered, indexed date/status query and processes only stale open requests. Runtime overhead is low and bounded by stale-request volume, with a 5-minute active deadline in Kubernetes.
+The command executes a filtered date/status query and processes only stale open requests. Runtime overhead is low and bounded by stale-request volume, with a 5-minute active deadline in Kubernetes.
 
 ### Security Analysis
 No new permissions or public endpoints were introduced. Changes are constrained to backend scheduled processing and existing email pathways. Distributed lock handling prevents duplicate multi-pod execution.

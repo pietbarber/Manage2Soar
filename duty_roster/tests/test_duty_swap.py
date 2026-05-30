@@ -29,6 +29,7 @@ from duty_roster.models import (
 from duty_roster.views_swap import (
     _accept_offer_and_finalize,
     get_eligible_members_for_role,
+    send_request_expired_notifications,
     update_duty_assignments,
 )
 from members.models import Member
@@ -1889,6 +1890,44 @@ class TestSwapRequestExpiryCronjob:
         assert past_cancelled.status == "cancelled"
         assert past_fulfilled.status == "fulfilled"
         assert notified_ids == [stale_open.pk]
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_expiry_notifications_render_and_send_requester_and_offerer_templates(
+        self, site_config, alice, bob
+    ):
+        """Expiry notification helper should render both templates without errors."""
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=1),
+            role="TOW",
+            request_type="general",
+            status="expired",
+        )
+        offer = DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+            status="auto_declined",
+        )
+
+        mail.outbox.clear()
+        send_request_expired_notifications(swap_request, auto_declined_offers=[offer])
+
+        assert len(mail.outbox) == 2
+        assert all(msg.alternatives for msg in mail.outbox)
+        html_payloads = [msg.alternatives[0][0] for msg in mail.outbox]
+        assert any("has expired" in html for html in html_payloads)
+        assert any("Hi Alice" in html for html in html_payloads)
+        assert any("Hi Bob" in html for html in html_payloads)
+        assert any(
+            "pending offer has been automatically closed" in html
+            for html in html_payloads
+        )
+
+
+@pytest.mark.django_db
+class TestVolunteerOpportunitiesEdgeCases:
+    """Additional edge-case coverage for volunteer opportunities context."""
 
     def test_no_opportunity_when_slot_filled(self, client, alice, site_config):
         """No opportunity is shown for a role that is already filled."""

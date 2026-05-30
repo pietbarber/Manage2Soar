@@ -195,19 +195,19 @@ When someone offers a **swap** (not a cover), the system checks if the proposed 
   - **Optional roles (Instructor, ADO)**: Operations can proceed without role, or DO can cancel, or DO can manually assign someone
 - Request stays open until resolved or duty day arrives
 
-### 8. Automatic Expiry of Stale Requests
+### 6. Automatic Expiry of Stale Requests
 - A scheduled backend command runs nightly to close stale open requests whose duty date has already passed.
 - This path uses status `expired` (not `cancelled`) so historical records clearly distinguish system expiry from member-initiated cancellation.
 - Any pending offers on expired requests are set to `auto_declined`.
 - Requester and impacted offerers receive expiry-specific notifications.
 
-### 6. Roles Covered
+### 7. Roles Covered
 - Instructor
 - Tow Pilot
 - Duty Officer
 - Assistant Duty Officer
 
-### 7. Site Configuration Constraints
+### 8. Site Configuration Constraints
 **Critical**: Swap requests are only available for roles that are **scheduled** ahead of time.
 
 From `SiteConfiguration`:

@@ -202,7 +202,7 @@ You'll receive emails for:
 - **Requests expired** automatically after the duty date has passed
 - **Emergency escalations** (if you're Duty Officer)
 
-All emails include direct links to the relevant pages.
+Most emails include direct links to the relevant pages; expiry notices provide summary context and direct users back to Duty Swap history.
 
 ---
 
