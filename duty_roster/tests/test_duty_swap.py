@@ -1793,6 +1793,10 @@ class TestSwapRequestExpiryCronjob:
             "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
             _mock_notify,
         )
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.transaction.on_commit",
+            lambda callback, using=None, robust=False: callback(),
+        )
 
         call_command("expire_past_swap_requests", verbosity=0)
 
@@ -1864,6 +1868,49 @@ class TestSwapRequestExpiryCronjob:
         assert offer.status == "pending"
         assert offer.responded_at is None
 
+    def test_expiry_notifications_are_deferred_until_transaction_commit(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() - timedelta(days=1),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapOffer.objects.create(
+            swap_request=swap_request,
+            offered_by=bob,
+            offer_type="cover",
+            status="pending",
+        )
+
+        scheduled_callbacks = []
+        notified = []
+
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.transaction.on_commit",
+            lambda callback, using=None, robust=False: scheduled_callbacks.append(
+                callback
+            ),
+        )
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
+            lambda request_obj, auto_declined_offers=None: notified.append(
+                (request_obj.pk, len(auto_declined_offers or []))
+            ),
+        )
+
+        call_command("expire_past_swap_requests", verbosity=0)
+
+        swap_request.refresh_from_db()
+        assert swap_request.status == "expired"
+        assert notified == []
+        assert len(scheduled_callbacks) == 1
+
+        scheduled_callbacks[0]()
+        assert notified == [(swap_request.pk, 1)]
+
     def test_leaves_future_or_non_open_requests_unchanged(
         self, site_config, alice, bob, monkeypatch
     ):
@@ -1904,6 +1951,10 @@ class TestSwapRequestExpiryCronjob:
         monkeypatch.setattr(
             "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
             _mock_notify,
+        )
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.transaction.on_commit",
+            lambda callback, using=None, robust=False: callback(),
         )
 
         call_command("expire_past_swap_requests", verbosity=0)

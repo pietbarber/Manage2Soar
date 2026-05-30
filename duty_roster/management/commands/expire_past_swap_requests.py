@@ -70,9 +70,11 @@ class Command(BaseCronJobCommand):
                     offer.responded_at = now_ts
                     offer.save(update_fields=["status", "responded_at"])
 
-                send_request_expired_notifications(
-                    swap_request,
-                    auto_declined_offers=pending_offers,
+                transaction.on_commit(
+                    lambda req=swap_request, offers=pending_offers: send_request_expired_notifications(
+                        req,
+                        auto_declined_offers=offers,
+                    )
                 )
 
                 expired_count += 1
