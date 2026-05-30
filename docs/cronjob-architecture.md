@@ -99,8 +99,8 @@ Uses PostgreSQL's atomic operations:
 1. ✅ Converted existing commands to use base class:
    - ✅ `send_duty_preop_emails.py` - **SCHEDULED DAILY**
    - ✅ `send_maintenance_digest.py` - **SCHEDULED WEEKLY**
-    - ✅ `expire_ad_hoc_days.py` - **SCHEDULED DAILY**
-    - ✅ `expire_past_swap_requests.py` - **SCHEDULED DAILY** (Issue #933 stale swap request expiry)
+   - ✅ `expire_ad_hoc_days.py` - **SCHEDULED DAILY**
+   - ✅ `expire_past_swap_requests.py` - **SCHEDULED DAILY** (Issue #933 stale swap request expiry)
 2. ✅ Created new notification commands:
    - ✅ `notify_aging_logsheets.py` - **FINDING REAL ISSUES**
    - ✅ `notify_pending_sprs.py` - **FIRST DAILY SPR REMINDER DIGEST**
