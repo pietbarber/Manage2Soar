@@ -19,7 +19,7 @@ class Command(BaseCronJobCommand):
     )  # Matches K8s CronJob activeDeadlineSeconds=300
 
     def execute_job(self, *args, **options):
-        today = timezone.localdate()
+        today = timezone.now().date()
         dry_run = options.get("dry_run", False)
 
         stale_request_ids = list(

@@ -8,7 +8,8 @@ Tests the duty swap workflow including:
 - Email notifications
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from datetime import timezone as dt_timezone
 
 import pytest
 from django.core import mail
@@ -1802,6 +1803,33 @@ class TestSwapRequestExpiryCronjob:
         assert offer.status == "auto_declined"
         assert offer.responded_at is not None
         assert notified == [(swap_request.pk, 1)]
+
+    def test_uses_utc_cutoff_date_for_nightly_run(
+        self, site_config, alice, monkeypatch
+    ):
+        """03:10 UTC run should expire requests from the prior UTC day."""
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date(2026, 5, 29),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        fixed_now = datetime(2026, 5, 30, 3, 10, tzinfo=dt_timezone.utc)
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.timezone.now",
+            lambda: fixed_now,
+        )
+        monkeypatch.setattr(
+            "duty_roster.management.commands.expire_past_swap_requests.send_request_expired_notifications",
+            lambda *_args, **_kwargs: None,
+        )
+
+        call_command("expire_past_swap_requests", verbosity=0)
+
+        swap_request.refresh_from_db()
+        assert swap_request.status == "expired"
 
     def test_dry_run_does_not_mutate_records(
         self, site_config, alice, bob, monkeypatch
