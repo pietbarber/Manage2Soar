@@ -163,6 +163,9 @@ class Flight(models.Model):
     rental_cost_actual = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True
     )
+    instruction_fee_actual = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True
+    )
 
     def is_incomplete(self):
         if self.landing_time is None:
@@ -229,7 +232,8 @@ class Flight(models.Model):
             try:
                 scheme = self.towplane.charge_scheme
                 if scheme.is_active:
-                    return scheme.calculate_tow_cost(self.release_altitude)
+                    base_cost = scheme.calculate_tow_cost(self.release_altitude)
+                    return self._apply_membership_tow_discount(base_cost, scheme=scheme)
             except TowplaneChargeScheme.DoesNotExist:
                 pass
 
@@ -267,10 +271,47 @@ class Flight(models.Model):
 
         if not self.glider or not duration:
             return None
-        if not self.glider.rental_rate:
+
+        config = self._get_site_config()
+
+        billable_seconds = Decimal(str(duration.total_seconds()))
+        if (
+            config
+            and config.billing_rules_enabled
+            and config.minimum_billable_rental_minutes
+        ):
+            minimum_seconds = Decimal(
+                str(config.minimum_billable_rental_minutes)
+            ) * Decimal("60")
+            billable_seconds = max(billable_seconds, minimum_seconds)
+
+        hourly_rate = (
+            Decimal(str(self.glider.rental_rate))
+            if self.glider.rental_rate is not None
+            else Decimal("0.00")
+        )
+        if (
+            config
+            and config.billing_rules_enabled
+            and config.billing_pricing_mode == "matrix"
+        ):
+            glider_rule = self._get_membership_glider_rental_rule()
+            if glider_rule:
+                hourly_rate = Decimal(str(glider_rule.hourly_rate_override))
+
+            rule = self._get_membership_billing_rule()
+            if (
+                not glider_rule
+                and rule
+                and rule.glider_rental_rate_per_hour_override is not None
+            ):
+                hourly_rate = Decimal(str(rule.glider_rental_rate_per_hour_override))
+
+        if hourly_rate == Decimal("0.00"):
             return Decimal("0.00")
-        hours = Decimal(duration.total_seconds()) / Decimal(3600)
-        return Decimal(str(self.glider.rental_rate)) * hours
+
+        hours = billable_seconds / Decimal(3600)
+        return hourly_rate * hours
 
     @property
     def tow_cost(self):
@@ -321,7 +362,8 @@ class Flight(models.Model):
     def total_cost(self):
         tow = self.tow_cost or 0
         rental = self.rental_cost or 0
-        return round(tow + rental, 2)
+        instruction_fee = self.instruction_fee_calculated or 0
+        return round(tow + rental + instruction_fee, 2)
 
     @property
     def total_cost_display(self):
@@ -424,6 +466,128 @@ class Flight(models.Model):
             config = SiteConfiguration.objects.first()
             self._site_config_cache = config
         return config
+
+    def _get_membership_billing_rule(self):
+        """Get active membership billing rule with instance-level caching."""
+        cached_rule = getattr(self, "_membership_billing_rule_cache", None)
+        if cached_rule is not None:
+            return cached_rule
+
+        if not self.pilot or not self.pilot.membership_status:
+            self._membership_billing_rule_cache = False
+            return None
+
+        from siteconfig.models import MembershipBillingRule
+
+        rule = MembershipBillingRule.get_for_membership_status(
+            self.pilot.membership_status
+        )
+        self._membership_billing_rule_cache = rule or False
+        return rule
+
+    def _get_membership_glider_rental_rule(self):
+        """Get active status+glider rental override with instance-level caching."""
+        cached_rule = getattr(self, "_membership_glider_rental_rule_cache", None)
+        if cached_rule is not None:
+            return cached_rule
+
+        if (
+            not self.glider
+            or not self.pilot
+            or not self.pilot.membership_status
+            or not self.glider.pk
+        ):
+            self._membership_glider_rental_rule_cache = False
+            return None
+
+        from siteconfig.models import MembershipGliderRentalRule
+
+        rule = MembershipGliderRentalRule.get_for_membership_status_and_glider(
+            self.pilot.membership_status,
+            self.glider.pk,
+        )
+        self._membership_glider_rental_rule_cache = rule or False
+        return rule
+
+    def _apply_membership_tow_discount(self, base_cost, scheme=None):
+        """Apply optional membership-status tow discount rules to a base cost."""
+        if base_cost is None:
+            return None
+
+        config = self._get_site_config()
+        if not config or not config.billing_rules_enabled:
+            return base_cost
+
+        rule = self._get_membership_billing_rule()
+        if config.billing_pricing_mode == "matrix":
+            return self._apply_membership_tow_matrix(base_cost, scheme, rule)
+
+        discount_percent = config.default_tow_discount_percent or Decimal("0.00")
+
+        # Use a status-specific active rule when available, otherwise fallback to
+        # SiteConfiguration default discount percent.
+        if rule:
+            discount_percent = rule.tow_discount_percent
+
+        factor = Decimal("1.00") - (Decimal(str(discount_percent)) / Decimal("100.00"))
+        adjusted = Decimal(str(base_cost)) * factor
+        return adjusted.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    def _apply_membership_tow_matrix(self, base_cost, scheme, rule):
+        """Apply matrix-mode tow pricing overrides by membership status."""
+        if base_cost is None or not scheme:
+            return base_cost
+
+        if not rule:
+            return base_cost
+
+        base_hookup = Decimal(str(scheme.hookup_fee or Decimal("0.00")))
+        base_altitude_component = Decimal(str(base_cost)) - base_hookup
+        if base_altitude_component < Decimal("0.00"):
+            base_altitude_component = Decimal("0.00")
+
+        hookup_fee = (
+            Decimal(str(rule.tow_hookup_fee_override))
+            if rule.tow_hookup_fee_override is not None
+            else base_hookup
+        )
+
+        if (
+            rule.tow_rate_per_1000ft_override is not None
+            and self.release_altitude is not None
+        ):
+            altitude_units = Decimal((self.release_altitude + 999) // 1000)
+            altitude_component = altitude_units * Decimal(
+                str(rule.tow_rate_per_1000ft_override)
+            )
+        else:
+            altitude_component = base_altitude_component
+
+        total = hookup_fee + altitude_component
+        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def instruction_fee_calculated(self):
+        """Calculate optional flat per-flight instruction fee."""
+        if not self.instructor:
+            return Decimal("0.00")
+
+        config = self._get_site_config()
+        if (
+            not config
+            or not config.billing_rules_enabled
+            or not config.instructor_time_charges_enabled
+        ):
+            return Decimal("0.00")
+
+        if config.billing_pricing_mode != "matrix":
+            return Decimal("0.00")
+
+        rule = self._get_membership_billing_rule()
+        if not rule or not rule.charge_instruction_per_instructed_flight:
+            return Decimal("0.00")
+
+        return Decimal(str(rule.instruction_flat_fee_per_flight or Decimal("0.00")))
 
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"

@@ -20,7 +20,7 @@ from logsheet.models import (
 )
 from logsheet.views import _get_personal_charge_data
 from members.models import Member
-from siteconfig.models import ChargeableItem, MembershipStatus
+from siteconfig.models import ChargeableItem, MembershipStatus, SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -180,6 +180,7 @@ class TestPersonalChargesView:
             flags=re.IGNORECASE,
         )
         assert len(sortable_tables) == 2
+        assert "Instruction Cost" in content
 
     def test_personal_charges_csv_exports_flights_and_misc(self, client):
         client.force_login(self.member)
@@ -238,11 +239,12 @@ class TestPersonalChargesView:
 
         sanitized_glider_values = [r[2] for r in data_rows if r[1] == "Flight"]
         sanitized_item_values = [r[3] for r in data_rows if r[1] == "Misc"]
-        sanitized_notes_values = [r[8] for r in data_rows if r[1] == "Misc"]
+        sanitized_notes_values = [r[9] for r in data_rows if r[1] == "Misc"]
 
         assert any(value.startswith("'=2+2") for value in sanitized_glider_values)
         assert "'@malicious-item" in sanitized_item_values
         assert "' +SUM(1,2)" in sanitized_notes_values
+        assert rows[0][6] == "Instruction Cost"
 
     def test_personal_charges_view_covers_even_rental_and_full_splits(self, client):
         flight_even = Flight.objects.create(
@@ -340,6 +342,14 @@ class TestPersonalChargesView:
     def test_personal_charge_data_avoids_n_plus_one_for_charge_tiers(
         self, django_assert_num_queries
     ):
+        SiteConfiguration.objects.get_or_create(
+            defaults={
+                "club_name": "Test Club",
+                "domain_name": "test.example.com",
+                "club_abbreviation": "TC",
+            }
+        )
+
         towplane = Towplane.objects.create(
             name="Tow 1",
             n_number="N200TP",

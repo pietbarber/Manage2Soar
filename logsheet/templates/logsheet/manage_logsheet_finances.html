@@ -85,6 +85,7 @@
         <th data-sort-method="number"># Flights</th>
         <th class="text-end" data-sort-method="number">Tow Total</th>
         <th class="text-end" data-sort-method="number">Rental Total</th>
+        {% if instruction_fees_present %}<th class="text-end" data-sort-method="number">Instruction Total</th>{% endif %}
         <th class="text-end" data-sort-method="number">Grand Total</th>
       </tr>
     </thead>
@@ -95,6 +96,7 @@
       <td>{{ summary.count }}</td>
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
       <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
+      {% if instruction_fees_present %}<td class="text-end">${{ summary.instruction|floatformat:2 }}</td>{% endif %}
       <td class="text-end fw-bold">${{ summary.total|floatformat:2 }}</td>
     </tr>
     {% endfor %}
@@ -115,6 +117,7 @@
         <th data-sort-method="string">Member</th>
         <th class="text-end" data-sort-method="number">Tow</th>
         <th class="text-end" data-sort-method="number">Rental</th>
+        {% if instruction_fees_present %}<th class="text-end" data-sort-method="number">Instruction</th>{% endif %}
         {% if towplane_rental_enabled %}<th class="text-end" data-sort-method="number">Towplane Rental</th>{% endif %}
         {% if misc_charges_data %}<th class="text-end" data-sort-method="number">Misc</th>{% endif %}
         <th class="text-end" data-sort-method="number">Total</th>
@@ -126,6 +129,7 @@
       <td data-sort-value="{{ member.last_name|default:'' }}">{{ member|full_display_name }}</td>
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
       <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
+      {% if instruction_fees_present %}<td class="text-end">${{ summary.instruction|floatformat:2 }}</td>{% endif %}
       {% if towplane_rental_enabled %}<td class="text-end">${{ summary.towplane_rental|floatformat:2 }}</td>{% endif %}
       {% if misc_charges_data %}<td class="text-end">${{ summary.misc_charges|floatformat:2 }}</td>{% endif %}
       <td class="text-end fw-bold">${{ summary.total|floatformat:2 }}</td>
@@ -290,6 +294,7 @@
         <th data-sort-method="duration">Duration</th>
         <th class="text-end" data-sort-method="number">Tow Cost</th>
         <th class="text-end" data-sort-method="number">Rental Cost</th>
+        {% if instruction_fees_present %}<th class="text-end" data-sort-method="number">Instruction Fee</th>{% endif %}
         <th class="text-end" data-sort-method="number">Total</th>
         <th class="text-end no-sort">Split</th>
         {# Only show the Splits column for Payment Method Tracker, not Member Charges #}
@@ -303,6 +308,7 @@
           <td>{{ flight.computed_duration|default_if_none:"—" }}</td>
           <td class="text-end">${{ costs.tow|floatformat:2 }}</td>
           <td class="text-end">${{ costs.rental|floatformat:2 }}</td>
+          {% if instruction_fees_present %}<td class="text-end">${{ costs.instruction|floatformat:2 }}</td>{% endif %}
           <td class="text-end fw-bold">${{ costs.total|floatformat:2 }}</td>
           <td>
             {% if not logsheet.finalized %}
@@ -332,6 +338,7 @@
                   data-duration="{{ flight.computed_duration|default_if_none:'—' }}"
                   data-tow-cost="{{ costs.tow|floatformat:2 }}"
                   data-rental-cost="{{ costs.rental|floatformat:2 }}"
+                  data-instruction-cost="{{ costs.instruction|floatformat:2 }}"
                   data-total-cost="{{ costs.total|floatformat:2 }}">
                   <i class="bi bi-eye me-1"></i>View Split
                 </button>
@@ -404,7 +411,8 @@
       <th colspan="3" class="text-end">Totals:</th>
       <th class="text-end">${{ total_tow|floatformat:2 }}</th>
       <th class="text-end">${{ total_rental|floatformat:2 }}</th>
-      <th class="text-end">${{ total_tow|add:total_rental|floatformat:2 }}</th>
+      {% if instruction_fees_present %}<th class="text-end">${{ total_instruction|floatformat:2 }}</th>{% endif %}
+      <th class="text-end">${{ total_tow|add:total_rental|add:total_instruction|floatformat:2 }}</th>
       <th></th>
     </tr>
     </tfoot>
@@ -673,6 +681,7 @@ document.addEventListener("DOMContentLoaded", function() {
       var duration = btn.getAttribute('data-duration');
       var towCost = parseFloat(btn.getAttribute('data-tow-cost'));
       var rentalCost = parseFloat(btn.getAttribute('data-rental-cost'));
+      var instructionCost = parseFloat(btn.getAttribute('data-instruction-cost'));
       var totalCost = parseFloat(btn.getAttribute('data-total-cost'));
 
       // Populate flight details
@@ -695,31 +704,41 @@ document.addEventListener("DOMContentLoaded", function() {
       // Calculate split amounts
       // IMPORTANT: This logic must match the backend calculation in views.py lines 990-997
       // If split calculation changes, update BOTH locations!
-      var pilotTow = 0, pilotRental = 0, partnerTow = 0, partnerRental = 0;
+      var pilotTow = 0, pilotRental = 0, pilotInstruction = 0;
+      var partnerTow = 0, partnerRental = 0, partnerInstruction = 0;
 
       if (splitType === 'even') {
         // For 50/50 splits, divide both tow and rental costs equally
         var halfTow = towCost / 2;
         var halfRental = rentalCost / 2;
+        var halfInstruction = instructionCost / 2;
         pilotTow = halfTow;
         pilotRental = halfRental;
+        pilotInstruction = halfInstruction;
         partnerTow = halfTow;
         partnerRental = halfRental;
+        partnerInstruction = halfInstruction;
       } else if (splitType === 'tow') {
         pilotTow = 0;
         pilotRental = rentalCost;
+        pilotInstruction = instructionCost;
         partnerTow = towCost;
         partnerRental = 0;
+        partnerInstruction = 0;
       } else if (splitType === 'rental') {
         pilotTow = towCost;
         pilotRental = 0;
+        pilotInstruction = instructionCost;
         partnerTow = 0;
         partnerRental = rentalCost;
+        partnerInstruction = 0;
       } else if (splitType === 'full') {
         pilotTow = 0;
         pilotRental = 0;
+        pilotInstruction = 0;
         partnerTow = towCost;
         partnerRental = rentalCost;
+        partnerInstruction = instructionCost;
       }
 
       // Build cost breakdown table
@@ -747,12 +766,18 @@ document.addEventListener("DOMContentLoaded", function() {
             <td class="text-end">$${rentalCost.toFixed(2)}</td>
             <td class="text-end">$${pilotRental.toFixed(2)}</td>
             <td class="text-end">$${partnerRental.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>Instruction Fee</td>
+            <td class="text-end">$${instructionCost.toFixed(2)}</td>
+            <td class="text-end">$${pilotInstruction.toFixed(2)}</td>
+            <td class="text-end">$${partnerInstruction.toFixed(2)}</td>
           </tr>`;
       }
 
       // Update totals
-      var pilotTotal = pilotTow + pilotRental;
-      var partnerTotal = partnerTow + partnerRental;
+      var pilotTotal = pilotTow + pilotRental + pilotInstruction;
+      var partnerTotal = partnerTow + partnerRental + partnerInstruction;
 
       document.getElementById('view-total-amount').textContent = '$' + totalCost.toFixed(2);
       document.getElementById('view-pilot-total').textContent = '$' + pilotTotal.toFixed(2);

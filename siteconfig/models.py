@@ -1,10 +1,10 @@
 import logging
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils.crypto import get_random_string
@@ -44,6 +44,13 @@ class ReservationLimitPeriod(models.TextChoices):
 
     YEARLY = "yearly", "Yearly"
     QUARTERLY = "quarterly", "Quarterly"
+
+
+class BillingPricingMode(models.TextChoices):
+    """Billing policy mode for membership rules."""
+
+    DISCOUNT = "discount", "Discount Mode"
+    MATRIX = "matrix", "Matrix Mode"
 
 
 class MailingList(models.Model):
@@ -464,6 +471,65 @@ class SiteConfiguration(models.Model):
     waive_rental_fee_on_retrieve = models.BooleanField(
         default=False,
         help_text="Don't charge for glider rental on retrieve flights (some clubs don't charge rental for the ferry flight back).",
+    )
+
+    # Membership-based billing rules (Issue #936)
+    billing_rules_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Enable membership-status billing rules for tow discounts and instructor "
+            "charge multipliers. When disabled, base pricing applies."
+        ),
+    )
+    instructor_time_charges_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Enable instructor-time billing workflows that can use membership-status "
+            "rate multipliers."
+        ),
+    )
+    default_tow_discount_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[
+            MinValueValidator(Decimal("-100.00")),
+            MaxValueValidator(Decimal("100.00")),
+        ],
+        help_text=(
+            "Fallback tow discount percentage when billing rules are enabled and no "
+            "membership-status-specific rule exists. Positive values are discounts; "
+            "negative values are surcharges."
+        ),
+    )
+    default_instructor_rate_multiplier = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("1.00"),
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("10.00")),
+        ],
+        help_text=(
+            "Fallback instructor charge multiplier when instructor-time charges are "
+            "enabled and no membership-status-specific rule exists."
+        ),
+    )
+    billing_pricing_mode = models.CharField(
+        max_length=20,
+        choices=tuple(BillingPricingMode.choices),
+        default=BillingPricingMode.DISCOUNT,
+        help_text=(
+            "Discount mode applies percentage modifiers. Matrix mode applies "
+            "absolute per-status component overrides for tow/rental/instruction."
+        ),
+    )
+    minimum_billable_rental_minutes = models.PositiveIntegerField(
+        default=0,
+        help_text=(
+            "Minimum billable glider rental duration in minutes. Set to 0 to "
+            "disable minimum billing floor."
+        ),
     )
 
     # Quick altitude buttons for flight form (Issue #467)
@@ -951,6 +1017,197 @@ class MembershipStatus(models.Model):
             (status.name, status.name)
             for status in cls.objects.all().order_by("sort_order", "name")
         ]
+
+
+class MembershipBillingRule(models.Model):
+    """Per-membership-status billing modifiers for tow and instructor charges."""
+
+    membership_status = models.OneToOneField(
+        MembershipStatus,
+        on_delete=models.CASCADE,
+        related_name="billing_rule",
+        help_text="Membership status this billing rule applies to.",
+    )
+    tow_discount_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[
+            MinValueValidator(Decimal("-100.00")),
+            MaxValueValidator(Decimal("100.00")),
+        ],
+        help_text=(
+            "Tow discount percentage for this membership status. Positive values are "
+            "discounts; negative values are surcharges."
+        ),
+    )
+    instructor_rate_multiplier = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("1.00"),
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("10.00")),
+        ],
+        help_text=(
+            "Instructor-time charge multiplier for this membership status "
+            "(for example, 0.80 = 20% discount)."
+        ),
+    )
+    tow_hookup_fee_override = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text=(
+            "Optional absolute tow hookup fee override used in matrix mode. "
+            "Leave blank to use the towplane scheme hookup fee."
+        ),
+    )
+    tow_rate_per_1000ft_override = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text=(
+            "Optional absolute tow altitude rate override used in matrix mode. "
+            "Calculated as ceil(altitude/1000) * rate."
+        ),
+    )
+    glider_rental_rate_per_hour_override = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text=(
+            "Optional absolute glider rental hourly rate override used in matrix mode."
+        ),
+    )
+    instruction_flat_fee_per_flight = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text=(
+            "Flat instruction fee per flight used in matrix mode when "
+            "instruction charging is enabled for this status."
+        ),
+    )
+    charge_instruction_per_instructed_flight = models.BooleanField(
+        default=False,
+        help_text=(
+            "When enabled, applies the flat instruction fee to flights where an "
+            "instructor is recorded."
+        ),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Inactive rules are ignored during billing calculations.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Membership Billing Rule"
+        verbose_name_plural = "Membership Billing Rules"
+        ordering = ["membership_status__sort_order", "membership_status__name"]
+
+    def __str__(self):
+        return f"{self.membership_status.name} billing rule"
+
+    @classmethod
+    def get_for_membership_status(cls, membership_status_name):
+        """Return active rule for a membership status name, if present."""
+        if not membership_status_name:
+            return None
+
+        return (
+            cls.objects.select_related("membership_status")
+            .filter(
+                membership_status__name=membership_status_name,
+                is_active=True,
+            )
+            .first()
+        )
+
+    @staticmethod
+    def apply_tow_discount(base_cost, discount_percent):
+        """Apply tow discount/surcharge percentage to a base cost."""
+        if base_cost is None:
+            return None
+
+        factor = Decimal("1.00") - (Decimal(str(discount_percent)) / Decimal("100.00"))
+        adjusted = Decimal(str(base_cost)) * factor
+        return adjusted.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+class MembershipGliderRentalRule(models.Model):
+    """Optional status+glider rental override for matrix billing mode."""
+
+    membership_status = models.ForeignKey(
+        MembershipStatus,
+        on_delete=models.CASCADE,
+        related_name="glider_rental_rules",
+        help_text="Membership status this glider-specific rental override applies to.",
+    )
+    glider = models.ForeignKey(
+        "logsheet.Glider",
+        on_delete=models.CASCADE,
+        related_name="membership_rental_rules",
+        help_text="Glider this rental override applies to.",
+    )
+    hourly_rate_override = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Absolute hourly rental rate for this membership status + glider.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Inactive rules are ignored during rental calculations.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Membership Glider Rental Rule"
+        verbose_name_plural = "Membership Glider Rental Rules"
+        ordering = [
+            "membership_status__sort_order",
+            "membership_status__name",
+            "glider__n_number",
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["membership_status", "glider"],
+                name="uniq_membership_status_glider_rental_rule",
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.membership_status.name} / {self.glider}"
+            f" (${self.hourly_rate_override:.2f}/hr)"
+        )
+
+    @classmethod
+    def get_for_membership_status_and_glider(cls, membership_status_name, glider_id):
+        """Return active status+glider override, if present."""
+        if not membership_status_name or not glider_id:
+            return None
+
+        return (
+            cls.objects.select_related("membership_status", "glider")
+            .filter(
+                membership_status__name=membership_status_name,
+                glider_id=glider_id,
+                is_active=True,
+            )
+            .first()
+        )
 
 
 class ChargeableItem(models.Model):

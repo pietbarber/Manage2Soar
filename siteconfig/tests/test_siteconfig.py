@@ -1,4 +1,5 @@
 import io
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -6,7 +7,13 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 
-from siteconfig.models import MembershipStatus, SiteConfiguration
+from logsheet.models import Glider
+from siteconfig.models import (
+    MembershipBillingRule,
+    MembershipGliderRentalRule,
+    MembershipStatus,
+    SiteConfiguration,
+)
 from utils.favicon import PWA_CLUB_ICON_NAME
 
 User = get_user_model()
@@ -164,6 +171,104 @@ def test_dynamic_duty_roles_flag_can_be_enabled():
     )
     config.refresh_from_db()
     assert config.enable_dynamic_duty_roles is True
+
+
+@pytest.mark.django_db
+def test_billing_rules_configuration_defaults():
+    """Billing rule toggles should default to safe neutral values."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+
+    assert config.billing_rules_enabled is False
+    assert config.instructor_time_charges_enabled is False
+    assert config.billing_pricing_mode == "discount"
+    assert config.minimum_billable_rental_minutes == 0
+    assert config.default_tow_discount_percent == 0
+    assert config.default_instructor_rate_multiplier == 1
+
+
+@pytest.mark.django_db
+def test_membership_billing_rule_lookup_and_discount_application():
+    """Membership billing rules should resolve by status name and apply discounts."""
+    status = MembershipStatus.objects.create(
+        name="Billing Test Student", is_active=True
+    )
+    rule = MembershipBillingRule.objects.create(
+        membership_status=status,
+        tow_discount_percent=Decimal("15.00"),
+        instructor_rate_multiplier=Decimal("0.80"),
+    )
+
+    resolved = MembershipBillingRule.get_for_membership_status("Billing Test Student")
+    assert resolved == rule
+
+    adjusted = MembershipBillingRule.apply_tow_discount(
+        Decimal("40.00"),
+        resolved.tow_discount_percent,
+    )
+    assert adjusted == Decimal("34.00")
+
+
+@pytest.mark.django_db
+def test_inactive_membership_billing_rule_is_not_used():
+    """Inactive rules should be ignored by lookup helper."""
+    status = MembershipStatus.objects.create(
+        name="Inactive Rule Status", is_active=True
+    )
+    MembershipBillingRule.objects.create(
+        membership_status=status,
+        tow_discount_percent=Decimal("25.00"),
+        is_active=False,
+    )
+
+    resolved = MembershipBillingRule.get_for_membership_status("Inactive Rule Status")
+    assert resolved is None
+
+
+@pytest.mark.django_db
+def test_membership_billing_rule_matrix_fields_can_be_configured():
+    """Matrix billing fields should persist expected absolute pricing values."""
+    status = MembershipStatus.objects.create(name="Matrix Status", is_active=True)
+    rule = MembershipBillingRule.objects.create(
+        membership_status=status,
+        tow_hookup_fee_override=Decimal("5.00"),
+        tow_rate_per_1000ft_override=Decimal("7.50"),
+        glider_rental_rate_per_hour_override=Decimal("9.00"),
+        instruction_flat_fee_per_flight=Decimal("18.00"),
+        charge_instruction_per_instructed_flight=True,
+    )
+
+    rule.refresh_from_db()
+    assert rule.tow_hookup_fee_override == Decimal("5.00")
+    assert rule.tow_rate_per_1000ft_override == Decimal("7.50")
+    assert rule.glider_rental_rate_per_hour_override == Decimal("9.00")
+    assert rule.instruction_flat_fee_per_flight == Decimal("18.00")
+    assert rule.charge_instruction_per_instructed_flight is True
+
+
+@pytest.mark.django_db
+def test_membership_glider_rental_rule_lookup():
+    """Status+glider rental override lookup should return active matching rule."""
+    status = MembershipStatus.objects.create(name="Junior Member", is_active=True)
+    glider = Glider.objects.create(
+        n_number="N123JM",
+        model="Club Glider",
+        club_owned=True,
+        rental_rate=Decimal("9.00"),
+    )
+    rule = MembershipGliderRentalRule.objects.create(
+        membership_status=status,
+        glider=glider,
+        hourly_rate_override=Decimal("0.00"),
+        is_active=True,
+    )
+
+    resolved = MembershipGliderRentalRule.get_for_membership_status_and_glider(
+        "Junior Member",
+        glider.id,
+    )
+    assert resolved == rule
 
 
 # MembershipStatus Tests

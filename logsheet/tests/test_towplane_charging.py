@@ -4,6 +4,7 @@ Tests for towplane-specific charging system (Issue #67).
 Tests different towplane charges and flexible pricing schemes.
 """
 
+from datetime import time
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -13,12 +14,19 @@ from django.test import TestCase
 from logsheet.models import (
     Airfield,
     Flight,
+    Glider,
     Logsheet,
     Towplane,
     TowplaneChargeScheme,
     TowplaneChargeTier,
 )
 from members.models import Member
+from siteconfig.models import (
+    MembershipBillingRule,
+    MembershipGliderRentalRule,
+    MembershipStatus,
+    SiteConfiguration,
+)
 
 User = get_user_model()
 
@@ -232,6 +240,18 @@ class FlightTowCostIntegrationTestCase(TestCase):
     """Test integration with Flight model tow cost calculation."""
 
     def setUp(self):
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="example.org",
+            club_abbreviation="TC",
+        )
+        MembershipStatus.objects.get_or_create(
+            name="Full Member", defaults={"is_active": True}
+        )
+        MembershipStatus.objects.get_or_create(
+            name="Student Member", defaults={"is_active": True}
+        )
+
         # Create user and member
         self.user = User.objects.create_user(
             username="testpilot",
@@ -243,12 +263,23 @@ class FlightTowCostIntegrationTestCase(TestCase):
         self.member = Member.objects.create(
             user=self.user, membership_status="Full Member"
         )
+        self.instructor = Member.objects.create(
+            username="instructor1",
+            membership_status="Full Member",
+            instructor=True,
+        )
 
         # Create airfield and logsheet
         self.airfield = Airfield.objects.create(identifier="KTEST", name="Test Field")
 
         self.logsheet = Logsheet.objects.create(
             log_date="2025-01-01", airfield=self.airfield, created_by=self.member
+        )
+        self.glider = Glider.objects.create(
+            n_number="N100GL",
+            model="ASK-21",
+            club_owned=True,
+            rental_rate=Decimal("12.00"),
         )
 
         # Create towplanes
@@ -338,3 +369,248 @@ class FlightTowCostIntegrationTestCase(TestCase):
 
         self.assertEqual(calculated_cost, property_cost)
         self.assertEqual(property_cost, Decimal("55.00"))  # $10 + (3 × $15)
+
+    def test_tow_discount_applies_when_billing_rules_enabled(self):
+        """Tow discount should apply when site config enables billing rules."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = True
+        config.save()
+
+        student_status = MembershipStatus.objects.get(name="Student Member")
+        MembershipBillingRule.objects.create(
+            membership_status=student_status,
+            tow_discount_percent=Decimal("25.00"),
+        )
+
+        student = Member.objects.create(
+            username="student1", membership_status="Student Member"
+        )
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=student,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+        )
+
+        # Base cost: $40.00, discounted by 25% => $30.00
+        self.assertEqual(flight.tow_cost_calculated, Decimal("30.00"))
+
+    def test_default_discount_applies_when_no_status_rule_exists(self):
+        """Default config discount should apply when no active status-specific rule exists."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = True
+        config.default_tow_discount_percent = Decimal("10.00")
+        config.save()
+
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+        )
+
+        # Base cost: $40.00, default discount 10% => $36.00
+        self.assertEqual(flight.tow_cost_calculated, Decimal("36.00"))
+
+    def test_matrix_mode_uses_absolute_tow_hookup_and_rate_overrides(self):
+        """Matrix mode should compose tow cost from per-status hookup and rate overrides."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = True
+        config.billing_pricing_mode = "matrix"
+        config.save()
+
+        status = MembershipStatus.objects.get(name="Student Member")
+        MembershipBillingRule.objects.create(
+            membership_status=status,
+            tow_hookup_fee_override=Decimal("5.00"),
+            tow_rate_per_1000ft_override=Decimal("7.50"),
+        )
+
+        student = Member.objects.create(
+            username="student2", membership_status="Student Member"
+        )
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=student,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+        )
+
+        # matrix: hookup $5 + ceil(2000/1000)*$7.50 = $20.00
+        self.assertEqual(flight.tow_cost_calculated, Decimal("20.00"))
+
+    def test_matrix_mode_applies_glider_rental_rate_override(self):
+        """Matrix mode should use per-status absolute glider rental hourly override."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = True
+        config.billing_pricing_mode = "matrix"
+        config.save()
+
+        status = MembershipStatus.objects.get(name="Student Member")
+        MembershipBillingRule.objects.create(
+            membership_status=status,
+            glider_rental_rate_per_hour_override=Decimal("9.00"),
+        )
+
+        student = Member.objects.create(
+            username="student3", membership_status="Student Member"
+        )
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=student,
+            glider=self.glider,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+            launch_time=time(9, 0),
+            landing_time=time(10, 0),
+        )
+
+        # Override 1 hour @ $9.00
+        self.assertEqual(flight.rental_cost_calculated, Decimal("9.00"))
+
+    def test_matrix_mode_applies_flat_instruction_fee(self):
+        """Matrix mode should apply per-flight instruction fee independent of duration."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = True
+        config.billing_pricing_mode = "matrix"
+        config.instructor_time_charges_enabled = True
+        config.save()
+
+        status = MembershipStatus.objects.get(name="Student Member")
+        MembershipBillingRule.objects.create(
+            membership_status=status,
+            instruction_flat_fee_per_flight=Decimal("18.00"),
+            charge_instruction_per_instructed_flight=True,
+        )
+
+        student = Member.objects.create(
+            username="student4", membership_status="Student Member"
+        )
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=student,
+            instructor=self.instructor,
+            glider=self.glider,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+            launch_time=time(9, 0),
+            landing_time=time(9, 10),
+        )
+        long_flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=student,
+            instructor=self.instructor,
+            glider=self.glider,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+            launch_time=time(10, 0),
+            landing_time=time(12, 0),
+        )
+
+        self.assertEqual(flight.instruction_fee_calculated, Decimal("18.00"))
+        self.assertEqual(long_flight.instruction_fee_calculated, Decimal("18.00"))
+
+    def test_minimum_billable_rental_minutes_floor_applies(self):
+        """Rental billing should floor duration to configured minimum minutes."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = True
+        config.minimum_billable_rental_minutes = 20
+        config.save()
+
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+            launch_time=time(9, 0),
+            landing_time=time(9, 10),
+        )
+
+        # Glider rate $12/hr with 20-minute floor => $4.00
+        self.assertEqual(flight.rental_cost_calculated, Decimal("4.00"))
+
+    def test_minimum_billable_rental_minutes_ignored_when_billing_rules_disabled(self):
+        """Minimum rental floor should not apply when billing rules are disabled."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = False
+        config.minimum_billable_rental_minutes = 20
+        config.save()
+
+        flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+            launch_time=time(9, 0),
+            landing_time=time(9, 10),
+        )
+
+        # Base behavior with 10-minute flight and $12/hr rate => $2.00.
+        self.assertEqual(flight.rental_cost_calculated, Decimal("2.00"))
+
+    def test_matrix_mode_glider_specific_override_precedence(self):
+        """Per-glider status override should take precedence over status-wide hourly override."""
+        config = SiteConfiguration.objects.first()
+        self.assertIsNotNone(config)
+        config.billing_rules_enabled = True
+        config.billing_pricing_mode = "matrix"
+        config.save()
+
+        status = MembershipStatus.objects.get(name="Student Member")
+        MembershipBillingRule.objects.create(
+            membership_status=status,
+            glider_rental_rate_per_hour_override=Decimal("9.00"),
+        )
+
+        free_glider = Glider.objects.create(
+            n_number="N777JR",
+            model="Junior Waived",
+            club_owned=True,
+            rental_rate=Decimal("12.00"),
+        )
+        paid_glider = Glider.objects.create(
+            n_number="N888JR",
+            model="Junior Paid",
+            club_owned=True,
+            rental_rate=Decimal("12.00"),
+        )
+
+        MembershipGliderRentalRule.objects.create(
+            membership_status=status,
+            glider=free_glider,
+            hourly_rate_override=Decimal("0.00"),
+        )
+
+        student = Member.objects.create(
+            username="student5", membership_status="Student Member"
+        )
+        waived_flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=student,
+            glider=free_glider,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+            launch_time=time(9, 0),
+            landing_time=time(10, 0),
+        )
+        paid_flight = Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=student,
+            glider=paid_glider,
+            towplane=self.premium_towplane,
+            release_altitude=2000,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+        )
+
+        self.assertEqual(waived_flight.rental_cost_calculated, Decimal("0.00"))
+        self.assertEqual(paid_flight.rental_cost_calculated, Decimal("9.00"))

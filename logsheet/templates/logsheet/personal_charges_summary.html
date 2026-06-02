@@ -21,6 +21,7 @@
           <th>Glider</th>
           <th class="text-end">Tow Cost</th>
           <th class="text-end">Rental Cost</th>
+          <th class="text-end">Instruction Cost</th>
           <th class="text-end">Total</th>
         </tr>
       </thead>
@@ -31,17 +32,18 @@
           <td>{{ row.glider|default:"—" }}</td>
           <td class="text-end">{{ row.tow_cost|floatformat:2 }}</td>
           <td class="text-end">{{ row.rental_cost|floatformat:2 }}</td>
+          <td class="text-end">{{ row.instruction_cost|floatformat:2 }}</td>
           <td class="text-end fw-semibold">{{ row.total_cost|floatformat:2 }}</td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="5" class="text-muted text-center py-4">No flight charges found for the last 365 days.</td>
+          <td colspan="6" class="text-muted text-center py-4">No flight charges found for the last 365 days.</td>
         </tr>
         {% endfor %}
       </tbody>
       <tfoot>
         <tr>
-          <th colspan="4" class="text-end">Flight Charges Total</th>
+          <th colspan="5" class="text-end">Flight Charges Total</th>
           <th class="text-end">{{ total_flight_cost|floatformat:2 }}</th>
         </tr>
       </tfoot>

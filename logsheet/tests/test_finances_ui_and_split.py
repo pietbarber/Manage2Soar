@@ -5,6 +5,12 @@ import pytest
 from django.urls import reverse
 
 from logsheet.models import Flight
+from siteconfig.models import (
+    BillingPricingMode,
+    MembershipBillingRule,
+    MembershipStatus,
+    SiteConfiguration,
+)
 
 # Fixtures are provided by conftest.py and fixtures_finances.py
 
@@ -52,6 +58,126 @@ def test_summary_by_flight_table_layout(client, active_member, logsheet_with_fli
     # Check that the table footer has proper structure
     assert 'colspan="3"' in content
     assert "Totals:" in content
+
+
+@pytest.mark.django_db
+def test_summary_by_flight_footer_includes_instruction_when_present(
+    client, active_member, logsheet_with_flights
+):
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    assert flight is not None
+
+    flight.tow_cost_actual = Decimal("40.00")
+    flight.rental_cost_actual = Decimal("20.00")
+    flight.instruction_fee_actual = Decimal("12.00")
+    flight.save(
+        update_fields=[
+            "tow_cost_actual",
+            "rental_cost_actual",
+            "instruction_fee_actual",
+        ]
+    )
+
+    logsheet_with_flights.finalized = True
+    logsheet_with_flights.save(update_fields=["finalized"])
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert response.context["instruction_fees_present"] is True
+    assert response.context["total_instruction"] == Decimal("12.00")
+    assert response.context["total_sum"] == Decimal("72.00")
+
+    content = response.content.decode("utf-8")
+    assert ">Instruction Fee</th>" in content
+    assert "$12.00" in content
+
+
+@pytest.mark.django_db
+def test_finalized_legacy_null_instruction_snapshot_stays_zero(
+    client,
+    active_member,
+    another_member,
+    member_instructor,
+    logsheet_with_flights,
+):
+    MembershipStatus.objects.update_or_create(
+        name="Full Member", defaults={"is_active": True}
+    )
+    config = SiteConfiguration.objects.first() or SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+    )
+    config.billing_rules_enabled = True
+    config.instructor_time_charges_enabled = True
+    config.billing_pricing_mode = BillingPricingMode.MATRIX
+    config.save(
+        update_fields=[
+            "billing_rules_enabled",
+            "instructor_time_charges_enabled",
+            "billing_pricing_mode",
+        ]
+    )
+
+    full_status = MembershipStatus.objects.get(name="Full Member")
+    MembershipBillingRule.objects.update_or_create(
+        membership_status=full_status,
+        defaults={
+            "is_active": True,
+            "charge_instruction_per_instructed_flight": True,
+            "instruction_flat_fee_per_flight": Decimal("25.00"),
+        },
+    )
+
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    assert flight is not None
+    flight.instructor = member_instructor
+    flight.tow_cost_actual = Decimal("30.00")
+    flight.rental_cost_actual = Decimal("10.00")
+    flight.instruction_fee_actual = None
+    flight.split_with = another_member
+    flight.split_type = "tow"
+    flight.save(
+        update_fields=[
+            "instructor",
+            "tow_cost_actual",
+            "rental_cost_actual",
+            "instruction_fee_actual",
+            "split_with",
+            "split_type",
+        ]
+    )
+
+    logsheet_with_flights.finalized = True
+    logsheet_with_flights.save(update_fields=["finalized"])
+
+    finance_url = reverse(
+        "logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk]
+    )
+    client.force_login(active_member)
+    response = client.get(finance_url)
+
+    assert response.status_code == 200
+    assert response.context["total_instruction"] == Decimal("0.00")
+    flight_row = next(
+        row for row in response.context["flight_data"] if row[0].pk == flight.pk
+    )
+    assert flight_row[1]["instruction"] == Decimal("0.00")
+    assert flight_row[1]["total"] == Decimal("40.00")
+
+    content = response.content.decode("utf-8")
+    assert 'data-instruction-cost="0.00"' in content
+
+    export_url = reverse(
+        "logsheet:export_logsheet_finances_csv", args=[logsheet_with_flights.pk]
+    )
+    export_response = client.get(export_url)
+    assert export_response.status_code == 200
+    export_content = export_response.content.decode("utf-8")
+    assert "Instruction Fee" not in export_content
 
 
 @pytest.mark.django_db
