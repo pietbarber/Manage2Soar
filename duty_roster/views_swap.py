@@ -1444,6 +1444,73 @@ def send_request_cancelled_notifications(swap_request):
             )
 
 
+def send_request_expired_notifications(swap_request, auto_declined_offers=None):
+    """Notify requester and impacted offerers when a request auto-expires."""
+    role_title = swap_request.get_role_title()
+    context = get_email_context_base()
+
+    requester_context = context.copy()
+    requester_context.update(
+        {
+            "swap_request": swap_request,
+            "role_title": role_title,
+        }
+    )
+
+    requester_subject = (
+        f"ℹ️ Your {role_title} swap request for "
+        f"{swap_request.original_date.strftime('%b %d')} has expired"
+    )
+
+    if swap_request.requester.email:
+        requester_html = render_to_string(
+            "duty_roster/emails/swap_request_expired_requester.html",
+            requester_context,
+        )
+        send_mail(
+            subject=requester_subject,
+            message="",
+            html_message=requester_html,
+            from_email=get_from_email(),
+            recipient_list=[swap_request.requester.email],
+            fail_silently=True,
+        )
+        logger.info(
+            f"Sent expiry notification to requester {swap_request.requester.email}"
+        )
+
+    offers_to_notify = auto_declined_offers or []
+    for offer in offers_to_notify:
+        if not offer.offered_by.email:
+            continue
+
+        offerer_context = context.copy()
+        offerer_context.update(
+            {
+                "swap_request": swap_request,
+                "role_title": role_title,
+                "offer": offer,
+            }
+        )
+        offerer_subject = (
+            f"ℹ️ {swap_request.requester.first_name}'s {role_title} swap request "
+            f"for {swap_request.original_date.strftime('%b %d')} has expired"
+        )
+        offerer_html = render_to_string(
+            "duty_roster/emails/swap_request_expired_offerer.html",
+            offerer_context,
+        )
+        send_mail(
+            subject=offerer_subject,
+            message="",
+            html_message=offerer_html,
+            from_email=get_from_email(),
+            recipient_list=[offer.offered_by.email],
+            fail_silently=True,
+        )
+        logger.info(f"Sent expiry notification to offerer {offer.offered_by.email}")
+
+
 def send_request_declined_by_member_notification(swap_request, declining_member):
     """Notify requester that a specific member declined their direct request."""
 

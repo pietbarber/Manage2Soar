@@ -23,6 +23,19 @@ Implemented tenant-configurable billing policies using site configuration and st
 - ✅ Added migrations and focused test coverage for matrix behavior and rental-floor logic
 
 **Technologies**: Django models/admin/migrations, configurable feature flags, pricing-rule composition, pytest
+### [Issue #933 - Duty Swap Auto-Expiry for Past Open Requests](issue-933-duty-swap-auto-expiry.md)
+**Status**: Complete ✅ | **Date**: May 2026 | **Branch**: `feature/issue-duty-swap-auto-expiry`
+
+Implemented nightly automatic expiry for stale open duty swap requests whose duty dates have passed, auto-declined pending offers, and clarified member-facing notification semantics so auto-expiry is distinct from manual cancellation.
+
+**Key Achievements**:
+- ✅ Added distributed-lock cron command `expire_past_swap_requests`
+- ✅ Auto-expired past-dated open requests and auto-declined pending offers
+- ✅ Added dedicated expiry notification templates for requesters and impacted offerers
+- ✅ Added targeted regression tests including dry-run and non-mutation cases
+- ✅ Added Kubernetes CronJob schedule for nightly execution
+
+**Technologies**: Django management commands, distributed CronJob locking, pytest, Kubernetes CronJob manifests, transactional status transitions
 
 ---
 

@@ -100,6 +100,7 @@ Uses PostgreSQL's atomic operations:
    - ✅ `send_duty_preop_emails.py` - **SCHEDULED DAILY**
    - ✅ `send_maintenance_digest.py` - **SCHEDULED WEEKLY**
    - ✅ `expire_ad_hoc_days.py` - **SCHEDULED DAILY**
+   - ✅ `expire_past_swap_requests.py` - **SCHEDULED DAILY** (Issue #933 stale swap request expiry)
 2. ✅ Created new notification commands:
    - ✅ `notify_aging_logsheets.py` - **FINDING REAL ISSUES**
    - ✅ `notify_pending_sprs.py` - **FIRST DAILY SPR REMINDER DIGEST**
@@ -124,6 +125,7 @@ Uses PostgreSQL's atomic operations:
 - **Monthly 1st @ 7:00 AM UTC**: Duty delinquent reports ✅ **DEPLOYED**
 - **Monthly 28th @ 11:59 PM UTC**: Cleanup old notifications (60+ days) ✅ **READY FOR DEPLOYMENT**
 - **Daily 3:00 AM UTC** (10 PM EST / 11 PM EDT): Expire ad-hoc days (night-before deadline, expires today's unconfirmed days) ✅ **DEPLOYED**
+- **Daily 3:10 AM UTC**: Expire past-dated open duty swap requests and auto-decline pending offers ✅ **DEPLOYED**
 
 ### 📊 Recent Production Metrics
 - **Aging Logsheets**: Found 1 logsheet (11 days old), notified Todd Morris & Bob Alexander
@@ -131,6 +133,7 @@ Uses PostgreSQL's atomic operations:
 - **Late SPRs**: Checked 34 instructional flights, no overdue SPRs found
 - **Duty Delinquents**: Found 19 delinquent members, notifications sent to 4 Member Managers only
 - **Notification Cleanup**: New monthly job to purge notifications older than 60 days (both dismissed and undismissed)
+- **Swap Hygiene**: New daily expiry job to prevent stale open duty swap requests after duty date passes (Issue #933)
 - **Execution Times**: 0.29s - 5.52s (excellent performance)
 - **Lock Contention**: Zero conflicts, perfect coordination
 - **Recipients Fixed**: Issue #288 resolved - now sends only to member_manager=True users
