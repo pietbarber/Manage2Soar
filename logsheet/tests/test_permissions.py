@@ -8,6 +8,7 @@ according to the business rules defined in Issue #198.
 import pytest
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 
 from logsheet.models import Logsheet, RevisionLog
 from logsheet.utils.permissions import can_edit_logsheet, can_unfinalize_logsheet
@@ -265,3 +266,20 @@ class TestLogsheetPermissions(TestCase):
         # Should be able to unfinalize due to any of the roles
         self.assertTrue(can_unfinalize_logsheet(multi_role_user, self.logsheet))
         self.assertTrue(can_edit_logsheet(multi_role_user, self.logsheet))
+
+    def test_webmaster_sees_revise_button_for_finalized_logsheet(self):
+        """Authorized webmasters should see the revise action in the manage UI."""
+        self.logsheet.finalized = True
+        self.logsheet.save()
+
+        RevisionLog.objects.create(
+            logsheet=self.logsheet,
+            revised_by=self.duty_officer,
+            note="Logsheet finalized",
+        )
+
+        self.client.force_login(self.webmaster)
+        response = self.client.get(reverse("logsheet:manage", args=[self.logsheet.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Revise Logsheet")
