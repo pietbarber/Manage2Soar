@@ -671,7 +671,7 @@
         </script>
       {% endif %}
 
-      {% if logsheet.finalized and user.is_superuser %}
+        {% if logsheet.finalized and can_edit %}
         <form method="post" class="action-form">
           {% csrf_token %}
           <button type="submit" name="revise" class="action-card action-card-warning online-only-btn">
