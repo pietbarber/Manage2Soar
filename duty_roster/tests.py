@@ -1997,9 +1997,16 @@ class BlackoutRoleChoiceSiteConfigTests(TestCase):
         self.client.force_login(self.member)
 
         today = timezone.now().date()
+        existing_date = today + timedelta(days=7)
         out_of_window_date = (
             today.replace(day=1) + timedelta(days=32 * BLACKOUT_CALENDAR_MONTHS)
         ).replace(day=1)
+
+        MemberBlackout.objects.create(
+            member=self.member,
+            date=existing_date,
+            note="Existing blackout that should be preserved",
+        )
 
         response = self.client.post(
             reverse("duty_roster:blackout_manage"),
@@ -2022,6 +2029,12 @@ class BlackoutRoleChoiceSiteConfigTests(TestCase):
             MemberBlackout.objects.filter(
                 member=self.member,
                 date=out_of_window_date,
+            ).exists()
+        )
+        self.assertTrue(
+            MemberBlackout.objects.filter(
+                member=self.member,
+                date=existing_date,
             ).exists()
         )
         self.assertContains(response, "Out-of-range dates were ignored")

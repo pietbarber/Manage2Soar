@@ -450,10 +450,11 @@ def blackout_manage(request):
     all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
 
     if request.method == "POST":
+        submitted_blackout_values = request.POST.getlist("blackout_dates")
         blackout_dates = set()
         invalid_date_count = 0
 
-        for raw_date in request.POST.getlist("blackout_dates"):
+        for raw_date in submitted_blackout_values:
             try:
                 blackout_dates.add(date.fromisoformat(raw_date))
             except ValueError:
@@ -478,6 +479,15 @@ def blackout_manage(request):
                 f"Blackout dates must be between {min_blackout_date} and "
                 f"{max_blackout_date}. Out-of-range dates were ignored.",
             )
+
+        if (
+            submitted_blackout_values
+            and not blackout_dates
+            and (invalid_date_count or out_of_window_dates)
+        ):
+            # Preserve existing blackouts when the submission only contained
+            # invalid/out-of-window entries.
+            blackout_dates = set(existing_dates)
 
         note = request.POST.get("default_note", "").strip()
 
