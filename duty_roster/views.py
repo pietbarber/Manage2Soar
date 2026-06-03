@@ -85,9 +85,26 @@ ALLOWED_ROLES = [
     "commercial_pilot",
 ]
 MAX_PROPOSAL_RANGE_MONTHS = 12
+BLACKOUT_CALENDAR_MONTHS = 4
 
 # OpsIntent activity keys that contribute to tow demand/surge calculations.
 TOW_INTENT_KEYS = {"club", "club_single", "club_two", "guest", "private"}
+
+
+def _calendar_month_start(base_date, offset_months):
+    """Return first day of month offset from base_date using month-sized jumps."""
+    return (base_date.replace(day=1) + timedelta(days=32 * offset_months)).replace(
+        day=1
+    )
+
+
+def _blackout_date_window(today):
+    """Return inclusive blackout selection window used by UI and POST validation."""
+    last_month_start = _calendar_month_start(today, BLACKOUT_CALENDAR_MONTHS - 1)
+    max_date = (last_month_start + timedelta(days=32)).replace(day=1) - timedelta(
+        days=1
+    )
+    return today, max_date
 
 
 def _is_commercial_pilot_qualified(member):
@@ -262,9 +279,11 @@ def blackout_manage(request):
             weeks.append(week)
         return weeks
 
+    min_blackout_date, max_blackout_date = _blackout_date_window(today)
+
     months = []
-    for i in range(3):
-        m1 = (today.replace(day=1) + timedelta(days=32 * i)).replace(day=1)
+    for i in range(BLACKOUT_CALENDAR_MONTHS):
+        m1 = _calendar_month_start(today, i)
         months.append(
             {
                 "label": m1.strftime("%B %Y"),
@@ -431,9 +450,34 @@ def blackout_manage(request):
     all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
 
     if request.method == "POST":
-        blackout_dates = set(
-            date.fromisoformat(d) for d in request.POST.getlist("blackout_dates")
-        )
+        blackout_dates = set()
+        invalid_date_count = 0
+
+        for raw_date in request.POST.getlist("blackout_dates"):
+            try:
+                blackout_dates.add(date.fromisoformat(raw_date))
+            except ValueError:
+                invalid_date_count += 1
+
+        out_of_window_dates = {
+            blackout_date
+            for blackout_date in blackout_dates
+            if blackout_date < min_blackout_date or blackout_date > max_blackout_date
+        }
+        blackout_dates -= out_of_window_dates
+
+        if invalid_date_count:
+            messages.error(
+                request,
+                "Some submitted blackout dates were invalid and were ignored.",
+            )
+
+        if out_of_window_dates:
+            messages.error(
+                request,
+                f"Blackout dates must be between {min_blackout_date} and "
+                f"{max_blackout_date}. Out-of-range dates were ignored.",
+            )
 
         note = request.POST.get("default_note", "").strip()
 

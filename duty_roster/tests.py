@@ -12,6 +12,7 @@ from duty_roster.models import (
     MemberBlackout,
 )
 from duty_roster.views import (
+    BLACKOUT_CALENDAR_MONTHS,
     _calculate_membership_duration,
     _has_performed_duty_detailed,
     calendar_refresh_response,
@@ -1705,6 +1706,13 @@ class BlackoutRoleChoiceSiteConfigTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return {role for role, _label in response.context["role_percent_choices"]}
 
+    def test_blackout_calendar_shows_four_months(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("duty_roster:blackout_manage"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["months"]), BLACKOUT_CALENDAR_MONTHS)
+
     def test_hides_all_role_choices_when_all_schedule_flags_false(self):
         self.config.schedule_instructors = False
         self.config.schedule_tow_pilots = False
@@ -1984,3 +1992,36 @@ class BlackoutRoleChoiceSiteConfigTests(TestCase):
 
         role_choices = dict(response.context["role_percent_choices"])
         self.assertEqual(role_choices["towpilot"], "Tow Pilot (AM Tow, PM Tow)")
+
+    def test_post_rejects_blackout_dates_beyond_calendar_window(self):
+        self.client.force_login(self.member)
+
+        today = timezone.now().date()
+        out_of_window_date = (
+            today.replace(day=1) + timedelta(days=32 * BLACKOUT_CALENDAR_MONTHS)
+        ).replace(day=1)
+
+        response = self.client.post(
+            reverse("duty_roster:blackout_manage"),
+            data={
+                "blackout_dates": [out_of_window_date.isoformat()],
+                "preferred_day": "",
+                "dont_schedule": "",
+                "scheduling_suspended": "",
+                "suspended_reason": "",
+                "comment": "",
+                "instructor_percent": "100",
+                "max_assignments_per_month": "4",
+                "allow_weekend_double": "",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            MemberBlackout.objects.filter(
+                member=self.member,
+                date=out_of_window_date,
+            ).exists()
+        )
+        self.assertContains(response, "Out-of-range dates were ignored")
