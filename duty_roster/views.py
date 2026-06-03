@@ -92,18 +92,16 @@ TOW_INTENT_KEYS = {"club", "club_single", "club_two", "guest", "private"}
 
 
 def _calendar_month_start(base_date, offset_months):
-    """Return first day of month offset from base_date using month-sized jumps."""
-    return (base_date.replace(day=1) + timedelta(days=32 * offset_months)).replace(
-        day=1
-    )
+    """Return first day of month offset from base_date."""
+    month_index = (base_date.month - 1) + offset_months
+    year = base_date.year + (month_index // 12)
+    month = (month_index % 12) + 1
+    return date(year, month, 1)
 
 
 def _blackout_date_window(today):
     """Return inclusive blackout selection window used by UI and POST validation."""
-    last_month_start = _calendar_month_start(today, BLACKOUT_CALENDAR_MONTHS - 1)
-    max_date = (last_month_start + timedelta(days=32)).replace(day=1) - timedelta(
-        days=1
-    )
+    max_date = _calendar_month_start(today, BLACKOUT_CALENDAR_MONTHS) - timedelta(days=1)
     return today, max_date
 
 
