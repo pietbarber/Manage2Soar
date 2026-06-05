@@ -268,7 +268,8 @@
 
       {# Essays for all blocks that have them #}
       {% for block in day.blocks %}
-      {% if block.report.report_text %}
+      {% if block.type == 'flight' %}
+      {% if block.report.report_text or request.user == block.report.instructor and block.days_ago <= 7 %}
       <div class="d-flex justify-content-between align-items-center">
         <h5>📝 Instructor Essay</h5>
         {# Edit button - only show if current user is the instructor and report is within 7 days #}
@@ -280,6 +281,7 @@
           </a>
         {% endif %}
       </div>
+      {% if block.report.report_text %}
       <div class="border p-3 bg-white card-body mb-2 cms-content" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
         {{ block.report.report_text|safe }}
         <div class="mt-2 small text-muted">
@@ -294,6 +296,12 @@
           {% endif %}
         </div>
       </div>
+      {% else %}
+      <div class="border p-3 bg-light card-body mb-2 text-muted" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
+        No essay written yet.
+      </div>
+      {% endif %}
+      {% endif %}
       {% elif block.report.notes %}
       <h5>📝 Notes</h5>
       <div class="border p-3 bg-white card-body mb-2 cms-content" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
