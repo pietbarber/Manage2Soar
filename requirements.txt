@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 anyio==4.11.0
 asgiref==3.9.1
-Authlib==1.6.11
+Authlib==1.6.12
 bandit==1.8.6
 black==26.3.1
 bleach==6.3.0
@@ -49,7 +49,7 @@ httplib2==0.31.0
 httpx==0.28.1
 icalendar==6.3.2
 identify==2.6.15
-idna==3.10
+idna==3.15
 iniconfig==2.1.0
 isort==7.0.0
 Jinja2==3.1.6
@@ -90,7 +90,7 @@ pydenticon==0.3.1
 pyee==13.0.0
 pyflakes==3.4.0
 Pygments==2.20.0
-PyJWT==2.12.0
+PyJWT==2.13.0
 pyparsing==3.2.5
 pytest==9.0.3
 pytest-base-url==2.1.0
