@@ -149,3 +149,105 @@ class TestMemberInstructionRecordQualificationVisibility:
         codes = {mq.qualification.code for mq in visible}
         assert "SAFE2026" in codes
         assert "SAFE2025" not in codes
+
+
+@pytest.mark.django_db
+class TestMemberInstructionRecordEmptyEssayEdit:
+    def setup_method(self):
+        MembershipStatus.objects.update_or_create(
+            name="Full Member", defaults={"is_active": True}
+        )
+
+        self.student = Member.objects.create_user(
+            username="empty_essay_student",
+            password="testpass123",
+            first_name="Alice",
+            last_name="Student",
+            membership_status="Full Member",
+            is_active=True,
+        )
+        self.instructor = Member.objects.create_user(
+            username="empty_essay_instructor",
+            password="testpass123",
+            first_name="Bob",
+            last_name="Instructor",
+            membership_status="Full Member",
+            is_active=True,
+            instructor=True,
+        )
+        self.other_instructor = Member.objects.create_user(
+            username="other_empty_essay_instructor",
+            password="testpass123",
+            first_name="Charlie",
+            last_name="Instructor",
+            membership_status="Full Member",
+            is_active=True,
+            instructor=True,
+        )
+
+    def test_owner_sees_edit_link_for_empty_essay_within_7_days(self, client):
+        report_date = timezone.localdate() - timedelta(days=2)
+        InstructionReport.objects.create(
+            student=self.student,
+            instructor=self.instructor,
+            report_date=report_date,
+            report_text="",
+        )
+
+        client.force_login(self.instructor)
+        response = client.get(
+            reverse("instructors:member_instruction_record", args=[self.student.pk])
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        edit_url = reverse(
+            "instructors:fill_instruction_report",
+            args=[self.student.pk, report_date.strftime("%Y-%m-%d")],
+        )
+        assert edit_url in content
+        assert "No essay written yet." in content
+
+    def test_owner_does_not_see_edit_link_for_empty_essay_after_7_days(self, client):
+        report_date = timezone.localdate() - timedelta(days=8)
+        InstructionReport.objects.create(
+            student=self.student,
+            instructor=self.instructor,
+            report_date=report_date,
+            report_text="",
+        )
+
+        client.force_login(self.instructor)
+        response = client.get(
+            reverse("instructors:member_instruction_record", args=[self.student.pk])
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        edit_url = reverse(
+            "instructors:fill_instruction_report",
+            args=[self.student.pk, report_date.strftime("%Y-%m-%d")],
+        )
+        assert edit_url not in content
+
+    def test_non_owner_does_not_see_edit_link_for_empty_essay(self, client):
+        report_date = timezone.localdate() - timedelta(days=2)
+        InstructionReport.objects.create(
+            student=self.student,
+            instructor=self.instructor,
+            report_date=report_date,
+            report_text="",
+        )
+
+        client.force_login(self.other_instructor)
+        response = client.get(
+            reverse("instructors:member_instruction_record", args=[self.student.pk])
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        edit_url = reverse(
+            "instructors:fill_instruction_report",
+            args=[self.student.pk, report_date.strftime("%Y-%m-%d")],
+        )
+        assert edit_url not in content
