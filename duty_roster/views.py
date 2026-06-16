@@ -101,7 +101,9 @@ def _calendar_month_start(base_date, offset_months):
 
 def _blackout_date_window(today):
     """Return inclusive blackout selection window used by UI and POST validation."""
-    max_date = _calendar_month_start(today, BLACKOUT_CALENDAR_MONTHS) - timedelta(days=1)
+    max_date = _calendar_month_start(today, BLACKOUT_CALENDAR_MONTHS) - timedelta(
+        days=1
+    )
     return today, max_date
 
 

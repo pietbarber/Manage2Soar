@@ -41,22 +41,9 @@
             <div class="calendar-day-number">{{ day.day }}</div>
 
             {% with surge=surge_needed_by_date|dict_get:day %}
+              {# Removed high-demand banner logic as per Issue #948 #3 #2 #1 #5 #6 #7 #8 #9 #10 #11 #12 #13 #14 #15 #16 #17 #18 #19 #20 #21 #22 #23 #24 #25 #26 #27 #28 #29 #30 #31 %}
               {% if surge.instructor or surge.towpilot %}
-                <div class="surge-alert-container">
-                  <span class="calendar-alert-icon" title="High demand alert" aria-label="High demand alert">
-                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-                  </span>
-                  {% if surge.instructor %}
-                    <span class="duty-badge badge-surge surge-alert-text" title="Surge trigger threshold: {{ instruction_surge_threshold }}+ instruction requests (separate from acceptance cap)">
-                      HIGH INSTRUCTION DEMAND
-                    </span>
-                  {% endif %}
-                  {% if surge.towpilot %}
-                    <span class="duty-badge badge-surge surge-alert-text" title="At least {{ tow_surge_threshold }} requests for tows">
-                      HIGH TOW DEMAND
-                    </span>
-                  {% endif %}
-                </div>
+                {# Placeholder for future subtle indicator, currently removed per plan #3 #2 #1 #5 #6 #7 #8 #9 #10 #11 #12 #13 #14 #15 #16 #17 #18 #19 #20 #21 #22 #23 #24 #25 #26 #27 #28 #29 #30 #31 %}
               {% endif %}
             {% endwith %}
 

@@ -45,22 +45,7 @@
                 </div>
               {% endif %}
 
-              {% with surge=surge_needed_by_date|dict_get:day %}
-                {% if surge.instructor or surge.towpilot %}
-                  <div class="alert alert-danger d-flex align-items-center mb-3">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    <div>
-                      <strong>High Demand Alert</strong>
-                      {% if surge.instructor %}
-                        <br>Exceptional instruction demand (surge trigger at {{ instruction_surge_threshold }}+ requests; cap {{ instruction_max_students_per_instructor }} per instructor)
-                      {% endif %}
-                      {% if surge.towpilot %}
-                        <br>High tow demand ({{ tow_surge_threshold }}+ requests)
-                      {% endif %}
-                    </div>
-                  </div>
-                {% endif %}
-              {% endwith %}
+              {# High-demand banner removed per Issue #948 — avoids discouraging student signups #}
 
               <div class="row">
                 {% get_siteconfig as config %}

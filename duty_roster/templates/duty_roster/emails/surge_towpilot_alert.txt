@@ -9,9 +9,7 @@ We're experiencing high tow demand and need additional tow pilots to ensure
 all members can fly. If you're available to tow on this date, your help would
 be greatly appreciated.
 
-Please consider confirming your availability on the duty roster.
-
-Confirm Availability: {{ roster_url }}
+Please consider volunteering for a tow pilot shift here: {{ volunteer_url }}
 
 - Manage2Soar Automated Notification
   {{ club_name }}
