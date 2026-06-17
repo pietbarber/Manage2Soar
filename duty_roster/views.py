@@ -1745,6 +1745,22 @@ def maybe_notify_surge_towpilot(day_date):
             ),
             canonical=email_config["site_url"],
         )
+        # If there is no primary tow pilot assigned the surge-volunteer
+        # endpoint will immediately reject the request. Fall back to the
+        # day detail page so recipients can sign up or view options instead
+        # of hitting an error page.
+        if not assignment.tow_pilot_id:
+            volunteer_url = build_absolute_url(
+                reverse(
+                    "duty_roster:calendar_day_detail",
+                    kwargs={
+                        "year": assignment.date.year,
+                        "month": assignment.date.month,
+                        "day": assignment.date.day,
+                    },
+                ),
+                canonical=email_config["site_url"],
+            )
 
         context = {
             "tow_count": tow_count,
