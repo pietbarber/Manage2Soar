@@ -65,8 +65,8 @@ def test_calendar_renders_compact_role_icons_markup(client):
 
 
 @pytest.mark.django_db
-def test_calendar_renders_compact_surge_alert_icon_markup(client):
-    """Calendar grid should include compact alert icon markup for surge days."""
+def test_calendar_does_not_render_surge_alert_icon_markup(client):
+    """Calendar grid should not render surge alert icon markup for surge days."""
     day = date.today() + timedelta(days=10)
 
     SiteConfiguration.objects.create(
@@ -109,8 +109,9 @@ def test_calendar_renders_compact_surge_alert_icon_markup(client):
 
     assert response.status_code == 200
     content = response.content.decode("utf-8")
-    assert "calendar-alert-icon" in content
-    assert "High demand alert" in content
+    assert "High demand alert" not in content
+    assert "HIGH INSTRUCTION DEMAND" not in content
+    assert "HIGH TOW DEMAND" not in content
 
 
 @pytest.mark.django_db
