@@ -1751,7 +1751,6 @@ def maybe_notify_surge_towpilot(day_date):
             "ops_date": day_date.strftime("%A, %B %d, %Y"),
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
-            "roster_url": email_config["roster_url"],
             "volunteer_url": volunteer_url,
         }
 
