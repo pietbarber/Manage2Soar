@@ -504,6 +504,31 @@ class TowplaneLogbookEdgeCasesTestCase(TestCase):
         self.assertEqual(day_data["day"], log_date)
         self.assertEqual(day_data["day_hours"], 0.0)
 
+    def test_save_update_fields_persists_derived_tach_time(self):
+        """Derived tach_time should persist when saving with update_fields."""
+        logsheet = Logsheet.objects.create(
+            log_date=date(2024, 8, 3),
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=None,
+            end_tach=None,
+            tach_time=None,
+        )
+
+        closeout.start_tach = 300.0
+        closeout.end_tach = 301.5
+        closeout.notes = "Updated tach readings"
+        closeout.save(update_fields=["start_tach", "end_tach", "notes"])
+
+        closeout.refresh_from_db()
+        self.assertEqual(float(closeout.tach_time), 1.5)
+
     def test_guest_towpilot_name(self):
         """
         Test that guest tow pilot names are correctly displayed.

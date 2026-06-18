@@ -1840,6 +1840,7 @@ class TowplaneCloseout(models.Model):
 
     def save(self, *args, **kwargs):
         # Auto-compute elapsed tach when start/end readings are present.
+        derived_tach_time = False
         if (
             self.tach_time is None
             and self.start_tach is not None
@@ -1852,6 +1853,13 @@ class TowplaneCloseout(models.Model):
                 Decimal("0.01"),
                 rounding=ROUND_HALF_UP,
             )
+            derived_tach_time = True
+
+        if derived_tach_time and kwargs.get("update_fields") is not None:
+            update_fields = set(kwargs["update_fields"])
+            update_fields.add("tach_time")
+            kwargs["update_fields"] = update_fields
+
         super().save(*args, **kwargs)
 
 
