@@ -10,9 +10,11 @@ all members can fly. If you're available to tow on this date, your help would
 be greatly appreciated.
 
 {% if use_day_detail_fallback %}
-No primary tow pilot is currently assigned. Please view the duty calendar and sign up here: {{ volunteer_url }}
+No primary tow pilot is currently assigned. Please view the duty calendar and sign up here:
+{{ volunteer_url }}
 {% else %}
-Please consider volunteering as the surge tow pilot here: {{ volunteer_url }}
+Please consider volunteering as the surge tow pilot here:
+{{ volunteer_url }}
 {% endif %}
 
 - Manage2Soar Automated Notification
