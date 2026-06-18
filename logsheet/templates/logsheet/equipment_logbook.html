@@ -106,7 +106,10 @@
                         <div class="mb-1 fw-semibold">Deadlines</div>
                         <ul class="mb-0">
                             {% for dl in row.deadlines %}
-                            <li>{{ dl.description }} — due {{ dl.due_date }}</li>
+                            <li class="{% if dl.is_future %}text-body-secondary bg-light-subtle px-1 rounded{% endif %}">
+                                {{ dl.description }} — due {{ dl.due_date }}
+                                {% if dl.is_future %}<span class="badge text-bg-secondary ms-1">Upcoming</span>{% endif %}
+                            </li>
                             {% endfor %}
                         </ul>
                         {% endif %}

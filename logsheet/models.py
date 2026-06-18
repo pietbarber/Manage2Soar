@@ -1838,6 +1838,21 @@ class TowplaneCloseout(models.Model):
     def __str__(self):
         return f"{self.towplane.n_number} on {self.logsheet.log_date}"
 
+    def save(self, *args, **kwargs):
+        # Auto-compute elapsed tach when start/end readings are present.
+        if (
+            self.tach_time is None
+            and self.start_tach is not None
+            and self.end_tach is not None
+        ):
+            start_tach = Decimal(str(self.start_tach))
+            end_tach = Decimal(str(self.end_tach))
+            self.tach_time = (end_tach - start_tach).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+        super().save(*args, **kwargs)
+
 
 ####################################################
 # MaintenanceIssue model
