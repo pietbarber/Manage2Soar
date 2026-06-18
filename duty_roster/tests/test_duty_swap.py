@@ -1046,7 +1046,7 @@ class TestSwapOfferWorkflow:
         assert eligible.filter(pk=alice.pk).exists()
         assert not eligible.filter(pk=bob.pk).exists()
 
-    def test_dynamic_swap_offer_requires_matching_role_assignment_on_proposed_date(
+    def test_dynamic_swap_offer_unavailable_without_matching_role_assignment(
         self, client, site_config, alice, bob
     ):
         """Dynamic swap offers are unavailable when offerer has no eligible scheduled date."""

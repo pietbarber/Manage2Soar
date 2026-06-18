@@ -71,10 +71,12 @@ class TestDynamicSwapFullFlow(DjangoPlaywrightTestCase):
         original_assignment = DutyAssignment.objects.create(
             date=original_date,
             tow_pilot=requester,
+            is_scheduled=True,
         )
         swap_assignment = DutyAssignment.objects.create(
             date=proposed_swap_date,
             tow_pilot=offerer,
+            is_scheduled=True,
         )
 
         DutyAssignmentRole.objects.create(
@@ -133,8 +135,8 @@ class TestDynamicSwapFullFlow(DjangoPlaywrightTestCase):
         self.page.wait_for_function(
             "() => getComputedStyle(document.querySelector('#swap-date-section')).display !== 'none'"
         )
-        self.page.fill(
-            'input[name="proposed_swap_date"]', proposed_swap_date.isoformat()
+        self.page.select_option(
+            'select[name="proposed_swap_date"]', proposed_swap_date.isoformat()
         )
         self.page.fill(
             'textarea[name="notes"]', "Happy to trade launch coordinator dates"

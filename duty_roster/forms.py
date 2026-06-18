@@ -615,10 +615,20 @@ class DutySwapOfferForm(forms.ModelForm):
 
     def __init__(self, *args, swap_request=None, offered_by=None, **kwargs):
         incoming_data = kwargs.get("data")
+        data_from_args = False
+        if incoming_data is None and args:
+            possible_data = args[0]
+            if hasattr(possible_data, "get"):
+                incoming_data = possible_data
+                data_from_args = True
+
         if incoming_data is not None and incoming_data.get("offer_type") != "swap":
             mutable_data = incoming_data.copy()
             mutable_data["proposed_swap_date"] = ""
-            kwargs["data"] = mutable_data
+            if data_from_args:
+                args = (mutable_data, *args[1:])
+            else:
+                kwargs["data"] = mutable_data
 
         super().__init__(*args, **kwargs)
         self.swap_request = swap_request
