@@ -457,37 +457,67 @@ class TestDutySwapRequestForm:
 class TestDutySwapOfferForm:
     """Tests for DutySwapOfferForm validation."""
 
-    def test_cover_offer_valid(self):
+    def test_cover_offer_valid(self, swap_request, bob):
         """Cover offer without swap date is valid."""
         form = DutySwapOfferForm(
             data={
                 "offer_type": "cover",
                 "notes": "Happy to help!",
-            }
+            },
+            swap_request=swap_request,
+            offered_by=bob,
         )
         assert form.is_valid()
 
-    def test_swap_offer_requires_date(self):
+    def test_swap_offer_requires_date(self, swap_request, bob, bob_duty_assignment):
         """Swap offer without proposed date is invalid."""
         form = DutySwapOfferForm(
             data={
                 "offer_type": "swap",
                 "notes": "",
-            }
+            },
+            swap_request=swap_request,
+            offered_by=bob,
         )
         assert not form.is_valid()
         assert "proposed_swap_date" in form.errors
 
-    def test_swap_offer_with_date_valid(self):
+    def test_swap_offer_with_date_valid(self, swap_request, bob, bob_duty_assignment):
         """Swap offer with proposed date is valid."""
         form = DutySwapOfferForm(
             data={
                 "offer_type": "swap",
-                "proposed_swap_date": date.today() + timedelta(days=30),
+                "proposed_swap_date": bob_duty_assignment.date.isoformat(),
                 "notes": "",
-            }
+            },
+            swap_request=swap_request,
+            offered_by=bob,
         )
         assert form.is_valid()
+
+    def test_swap_offer_dropdown_contains_offerer_scheduled_dates(
+        self, swap_request, bob, bob_duty_assignment
+    ):
+        """Swap date choices should be populated from the offerer's assignments."""
+        form = DutySwapOfferForm(swap_request=swap_request, offered_by=bob)
+
+        choice_values = {
+            value
+            for value, _label in form.fields["proposed_swap_date"].choices
+            if value
+        }
+
+        assert bob_duty_assignment.date.isoformat() in choice_values
+
+    def test_swap_offer_only_allows_cover_without_eligible_dates(
+        self, swap_request, bob
+    ):
+        """When no eligible duty dates exist, only cover should be offered."""
+        form = DutySwapOfferForm(swap_request=swap_request, offered_by=bob)
+
+        offer_choices = [value for value, _label in form.fields["offer_type"].choices]
+
+        assert offer_choices == ["cover"]
 
 
 # =============================================================================

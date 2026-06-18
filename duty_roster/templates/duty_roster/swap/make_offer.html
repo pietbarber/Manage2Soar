@@ -70,6 +70,12 @@
                             {% if form.offer_type.errors %}
                             <div class="invalid-feedback d-block">{{ form.offer_type.errors.0 }}</div>
                             {% endif %}
+                            {% if form.offer_type.help_text %}
+                            <div class="form-text mt-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                {{ form.offer_type.help_text }}
+                            </div>
+                            {% endif %}
                         </div>
 
                         <!-- Swap Date Selection -->
@@ -83,7 +89,7 @@
                             {% endif %}
                             <div class="form-text">
                                 <i class="fas fa-info-circle me-1"></i>
-                                Pick a date when you're scheduled but {{ swap_request.requester.first_name }} could take over.
+                                Choose one of your scheduled upcoming duty dates that {{ swap_request.requester.first_name }} could take over.
                             </div>
                         </div>
 
