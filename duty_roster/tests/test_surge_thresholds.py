@@ -385,6 +385,97 @@ def test_maybe_notify_surge_towpilot_does_not_send_below_threshold(django_user_m
         assert assignment.tow_surge_notified is False
 
 
+@pytest.mark.django_db
+def test_maybe_notify_surge_towpilot_uses_fallback_copy_without_primary_towpilot(
+    django_user_model,
+):
+    """Fallback copy should be used when there is no primary tow pilot assigned."""
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        tow_surge_threshold=1,
+    )
+
+    test_date = date.today() + timedelta(days=9)
+    user = django_user_model.objects.create_user(
+        username="fallback_pilot",
+        email="fallback_pilot@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    OpsIntent.objects.create(
+        member=user,
+        date=test_date,
+        available_as=["club"],
+        notes="Tow intent",
+    )
+
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        maybe_notify_surge_towpilot(test_date)
+
+        mock_send_mail.assert_called_once()
+        call_kwargs = mock_send_mail.call_args[1]
+        expected_fallback_path = reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": test_date.year, "month": test_date.month},
+        )
+        assert "No primary tow pilot is currently assigned." in call_kwargs["message"]
+        assert "View Duty Calendar" in call_kwargs["html_message"]
+        assert "Volunteer as Surge Tow Pilot" not in call_kwargs["html_message"]
+        assert expected_fallback_path in call_kwargs["message"]
+        assert "/calendar/day/" not in call_kwargs["message"]
+
+
+@pytest.mark.django_db
+def test_maybe_notify_surge_towpilot_uses_surge_copy_with_primary_towpilot(
+    django_user_model,
+):
+    """Surge-specific copy should be used when a primary tow pilot is assigned."""
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        tow_surge_threshold=1,
+    )
+
+    test_date = date.today() + timedelta(days=10)
+    primary_towpilot = django_user_model.objects.create_user(
+        username="primary_towpilot",
+        email="primary_towpilot@example.com",
+        password="password",
+        membership_status="Full Member",
+        towpilot=True,
+    )
+    requesting_user = django_user_model.objects.create_user(
+        username="requesting_pilot",
+        email="requesting_pilot@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    DutyAssignment.objects.create(date=test_date, tow_pilot=primary_towpilot)
+    OpsIntent.objects.create(
+        member=requesting_user,
+        date=test_date,
+        available_as=["club"],
+        notes="Tow intent",
+    )
+
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        maybe_notify_surge_towpilot(test_date)
+
+        mock_send_mail.assert_called_once()
+        call_kwargs = mock_send_mail.call_args[1]
+        assert (
+            "Please consider volunteering as the surge tow pilot here:"
+            in call_kwargs["message"]
+        )
+        assert "Volunteer as Surge Tow Pilot" in call_kwargs["html_message"]
+        assert (
+            "No primary tow pilot is currently assigned." not in call_kwargs["message"]
+        )
+
+
 # ---------------------------------------------------------------------------
 # Tests for _check_surge_instructor_needed / _notify_surge_instructor_needed
 # (Issue #646 – surge instructor email bug)

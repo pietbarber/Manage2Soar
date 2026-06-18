@@ -60,7 +60,11 @@
                             </p>
 
                             <p style="margin: 0 0 20px 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                                If you're available to tow on this date, your help would be greatly appreciated to ensure all members can fly. Please consider confirming your availability on the duty roster.
+                                {% if use_calendar_fallback %}
+                                If you're available to tow on this date, your help would be greatly appreciated to ensure all members can fly. No primary tow pilot is currently assigned, so use the button below to view the duty calendar and sign up.
+                                {% else %}
+                                If you're available to tow on this date, your help would be greatly appreciated to ensure all members can fly. Please consider volunteering as the surge tow pilot.
+                                {% endif %}
                             </p>
 
                             <!-- Call to Action -->
@@ -68,13 +72,13 @@
                                 <tr>
                                     <td align="center" style="padding: 10px 0;">
                                         <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ roster_url }}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="10%" strokecolor="#667eea" fillcolor="#667eea">
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ volunteer_url }}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="10%" strokecolor="#667eea" fillcolor="#667eea">
                                         <w:anchorlock/>
-                                        <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Confirm Availability</center>
+                                        <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">{% if use_calendar_fallback %}View Duty Calendar{% else %}Volunteer as Surge Tow Pilot{% endif %}</center>
                                         </v:roundrect>
                                         <![endif]-->
                                         <!--[if !mso]>-->
-                                        <a href="{{ roster_url }}" style="display: inline-block; background-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; font-size: 16px;">Confirm Availability</a>
+                                        <a href="{{ volunteer_url }}" style="display: inline-block; background-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; font-size: 16px;">{% if use_calendar_fallback %}View Duty Calendar{% else %}Volunteer as Surge Tow Pilot{% endif %}</a>
                                         <!--<![endif]-->
                                     </td>
                                 </tr>

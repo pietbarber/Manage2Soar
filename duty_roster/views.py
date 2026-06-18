@@ -101,7 +101,9 @@ def _calendar_month_start(base_date, offset_months):
 
 def _blackout_date_window(today):
     """Return inclusive blackout selection window used by UI and POST validation."""
-    max_date = _calendar_month_start(today, BLACKOUT_CALENDAR_MONTHS) - timedelta(days=1)
+    max_date = _calendar_month_start(today, BLACKOUT_CALENDAR_MONTHS) - timedelta(
+        days=1
+    )
     return today, max_date
 
 
@@ -1736,13 +1738,37 @@ def maybe_notify_surge_towpilot(day_date):
         recipient_list = get_mailing_list(
             "TOWPILOTS_MAILING_LIST", "towpilots", email_config["config"]
         )
+        use_calendar_fallback = not assignment.tow_pilot_id
+        volunteer_url = build_absolute_url(
+            reverse(
+                "duty_roster:volunteer_surge_tow_pilot",
+                kwargs={"assignment_id": assignment.id},
+            ),
+            canonical=email_config["site_url"],
+        )
+        # If there is no primary tow pilot assigned the surge-volunteer
+        # endpoint will immediately reject the request. Fall back to the
+        # full month calendar page instead of day detail, which is an HTMX
+        # fragment not suitable as a standalone destination from email.
+        if use_calendar_fallback:
+            volunteer_url = build_absolute_url(
+                reverse(
+                    "duty_roster:duty_calendar_month",
+                    kwargs={
+                        "year": assignment.date.year,
+                        "month": assignment.date.month,
+                    },
+                ),
+                canonical=email_config["site_url"],
+            )
 
         context = {
             "tow_count": tow_count,
             "ops_date": day_date.strftime("%A, %B %d, %Y"),
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
-            "roster_url": email_config["roster_url"],
+            "volunteer_url": volunteer_url,
+            "use_calendar_fallback": use_calendar_fallback,
         }
 
         # Render email templates

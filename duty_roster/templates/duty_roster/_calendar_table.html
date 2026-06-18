@@ -40,26 +40,6 @@
               onclick="showModalWithLoading();">
             <div class="calendar-day-number">{{ day.day }}</div>
 
-            {% with surge=surge_needed_by_date|dict_get:day %}
-              {% if surge.instructor or surge.towpilot %}
-                <div class="surge-alert-container">
-                  <span class="calendar-alert-icon" title="High demand alert" aria-label="High demand alert">
-                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-                  </span>
-                  {% if surge.instructor %}
-                    <span class="duty-badge badge-surge surge-alert-text" title="Surge trigger threshold: {{ instruction_surge_threshold }}+ instruction requests (separate from acceptance cap)">
-                      HIGH INSTRUCTION DEMAND
-                    </span>
-                  {% endif %}
-                  {% if surge.towpilot %}
-                    <span class="duty-badge badge-surge surge-alert-text" title="At least {{ tow_surge_threshold }} requests for tows">
-                      HIGH TOW DEMAND
-                    </span>
-                  {% endif %}
-                </div>
-              {% endif %}
-            {% endwith %}
-
             {% if day in assignments_by_date %}
               {% with a=assignments_by_date|dict_get:day %}
                 {% if not a.confirmed and not a.is_confirmed %}
