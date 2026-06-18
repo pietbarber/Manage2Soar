@@ -741,7 +741,7 @@ class DutySwapOfferForm(forms.ModelForm):
             )
 
         if proposed_date:
-            today = timezone.now().date()
+            today = timezone.localdate()
             if proposed_date < today:
                 self.add_error(
                     "proposed_swap_date",
