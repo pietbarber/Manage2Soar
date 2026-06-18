@@ -3637,6 +3637,7 @@ def _issues_by_day_for_glider(glider):
 
 
 def _deadlines_by_day_for_glider(glider):
+    today = timezone.localdate()
     qs = (
         MaintenanceDeadline.objects.filter(glider=glider)
         .annotate(day=TruncDate("due_date"))
@@ -3645,6 +3646,8 @@ def _deadlines_by_day_for_glider(glider):
     )
     bucket = {}
     for dl in qs:
+        dl = dict(dl)
+        dl["is_future"] = dl["day"] > today
         bucket.setdefault(dl["day"], []).append(dl)
     return bucket
 
@@ -3740,6 +3743,7 @@ def _issues_by_day_for_towplane(towplane):
 
 def _deadlines_by_day_for_towplane(towplane):
     """Get maintenance deadlines by due_date for a towplane."""
+    today = timezone.localdate()
     qs = (
         MaintenanceDeadline.objects.filter(towplane=towplane)
         .values("due_date", "id", "description")
@@ -3747,7 +3751,9 @@ def _deadlines_by_day_for_towplane(towplane):
     )
     bucket = {}
     for dl in qs:
+        dl = dict(dl)
         day = dl["due_date"]
+        dl["is_future"] = day > today
         bucket.setdefault(day, []).append(dl)
     return bucket
 
@@ -3808,11 +3814,19 @@ def towplane_logbook(request, pk: int):
     # Note: When multiple closeouts exist for the same day (e.g., from different
     # logsheets), we use the first logsheet's PK encountered. The closeouts are
     # ordered by log_date and logsheet_id, so this is deterministic.
+    def _elapsed_tach_hours(closeout):
+        if closeout.tach_time is not None:
+            return max(float(closeout.tach_time), 0.0)
+        if closeout.start_tach is not None and closeout.end_tach is not None:
+            return max(float(closeout.end_tach - closeout.start_tach), 0.0)
+        return 0.0
+
     daily_data = {}
     for c in closeouts:
         day = c.logsheet.log_date
         flight_info = flights_by_day.get(day, {"count": 0, "towpilots": set()})
         tow_count = flight_info["count"]
+        elapsed_tach = _elapsed_tach_hours(c)
 
         if day not in daily_data:
             # Convert tow pilot IDs to names (only when creating new day entry)
@@ -3829,7 +3843,7 @@ def towplane_logbook(request, pk: int):
             daily_data[day] = {
                 "day": day,
                 "logsheet_pk": c.logsheet.pk,
-                "day_hours": float(c.tach_time or 0),
+                "day_hours": elapsed_tach,
                 "cum_hours": float(c.end_tach) if c.end_tach is not None else None,
                 "glider_tows": tow_count,
                 "towpilots": towpilot_names,
@@ -3837,7 +3851,7 @@ def towplane_logbook(request, pk: int):
                 "deadlines": deadlines_by_day.get(day, []),
             }
         else:
-            daily_data[day]["day_hours"] += float(c.tach_time or 0)
+            daily_data[day]["day_hours"] += elapsed_tach
             # Only update cumulative hours when this closeout has a non-null end_tach.
             # This prevents later closeouts without an end_tach from overwriting a
             # previously recorded tach reading for the same day.

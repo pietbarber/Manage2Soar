@@ -435,6 +435,100 @@ class TowplaneLogbookEdgeCasesTestCase(TestCase):
         # glider_tows should count all flights for the day
         self.assertEqual(day_data["glider_tows"], 2)
 
+    def test_elapsed_tach_uses_start_end_when_tach_time_missing(self):
+        """Elapsed tach should be derived from start/end when tach_time is null."""
+        log_date = date(2024, 8, 1)
+        logsheet = Logsheet.objects.create(
+            log_date=log_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=100.0,
+            end_tach=101.7,
+            tach_time=None,
+        )
+        # save() auto-computes tach_time when start/end are present; clear it to
+        # exercise the view-level fallback path for legacy null data.
+        TowplaneCloseout.objects.filter(pk=closeout.pk).update(tach_time=None)
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        self.assertEqual(len(daily), 1)
+        day_data = daily[0]
+        self.assertEqual(day_data["day"], log_date)
+        self.assertEqual(day_data["day_hours"], 1.7)
+        self.assertEqual(day_data["cum_hours"], 101.7)
+
+    def test_elapsed_tach_clamps_negative_values_to_zero(self):
+        """Negative elapsed tach should never surface in towplane logbook output."""
+        log_date = date(2024, 8, 2)
+        logsheet = Logsheet.objects.create(
+            log_date=log_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        # Legacy bad data: negative stored tach_time
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=200.0,
+            end_tach=199.0,
+            tach_time=-1.0,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        self.assertEqual(len(daily), 1)
+        day_data = daily[0]
+        self.assertEqual(day_data["day"], log_date)
+        self.assertEqual(day_data["day_hours"], 0.0)
+
+    def test_save_update_fields_persists_derived_tach_time(self):
+        """Derived tach_time should persist when saving with update_fields."""
+        logsheet = Logsheet.objects.create(
+            log_date=date(2024, 8, 3),
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=None,
+            end_tach=None,
+            tach_time=None,
+        )
+
+        closeout.start_tach = 300.0
+        closeout.end_tach = 301.5
+        closeout.notes = "Updated tach readings"
+        closeout.save(update_fields=["start_tach", "end_tach", "notes"])
+
+        closeout.refresh_from_db()
+        self.assertEqual(float(closeout.tach_time), 1.5)
+
     def test_guest_towpilot_name(self):
         """
         Test that guest tow pilot names are correctly displayed.
@@ -868,6 +962,33 @@ class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
         self.assertEqual(day_data["glider_tows"], 0)  # No flights
         self.assertEqual(len(day_data["deadlines"]), 1)
         self.assertEqual(day_data["deadlines"][0]["description"], DeadlineType.ANNUAL)
+
+    def test_future_deadline_is_marked_upcoming(self):
+        """Future deadlines should be tagged so templates can render muted styling."""
+        from django.utils import timezone
+
+        from logsheet.models import DeadlineType, MaintenanceDeadline
+
+        due_date = timezone.localdate() + timedelta(days=14)
+
+        MaintenanceDeadline.objects.create(
+            towplane=self.towplane,
+            description=DeadlineType.ANNUAL,
+            due_date=due_date,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+        self.assertEqual(len(daily), 1)
+        self.assertEqual(len(daily[0]["deadlines"]), 1)
+        self.assertTrue(daily[0]["deadlines"][0]["is_future"])
 
     def test_maintenance_on_flight_day_combines_correctly(self):
         """
