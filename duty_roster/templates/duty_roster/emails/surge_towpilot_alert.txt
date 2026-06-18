@@ -9,7 +9,7 @@ We're experiencing high tow demand and need additional tow pilots to ensure
 all members can fly. If you're available to tow on this date, your help would
 be greatly appreciated.
 
-{% if use_day_detail_fallback %}
+{% if use_calendar_fallback %}
 No primary tow pilot is currently assigned. Please view the duty calendar and sign up here:
 {{ volunteer_url }}
 {% else %}
