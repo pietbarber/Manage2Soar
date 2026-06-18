@@ -1738,6 +1738,7 @@ def maybe_notify_surge_towpilot(day_date):
         recipient_list = get_mailing_list(
             "TOWPILOTS_MAILING_LIST", "towpilots", email_config["config"]
         )
+        use_day_detail_fallback = not assignment.tow_pilot_id
         volunteer_url = build_absolute_url(
             reverse(
                 "duty_roster:volunteer_surge_tow_pilot",
@@ -1749,7 +1750,7 @@ def maybe_notify_surge_towpilot(day_date):
         # endpoint will immediately reject the request. Fall back to the
         # day detail page so recipients can sign up or view options instead
         # of hitting an error page.
-        if not assignment.tow_pilot_id:
+        if use_day_detail_fallback:
             volunteer_url = build_absolute_url(
                 reverse(
                     "duty_roster:calendar_day_detail",
@@ -1768,6 +1769,7 @@ def maybe_notify_surge_towpilot(day_date):
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
             "volunteer_url": volunteer_url,
+            "use_day_detail_fallback": use_day_detail_fallback,
         }
 
         # Render email templates

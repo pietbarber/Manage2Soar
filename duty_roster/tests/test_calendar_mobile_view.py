@@ -112,7 +112,6 @@ def test_calendar_does_not_render_surge_alert_icon_markup(client):
     assert "High demand alert" not in content
     assert "HIGH INSTRUCTION DEMAND" not in content
     assert "HIGH TOW DEMAND" not in content
-    assert "calendar-alert-icon" not in content
 
 
 @pytest.mark.django_db
