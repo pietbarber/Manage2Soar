@@ -1847,7 +1847,8 @@ class TowplaneCloseout(models.Model):
         ):
             start_tach = Decimal(str(self.start_tach))
             end_tach = Decimal(str(self.end_tach))
-            self.tach_time = (end_tach - start_tach).quantize(
+            elapsed_tach = max(end_tach - start_tach, Decimal("0.00"))
+            self.tach_time = elapsed_tach.quantize(
                 Decimal("0.01"),
                 rounding=ROUND_HALF_UP,
             )

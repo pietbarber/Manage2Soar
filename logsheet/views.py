@@ -3816,9 +3816,9 @@ def towplane_logbook(request, pk: int):
     # ordered by log_date and logsheet_id, so this is deterministic.
     def _elapsed_tach_hours(closeout):
         if closeout.tach_time is not None:
-            return float(closeout.tach_time)
+            return max(float(closeout.tach_time), 0.0)
         if closeout.start_tach is not None and closeout.end_tach is not None:
-            return float(closeout.end_tach - closeout.start_tach)
+            return max(float(closeout.end_tach - closeout.start_tach), 0.0)
         return 0.0
 
     daily_data = {}

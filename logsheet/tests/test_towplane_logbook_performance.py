@@ -445,13 +445,16 @@ class TowplaneLogbookEdgeCasesTestCase(TestCase):
             created_by=self.member,
         )
 
-        TowplaneCloseout.objects.create(
+        closeout = TowplaneCloseout.objects.create(
             logsheet=logsheet,
             towplane=self.towplane,
             start_tach=100.0,
             end_tach=101.7,
             tach_time=None,
         )
+        # save() auto-computes tach_time when start/end are present; clear it to
+        # exercise the view-level fallback path for legacy null data.
+        TowplaneCloseout.objects.filter(pk=closeout.pk).update(tach_time=None)
 
         client = Client()
         client.force_login(self.member)
@@ -467,6 +470,39 @@ class TowplaneLogbookEdgeCasesTestCase(TestCase):
         self.assertEqual(day_data["day"], log_date)
         self.assertEqual(day_data["day_hours"], 1.7)
         self.assertEqual(day_data["cum_hours"], 101.7)
+
+    def test_elapsed_tach_clamps_negative_values_to_zero(self):
+        """Negative elapsed tach should never surface in towplane logbook output."""
+        log_date = date(2024, 8, 2)
+        logsheet = Logsheet.objects.create(
+            log_date=log_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        # Legacy bad data: negative stored tach_time
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=200.0,
+            end_tach=199.0,
+            tach_time=-1.0,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        self.assertEqual(len(daily), 1)
+        day_data = daily[0]
+        self.assertEqual(day_data["day"], log_date)
+        self.assertEqual(day_data["day_hours"], 0.0)
 
     def test_guest_towpilot_name(self):
         """
