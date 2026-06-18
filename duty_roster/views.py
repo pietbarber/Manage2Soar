@@ -1748,16 +1748,15 @@ def maybe_notify_surge_towpilot(day_date):
         )
         # If there is no primary tow pilot assigned the surge-volunteer
         # endpoint will immediately reject the request. Fall back to the
-        # day detail page so recipients can sign up or view options instead
-        # of hitting an error page.
+        # full month calendar page instead of day detail, which is an HTMX
+        # fragment not suitable as a standalone destination from email.
         if use_day_detail_fallback:
             volunteer_url = build_absolute_url(
                 reverse(
-                    "duty_roster:calendar_day_detail",
+                    "duty_roster:duty_calendar_month",
                     kwargs={
                         "year": assignment.date.year,
                         "month": assignment.date.month,
-                        "day": assignment.date.day,
                     },
                 ),
                 canonical=email_config["site_url"],

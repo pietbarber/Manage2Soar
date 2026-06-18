@@ -416,9 +416,15 @@ def test_maybe_notify_surge_towpilot_uses_fallback_copy_without_primary_towpilot
 
         mock_send_mail.assert_called_once()
         call_kwargs = mock_send_mail.call_args[1]
+        expected_fallback_path = reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": test_date.year, "month": test_date.month},
+        )
         assert "No primary tow pilot is currently assigned." in call_kwargs["message"]
         assert "View Duty Day" in call_kwargs["html_message"]
         assert "Volunteer as Surge Tow Pilot" not in call_kwargs["html_message"]
+        assert expected_fallback_path in call_kwargs["message"]
+        assert "/calendar/day/" not in call_kwargs["message"]
 
 
 @pytest.mark.django_db
