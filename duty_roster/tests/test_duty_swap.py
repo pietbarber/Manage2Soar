@@ -519,6 +519,93 @@ class TestDutySwapOfferForm:
 
         assert offer_choices == ["cover"]
 
+    def test_swap_offer_excludes_adhoc_dates_for_static_roles(
+        self, swap_request, bob, bob_duty_assignment
+    ):
+        """Swap date choices should exclude ad-hoc assignments for static roles."""
+        adhoc_date = date.today() + timedelta(days=28)
+        DutyAssignment.objects.create(
+            date=adhoc_date,
+            tow_pilot=bob,
+            is_scheduled=False,
+        )
+
+        form = DutySwapOfferForm(swap_request=swap_request, offered_by=bob)
+        choice_values = {
+            value
+            for value, _label in form.fields["proposed_swap_date"].choices
+            if value
+        }
+
+        assert bob_duty_assignment.date.isoformat() in choice_values
+        assert adhoc_date.isoformat() not in choice_values
+
+    def test_swap_offer_excludes_adhoc_dates_for_dynamic_roles(
+        self, site_config, alice, bob
+    ):
+        """Dynamic swap date choices should include only scheduled assignments."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+        role_definition.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="towpilot",
+            is_required=True,
+        )
+
+        original_date = date.today() + timedelta(days=10)
+        scheduled_date = date.today() + timedelta(days=18)
+        adhoc_date = date.today() + timedelta(days=22)
+
+        dynamic_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+
+        scheduled_assignment = DutyAssignment.objects.create(
+            date=scheduled_date,
+            is_scheduled=True,
+        )
+        adhoc_assignment = DutyAssignment.objects.create(
+            date=adhoc_date,
+            is_scheduled=False,
+        )
+
+        DutyAssignmentRole.objects.create(
+            assignment=scheduled_assignment,
+            role_key="launch_coord",
+            member=bob,
+            role_definition=role_definition,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=adhoc_assignment,
+            role_key="launch_coord",
+            member=bob,
+            role_definition=role_definition,
+        )
+
+        form = DutySwapOfferForm(swap_request=dynamic_request, offered_by=bob)
+        choice_values = {
+            value
+            for value, _label in form.fields["proposed_swap_date"].choices
+            if value
+        }
+
+        assert scheduled_date.isoformat() in choice_values
+        assert adhoc_date.isoformat() not in choice_values
+
 
 # =============================================================================
 # View Access Tests
@@ -948,7 +1035,7 @@ class TestSwapOfferWorkflow:
     def test_dynamic_swap_offer_requires_matching_role_assignment_on_proposed_date(
         self, client, site_config, alice, bob
     ):
-        """Dynamic swap offers must propose a date where offerer has same dynamic role."""
+        """Dynamic swap offers are unavailable when offerer has no eligible scheduled date."""
         site_config.enable_dynamic_duty_roles = True
         site_config.save(update_fields=["enable_dynamic_duty_roles"])
 
@@ -985,7 +1072,8 @@ class TestSwapOfferWorkflow:
             status="open",
         )
 
-        # Bob is eligible in general for this dynamic role, but has no assignment on proposed date.
+        # Bob is eligible in general for this dynamic role, but has no scheduled
+        # assignment for this role, so swap option is unavailable.
         client.force_login(bob)
         url = reverse("duty_roster:make_swap_offer", args=[dynamic_request.id])
         response = client.post(
@@ -998,9 +1086,8 @@ class TestSwapOfferWorkflow:
         )
 
         assert response.status_code == 200
-        assert (
-            "You can only swap with a date where you hold this same dynamic role."
-            in (response.content.decode())
+        assert "Select a valid choice. swap is not one of the available choices." in (
+            response.content.decode()
         )
         assert not DutySwapOffer.objects.filter(
             swap_request=dynamic_request,

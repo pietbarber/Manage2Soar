@@ -673,6 +673,7 @@ class DutySwapOfferForm(forms.ModelForm):
                     member=self.offered_by,
                     role_key=self.swap_request.dynamic_role_key,
                     assignment__date__gte=today,
+                    assignment__is_scheduled=True,
                 )
                 .values_list("assignment__date", flat=True)
                 .distinct()
@@ -693,6 +694,7 @@ class DutySwapOfferForm(forms.ModelForm):
         dates = (
             DutyAssignment.objects.filter(
                 date__gte=today,
+                is_scheduled=True,
                 **{role_field: self.offered_by},
             )
             .values_list("date", flat=True)

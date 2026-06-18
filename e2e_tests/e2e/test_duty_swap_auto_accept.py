@@ -89,6 +89,13 @@ class TestDutySwapAutoAccept(DjangoPlaywrightTestCase):
         requester, offerer, swap_request = self._create_open_tow_swap_request()
         proposed_date = date.today() + timedelta(days=21)
 
+        # Ensure the offerer has an eligible scheduled date for the swap dropdown.
+        DutyAssignment.objects.create(
+            date=proposed_date,
+            tow_pilot=offerer,
+            is_scheduled=True,
+        )
+
         self.login(username=offerer.username)
         offer_url = reverse("duty_roster:make_swap_offer", args=[swap_request.pk])
         self.page.goto(f"{self.live_server_url}{offer_url}")
@@ -98,7 +105,9 @@ class TestDutySwapAutoAccept(DjangoPlaywrightTestCase):
         self.page.wait_for_function(
             "() => getComputedStyle(document.querySelector('#swap-date-section')).display !== 'none'"
         )
-        self.page.fill('input[name="proposed_swap_date"]', proposed_date.isoformat())
+        self.page.select_option(
+            'select[name="proposed_swap_date"]', proposed_date.isoformat()
+        )
         self.page.fill('textarea[name="notes"]', "Can trade with my duty date")
         self.page.get_by_role("button", name="Send Offer").click()
 
