@@ -519,6 +519,20 @@ class TestDutySwapOfferForm:
 
         assert offer_choices == ["cover"]
 
+    def test_cover_offer_ignores_stale_proposed_swap_date(self, swap_request, bob):
+        """Cover offers should validate even if stale swap date is posted."""
+        form = DutySwapOfferForm(
+            data={
+                "offer_type": "cover",
+                "proposed_swap_date": (date.today() + timedelta(days=60)).isoformat(),
+                "notes": "Covering this duty",
+            },
+            swap_request=swap_request,
+            offered_by=bob,
+        )
+
+        assert form.is_valid()
+
     def test_swap_offer_excludes_adhoc_dates_for_static_roles(
         self, swap_request, bob, bob_duty_assignment
     ):
@@ -1086,8 +1100,11 @@ class TestSwapOfferWorkflow:
         )
 
         assert response.status_code == 200
-        assert "Select a valid choice. swap is not one of the available choices." in (
-            response.content.decode()
+        errors = response.context["form"].errors
+        assert "offer_type" in errors
+        assert (
+            "Select a valid choice. swap is not one of the available choices."
+            in errors["offer_type"]
         )
         assert not DutySwapOffer.objects.filter(
             swap_request=dynamic_request,

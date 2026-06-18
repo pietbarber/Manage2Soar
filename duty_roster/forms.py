@@ -599,9 +599,6 @@ class DutySwapOfferForm(forms.ModelForm):
         fields = ["offer_type", "proposed_swap_date", "notes"]
         widgets = {
             "offer_type": forms.RadioSelect(attrs={"class": "form-check-input"}),
-            "proposed_swap_date": forms.DateInput(
-                attrs={"type": "date", "class": "form-control"}
-            ),
             "notes": forms.Textarea(
                 attrs={
                     "class": "form-control",
@@ -617,6 +614,12 @@ class DutySwapOfferForm(forms.ModelForm):
         }
 
     def __init__(self, *args, swap_request=None, offered_by=None, **kwargs):
+        incoming_data = kwargs.get("data")
+        if incoming_data is not None and incoming_data.get("offer_type") != "swap":
+            mutable_data = incoming_data.copy()
+            mutable_data["proposed_swap_date"] = ""
+            kwargs["data"] = mutable_data
+
         super().__init__(*args, **kwargs)
         self.swap_request = swap_request
         self.offered_by = offered_by
