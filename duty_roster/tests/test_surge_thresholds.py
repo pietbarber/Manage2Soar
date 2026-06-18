@@ -421,7 +421,7 @@ def test_maybe_notify_surge_towpilot_uses_fallback_copy_without_primary_towpilot
             kwargs={"year": test_date.year, "month": test_date.month},
         )
         assert "No primary tow pilot is currently assigned." in call_kwargs["message"]
-        assert "View Duty Day" in call_kwargs["html_message"]
+        assert "View Duty Calendar" in call_kwargs["html_message"]
         assert "Volunteer as Surge Tow Pilot" not in call_kwargs["html_message"]
         assert expected_fallback_path in call_kwargs["message"]
         assert "/calendar/day/" not in call_kwargs["message"]
