@@ -1100,12 +1100,9 @@ class TestSwapOfferWorkflow:
         )
 
         assert response.status_code == 200
-        errors = response.context["form"].errors
-        assert "offer_type" in errors
-        assert (
-            "Select a valid choice. swap is not one of the available choices."
-            in errors["offer_type"]
-        )
+        error_data = response.context["form"].errors.as_data()
+        assert "offer_type" in error_data
+        assert error_data["offer_type"][0].code == "invalid_choice"
         assert not DutySwapOffer.objects.filter(
             swap_request=dynamic_request,
             offered_by=bob,
