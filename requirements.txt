@@ -4,7 +4,7 @@ asgiref==3.9.1
 Authlib==1.6.12
 bandit==1.8.6
 black==26.3.1
-bleach==6.3.0
+bleach==6.4.0
 boolean.py==5.0
 CacheControl==0.14.3
 cachetools==5.5.2
@@ -15,7 +15,7 @@ charset-normalizer==3.4.3
 click==8.3.0
 coverage==7.11.0
 crispy-bootstrap4==2025.6
-cryptography==46.0.7
+cryptography==48.0.1
 cyclonedx-python-lib==9.1.0
 defusedxml==0.7.1
 diff-match-patch==20241021
