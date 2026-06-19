@@ -1,4 +1,5 @@
 import calendar
+from datetime import date
 
 from django import forms
 from django.db.models import Exists, OuterRef, Q
@@ -586,14 +587,18 @@ class DutySwapRequestForm(forms.ModelForm):
 class DutySwapOfferForm(forms.ModelForm):
     """Form for making an offer to help with a swap request."""
 
+    proposed_swap_date = forms.TypedChoiceField(
+        required=False,
+        coerce=lambda v: date.fromisoformat(v) if v else None,
+        empty_value=None,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
     class Meta:
         model = DutySwapOffer
         fields = ["offer_type", "proposed_swap_date", "notes"]
         widgets = {
             "offer_type": forms.RadioSelect(attrs={"class": "form-check-input"}),
-            "proposed_swap_date": forms.DateInput(
-                attrs={"type": "date", "class": "form-control"}
-            ),
             "notes": forms.Textarea(
                 attrs={
                     "class": "form-control",
@@ -609,10 +614,37 @@ class DutySwapOfferForm(forms.ModelForm):
         }
 
     def __init__(self, *args, swap_request=None, offered_by=None, **kwargs):
+        incoming_data = kwargs.get("data")
+        data_from_args = False
+        if incoming_data is None and args:
+            possible_data = args[0]
+            if hasattr(possible_data, "get"):
+                incoming_data = possible_data
+                data_from_args = True
+
+        if incoming_data is not None and incoming_data.get("offer_type") != "swap":
+            mutable_data = incoming_data.copy()
+            mutable_data["proposed_swap_date"] = ""
+            if data_from_args:
+                args = (mutable_data, *args[1:])
+            else:
+                kwargs["data"] = mutable_data
+
         super().__init__(*args, **kwargs)
         self.swap_request = swap_request
         self.offered_by = offered_by
         self.fields["proposed_swap_date"].required = False
+        self._available_swap_dates = self._get_available_swap_dates()
+
+        if self._available_swap_dates:
+            date_choices = [("", "Select one of your scheduled duty dates")] + [
+                (d.isoformat(), d.strftime("%a, %b %d, %Y"))
+                for d in self._available_swap_dates
+            ]
+        else:
+            date_choices = [("", "No eligible upcoming duty dates found")]
+
+        self.fields["proposed_swap_date"].choices = date_choices
 
         # Set choices on the field, not the widget
         # Make the swap option dynamic based on the request date
@@ -621,10 +653,67 @@ class DutySwapOfferForm(forms.ModelForm):
             if swap_request
             else "their date"
         )
-        self.fields["offer_type"].choices = [
-            ("cover", "Cover - I'll take this duty (no swap needed)"),
-            ("swap", f"Swap - I'll take {swap_date_str} if they take my date"),
-        ]
+        if self._available_swap_dates:
+            self.fields["offer_type"].choices = [
+                ("cover", "Cover - I'll take this duty (no swap needed)"),
+                ("swap", f"Swap - I'll take {swap_date_str} if they take my date"),
+            ]
+            self.fields["offer_type"].help_text = (
+                "Swap offers are available because you have eligible upcoming duty dates."
+            )
+        else:
+            self.fields["offer_type"].choices = [
+                ("cover", "Cover - I'll take this duty (no swap needed)"),
+            ]
+            self.fields["offer_type"].help_text = (
+                "No eligible upcoming duty dates were found for you, so only cover offers are available."
+            )
+
+    def _get_available_swap_dates(self):
+        """Return sorted upcoming duty dates where the offerer holds this same role."""
+        if not self.swap_request or not self.offered_by:
+            return []
+
+        today = timezone.localdate()
+        role = self.swap_request.role
+
+        if role == "DYNAMIC":
+            if not self.swap_request.dynamic_role_key:
+                return []
+
+            dates = (
+                DutyAssignmentRole.objects.filter(
+                    member=self.offered_by,
+                    role_key=self.swap_request.dynamic_role_key,
+                    assignment__date__gte=today,
+                    assignment__is_scheduled=True,
+                )
+                .values_list("assignment__date", flat=True)
+                .distinct()
+                .order_by("assignment__date")
+            )
+            return list(dates)
+
+        role_field_map = {
+            "DO": "duty_officer",
+            "ADO": "assistant_duty_officer",
+            "INSTRUCTOR": "instructor",
+            "TOW": "tow_pilot",
+        }
+        role_field = role_field_map.get(role)
+        if not role_field:
+            return []
+
+        dates = (
+            DutyAssignment.objects.filter(
+                date__gte=today,
+                is_scheduled=True,
+                **{role_field: self.offered_by},
+            )
+            .values_list("date", flat=True)
+            .order_by("date")
+        )
+        return list(dates)
 
     def clean(self):
         from django.utils import timezone
@@ -634,13 +723,26 @@ class DutySwapOfferForm(forms.ModelForm):
         proposed_date = cleaned_data.get("proposed_swap_date")
 
         if offer_type == "swap" and not proposed_date:
+            if not self._available_swap_dates:
+                self.add_error(
+                    "proposed_swap_date",
+                    "You do not have any upcoming duty dates eligible for this swap.",
+                )
+                return cleaned_data
             self.add_error(
                 "proposed_swap_date",
                 "Please select a date for the swap.",
             )
 
+        if proposed_date and proposed_date not in set(self._available_swap_dates):
+            self.add_error(
+                "proposed_swap_date",
+                "Please choose one of your eligible scheduled duty dates.",
+            )
+            return cleaned_data
+
         if proposed_date:
-            today = timezone.now().date()
+            today = timezone.localdate()
             if proposed_date < today:
                 self.add_error(
                     "proposed_swap_date",

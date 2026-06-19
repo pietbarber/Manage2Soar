@@ -457,37 +457,168 @@ class TestDutySwapRequestForm:
 class TestDutySwapOfferForm:
     """Tests for DutySwapOfferForm validation."""
 
-    def test_cover_offer_valid(self):
+    def test_cover_offer_valid(self, swap_request, bob):
         """Cover offer without swap date is valid."""
         form = DutySwapOfferForm(
             data={
                 "offer_type": "cover",
                 "notes": "Happy to help!",
-            }
+            },
+            swap_request=swap_request,
+            offered_by=bob,
         )
         assert form.is_valid()
 
-    def test_swap_offer_requires_date(self):
+    def test_swap_offer_requires_date(self, swap_request, bob, bob_duty_assignment):
         """Swap offer without proposed date is invalid."""
         form = DutySwapOfferForm(
             data={
                 "offer_type": "swap",
                 "notes": "",
-            }
+            },
+            swap_request=swap_request,
+            offered_by=bob,
         )
         assert not form.is_valid()
         assert "proposed_swap_date" in form.errors
 
-    def test_swap_offer_with_date_valid(self):
+    def test_swap_offer_with_date_valid(self, swap_request, bob, bob_duty_assignment):
         """Swap offer with proposed date is valid."""
         form = DutySwapOfferForm(
             data={
                 "offer_type": "swap",
-                "proposed_swap_date": date.today() + timedelta(days=30),
+                "proposed_swap_date": bob_duty_assignment.date.isoformat(),
                 "notes": "",
-            }
+            },
+            swap_request=swap_request,
+            offered_by=bob,
         )
         assert form.is_valid()
+
+    def test_swap_offer_dropdown_contains_offerer_scheduled_dates(
+        self, swap_request, bob, bob_duty_assignment
+    ):
+        """Swap date choices should be populated from the offerer's assignments."""
+        form = DutySwapOfferForm(swap_request=swap_request, offered_by=bob)
+
+        choice_values = {
+            value
+            for value, _label in form.fields["proposed_swap_date"].choices
+            if value
+        }
+
+        assert bob_duty_assignment.date.isoformat() in choice_values
+
+    def test_swap_offer_only_allows_cover_without_eligible_dates(
+        self, swap_request, bob
+    ):
+        """When no eligible duty dates exist, only cover should be offered."""
+        form = DutySwapOfferForm(swap_request=swap_request, offered_by=bob)
+
+        offer_choices = [value for value, _label in form.fields["offer_type"].choices]
+
+        assert offer_choices == ["cover"]
+
+    def test_cover_offer_ignores_stale_proposed_swap_date(self, swap_request, bob):
+        """Cover offers should validate even if stale swap date is posted."""
+        form = DutySwapOfferForm(
+            data={
+                "offer_type": "cover",
+                "proposed_swap_date": (date.today() + timedelta(days=60)).isoformat(),
+                "notes": "Covering this duty",
+            },
+            swap_request=swap_request,
+            offered_by=bob,
+        )
+
+        assert form.is_valid()
+
+    def test_swap_offer_excludes_adhoc_dates_for_static_roles(
+        self, swap_request, bob, bob_duty_assignment
+    ):
+        """Swap date choices should exclude ad-hoc assignments for static roles."""
+        adhoc_date = date.today() + timedelta(days=28)
+        DutyAssignment.objects.create(
+            date=adhoc_date,
+            tow_pilot=bob,
+            is_scheduled=False,
+        )
+
+        form = DutySwapOfferForm(swap_request=swap_request, offered_by=bob)
+        choice_values = {
+            value
+            for value, _label in form.fields["proposed_swap_date"].choices
+            if value
+        }
+
+        assert bob_duty_assignment.date.isoformat() in choice_values
+        assert adhoc_date.isoformat() not in choice_values
+
+    def test_swap_offer_excludes_adhoc_dates_for_dynamic_roles(
+        self, site_config, alice, bob
+    ):
+        """Dynamic swap date choices should include only scheduled assignments."""
+        site_config.enable_dynamic_duty_roles = True
+        site_config.save(update_fields=["enable_dynamic_duty_roles"])
+
+        role_definition = DutyRoleDefinition.objects.create(
+            site_configuration=site_config,
+            key="launch_coord",
+            display_name="Launch Coordinator",
+            is_active=True,
+            sort_order=10,
+        )
+        role_definition.qualification_requirements.create(
+            requirement_type="legacy_role_flag",
+            requirement_value="towpilot",
+            is_required=True,
+        )
+
+        original_date = date.today() + timedelta(days=10)
+        scheduled_date = date.today() + timedelta(days=18)
+        adhoc_date = date.today() + timedelta(days=22)
+
+        dynamic_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=original_date,
+            role="DYNAMIC",
+            dynamic_role_key="launch_coord",
+            dynamic_role_label="Launch Coordinator",
+            request_type="general",
+            status="open",
+        )
+
+        scheduled_assignment = DutyAssignment.objects.create(
+            date=scheduled_date,
+            is_scheduled=True,
+        )
+        adhoc_assignment = DutyAssignment.objects.create(
+            date=adhoc_date,
+            is_scheduled=False,
+        )
+
+        DutyAssignmentRole.objects.create(
+            assignment=scheduled_assignment,
+            role_key="launch_coord",
+            member=bob,
+            role_definition=role_definition,
+        )
+        DutyAssignmentRole.objects.create(
+            assignment=adhoc_assignment,
+            role_key="launch_coord",
+            member=bob,
+            role_definition=role_definition,
+        )
+
+        form = DutySwapOfferForm(swap_request=dynamic_request, offered_by=bob)
+        choice_values = {
+            value
+            for value, _label in form.fields["proposed_swap_date"].choices
+            if value
+        }
+
+        assert scheduled_date.isoformat() in choice_values
+        assert adhoc_date.isoformat() not in choice_values
 
 
 # =============================================================================
@@ -915,10 +1046,10 @@ class TestSwapOfferWorkflow:
         assert eligible.filter(pk=alice.pk).exists()
         assert not eligible.filter(pk=bob.pk).exists()
 
-    def test_dynamic_swap_offer_requires_matching_role_assignment_on_proposed_date(
+    def test_dynamic_swap_offer_unavailable_without_matching_role_assignment(
         self, client, site_config, alice, bob
     ):
-        """Dynamic swap offers must propose a date where offerer has same dynamic role."""
+        """Dynamic swap offers are unavailable when offerer has no eligible scheduled date."""
         site_config.enable_dynamic_duty_roles = True
         site_config.save(update_fields=["enable_dynamic_duty_roles"])
 
@@ -955,7 +1086,8 @@ class TestSwapOfferWorkflow:
             status="open",
         )
 
-        # Bob is eligible in general for this dynamic role, but has no assignment on proposed date.
+        # Bob is eligible in general for this dynamic role, but has no scheduled
+        # assignment for this role, so swap option is unavailable.
         client.force_login(bob)
         url = reverse("duty_roster:make_swap_offer", args=[dynamic_request.id])
         response = client.post(
@@ -968,10 +1100,9 @@ class TestSwapOfferWorkflow:
         )
 
         assert response.status_code == 200
-        assert (
-            "You can only swap with a date where you hold this same dynamic role."
-            in (response.content.decode())
-        )
+        error_data = response.context["form"].errors.as_data()
+        assert "offer_type" in error_data
+        assert error_data["offer_type"][0].code == "invalid_choice"
         assert not DutySwapOffer.objects.filter(
             swap_request=dynamic_request,
             offered_by=bob,
