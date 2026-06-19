@@ -519,6 +519,12 @@
                           {{ flight.towplane }}
                         </small>
                       {% endif %}
+                      {% if flight.tow_pilot %}
+                        <small class="text-muted d-block">
+                          <i class="bi bi-person-badge me-1"></i>
+                          {{ flight.tow_pilot|full_display_name }}
+                        </small>
+                      {% endif %}
                       {% if flight.release_altitude %}
                         <small class="text-muted d-block">
                           <i class="bi bi-arrow-up me-1"></i>
@@ -531,10 +537,20 @@
 
                 <td class="towplane-col d-none d-lg-table-cell" data-sort="{% if flight.towplane %}{{ flight.towplane }}{% else %}{% endif %}">
                   {% if flight.towplane %}
-                    <span class="towplane-name">
-                      <i class="bi bi-airplane-engines text-warning me-1"></i>
-                      {{ flight.towplane }}
-                    </span>
+                    <div class="towplane-info">
+                      <span class="towplane-name">
+                        <i class="bi bi-airplane-engines text-warning me-1"></i>
+                        {{ flight.towplane }}
+                      </span>
+                      {% if flight.tow_pilot %}
+                        <div>
+                          <small class="text-muted">
+                            <i class="bi bi-person-badge me-1"></i>
+                            {{ flight.tow_pilot|full_display_name }}
+                          </small>
+                        </div>
+                      {% endif %}
+                    </div>
                   {% elif flight.is_incomplete %}
                     <span class="missing-data-badge" title="Missing: {{ flight.get_missing_fields|join:', ' }}">
                       <i class="bi bi-exclamation-triangle text-warning"></i>

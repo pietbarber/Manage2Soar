@@ -321,6 +321,45 @@ class TestTowplaneIsVirtual:
 
 
 @pytest.mark.django_db
+class TestManageLogsheetTowPilotDisplay:
+    def test_manage_view_displays_tow_pilot_for_flight(
+        self,
+        client,
+        logsheet,
+        pilot,
+        glider,
+        towplane,
+        duty_officer,
+    ):
+        tow_pilot_member = Member.objects.create(
+            username="grid_towpilot",
+            first_name="Grid",
+            last_name="Towpilot",
+            membership_status="Full Member",
+            towpilot=True,
+        )
+
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            glider=glider,
+            launch_method=Flight.LaunchMethod.TOWPLANE,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            release_altitude=3000,
+            towplane=towplane,
+            tow_pilot=tow_pilot_member,
+        )
+
+        client.force_login(duty_officer)
+        response = client.get(reverse("logsheet:manage", args=[logsheet.pk]))
+
+        assert response.status_code == 200
+        assert towplane.n_number in response.content.decode()
+        assert "Grid Towpilot" in response.content.decode()
+
+
+@pytest.mark.django_db
 class TestFinalizationWithNonTowFlights:
     """Test logsheet finalization with non-tow launch methods."""
 
