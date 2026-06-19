@@ -353,10 +353,11 @@ class TestManageLogsheetTowPilotDisplay:
 
         client.force_login(duty_officer)
         response = client.get(reverse("logsheet:manage", args=[logsheet.pk]))
+        response_body = response.content.decode()
 
         assert response.status_code == 200
-        assert towplane.n_number in response.content.decode()
-        assert "Grid Towpilot" in response.content.decode()
+        assert towplane.n_number in response_body
+        assert "Grid Towpilot" in response_body
 
 
 @pytest.mark.django_db
