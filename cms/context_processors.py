@@ -130,7 +130,13 @@ def _build_resources_nav_items(request, footer=None):
             )
 
     # Separator between promoted pages and utility links.
-    items.append({"title": "---", "url": None, "rank": 800})
+    # Only add if the user is authenticated and has at least one utility link to display.
+    if request.user.is_authenticated and (
+        is_active_member(request.user)
+        or getattr(request.user, "safety_officer", False)
+        or request.user.is_superuser
+    ):
+        items.append({"title": "---", "url": None, "rank": 800})
 
     if request.user.is_authenticated and is_active_member(request.user):
         # Relocated utility links (issue #746 IA update).
