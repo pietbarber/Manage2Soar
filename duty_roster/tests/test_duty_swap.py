@@ -2245,6 +2245,32 @@ class TestOpenSwapPeriodicReminders:
         assert summary["email_count"] >= 2  # requester + at least one eligible helper
         assert len(mail.outbox) == 0
 
+    def test_email_count_only_includes_successful_deliveries(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        today = date(2026, 6, 18)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=3),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        monkeypatch.setattr(
+            "duty_roster.views_swap.send_mail",
+            lambda **_kwargs: 0,
+        )
+
+        summary = send_periodic_open_swap_reminder_notifications(
+            today=today,
+            day_offsets=(3,),
+        )
+
+        assert summary["candidate_count"] == 1
+        assert summary["request_count"] == 1
+        assert summary["email_count"] == 0
+
     def test_command_passes_dry_run_and_today(self, monkeypatch):
         captured = {}
 

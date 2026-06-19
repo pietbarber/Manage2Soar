@@ -1305,7 +1305,7 @@ def send_periodic_open_swap_reminder_notifications(
                 "duty_roster/emails/swap_reminder_periodic.html",
                 recipient_context,
             )
-            send_mail(
+            delivered_count = send_mail(
                 subject=subject,
                 message="",
                 html_message=html_content,
@@ -1313,7 +1313,14 @@ def send_periodic_open_swap_reminder_notifications(
                 recipient_list=[recipient.email],
                 fail_silently=True,
             )
-            summary["email_count"] += 1
+            if delivered_count:
+                summary["email_count"] += 1
+            else:
+                logger.warning(
+                    "Periodic swap reminder not delivered for request %s to %s",
+                    swap_request.pk,
+                    recipient.email,
+                )
 
         summary["request_count"] += 1
 

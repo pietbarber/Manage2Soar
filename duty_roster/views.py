@@ -1018,14 +1018,10 @@ def duty_calendar_view(request, year=None, month=None):
     active_statuses = set(get_active_membership_statuses())
     open_swap_summary_by_date = {}
 
-    for open_swap in (
-        DutySwapRequest.objects.filter(
-            status="open",
-            original_date__in=visible_dates,
-        )
-        .select_related("requester")
-        .order_by("original_date", "pk")
-    ):
+    for open_swap in DutySwapRequest.objects.filter(
+        status="open",
+        original_date__in=visible_dates,
+    ).order_by("original_date", "pk"):
         day_summary = open_swap_summary_by_date.setdefault(
             open_swap.original_date,
             {"count": 0, "roles": []},
