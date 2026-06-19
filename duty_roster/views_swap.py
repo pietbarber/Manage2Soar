@@ -1232,9 +1232,11 @@ def get_periodic_reminder_recipients(swap_request):
     if not recipient_ids:
         return Member.objects.none()
 
-    return Member.objects.filter(pk__in=recipient_ids).order_by(
-        "last_name", "first_name"
-    )
+    return Member.objects.filter(
+        pk__in=recipient_ids,
+        is_active=True,
+        membership_status__in=active_statuses,
+    ).order_by("last_name", "first_name")
 
 
 def send_periodic_open_swap_reminder_notifications(

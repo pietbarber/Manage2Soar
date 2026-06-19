@@ -2262,6 +2262,28 @@ class TestOpenSwapPeriodicReminders:
         assert summary["email_count"] >= 2  # requester + at least one eligible helper
         assert len(mail.outbox) == 0
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_urgent_banner_pluralizes_day_label(self, site_config, alice, bob):
+        today = date(2026, 6, 18)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today,
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        mail.outbox.clear()
+        summary = send_periodic_open_swap_reminder_notifications(
+            today=today,
+            day_offsets=(0,),
+        )
+
+        assert summary["candidate_count"] == 1
+        assert len(mail.outbox) >= 1
+        html_payload = mail.outbox[0].alternatives[0][0]
+        assert "Urgent: 0 days left" in html_payload
+
     def test_email_count_only_includes_successful_deliveries(
         self, site_config, alice, bob, monkeypatch
     ):
@@ -2637,3 +2659,23 @@ class TestReminderRecipientFiltering:
         assert bob.id in recipient_ids
         assert alice.id in recipient_ids
         assert unrelated_helper.id not in recipient_ids
+
+    def test_inactive_direct_target_is_excluded_from_reminders(
+        self, site_config, alice, bob
+    ):
+        Member.objects.filter(pk=bob.pk).update(is_active=False)
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() + timedelta(days=7),
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        recipients = list(get_periodic_reminder_recipients(swap_request))
+        recipient_ids = {member.id for member in recipients}
+
+        assert bob.id not in recipient_ids
+        assert alice.id in recipient_ids
