@@ -31,6 +31,7 @@ from duty_roster.views_swap import (
     _accept_offer_and_finalize,
     get_eligible_members_for_role,
     get_open_swap_reminder_candidates,
+    get_periodic_reminder_recipients,
     send_periodic_open_swap_reminder_notifications,
     send_request_expired_notifications,
     update_duty_assignments,
@@ -2485,3 +2486,110 @@ class TestSwapVisibilityInCalendar:
             )
             in content
         )
+
+    def test_calendar_month_hides_direct_request_from_unrelated_viewer(
+        self, client, site_config, alice, bob, charlie
+    ):
+        duty_date = date.today() + timedelta(days=11)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        client.force_login(charlie)
+        response = client.get(
+            reverse(
+                "duty_roster:duty_calendar_month",
+                kwargs={"year": duty_date.year, "month": duty_date.month},
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "1 open" in content
+        assert "2 open" not in content
+
+    def test_calendar_day_modal_hides_direct_request_from_unrelated_viewer(
+        self, client, site_config, alice, bob, charlie
+    ):
+        duty_date = date.today() + timedelta(days=12)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        client.force_login(charlie)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                kwargs={
+                    "year": duty_date.year,
+                    "month": duty_date.month,
+                    "day": duty_date.day,
+                },
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Open Swap Requests" in content
+        assert "1 open coverage request" in content
+        assert "Direct to Bob Offerer" not in content
+
+
+@pytest.mark.django_db
+class TestReminderRecipientFiltering:
+    def test_inactive_rostermeister_is_excluded_from_reminders(
+        self, site_config, alice, bob
+    ):
+        inactive_rostermeister = Member.objects.create(
+            username="inactive_rm",
+            first_name="Inactive",
+            last_name="Rostermeister",
+            email="inactive-rm@example.com",
+            membership_status="Full Member",
+            rostermeister=True,
+        )
+        Member.objects.filter(pk=inactive_rostermeister.pk).update(is_active=False)
+        inactive_rostermeister.refresh_from_db(fields=["is_active"])
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() + timedelta(days=7),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        recipients = list(get_periodic_reminder_recipients(swap_request))
+        recipient_ids = {member.id for member in recipients}
+
+        assert bob.id in recipient_ids
+        assert alice.id in recipient_ids
+        assert inactive_rostermeister.id not in recipient_ids

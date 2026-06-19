@@ -1217,6 +1217,7 @@ def get_periodic_reminder_recipients(swap_request):
 
     rostermeister_qs = Member.objects.filter(
         rostermeister=True,
+        is_active=True,
         membership_status__in=active_statuses,
     )
 

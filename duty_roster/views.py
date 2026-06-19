@@ -1029,10 +1029,25 @@ def duty_calendar_view(request, year=None, month=None):
     }
     role_title_cache = {}
 
-    for open_swap in DutySwapRequest.objects.filter(
+    open_swap_queryset = DutySwapRequest.objects.filter(
         status="open",
         original_date__in=visible_dates,
-    ).order_by("original_date", "pk"):
+    )
+    if request.user.is_authenticated:
+        open_swap_queryset = open_swap_queryset.filter(
+            models.Q(request_type="general")
+            | (
+                models.Q(request_type="direct")
+                & (
+                    models.Q(requester=request.user)
+                    | models.Q(direct_request_to=request.user)
+                )
+            )
+        )
+    else:
+        open_swap_queryset = open_swap_queryset.filter(request_type="general")
+
+    for open_swap in open_swap_queryset.order_by("original_date", "pk"):
         day_summary = open_swap_summary_by_date.setdefault(
             open_swap.original_date,
             {"count": 0, "roles": []},
@@ -1424,13 +1439,30 @@ def calendar_day_detail(request, year, month, day):
             if role["member"].id == request.user.id
         ]
 
-    open_swap_requests = list(
-        DutySwapRequest.objects.filter(
-            status="open",
-            original_date=day_date,
+    open_swap_requests_queryset = DutySwapRequest.objects.filter(
+        status="open",
+        original_date=day_date,
+    )
+    if request.user.is_authenticated:
+        open_swap_requests_queryset = open_swap_requests_queryset.filter(
+            models.Q(request_type="general")
+            | (
+                models.Q(request_type="direct")
+                & (
+                    models.Q(requester=request.user)
+                    | models.Q(direct_request_to=request.user)
+                )
+            )
         )
-        .select_related("requester", "direct_request_to")
-        .order_by("created_at", "pk")
+    else:
+        open_swap_requests_queryset = open_swap_requests_queryset.filter(
+            request_type="general"
+        )
+
+    open_swap_requests = list(
+        open_swap_requests_queryset.select_related(
+            "requester", "direct_request_to"
+        ).order_by("created_at", "pk")
     )
 
     return render(
