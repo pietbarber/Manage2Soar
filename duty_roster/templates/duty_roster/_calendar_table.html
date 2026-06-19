@@ -45,7 +45,7 @@
                 <div class="mb-1">
                   <span class="badge rounded-pill text-bg-warning"
                         title="Open coverage requests: {{ swap_summary.roles|join:', ' }}"
-                    aria-label="{{ swap_summary.count }} open swap request{{ swap_summary.count|pluralize }}">
+                    aria-label="{{ swap_summary.count }} open swap request{{ swap_summary.count|pluralize }}: {{ swap_summary.roles|join:', ' }}">
                     <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
                     {{ swap_summary.count }} open
                   </span>

@@ -2590,6 +2590,52 @@ class TestSwapVisibilityInCalendar:
         assert "1 open" in content
         assert "2 open" not in content
 
+    def test_calendar_month_shows_direct_request_to_staff_viewer(
+        self, client, site_config, alice, bob
+    ):
+        duty_date = date.today() + timedelta(days=11)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+
+        staff_viewer = Member.objects.create(
+            username="staff_viewer",
+            first_name="Staff",
+            last_name="Viewer",
+            email="staff-viewer@example.com",
+            membership_status="Full Member",
+            rostermeister=True,
+            is_staff=True,
+        )
+        Member.objects.filter(pk=staff_viewer.pk).update(is_staff=True)
+        staff_viewer.refresh_from_db(fields=["is_staff"])
+
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        client.force_login(staff_viewer)
+        response = client.get(
+            reverse(
+                "duty_roster:duty_calendar_month",
+                kwargs={"year": duty_date.year, "month": duty_date.month},
+            )
+        )
+
+        assert response.status_code == 200
+        summary = response.context["open_swap_summary_by_date"][duty_date]
+        assert summary["count"] == 2
+
     def test_calendar_day_modal_hides_direct_request_from_unrelated_viewer(
         self, client, site_config, alice, bob, charlie
     ):
@@ -2629,6 +2675,82 @@ class TestSwapVisibilityInCalendar:
         assert "Open Swap Requests" in content
         assert "1 open coverage request" in content
         assert "Direct to Bob Offerer" not in content
+
+    def test_calendar_day_modal_shows_direct_request_to_staff_viewer(
+        self, client, site_config, alice, bob
+    ):
+        duty_date = date.today() + timedelta(days=12)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+
+        staff_viewer = Member.objects.create(
+            username="staff_modal_viewer",
+            first_name="Staff",
+            last_name="ModalViewer",
+            email="staff-modal-viewer@example.com",
+            membership_status="Full Member",
+            rostermeister=True,
+            is_staff=True,
+        )
+        Member.objects.filter(pk=staff_viewer.pk).update(is_staff=True)
+        staff_viewer.refresh_from_db(fields=["is_staff"])
+
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        client.force_login(staff_viewer)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                kwargs={
+                    "year": duty_date.year,
+                    "month": duty_date.month,
+                    "day": duty_date.day,
+                },
+            )
+        )
+
+        assert response.status_code == 200
+        open_swap_requests = response.context["open_swap_requests"]
+        assert len(open_swap_requests) == 2
+        assert any(req.request_type == "direct" for req in open_swap_requests)
+
+    def test_calendar_month_swap_badge_aria_label_includes_roles(
+        self, client, site_config, alice
+    ):
+        duty_date = date.today() + timedelta(days=6)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        client.force_login(alice)
+        response = client.get(
+            reverse(
+                "duty_roster:duty_calendar_month",
+                kwargs={"year": duty_date.year, "month": duty_date.month},
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert 'aria-label="1 open swap request: Tow Pilot"' in content
 
 
 @pytest.mark.django_db

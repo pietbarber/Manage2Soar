@@ -1034,16 +1034,17 @@ def duty_calendar_view(request, year=None, month=None):
         original_date__in=visible_dates,
     )
     if request.user.is_authenticated:
-        open_swap_queryset = open_swap_queryset.filter(
-            models.Q(request_type="general")
-            | (
-                models.Q(request_type="direct")
-                & (
-                    models.Q(requester=request.user)
-                    | models.Q(direct_request_to=request.user)
+        if not (request.user.is_staff or getattr(request.user, "rostermeister", False)):
+            open_swap_queryset = open_swap_queryset.filter(
+                models.Q(request_type="general")
+                | (
+                    models.Q(request_type="direct")
+                    & (
+                        models.Q(requester=request.user)
+                        | models.Q(direct_request_to=request.user)
+                    )
                 )
             )
-        )
     else:
         open_swap_queryset = open_swap_queryset.filter(request_type="general")
 
@@ -1444,16 +1445,17 @@ def calendar_day_detail(request, year, month, day):
         original_date=day_date,
     )
     if request.user.is_authenticated:
-        open_swap_requests_queryset = open_swap_requests_queryset.filter(
-            models.Q(request_type="general")
-            | (
-                models.Q(request_type="direct")
-                & (
-                    models.Q(requester=request.user)
-                    | models.Q(direct_request_to=request.user)
+        if not (request.user.is_staff or getattr(request.user, "rostermeister", False)):
+            open_swap_requests_queryset = open_swap_requests_queryset.filter(
+                models.Q(request_type="general")
+                | (
+                    models.Q(request_type="direct")
+                    & (
+                        models.Q(requester=request.user)
+                        | models.Q(direct_request_to=request.user)
+                    )
                 )
             )
-        )
     else:
         open_swap_requests_queryset = open_swap_requests_queryset.filter(
             request_type="general"
