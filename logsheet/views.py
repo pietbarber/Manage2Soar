@@ -348,6 +348,21 @@ def _csv_towplane_product_name(towplane):
     return _sanitize_csv_cell(name or "Towplane")
 
 
+def _effective_rental_cost(flight):
+    """Return effective rental cost with historical snapshot priority.
+
+    For finalized logsheets, prefer locked actual values and only clamp against
+    the glider max-rental cap when configured.
+    """
+    if flight.logsheet.finalized and flight.rental_cost_actual is not None:
+        if flight.glider and flight.glider.max_rental_rate is not None:
+            max_rate = Decimal(str(flight.glider.max_rental_rate))
+            return min(flight.rental_cost_actual, max_rate)
+        return flight.rental_cost_actual
+
+    return flight.rental_cost
+
+
 def _member_flight_charge_breakdown(flight, member):
     """Return (tow, rental, instruction, total) owed by `member` for a flight."""
     if flight.commercial_ride:
@@ -361,10 +376,7 @@ def _member_flight_charge_breakdown(flight, member):
     else:
         tow_base = flight.tow_cost_calculated or Decimal("0.00")
 
-    if flight.logsheet.finalized and flight.rental_cost_actual is not None:
-        rental_base = flight.rental_cost_actual
-    else:
-        rental_base = flight.rental_cost or Decimal("0.00")
+    rental_base = _effective_rental_cost(flight) or Decimal("0.00")
 
     if flight.logsheet.finalized:
         instruction_base = flight.instruction_fee_actual or Decimal("0.00")
@@ -722,11 +734,7 @@ def export_logsheet_finances_csv(request, pk):
             if flight.tow_cost_actual is not None
             else (flight.tow_cost_calculated or Decimal("0.00"))
         )
-        rental_base = (
-            flight.rental_cost_actual
-            if flight.rental_cost_actual is not None
-            else (flight.rental_cost or Decimal("0.00"))
-        )
+        rental_base = _effective_rental_cost(flight) or Decimal("0.00")
         instruction_base = flight.instruction_fee_actual or Decimal("0.00")
 
         allocations = split_flight_costs(
@@ -1329,7 +1337,7 @@ def manage_logsheet(request, pk):
                 if flight.tow_cost_actual is None:
                     flight.tow_cost_actual = flight.tow_cost_calculated
                 if flight.rental_cost_actual is None:
-                    flight.rental_cost_actual = flight.rental_cost_calculated
+                    flight.rental_cost_actual = flight.rental_cost
                 if flight.instruction_fee_actual is None:
                     flight.instruction_fee_actual = flight.instruction_fee_calculated
                 flight.save()
@@ -1467,15 +1475,26 @@ def manage_logsheet(request, pk):
 @active_member_required
 def view_flight(request, pk):
     flight = get_object_or_404(Flight, pk=pk)
+    rental_cost_effective = _effective_rental_cost(flight)
     is_modal = request.headers.get("HX-Request") == "true"
     if is_modal:
         return render(
             request,
             "logsheet/flight_detail_content.html",
-            {"flight": flight, "is_modal": True},
+            {
+                "flight": flight,
+                "is_modal": True,
+                "rental_cost_effective": rental_cost_effective,
+            },
         )
     return render(
-        request, "logsheet/flight_view.html", {"flight": flight, "is_modal": False}
+        request,
+        "logsheet/flight_view.html",
+        {
+            "flight": flight,
+            "is_modal": False,
+            "rental_cost_effective": rental_cost_effective,
+        },
     )
 
 
@@ -2405,7 +2424,7 @@ def manage_logsheet_finances(request, pk):
                     if flight.tow_cost_actual is None:
                         flight.tow_cost_actual = flight.tow_cost_calculated
                     if flight.rental_cost_actual is None:
-                        flight.rental_cost_actual = flight.rental_cost_calculated
+                        flight.rental_cost_actual = flight.rental_cost
                     if flight.instruction_fee_actual is None:
                         flight.instruction_fee_actual = (
                             flight.instruction_fee_calculated

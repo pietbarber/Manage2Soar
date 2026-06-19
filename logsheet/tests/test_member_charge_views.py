@@ -960,6 +960,100 @@ class FinancesViewChargeDisplayTestCase(TestCase):
         self.assertTrue(invoice_numbers[0].isdigit())
         self.assertGreaterEqual(int(invoice_numbers[0]), 90000)
 
+    def test_treasurer_csv_export_preserves_valid_locked_rental_actual(self):
+        """Finalized export should keep locked actual when it is below max rental cap."""
+        glider = Glider.objects.create(
+            n_number="N301CC",
+            make="DG",
+            model="DG-100",
+            rental_rate=Decimal("10.00"),
+            max_rental_rate=Decimal("120.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            name="Pawnee",
+            n_number="N401DD",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+        Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(9, 0),
+            landing_time=time(12, 0),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("45.00"),
+            rental_cost_actual=Decimal("100.00"),
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        self.assertEqual(response.status_code, 200)
+        rows = list(csv.reader(StringIO(response.content.decode("utf-8"))))
+        rental_rows = [r for r in rows if len(r) >= 8 and r[4].endswith("Rental")]
+        self.assertTrue(rental_rows)
+        self.assertEqual(Decimal(rental_rows[0][7]), Decimal("100"))
+
+    def test_treasurer_csv_export_caps_legacy_over_cap_rental_actual(self):
+        """Finalized export should clamp legacy over-cap rental actual values to capped rental."""
+        glider = Glider.objects.create(
+            n_number="N300CC",
+            make="DG",
+            model="DG-100",
+            rental_rate=Decimal("60.00"),
+            max_rental_rate=Decimal("120.00"),
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            name="Pawnee",
+            n_number="N400DD",
+            make="Piper",
+            model="Pawnee",
+            club_owned=True,
+            is_active=True,
+        )
+        Flight.objects.create(
+            logsheet=self.logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            flight_type="dual",
+            launch_time=time(9, 0),
+            landing_time=time(12, 0),
+            release_altitude=3000,
+            tow_cost_actual=Decimal("45.00"),
+            rental_cost_actual=Decimal("180.00"),
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save(update_fields=["finalized"])
+
+        self.client.login(username="do@test.com", password="testpass123")
+        export_url = reverse(
+            "logsheet:export_logsheet_finances_csv",
+            kwargs={"pk": self.logsheet.pk},
+        )
+        response = self.client.get(export_url)
+
+        self.assertEqual(response.status_code, 200)
+        rows = list(csv.reader(StringIO(response.content.decode("utf-8"))))
+        rental_rows = [r for r in rows if len(r) >= 8 and r[4].endswith("Rental")]
+        self.assertTrue(rental_rows)
+        self.assertEqual(Decimal(rental_rows[0][7]), Decimal("120"))
+
     def test_treasurer_csv_export_prefers_glider_competition_number_for_product(self):
         """Glider Product/Service should use competition number when present."""
         glider = Glider.objects.create(
