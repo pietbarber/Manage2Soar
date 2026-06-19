@@ -739,6 +739,7 @@ class DutySwapOfferForm(forms.ModelForm):
                 "proposed_swap_date",
                 "Please choose one of your eligible scheduled duty dates.",
             )
+            return cleaned_data
 
         if proposed_date:
             today = timezone.localdate()
