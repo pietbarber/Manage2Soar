@@ -519,6 +519,90 @@ class TestFinalizationWithNonTowFlights:
         assert logsheet.finalized is True
         assert flight.instruction_fee_actual == Decimal("18.00")
 
+    def test_manage_finalize_locks_capped_rental_cost_actual(
+        self,
+        client,
+        logsheet,
+        pilot,
+        glider,
+        virtual_towplane_winch,
+        duty_officer,
+        duty_instructor,
+    ):
+        """Manage-view finalization should snapshot capped rental cost."""
+        glider.rental_rate = Decimal("50.00")
+        glider.max_rental_rate = Decimal("120.00")
+        glider.save(update_fields=["rental_rate", "max_rental_rate"])
+
+        flight = Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            glider=glider,
+            launch_method=Flight.LaunchMethod.WINCH,
+            launch_time=time(10, 0),
+            landing_time=time(13, 0),
+            release_altitude=1000,
+            towplane=virtual_towplane_winch,
+        )
+
+        LogsheetCloseout.objects.create(logsheet=logsheet)
+        LogsheetPayment.objects.create(
+            logsheet=logsheet, member=pilot, payment_method="cash"
+        )
+
+        client.force_login(duty_officer)
+        client.post(
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
+        )
+
+        logsheet.refresh_from_db()
+        flight.refresh_from_db()
+        assert logsheet.finalized is True
+        assert flight.rental_cost == Decimal("120.00")
+        assert flight.rental_cost_actual == Decimal("120.00")
+
+    def test_flight_modal_uses_effective_capped_rental_cost(
+        self,
+        client,
+        logsheet,
+        pilot,
+        glider,
+        virtual_towplane_winch,
+        duty_officer,
+    ):
+        """Flight detail modal should display capped rental when actual is over cap."""
+        logsheet.finalized = True
+        logsheet.save(update_fields=["finalized"])
+
+        glider.rental_rate = Decimal("37.00")
+        glider.max_rental_rate = Decimal("111.00")
+        glider.save(update_fields=["rental_rate", "max_rental_rate"])
+
+        flight = Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            glider=glider,
+            launch_method=Flight.LaunchMethod.WINCH,
+            launch_time=time(10, 0),
+            landing_time=time(13, 0),
+            release_altitude=1000,
+            towplane=virtual_towplane_winch,
+            rental_cost_actual=Decimal("137.00"),
+        )
+
+        client.force_login(duty_officer)
+        response = client.get(
+            reverse("logsheet:flight_view", args=[flight.pk]),
+            HTTP_HX_REQUEST="true",
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "Rental Cost:" in content
+        assert "111.00" in content
+
     def test_manage_finalize_already_finalized_does_not_reenqueue(
         self,
         client,
