@@ -349,17 +349,18 @@ def _csv_towplane_product_name(towplane):
 
 
 def _effective_rental_cost(flight):
-    """Return effective rental cost, applying cap safety for finalized rows.
+    """Return effective rental cost with historical snapshot priority.
 
-    For finalized logsheets, prefer locked actual values but never exceed the
-    capped rental_cost derived from current per-flight rules.
+    For finalized logsheets, prefer locked actual values and only clamp against
+    the glider max-rental cap when configured.
     """
-    capped_rental = flight.rental_cost
     if flight.logsheet.finalized and flight.rental_cost_actual is not None:
-        if capped_rental is None:
-            return flight.rental_cost_actual
-        return min(flight.rental_cost_actual, capped_rental)
-    return capped_rental
+        if flight.glider and flight.glider.max_rental_rate is not None:
+            max_rate = Decimal(str(flight.glider.max_rental_rate))
+            return min(flight.rental_cost_actual, max_rate)
+        return flight.rental_cost_actual
+
+    return flight.rental_cost
 
 
 def _member_flight_charge_breakdown(flight, member):
