@@ -2177,6 +2177,22 @@ class TestOpenSwapPeriodicReminders:
         candidates = list(get_open_swap_reminder_candidates(today=today))
         assert {req.pk for req in candidates} == {due_14.pk, due_7.pk}
 
+    def test_candidate_selection_allows_empty_offsets(self, site_config, alice):
+        today = date(2026, 6, 18)
+
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=14),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        candidates = list(
+            get_open_swap_reminder_candidates(today=today, day_offsets=())
+        )
+        assert candidates == []
+
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_reminders_include_eligible_requester_and_rostermeister_deduped(
         self, site_config, alice, bob, charlie

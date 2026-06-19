@@ -1184,7 +1184,7 @@ def get_from_email():
 def get_open_swap_reminder_candidates(today=None, day_offsets=None):
     """Return open swap requests that should receive periodic reminders today."""
     today = today or timezone.now().date()
-    offsets = tuple(day_offsets or SWAP_REMINDER_DAY_OFFSETS)
+    offsets = SWAP_REMINDER_DAY_OFFSETS if day_offsets is None else tuple(day_offsets)
     target_dates = [today + timedelta(days=offset) for offset in offsets]
 
     return (
