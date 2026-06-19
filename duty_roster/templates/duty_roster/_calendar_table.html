@@ -40,6 +40,19 @@
               onclick="showModalWithLoading();">
             <div class="calendar-day-number">{{ day.day }}</div>
 
+            {% with swap_summary=open_swap_summary_by_date|dict_get:day %}
+              {% if swap_summary %}
+                <div class="mb-1">
+                  <span class="badge rounded-pill text-bg-warning"
+                        title="Open coverage requests: {{ swap_summary.roles|join:', ' }}"
+                    aria-label="{{ swap_summary.count }} open swap request{{ swap_summary.count|pluralize }}: {{ swap_summary.roles|join:', ' }}">
+                    <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                    {{ swap_summary.count }} open
+                  </span>
+                </div>
+              {% endif %}
+            {% endwith %}
+
             {% if day in assignments_by_date %}
               {% with a=assignments_by_date|dict_get:day %}
                 {% if not a.confirmed and not a.is_confirmed %}

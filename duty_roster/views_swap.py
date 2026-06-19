@@ -7,7 +7,7 @@ for their scheduled duties and for other members to offer help.
 
 import calendar as _cal_lib
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.contrib import messages
@@ -16,6 +16,7 @@ from django.db import models, transaction
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -43,6 +44,8 @@ from .utils.role_resolution import RoleResolutionService
 from .utils.roles import member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views_swap")
+
+SWAP_REMINDER_DAY_OFFSETS = (14, 7, 3, 1)
 
 
 def get_scheduling_config():
@@ -1177,6 +1180,184 @@ def get_email_context_base():
 def get_from_email():
     """Get the from email address for notifications."""
     return getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
+
+
+def get_open_swap_reminder_candidates(today=None, day_offsets=None):
+    """Return open swap requests that should receive periodic reminders today."""
+    today = today or timezone.now().date()
+    offsets = SWAP_REMINDER_DAY_OFFSETS if day_offsets is None else tuple(day_offsets)
+    target_dates = [today + timedelta(days=offset) for offset in offsets]
+
+    return (
+        DutySwapRequest.objects.filter(
+            status="open",
+            original_date__gte=today,
+            original_date__in=target_dates,
+        )
+        .select_related("requester", "direct_request_to")
+        .order_by("original_date", "pk")
+    )
+
+
+def get_periodic_reminder_recipients(swap_request, rostermeister_ids=None):
+    """
+    Return de-duplicated reminder recipients for an open swap request.
+
+    Recipient contract (Issue #946):
+      - all eligible members for the role,
+      - the requester,
+      - active rostermeisters.
+    """
+    active_statuses = get_active_membership_statuses()
+
+    if rostermeister_ids is None:
+        rostermeister_ids = Member.objects.filter(
+            rostermeister=True,
+            is_active=True,
+            membership_status__in=active_statuses,
+        ).values_list("pk", flat=True)
+
+    if swap_request.request_type == "direct" and swap_request.direct_request_to_id:
+        recipient_ids = {swap_request.direct_request_to_id}
+    else:
+        eligible_members = get_eligible_members_for_role(
+            swap_request.role,
+            exclude_member=None,
+            dynamic_role_key=swap_request.dynamic_role_key,
+        )
+        recipient_ids = set(eligible_members.values_list("pk", flat=True))
+    if swap_request.requester_id:
+        recipient_ids.add(swap_request.requester_id)
+    recipient_ids.update(rostermeister_ids)
+
+    if not recipient_ids:
+        return Member.objects.none()
+
+    return Member.objects.filter(
+        pk__in=recipient_ids,
+        is_active=True,
+        membership_status__in=active_statuses,
+    ).order_by("last_name", "first_name")
+
+
+def send_periodic_open_swap_reminder_notifications(
+    today=None,
+    day_offsets=None,
+    dry_run=False,
+):
+    """Send periodic reminder emails for open swap requests at configured offsets."""
+    today = today or timezone.now().date()
+    candidates = list(
+        get_open_swap_reminder_candidates(today=today, day_offsets=day_offsets)
+    )
+
+    summary = {
+        "candidate_count": len(candidates),
+        "email_count": 0,
+        "request_count": 0,
+        "skipped_no_recipients": 0,
+    }
+
+    if not candidates:
+        return summary
+
+    base_context = get_email_context_base()
+    base_url = base_context.get("base_url", "http://localhost:8001")
+    active_statuses = get_active_membership_statuses()
+    rostermeister_ids = tuple(
+        Member.objects.filter(
+            rostermeister=True,
+            is_active=True,
+            membership_status__in=active_statuses,
+        ).values_list("pk", flat=True)
+    )
+
+    for swap_request in candidates:
+        recipients = [
+            recipient
+            for recipient in get_periodic_reminder_recipients(
+                swap_request,
+                rostermeister_ids=rostermeister_ids,
+            )
+            if recipient.email
+        ]
+        summary["request_count"] += 1
+
+        if not recipients:
+            logger.warning(
+                "No reminder recipients with email for open swap request %s",
+                swap_request.pk,
+            )
+            summary["skipped_no_recipients"] += 1
+            continue
+
+        days_until = (swap_request.original_date - today).days
+        role_title = swap_request.get_role_title()
+        subject = (
+            f"⏰ Reminder ({days_until} day{'s' if days_until != 1 else ''} left): "
+            f"{role_title} coverage needed on {swap_request.original_date.strftime('%b %d')}"
+        )
+
+        request_path = reverse(
+            "duty_roster:swap_request_detail",
+            kwargs={"request_id": swap_request.pk},
+        )
+        request_url = f"{base_url}{request_path}"
+        text_message = (
+            f"Reminder: {role_title} coverage needed on {swap_request.original_date.isoformat()}.\n"
+            f"View details: {request_url}"
+        )
+
+        for recipient in recipients:
+            recipient_context = {
+                **base_context,
+                "swap_request": swap_request,
+                "recipient": recipient,
+                "role_title": role_title,
+                "days_until": days_until,
+                "request_url": request_url,
+                "is_direct_request": swap_request.request_type == "direct",
+            }
+
+            if dry_run:
+                logger.info(
+                    "[DRY RUN] Would send periodic swap reminder for request %s to %s",
+                    swap_request.pk,
+                    recipient.email,
+                )
+                summary["email_count"] += 1
+                continue
+
+            html_content = render_to_string(
+                "duty_roster/emails/swap_reminder_periodic.html",
+                recipient_context,
+            )
+            try:
+                delivered_count = send_mail(
+                    subject=subject,
+                    message=text_message,
+                    html_message=html_content,
+                    from_email=get_from_email(),
+                    recipient_list=[recipient.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception(
+                    "Periodic swap reminder failed for request %s to %s",
+                    swap_request.pk,
+                    recipient.email,
+                )
+                continue
+            if delivered_count:
+                summary["email_count"] += 1
+            else:
+                logger.warning(
+                    "Periodic swap reminder not delivered for request %s to %s",
+                    swap_request.pk,
+                    recipient.email,
+                )
+
+    return summary
 
 
 def send_swap_request_notifications(swap_request):

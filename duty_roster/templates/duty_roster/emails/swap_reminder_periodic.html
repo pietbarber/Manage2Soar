@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swap Reminder</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center" style="padding:20px 0;">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.1)">
+                <tr>
+                    <td style="padding:28px 36px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);text-align:center;">
+                        {% if club_logo_url %}
+                        <img src="{{ club_logo_url }}" alt="{{ club_name }}" style="max-height:60px;max-width:200px;height:auto;margin-bottom:12px;">
+                        {% endif %}
+                        <h1 style="margin:0;color:#fff;font-size:24px;">⏰ Swap Reminder</h1>
+                        <p style="margin:8px 0 0 0;color:#e6e6e6;font-size:16px;">
+                            {{ role_title }} · {{ swap_request.original_date|date:"l, F j, Y" }}
+                        </p>
+                    </td>
+                </tr>
+
+                {% if days_until <= 1 %}
+                <tr>
+                    <td style="padding:14px 36px;background:#dc3545;color:#fff;font-weight:bold;text-align:center;">
+                        🚨 Urgent: {{ days_until }} day{{ days_until|pluralize }} left
+                    </td>
+                </tr>
+                {% elif days_until <= 3 %}
+                <tr>
+                    <td style="padding:14px 36px;background:#fd7e14;color:#fff;font-weight:bold;text-align:center;">
+                        ⚠️ Coming soon: {{ days_until }} days left
+                    </td>
+                </tr>
+                {% endif %}
+
+                <tr>
+                    <td style="padding:32px 36px;">
+                        <p style="margin:0 0 16px 0;color:#2d3748;font-size:16px;line-height:1.6;">
+                            Hi{% if recipient %} {{ recipient.first_name }}{% endif %},
+                        </p>
+
+                        <p style="margin:0 0 16px 0;color:#2d3748;font-size:16px;line-height:1.6;">
+                            This is a reminder that <strong>{{ swap_request.requester.full_display_name }}</strong>
+                            still needs coverage for a <strong>{{ role_title }}</strong> duty on
+                            <strong>{{ swap_request.original_date|date:"l, F j, Y" }}</strong>.
+                        </p>
+
+                        <p style="margin:0 0 18px 0;color:#4a5568;font-size:15px;line-height:1.6;">
+                            Time remaining: <strong>{{ days_until }} day{{ days_until|pluralize }}</strong>
+                        </p>
+
+                        {% if swap_request.notes %}
+                        <div style="background:#f7fafc;border-left:4px solid #667eea;padding:14px 16px;margin:0 0 18px 0;">
+                            <p style="margin:0;color:#4a5568;font-style:italic;">"{{ swap_request.notes }}"</p>
+                        </div>
+                        {% endif %}
+
+                        <div style="text-align:center;margin:26px 0;">
+                            <a href="{{ request_url }}" style="display:inline-block;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;">
+                                View Request / Make Offer
+                            </a>
+                        </div>
+
+                        <p style="margin:0;color:#718096;font-size:13px;line-height:1.6;">
+                            You're receiving this reminder because you're eligible to help, requested the swap,
+                            or manage roster operations.
+                        </p>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="background:#f4f4f4;padding:18px;text-align:center;color:#666;font-size:12px;">
+                        This is an automated message from {{ club_name }}.
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

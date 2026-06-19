@@ -370,6 +370,58 @@ spec:
                 secretName: gcp-sa-key
 
 ---
+# Daily: Reminder emails for open duty swap requests (3:20 AM UTC)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: remind-open-swap-requests
+  namespace: default
+spec:
+  schedule: "20 3 * * *" # Daily at 3:20 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 900 # 15 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: remind-open-swap-requests
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - remind_open_swap_requests
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/gcp-credentials.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
 # Weekly: Late SPR Notifications (Monday 10:00 AM UTC)
 apiVersion: batch/v1
 kind: CronJob

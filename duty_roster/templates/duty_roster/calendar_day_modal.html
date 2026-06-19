@@ -204,7 +204,41 @@
     </div>
   </div>
 
-  {# Surge Alerts #}
+  {# Open Swap Requests #}
+  {% if open_swap_requests %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-light text-dark py-2 border-bottom">
+      <h6 class="mb-0 fw-semibold">
+        <i class="bi bi-arrow-left-right me-2" aria-hidden="true"></i>Open Swap Requests
+      </h6>
+    </div>
+    <div class="card-body p-3">
+      <p class="text-muted small mb-2">
+        {{ open_swap_requests|length }} open coverage request{{ open_swap_requests|length|pluralize }} for this day.
+      </p>
+      <ul class="list-group list-group-flush">
+        {% for swap_request in open_swap_requests %}
+        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <div class="fw-semibold">{{ swap_request.get_role_title }}</div>
+            <small class="text-muted">
+              Requested by {{ swap_request.requester.full_display_name }}
+              {% if swap_request.request_type == 'direct' and swap_request.direct_request_to %}
+                · Direct to {{ swap_request.direct_request_to.full_display_name }}
+              {% endif %}
+            </small>
+          </div>
+          <a href="{% url 'duty_roster:swap_request_detail' request_id=swap_request.id %}"
+             class="btn btn-outline-primary btn-sm">
+            View
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
   {% if show_surge_alert %}
   <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
     <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
