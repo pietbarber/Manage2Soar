@@ -29,7 +29,7 @@ class Command(BaseCronJobCommand):
         prefix = "[DRY RUN] " if dry_run else ""
         self.log_info(
             f"{prefix}Reminder candidates={summary['candidate_count']}, "
-            f"requests_notified={summary['request_count']}, "
+            f"requests_processed={summary['request_count']}, "
             f"emails_sent={summary['email_count']}, "
             f"skipped_no_recipients={summary['skipped_no_recipients']}"
         )
