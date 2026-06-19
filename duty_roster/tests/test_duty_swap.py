@@ -2340,6 +2340,38 @@ class TestOpenSwapPeriodicReminders:
         assert summary["email_count"] >= 1
         assert captured["fail_silently"] is False
 
+    def test_periodic_reminder_continues_after_recipient_send_exception(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        today = date(2026, 6, 18)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=3),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        call_count = {"count": 0}
+
+        def _mock_send_mail(**_kwargs):
+            call_count["count"] += 1
+            if call_count["count"] == 1:
+                raise RuntimeError("smtp unavailable")
+            return 1
+
+        monkeypatch.setattr("duty_roster.views_swap.send_mail", _mock_send_mail)
+
+        summary = send_periodic_open_swap_reminder_notifications(
+            today=today,
+            day_offsets=(3,),
+        )
+
+        assert summary["candidate_count"] == 1
+        assert summary["request_count"] == 1
+        assert summary["email_count"] == 1
+        assert call_count["count"] >= 2
+
     def test_command_passes_dry_run_and_today(self, monkeypatch):
         captured = {}
 

@@ -1311,14 +1311,22 @@ def send_periodic_open_swap_reminder_notifications(
                 "duty_roster/emails/swap_reminder_periodic.html",
                 recipient_context,
             )
-            delivered_count = send_mail(
-                subject=subject,
-                message="",
-                html_message=html_content,
-                from_email=get_from_email(),
-                recipient_list=[recipient.email],
-                fail_silently=False,
-            )
+            try:
+                delivered_count = send_mail(
+                    subject=subject,
+                    message="",
+                    html_message=html_content,
+                    from_email=get_from_email(),
+                    recipient_list=[recipient.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception(
+                    "Periodic swap reminder failed for request %s to %s",
+                    swap_request.pk,
+                    recipient.email,
+                )
+                continue
             if delivered_count:
                 summary["email_count"] += 1
             else:
