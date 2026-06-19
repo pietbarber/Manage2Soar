@@ -1317,7 +1317,7 @@ def send_periodic_open_swap_reminder_notifications(
                 html_message=html_content,
                 from_email=get_from_email(),
                 recipient_list=[recipient.email],
-                fail_silently=True,
+                fail_silently=False,
             )
             if delivered_count:
                 summary["email_count"] += 1

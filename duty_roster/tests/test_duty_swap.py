@@ -2310,6 +2310,36 @@ class TestOpenSwapPeriodicReminders:
         assert summary["request_count"] == 1
         assert summary["email_count"] == 0
 
+    def test_periodic_reminder_sends_with_fail_silently_false(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        today = date(2026, 6, 18)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=3),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        captured = {}
+
+        def _mock_send_mail(**kwargs):
+            captured["fail_silently"] = kwargs.get("fail_silently")
+            return 1
+
+        monkeypatch.setattr("duty_roster.views_swap.send_mail", _mock_send_mail)
+
+        summary = send_periodic_open_swap_reminder_notifications(
+            today=today,
+            day_offsets=(3,),
+        )
+
+        assert summary["candidate_count"] == 1
+        assert summary["request_count"] == 1
+        assert summary["email_count"] >= 1
+        assert captured["fail_silently"] is False
+
     def test_command_passes_dry_run_and_today(self, monkeypatch):
         captured = {}
 
