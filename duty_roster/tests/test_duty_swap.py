@@ -30,6 +30,8 @@ from duty_roster.models import (
 from duty_roster.views_swap import (
     _accept_offer_and_finalize,
     get_eligible_members_for_role,
+    get_open_swap_reminder_candidates,
+    send_periodic_open_swap_reminder_notifications,
     send_request_expired_notifications,
     update_duty_assignments,
 )
@@ -2136,6 +2138,140 @@ class TestSwapRequestExpiryCronjob:
 
 
 @pytest.mark.django_db
+class TestOpenSwapPeriodicReminders:
+    """Tests for periodic open swap reminder cadence and delivery."""
+
+    def test_candidate_selection_uses_exact_offsets(self, site_config, alice):
+        today = date(2026, 6, 18)
+
+        due_14 = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=14),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        due_7 = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=7),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=2),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=14),
+            role="TOW",
+            request_type="general",
+            status="fulfilled",
+        )
+
+        candidates = list(get_open_swap_reminder_candidates(today=today))
+        assert {req.pk for req in candidates} == {due_14.pk, due_7.pk}
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_reminders_include_eligible_requester_and_rostermeister_deduped(
+        self, site_config, alice, bob, charlie
+    ):
+        today = date(2026, 6, 18)
+        charlie.rostermeister = True
+        charlie.save(update_fields=["rostermeister"])
+
+        Member.objects.create(
+            username="no_email_helper",
+            first_name="No",
+            last_name="Email",
+            email="",
+            membership_status="Full Member",
+            towpilot=True,
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=7),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        mail.outbox.clear()
+        summary = send_periodic_open_swap_reminder_notifications(
+            today=today,
+            day_offsets=(7,),
+        )
+
+        assert summary["candidate_count"] == 1
+        assert summary["request_count"] == 1
+        assert summary["email_count"] == 3
+
+        assert len(mail.outbox) == 3
+        html_payloads = [msg.alternatives[0][0] for msg in mail.outbox]
+        assert any("Hi Alice" in html for html in html_payloads)
+        assert any("Hi Bob" in html for html in html_payloads)
+        assert any("Hi Charlie" in html for html in html_payloads)
+        assert all("Reminder" in msg.subject for msg in mail.outbox)
+        assert all(
+            f"/swap/request/{swap_request.pk}/" in msg.alternatives[0][0]
+            for msg in mail.outbox
+        )
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_dry_run_counts_emails_but_sends_nothing(self, site_config, alice, bob):
+        today = date(2026, 6, 18)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=today + timedelta(days=3),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        mail.outbox.clear()
+        summary = send_periodic_open_swap_reminder_notifications(
+            today=today,
+            day_offsets=(3,),
+            dry_run=True,
+        )
+
+        assert summary["candidate_count"] == 1
+        assert summary["request_count"] == 1
+        assert summary["email_count"] >= 2  # requester + at least one eligible helper
+        assert len(mail.outbox) == 0
+
+    def test_command_passes_dry_run_and_today(self, monkeypatch):
+        captured = {}
+
+        def _mock_sender(today=None, day_offsets=None, dry_run=False):
+            captured["today"] = today
+            captured["day_offsets"] = day_offsets
+            captured["dry_run"] = dry_run
+            return {
+                "candidate_count": 1,
+                "request_count": 1,
+                "email_count": 4,
+                "skipped_no_recipients": 0,
+            }
+
+        monkeypatch.setattr(
+            "duty_roster.management.commands.remind_open_swap_requests.send_periodic_open_swap_reminder_notifications",
+            _mock_sender,
+        )
+
+        call_command("remind_open_swap_requests", "--dry-run", verbosity=0)
+
+        assert captured["dry_run"] is True
+        assert isinstance(captured["today"], date)
+        assert captured["day_offsets"] is None
+
+
+@pytest.mark.django_db
 class TestVolunteerOpportunitiesEdgeCases:
     """Additional edge-case coverage for volunteer opportunities context."""
 
@@ -2253,3 +2389,73 @@ class TestVolunteerOpportunitiesEdgeCases:
         assert (
             not instr_holes
         ), "Should not show instructor hole to someone already serving as tow pilot that day"
+
+
+@pytest.mark.django_db
+class TestSwapVisibilityInCalendar:
+    """Open swap visibility in month cells and day modal (Issue #946)."""
+
+    def test_calendar_month_shows_open_swap_marker_badge(
+        self, client, site_config, alice
+    ):
+        duty_date = date.today() + timedelta(days=6)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+
+        client.force_login(alice)
+        response = client.get(
+            reverse(
+                "duty_roster:duty_calendar_month",
+                kwargs={"year": duty_date.year, "month": duty_date.month},
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "1 open" in content
+        assert "Open coverage requests: Tow Pilot" in content
+
+    def test_calendar_day_modal_shows_open_swap_section_with_links(
+        self, client, site_config, alice, bob
+    ):
+        duty_date = date.today() + timedelta(days=8)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        client.force_login(bob)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                kwargs={
+                    "year": duty_date.year,
+                    "month": duty_date.month,
+                    "day": duty_date.day,
+                },
+            )
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Open Swap Requests" in content
+        assert "Requested by Alice Requester" in content
+        assert "Tow Pilot" in content
+        assert (
+            reverse(
+                "duty_roster:swap_request_detail",
+                kwargs={"request_id": swap_request.id},
+            )
+            in content
+        )

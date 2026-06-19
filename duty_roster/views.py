@@ -1016,6 +1016,24 @@ def duty_calendar_view(request, year=None, month=None):
     }
 
     active_statuses = set(get_active_membership_statuses())
+    open_swap_summary_by_date = {}
+
+    for open_swap in (
+        DutySwapRequest.objects.filter(
+            status="open",
+            original_date__in=visible_dates,
+        )
+        .select_related("requester")
+        .order_by("original_date", "pk")
+    ):
+        day_summary = open_swap_summary_by_date.setdefault(
+            open_swap.original_date,
+            {"count": 0, "roles": []},
+        )
+        day_summary["count"] += 1
+        role_title = open_swap.get_role_title()
+        if role_title not in day_summary["roles"]:
+            day_summary["roles"].append(role_title)
 
     intent_dates = set()
     instruction_dates = set()
@@ -1120,6 +1138,7 @@ def duty_calendar_view(request, year=None, month=None):
         "weeks": weeks,
         "assignments_by_date": assignments_by_date,
         "dynamic_role_assignments_by_date": dynamic_role_assignments_by_date,
+        "open_swap_summary_by_date": open_swap_summary_by_date,
         "has_upcoming_assignments": has_upcoming_assignments,
         "prev_year": prev_year,
         "prev_month": prev_month,
@@ -1381,6 +1400,15 @@ def calendar_day_detail(request, year, month, day):
             if role["member"].id == request.user.id
         ]
 
+    open_swap_requests = list(
+        DutySwapRequest.objects.filter(
+            status="open",
+            original_date=day_date,
+        )
+        .select_related("requester", "direct_request_to")
+        .order_by("created_at", "pk")
+    )
+
     return render(
         request,
         "duty_roster/calendar_day_modal.html",
@@ -1446,6 +1474,7 @@ def calendar_day_detail(request, year, month, day):
             "open_panel": open_panel,
             "dynamic_role_assignments": dynamic_role_assignments,
             "user_dynamic_role_assignments": user_dynamic_role_assignments,
+            "open_swap_requests": open_swap_requests,
         },
     )
 
