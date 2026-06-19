@@ -1209,12 +1209,6 @@ def get_periodic_reminder_recipients(swap_request):
     """
     active_statuses = get_active_membership_statuses()
 
-    eligible_members = get_eligible_members_for_role(
-        swap_request.role,
-        exclude_member=None,
-        dynamic_role_key=swap_request.dynamic_role_key,
-    )
-
     rostermeister_qs = Member.objects.filter(
         rostermeister=True,
         is_active=True,
@@ -1224,6 +1218,11 @@ def get_periodic_reminder_recipients(swap_request):
     if swap_request.request_type == "direct" and swap_request.direct_request_to_id:
         recipient_ids = {swap_request.direct_request_to_id}
     else:
+        eligible_members = get_eligible_members_for_role(
+            swap_request.role,
+            exclude_member=None,
+            dynamic_role_key=swap_request.dynamic_role_key,
+        )
         recipient_ids = set(eligible_members.values_list("pk", flat=True))
     if swap_request.requester_id:
         recipient_ids.add(swap_request.requester_id)

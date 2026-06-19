@@ -2863,3 +2863,29 @@ class TestReminderRecipientFiltering:
 
         assert bob.id not in recipient_ids
         assert alice.id in recipient_ids
+
+    def test_direct_request_recipients_do_not_resolve_eligible_members(
+        self, site_config, alice, bob, monkeypatch
+    ):
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() + timedelta(days=7),
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        def _fail_if_called(*_args, **_kwargs):
+            raise AssertionError("eligible member resolution should not run")
+
+        monkeypatch.setattr(
+            "duty_roster.views_swap.get_eligible_members_for_role",
+            _fail_if_called,
+        )
+
+        recipients = list(get_periodic_reminder_recipients(swap_request))
+        recipient_ids = {member.id for member in recipients}
+
+        assert bob.id in recipient_ids
+        assert alice.id in recipient_ids
