@@ -2234,6 +2234,8 @@ class TestOpenSwapPeriodicReminders:
         assert any("Hi Bob" in html for html in html_payloads)
         assert any("Hi Charlie" in html for html in html_payloads)
         assert all("Reminder" in msg.subject for msg in mail.outbox)
+        assert all("View details:" in msg.body for msg in mail.outbox)
+        assert all(str(swap_request.original_date) in msg.body for msg in mail.outbox)
         assert all(
             f"/swap/request/{swap_request.pk}/" in msg.alternatives[0][0]
             for msg in mail.outbox

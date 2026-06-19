@@ -61,7 +61,9 @@ class TestSwapVisibilityCalendarModal(DjangoPlaywrightTestCase):
         )
         self.page.goto(f"{self.live_server_url}{calendar_url}")
 
-        marker = self.page.locator("span.badge:has-text('1 open')").first
+        marker = self.page.locator(
+            "span.badge[aria-label^='1 open swap request']"
+        ).first
         marker.wait_for(state="visible")
 
         marker_cell = marker.locator("xpath=ancestor::td[1]")

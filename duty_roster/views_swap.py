@@ -1303,6 +1303,10 @@ def send_periodic_open_swap_reminder_notifications(
             kwargs={"request_id": swap_request.pk},
         )
         request_url = f"{base_url}{request_path}"
+        text_message = (
+            f"Reminder: {role_title} coverage needed on {swap_request.original_date.isoformat()}.\n"
+            f"View details: {request_url}"
+        )
 
         for recipient in recipients:
             recipient_context = {
@@ -1331,7 +1335,7 @@ def send_periodic_open_swap_reminder_notifications(
             try:
                 delivered_count = send_mail(
                     subject=subject,
-                    message="",
+                    message=text_message,
                     html_message=html_content,
                     from_email=get_from_email(),
                     recipient_list=[recipient.email],
