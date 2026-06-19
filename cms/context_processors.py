@@ -75,7 +75,10 @@ def _dedupe_resource_items(items):
     deduped = []
     for item in items:
         url = item.get("url")
-        if not url or url in seen_urls:
+        if url is None:
+            deduped.append(item)
+            continue
+        if url in seen_urls:
             continue
         seen_urls.add(url)
         deduped.append(item)
@@ -122,18 +125,15 @@ def _build_resources_nav_items(request, footer=None):
                     "title": page.effective_navbar_title(),
                     "url": page.get_absolute_url(),
                     "rank": page.navbar_rank,
+                    "is_promoted": True,
                 }
             )
 
+    # Separator between promoted pages and utility links.
+    items.append({"title": "---", "url": None, "rank": 800})
+
     if request.user.is_authenticated and is_active_member(request.user):
         # Relocated utility links (issue #746 IA update).
-        items.append(
-            {
-                "title": "Gliders and Towplanes",
-                "url": reverse("logsheet:equipment_list"),
-                "rank": 900,
-            }
-        )
         items.append(
             {
                 "title": "Report Website Issue",

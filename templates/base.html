@@ -258,6 +258,9 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="equipmentDropdown">
               <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'logsheet:equipment_list' %}">✈️ Gliders and Towplanes</a>
+              </li>
+              <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'logsheet:maintenance_issues' %}">🔧 Maintenance Issues</a>
               </li>
               <li class="nav-item">
@@ -277,9 +280,13 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="resourcesDropdown">
               {% for item in resources_nav_items %}
-              <li>
-                <a class="dropdown-item" href="{{ item.url }}">{{ item.title }}</a>
-              </li>
+              {% if item.title == "---" %}
+                <hr class="dropdown-divider">
+              {% else %}
+                <li class="nav-item {% if item.is_promoted %}ps-3{% endif %}">
+                  <a class="dropdown-item" href="{{ item.url }}">{{ item.title }}</a>
+                </li>
+              {% endif %}
               {% empty %}
               <li><span class="dropdown-item-text text-muted">No resources available</span></li>
               {% endfor %}
