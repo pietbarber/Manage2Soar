@@ -16,6 +16,7 @@ from django.db import models, transaction
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -1284,7 +1285,11 @@ def send_periodic_open_swap_reminder_notifications(
             f"{role_title} coverage needed on {swap_request.original_date.strftime('%b %d')}"
         )
 
-        request_url = f"{base_url}/duty_roster/swap/request/{swap_request.pk}/"
+        request_path = reverse(
+            "duty_roster:swap_request_detail",
+            kwargs={"request_id": swap_request.pk},
+        )
+        request_url = f"{base_url}{request_path}"
 
         for recipient in recipients:
             recipient_context = {
