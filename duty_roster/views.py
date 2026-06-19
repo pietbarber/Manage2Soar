@@ -1017,6 +1017,17 @@ def duty_calendar_view(request, year=None, month=None):
 
     active_statuses = set(get_active_membership_statuses())
     open_swap_summary_by_date = {}
+    static_swap_role_titles = {
+        "DO": (site_config.duty_officer_title if site_config else "Duty Officer"),
+        "ADO": (
+            site_config.assistant_duty_officer_title
+            if site_config
+            else "Assistant Duty Officer"
+        ),
+        "TOW": (site_config.towpilot_title if site_config else "Tow Pilot"),
+        "INSTRUCTOR": (site_config.instructor_title if site_config else "Instructor"),
+    }
+    role_title_cache = {}
 
     for open_swap in DutySwapRequest.objects.filter(
         status="open",
@@ -1027,7 +1038,24 @@ def duty_calendar_view(request, year=None, month=None):
             {"count": 0, "roles": []},
         )
         day_summary["count"] += 1
-        role_title = open_swap.get_role_title()
+        cache_key = (
+            open_swap.role,
+            open_swap.dynamic_role_key,
+            open_swap.dynamic_role_label,
+        )
+        if cache_key not in role_title_cache:
+            if open_swap.role == "DYNAMIC":
+                role_title_cache[cache_key] = (
+                    open_swap.dynamic_role_label
+                    or open_swap.dynamic_role_key
+                    or "Dynamic Role"
+                )
+            else:
+                role_title_cache[cache_key] = static_swap_role_titles.get(
+                    open_swap.role,
+                    open_swap.role.replace("_", " ").title(),
+                )
+        role_title = role_title_cache[cache_key]
         if role_title not in day_summary["roles"]:
             day_summary["roles"].append(role_title)
 

@@ -1215,14 +1215,14 @@ def get_periodic_reminder_recipients(swap_request):
         dynamic_role_key=swap_request.dynamic_role_key,
     )
 
-    requester_qs = Member.objects.filter(pk=swap_request.requester_id)
     rostermeister_qs = Member.objects.filter(
         rostermeister=True,
         membership_status__in=active_statuses,
     )
 
     recipient_ids = set(eligible_members.values_list("pk", flat=True))
-    recipient_ids.update(requester_qs.values_list("pk", flat=True))
+    if swap_request.requester_id:
+        recipient_ids.add(swap_request.requester_id)
     recipient_ids.update(rostermeister_qs.values_list("pk", flat=True))
 
     if not recipient_ids:
