@@ -1221,7 +1221,10 @@ def get_periodic_reminder_recipients(swap_request):
         membership_status__in=active_statuses,
     )
 
-    recipient_ids = set(eligible_members.values_list("pk", flat=True))
+    if swap_request.request_type == "direct" and swap_request.direct_request_to_id:
+        recipient_ids = {swap_request.direct_request_to_id}
+    else:
+        recipient_ids = set(eligible_members.values_list("pk", flat=True))
     if swap_request.requester_id:
         recipient_ids.add(swap_request.requester_id)
     recipient_ids.update(rostermeister_qs.values_list("pk", flat=True))

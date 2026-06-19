@@ -2593,3 +2593,31 @@ class TestReminderRecipientFiltering:
         assert bob.id in recipient_ids
         assert alice.id in recipient_ids
         assert inactive_rostermeister.id not in recipient_ids
+
+    def test_direct_request_reminders_only_include_target_not_all_eligible(
+        self, site_config, alice, bob
+    ):
+        unrelated_helper = Member.objects.create(
+            username="unrelated_helper",
+            first_name="Unrelated",
+            last_name="Helper",
+            email="unrelated-helper@example.com",
+            membership_status="Full Member",
+            towpilot=True,
+        )
+
+        swap_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date.today() + timedelta(days=7),
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        recipients = list(get_periodic_reminder_recipients(swap_request))
+        recipient_ids = {member.id for member in recipients}
+
+        assert bob.id in recipient_ids
+        assert alice.id in recipient_ids
+        assert unrelated_helper.id not in recipient_ids
