@@ -2372,6 +2372,83 @@ class TestOpenSwapPeriodicReminders:
         assert summary["email_count"] == 1
         assert call_count["count"] >= 2
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_periodic_reminder_counts_skipped_request_as_processed(self, site_config):
+        today = date(2026, 6, 18)
+        requester = Member.objects.create(
+            username="no_email_requester",
+            first_name="No",
+            last_name="Requester",
+            email="",
+            membership_status="Full Member",
+        )
+        target = Member.objects.create(
+            username="no_email_target",
+            first_name="No",
+            last_name="Target",
+            email="",
+            membership_status="Full Member",
+        )
+        DutySwapRequest.objects.create(
+            requester=requester,
+            original_date=today + timedelta(days=3),
+            role="TOW",
+            request_type="direct",
+            direct_request_to=target,
+            status="open",
+        )
+
+        mail.outbox.clear()
+        summary = send_periodic_open_swap_reminder_notifications(
+            today=today,
+            day_offsets=(3,),
+        )
+
+        assert summary["candidate_count"] == 1
+        assert summary["request_count"] == 1
+        assert summary["skipped_no_recipients"] == 1
+        assert summary["email_count"] == 0
+        assert len(mail.outbox) == 0
+
+    def test_periodic_reminder_reuses_precomputed_rostermeister_ids(
+        self, site_config, alice, charlie, monkeypatch
+    ):
+        today = date(2026, 6, 18)
+        charlie.rostermeister = True
+        charlie.save(update_fields=["rostermeister"])
+        for offset in (3, 7):
+            DutySwapRequest.objects.create(
+                requester=alice,
+                original_date=today + timedelta(days=offset),
+                role="TOW",
+                request_type="general",
+                status="open",
+            )
+
+        captured_rostermeister_ids = []
+
+        def _mock_recipients(_swap_request, rostermeister_ids=None):
+            captured_rostermeister_ids.append(rostermeister_ids)
+            return [alice]
+
+        monkeypatch.setattr(
+            "duty_roster.views_swap.get_periodic_reminder_recipients",
+            _mock_recipients,
+        )
+
+        summary = send_periodic_open_swap_reminder_notifications(
+            today=today,
+            day_offsets=(3, 7),
+            dry_run=True,
+        )
+
+        assert summary["candidate_count"] == 2
+        assert summary["request_count"] == 2
+        assert captured_rostermeister_ids == [
+            (charlie.pk,),
+            (charlie.pk,),
+        ]
+
     def test_command_passes_dry_run_and_today(self, monkeypatch):
         captured = {}
 

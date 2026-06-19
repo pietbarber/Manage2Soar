@@ -1199,7 +1199,7 @@ def get_open_swap_reminder_candidates(today=None, day_offsets=None):
     )
 
 
-def get_periodic_reminder_recipients(swap_request):
+def get_periodic_reminder_recipients(swap_request, rostermeister_ids=None):
     """
     Return de-duplicated reminder recipients for an open swap request.
 
@@ -1210,11 +1210,12 @@ def get_periodic_reminder_recipients(swap_request):
     """
     active_statuses = get_active_membership_statuses()
 
-    rostermeister_qs = Member.objects.filter(
-        rostermeister=True,
-        is_active=True,
-        membership_status__in=active_statuses,
-    )
+    if rostermeister_ids is None:
+        rostermeister_ids = Member.objects.filter(
+            rostermeister=True,
+            is_active=True,
+            membership_status__in=active_statuses,
+        ).values_list("pk", flat=True)
 
     if swap_request.request_type == "direct" and swap_request.direct_request_to_id:
         recipient_ids = {swap_request.direct_request_to_id}
@@ -1227,7 +1228,7 @@ def get_periodic_reminder_recipients(swap_request):
         recipient_ids = set(eligible_members.values_list("pk", flat=True))
     if swap_request.requester_id:
         recipient_ids.add(swap_request.requester_id)
-    recipient_ids.update(rostermeister_qs.values_list("pk", flat=True))
+    recipient_ids.update(rostermeister_ids)
 
     if not recipient_ids:
         return Member.objects.none()
@@ -1262,13 +1263,25 @@ def send_periodic_open_swap_reminder_notifications(
 
     base_context = get_email_context_base()
     base_url = base_context.get("base_url", "http://localhost:8001")
+    active_statuses = get_active_membership_statuses()
+    rostermeister_ids = tuple(
+        Member.objects.filter(
+            rostermeister=True,
+            is_active=True,
+            membership_status__in=active_statuses,
+        ).values_list("pk", flat=True)
+    )
 
     for swap_request in candidates:
         recipients = [
             recipient
-            for recipient in get_periodic_reminder_recipients(swap_request)
+            for recipient in get_periodic_reminder_recipients(
+                swap_request,
+                rostermeister_ids=rostermeister_ids,
+            )
             if recipient.email
         ]
+        summary["request_count"] += 1
 
         if not recipients:
             logger.warning(
@@ -1339,8 +1352,6 @@ def send_periodic_open_swap_reminder_notifications(
                     swap_request.pk,
                     recipient.email,
                 )
-
-        summary["request_count"] += 1
 
     return summary
 

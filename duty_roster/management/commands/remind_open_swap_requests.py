@@ -10,8 +10,8 @@ class Command(BaseCronJobCommand):
     help = "Send periodic reminder emails for open duty swap requests"
     job_name = "remind_open_swap_requests"
     max_execution_time = timedelta(
-        minutes=5
-    )  # Matches K8s CronJob activeDeadlineSeconds=300
+        minutes=15
+    )  # Matches K8s CronJob activeDeadlineSeconds=900
 
     def execute_job(self, *args, **options):
         dry_run = options.get("dry_run", False)

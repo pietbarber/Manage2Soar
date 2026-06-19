@@ -385,7 +385,7 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 2
-      activeDeadlineSeconds: 300 # 5 minute timeout
+      activeDeadlineSeconds: 900 # 15 minute timeout
       template:
         spec:
           restartPolicy: Never
