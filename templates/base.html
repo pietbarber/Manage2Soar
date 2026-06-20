@@ -257,7 +257,7 @@
               Equipment
             </a>
             <ul class="dropdown-menu" aria-labelledby="equipmentDropdown">
-              {% if user.is_active_member %}
+              {% if user.is_active_member or user.is_superuser %}
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'logsheet:equipment_list' %}">✈️ Gliders and Towplanes</a>
               </li>
@@ -282,7 +282,7 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="resourcesDropdown">
               {% for item in resources_nav_items %}
-              {% if item.title == "---" %}
+              {% if item.is_divider %}
                 <li><hr class="dropdown-divider"></li>
               {% else %}
                 <li class="nav-item {% if item.is_promoted %}ps-3{% endif %}">
