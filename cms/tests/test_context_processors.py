@@ -7,11 +7,12 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from django.template import Context, Template
 from django.test import override_settings
 from django.test.client import RequestFactory
 from django.urls import reverse
 
-from cms.context_processors import footer_content
+from cms.context_processors import _dedupe_resource_items, footer_content
 from cms.models import HomePageContent, Page
 from siteconfig.models import SiteConfiguration
 
@@ -83,6 +84,13 @@ def test_resources_nav_includes_promoted_public_page_for_anonymous():
 
     titles = [item["title"] for item in context["resources_nav_items"]]
     assert "Weather Links" in titles
+
+    weather_item = next(
+        item
+        for item in context["resources_nav_items"]
+        if item["title"] == "Weather Links"
+    )
+    assert weather_item.get("is_promoted") is True
 
 
 @pytest.mark.django_db
@@ -169,6 +177,67 @@ def test_resources_nav_includes_member_footer_links_for_active_member():
 
 
 @pytest.mark.django_db
+def test_resources_nav_adds_divider_only_when_promoted_and_utility_links_exist():
+    member = User.objects.create_user(
+        username="member_divider_present",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+    Page.objects.create(
+        title="Promoted Public",
+        slug="promoted-public",
+        is_public=True,
+        promote_to_navbar=True,
+        navbar_rank=10,
+    )
+
+    request = RequestFactory().get("/")
+    request.user = member
+    context = footer_content(request)
+
+    divider_items = [
+        item for item in context["resources_nav_items"] if item.get("is_divider")
+    ]
+    assert len(divider_items) == 1
+
+    promoted_index = next(
+        idx
+        for idx, item in enumerate(context["resources_nav_items"])
+        if item.get("is_promoted")
+    )
+    divider_index = next(
+        idx
+        for idx, item in enumerate(context["resources_nav_items"])
+        if item.get("is_divider")
+    )
+    utility_index = next(
+        idx
+        for idx, item in enumerate(context["resources_nav_items"])
+        if item["title"] == "Report Website Issue"
+    )
+
+    assert promoted_index < divider_index < utility_index
+
+
+@pytest.mark.django_db
+def test_resources_nav_omits_divider_when_no_promoted_pages():
+    member = User.objects.create_user(
+        username="member_divider_absent_no_promoted",
+        password="testpass123",
+        membership_status="Full Member",
+    )
+
+    request = RequestFactory().get("/")
+    request.user = member
+    context = footer_content(request)
+
+    divider_items = [
+        item for item in context["resources_nav_items"] if item.get("is_divider")
+    ]
+    assert divider_items == []
+
+
+@pytest.mark.django_db
 def test_resources_nav_dedupes_report_issue_link_from_footer():
     member = User.objects.create_user(
         username="member_footer_dedupe",
@@ -192,6 +261,53 @@ def test_resources_nav_dedupes_report_issue_link_from_footer():
         if item["url"] == "/cms/feedback/"
     ]
     assert len(report_issue_items) == 1
+
+
+def test_dedupe_resource_items_keeps_only_divider_for_url_less_items():
+    items = [
+        {"title": "Document Root", "url": "/cms/", "rank": 0},
+        {"title": "Divider", "url": None, "rank": 800, "is_divider": True},
+        {"title": "Malformed", "url": None, "rank": 810},
+        {"title": "Report Website Issue", "url": "/cms/feedback/", "rank": 910},
+        {
+            "title": "Report Website Issue Duplicate",
+            "url": "/cms/feedback/",
+            "rank": 911,
+        },
+    ]
+
+    deduped = _dedupe_resource_items(items)
+
+    assert {"title": "Malformed", "url": None, "rank": 810} not in deduped
+    assert any(item.get("is_divider") for item in deduped)
+    assert len([item for item in deduped if item.get("url") == "/cms/feedback/"]) == 1
+
+
+def test_resources_template_treats_title_dashes_as_link_without_is_divider():
+    template = Template(
+        """
+                {% for item in resources_nav_items %}
+                    {% if item.is_divider %}
+                        <hr class=\"dropdown-divider\">
+                    {% else %}
+                        <a class=\"dropdown-item\" href=\"{{ item.url }}\">{{ item.title }}</a>
+                    {% endif %}
+                {% endfor %}
+                """
+    )
+
+    rendered = template.render(
+        Context(
+            {
+                "resources_nav_items": [
+                    {"title": "---", "url": "/cms/dashes-page/", "rank": 10},
+                ]
+            }
+        )
+    )
+
+    assert 'href="/cms/dashes-page/"' in rendered
+    assert "dropdown-divider" not in rendered
 
 
 @pytest.mark.django_db

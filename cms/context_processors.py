@@ -75,7 +75,11 @@ def _dedupe_resource_items(items):
     deduped = []
     for item in items:
         url = item.get("url")
-        if not url or url in seen_urls:
+        if url is None:
+            if item.get("is_divider"):
+                deduped.append(item)
+            continue
+        if url in seen_urls:
             continue
         seen_urls.add(url)
         deduped.append(item)
@@ -115,25 +119,33 @@ def _build_resources_nav_items(request, footer=None):
         promoted_pages = promoted_pages.filter(is_public=True)
 
     promoted_pages = promoted_pages.order_by("navbar_rank", "id")
+    has_promoted_pages = False
     for page in promoted_pages:
         if page.can_user_access(request.user, access_request):
+            has_promoted_pages = True
             items.append(
                 {
                     "title": page.effective_navbar_title(),
                     "url": page.get_absolute_url(),
                     "rank": page.navbar_rank,
+                    "is_promoted": True,
                 }
             )
 
-    if request.user.is_authenticated and is_active_member(request.user):
+    has_member_utility_links = request.user.is_authenticated and is_active_member(
+        request.user
+    )
+    has_safety_utility_links = request.user.is_authenticated and (
+        getattr(request.user, "safety_officer", False) or request.user.is_superuser
+    )
+
+    # Separator between promoted pages and utility links.
+    # Only add if there is at least one promoted page and at least one utility link.
+    if has_promoted_pages and (has_member_utility_links or has_safety_utility_links):
+        items.append({"title": "", "url": None, "rank": 800, "is_divider": True})
+
+    if has_member_utility_links:
         # Relocated utility links (issue #746 IA update).
-        items.append(
-            {
-                "title": "Gliders and Towplanes",
-                "url": reverse("logsheet:equipment_list"),
-                "rank": 900,
-            }
-        )
         items.append(
             {
                 "title": "Report Website Issue",
@@ -162,9 +174,7 @@ def _build_resources_nav_items(request, footer=None):
                 }
             )
 
-    if request.user.is_authenticated and (
-        getattr(request.user, "safety_officer", False) or request.user.is_superuser
-    ):
+    if has_safety_utility_links:
         items.append(
             {
                 "title": "Safety Dashboard",

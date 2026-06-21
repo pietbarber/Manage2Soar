@@ -45,3 +45,53 @@ def test_resources_link_for_logged_in_user(client, django_user_model):
     assert 'href="/cms/"' in content or "href=\"{% url 'cms:resources' %}\"" in content
     # ensure Resources label exists somewhere
     assert "Resources" in content
+
+
+@pytest.mark.django_db
+def test_equipment_link_visible_for_active_member(client, django_user_model):
+    user = django_user_model.objects.create_user(
+        username="active_member_equipment",
+        password="pass",
+        membership_status="Full Member",
+    )
+    client.force_login(user)
+
+    resp = client.get(reverse("home"))
+    content = resp.content.decode("utf-8")
+    assert f'href="{reverse("logsheet:equipment_list")}"' in content
+
+
+@pytest.mark.django_db
+def test_equipment_link_hidden_for_non_active_non_superuser(client, django_user_model):
+    user = django_user_model.objects.create_user(
+        username="inactive_member_equipment",
+        password="pass",
+        membership_status="Prospective Member",
+    )
+    client.force_login(user)
+
+    resp = client.get(reverse("home"))
+    assert resp.status_code == 200
+
+    content = resp.content.decode("utf-8")
+    assert f'href="{reverse("logsheet:equipment_list")}"' not in content
+
+
+@pytest.mark.django_db
+def test_equipment_link_visible_for_superuser_even_if_not_active_member(
+    client, django_user_model
+):
+    user = django_user_model.objects.create_user(
+        username="superuser_equipment",
+        password="pass",
+        membership_status="Prospective Member",
+        is_superuser=True,
+        is_staff=True,
+    )
+    client.force_login(user)
+
+    resp = client.get(reverse("home"))
+    assert resp.status_code == 200
+
+    content = resp.content.decode("utf-8")
+    assert f'href="{reverse("logsheet:equipment_list")}"' in content
