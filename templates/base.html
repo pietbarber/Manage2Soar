@@ -285,8 +285,8 @@
               {% if item.is_divider %}
                 <li><hr class="dropdown-divider"></li>
               {% else %}
-                <li class="nav-item {% if item.is_promoted %}ps-3{% endif %}">
-                  <a class="dropdown-item" href="{{ item.url }}">{{ item.title }}</a>
+                <li class="nav-item">
+                  <a class="dropdown-item {% if item.is_promoted %}ps-3{% endif %}" href="{{ item.url }}">{{ item.title }}</a>
                 </li>
               {% endif %}
               {% empty %}

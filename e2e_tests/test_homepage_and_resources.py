@@ -57,10 +57,8 @@ def test_equipment_link_visible_for_active_member(client, django_user_model):
     client.force_login(user)
 
     resp = client.get(reverse("home"))
-    assert resp.status_code == 200
-
     content = resp.content.decode("utf-8")
-    assert "Gliders and Towplanes" in content
+    assert f'href="{reverse("logsheet:equipment_list")}"' in content
 
 
 @pytest.mark.django_db
@@ -76,7 +74,7 @@ def test_equipment_link_hidden_for_non_active_non_superuser(client, django_user_
     assert resp.status_code == 200
 
     content = resp.content.decode("utf-8")
-    assert "Gliders and Towplanes" not in content
+    assert f'href="{reverse("logsheet:equipment_list")}"' not in content
 
 
 @pytest.mark.django_db
@@ -96,4 +94,4 @@ def test_equipment_link_visible_for_superuser_even_if_not_active_member(
     assert resp.status_code == 200
 
     content = resp.content.decode("utf-8")
-    assert "Gliders and Towplanes" in content
+    assert f'href="{reverse("logsheet:equipment_list")}"' in content
