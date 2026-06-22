@@ -15,6 +15,7 @@ from django.http import (
     HttpResponseForbidden,
     HttpResponseNotAllowed,
     JsonResponse,
+    StreamingHttpResponse,
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -69,6 +70,13 @@ from .utils.tow_logbook import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _CSVBuffer:
+    """Minimal write-only buffer used by csv.writer for streaming responses."""
+
+    def write(self, value):
+        return value
 
 
 def _can_issue_commercial_ticket(user):
@@ -585,6 +593,173 @@ def tow_pilot_logbook_csv(request):
             ]
         )
 
+    return response
+
+
+def _stats_dump_person_name(*, member=None, guest_name=None, legacy_name=None):
+    """Return a best-effort display name for people columns in stats dump CSV."""
+    if member:
+        if hasattr(member, "full_display_name") and member.full_display_name:
+            return member.full_display_name
+        first = (member.first_name or "").strip()
+        last = (member.last_name or "").strip()
+        if first or last:
+            return " ".join(part for part in [first, last] if part)
+        return member.username
+
+    guest = (guest_name or "").strip()
+    if guest:
+        return guest
+
+    legacy = (legacy_name or "").strip()
+    if legacy:
+        return legacy
+
+    return ""
+
+
+def _stats_dump_duration_text(duration):
+    """Return duration in HH:MM:SS form, preserving empty values."""
+    if duration is None:
+        return ""
+
+    total_seconds = int(duration.total_seconds())
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+@active_member_required
+def stats_dump_csv(request):
+    """Export raw historical flight operations data as a CSV stream."""
+    if not getattr(request.user, "is_stats_monger", False):
+        return HttpResponseForbidden("You do not have permission to export stats dump.")
+
+    flights = (
+        Flight.objects.select_related(
+            "logsheet",
+            "logsheet__airfield",
+            "pilot",
+            "passenger",
+            "glider",
+            "instructor",
+            "tow_pilot",
+        )
+        .order_by("logsheet__log_date", "pk")
+        .iterator(chunk_size=500)
+    )
+
+    def row_generator():
+        pseudo_buffer = _CSVBuffer()
+        writer = csv.writer(pseudo_buffer)
+
+        yield writer.writerow(
+            [
+                "flight_tracking_id",
+                "flight_date",
+                "pilot",
+                "passenger",
+                "glider",
+                "instructor",
+                "towpilot",
+                "flight_type",
+                "takeoff_time",
+                "landing_time",
+                "flight_time",
+                "release_altitude",
+                "flight_cost",
+                "tow_cost",
+                "total_cost",
+                "field",
+            ]
+        )
+
+        site_config = SiteConfiguration.objects.first()
+        for flight in flights:
+            flight._site_config_cache = site_config
+
+            if flight.logsheet.finalized:
+                tow_cost = flight.tow_cost_actual
+                if tow_cost is None:
+                    tow_cost = flight.tow_cost_calculated or Decimal("0.00")
+
+                rental_cost = _effective_rental_cost(flight) or Decimal("0.00")
+                instruction_cost = flight.instruction_fee_actual or Decimal("0.00")
+            else:
+                tow_cost = flight.tow_cost_calculated or Decimal("0.00")
+                rental_cost = _effective_rental_cost(flight) or Decimal("0.00")
+                instruction_cost = flight.instruction_fee_calculated or Decimal("0.00")
+
+            flight_cost = (rental_cost + instruction_cost).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+            tow_cost = tow_cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            total_cost = (flight_cost + tow_cost).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+            airfield_label = ""
+            if flight.logsheet and flight.logsheet.airfield:
+                airfield_label = (
+                    flight.logsheet.airfield.identifier or flight.logsheet.airfield.name
+                )
+
+            yield writer.writerow(
+                [
+                    str(flight.pk),
+                    flight.logsheet.log_date.isoformat() if flight.logsheet else "",
+                    _sanitize_csv_cell(
+                        _stats_dump_person_name(
+                            member=flight.pilot,
+                            guest_name=flight.guest_pilot_name,
+                            legacy_name=flight.legacy_pilot_name,
+                        )
+                    ),
+                    _sanitize_csv_cell(
+                        _stats_dump_person_name(
+                            member=flight.passenger,
+                            guest_name=flight.passenger_name,
+                            legacy_name=flight.legacy_passenger_name,
+                        )
+                    ),
+                    _sanitize_csv_cell(str(flight.glider) if flight.glider else ""),
+                    _sanitize_csv_cell(
+                        _stats_dump_person_name(
+                            member=flight.instructor,
+                            guest_name=flight.guest_instructor_name,
+                            legacy_name=flight.legacy_instructor_name,
+                        )
+                    ),
+                    _sanitize_csv_cell(
+                        _stats_dump_person_name(
+                            member=flight.tow_pilot,
+                            guest_name=flight.guest_towpilot_name,
+                            legacy_name=flight.legacy_towpilot_name,
+                        )
+                    ),
+                    _sanitize_csv_cell(flight.flight_type or ""),
+                    flight.launch_time.isoformat() if flight.launch_time else "",
+                    flight.landing_time.isoformat() if flight.landing_time else "",
+                    _stats_dump_duration_text(flight.computed_duration),
+                    (
+                        flight.release_altitude
+                        if flight.release_altitude is not None
+                        else ""
+                    ),
+                    f"{flight_cost:.2f}",
+                    f"{tow_cost:.2f}",
+                    f"{total_cost:.2f}",
+                    _sanitize_csv_cell(airfield_label),
+                ]
+            )
+
+    response = StreamingHttpResponse(row_generator(), content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="stats_dump_{timezone.localdate().isoformat()}.csv"'
+    )
     return response
 
 

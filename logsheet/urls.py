@@ -38,6 +38,7 @@ urlpatterns = [
         views.personal_charges_summary_csv,
         name="personal_charges_csv",
     ),
+    path("stats-dump/export/csv/", views.stats_dump_csv, name="stats_dump_csv"),
     path("create/", views.create_logsheet, name="create"),
     path("flight/<int:pk>/view/", views.view_flight, name="flight_view"),
     path("manage/<int:pk>/", views.manage_logsheet, name="manage"),
