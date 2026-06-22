@@ -704,7 +704,9 @@ def stats_dump_csv(request):
             airfield_label = ""
             if flight.logsheet and flight.logsheet.airfield:
                 airfield_label = (
-                    flight.logsheet.airfield.identifier or flight.logsheet.airfield.name
+                    flight.logsheet.airfield.identifier
+                    or flight.logsheet.airfield.name
+                    or ""
                 )
 
             yield writer.writerow(
