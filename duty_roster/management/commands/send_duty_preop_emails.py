@@ -22,7 +22,6 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.template.loader import render_to_string
-from django.utils.timezone import now
 
 from duty_roster.models import (
     DutyAssignment,
@@ -33,6 +32,7 @@ from duty_roster.models import (
 from duty_roster.utils.ics import generate_ops_day_ics, generate_preop_ics
 from logsheet.models import MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
+from siteconfig.timezone_utils import get_club_today
 from siteconfig.utils import get_role_title
 from utils.email import enforce_noreply_from_email, get_dev_mode_info
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -74,7 +74,7 @@ class Command(BaseCommand):
                 )
                 return
         else:
-            target_date = now().date() + timedelta(days=1)
+            target_date = get_club_today() + timedelta(days=1)
 
         self.stdout.write(
             self.style.NOTICE(f"Generating pre-op report for {target_date}")
@@ -305,7 +305,7 @@ class Command(BaseCommand):
         reservations = GliderReservation.get_reservations_for_date(target_date)
 
         # Calculate days until target date for dynamic wording
-        today = now().date()
+        today = get_club_today()
         days_until = (target_date - today).days
 
         # Get role titles from site config

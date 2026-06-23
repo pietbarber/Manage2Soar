@@ -1942,17 +1942,27 @@ class TestSwapRequestExpiryCronjob:
         assert offer.responded_at is not None
         assert notified == [(swap_request.pk, 1)]
 
-    def test_uses_utc_cutoff_date_for_nightly_run(
+    def test_uses_club_local_cutoff_date_for_nightly_run(
         self, site_config, alice, monkeypatch
     ):
-        """03:10 UTC run should expire requests from the prior UTC day."""
-        swap_request = DutySwapRequest.objects.create(
+        """03:10 UTC run should respect club-local date boundaries."""
+        stale_request = DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=date(2026, 5, 28),
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        boundary_request = DutySwapRequest.objects.create(
             requester=alice,
             original_date=date(2026, 5, 29),
             role="TOW",
             request_type="general",
             status="open",
         )
+
+        site_config.club_timezone = "America/Los_Angeles"
+        site_config.save(update_fields=["club_timezone"])
 
         fixed_now = datetime(2026, 5, 30, 3, 10, tzinfo=dt_timezone.utc)
         monkeypatch.setattr(
@@ -1966,8 +1976,10 @@ class TestSwapRequestExpiryCronjob:
 
         call_command("expire_past_swap_requests", verbosity=0)
 
-        swap_request.refresh_from_db()
-        assert swap_request.status == "expired"
+        stale_request.refresh_from_db()
+        boundary_request.refresh_from_db()
+        assert stale_request.status == "expired"
+        assert boundary_request.status == "open"
 
     def test_dry_run_does_not_mutate_records(
         self, site_config, alice, bob, monkeypatch
@@ -2451,7 +2463,11 @@ class TestOpenSwapPeriodicReminders:
             (charlie.pk,),
         ]
 
-    def test_command_passes_dry_run_and_today(self, monkeypatch):
+    def test_command_passes_dry_run_and_today(self, site_config, monkeypatch):
+        site_config = SiteConfiguration.objects.first()
+        site_config.club_timezone = "America/Los_Angeles"
+        site_config.save(update_fields=["club_timezone"])
+
         captured = {}
 
         def _mock_sender(today=None, day_offsets=None, dry_run=False):
@@ -2469,11 +2485,16 @@ class TestOpenSwapPeriodicReminders:
             "duty_roster.management.commands.remind_open_swap_requests.send_periodic_open_swap_reminder_notifications",
             _mock_sender,
         )
+        fixed_now = datetime(2026, 5, 30, 3, 10, tzinfo=dt_timezone.utc)
+        monkeypatch.setattr(
+            "siteconfig.timezone_utils.timezone.now",
+            lambda: fixed_now,
+        )
 
         call_command("remind_open_swap_requests", "--dry-run", verbosity=0)
 
         assert captured["dry_run"] is True
-        assert isinstance(captured["today"], date)
+        assert captured["today"] == date(2026, 5, 29)
         assert captured["day_offsets"] is None
 
 

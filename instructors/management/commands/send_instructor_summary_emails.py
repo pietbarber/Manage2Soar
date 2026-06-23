@@ -16,11 +16,11 @@ from datetime import timedelta
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.urls import reverse
-from django.utils.timezone import now
 
 from duty_roster.models import DutyAssignment, InstructionSlot
 from instructors.models import StudentProgressSnapshot
 from siteconfig.models import SiteConfiguration
+from siteconfig.timezone_utils import get_club_now, get_club_today
 from utils.email import send_mail
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -78,7 +78,7 @@ class Command(BaseCronJobCommand):
                 return
         else:
             hours_ahead = options.get("hours_ahead", 48)
-            target_date = (now() + timedelta(hours=hours_ahead)).date()
+            target_date = (get_club_now() + timedelta(hours=hours_ahead)).date()
 
         self.stdout.write(
             self.style.NOTICE(f"Generating instructor summary emails for {target_date}")
@@ -139,7 +139,7 @@ class Command(BaseCronJobCommand):
             students_data = self._build_students_data(slots)
 
             # Calculate days until
-            today = now().date()
+            today = get_club_today()
             days_until = (target_date - today).days
 
             # Send to each instructor

@@ -1,3 +1,5 @@
+from zoneinfo import available_timezones
+
 from django import forms
 from django.contrib import admin
 from django.utils.html import format_html
@@ -77,6 +79,28 @@ class SiteConfigurationAdminForm(forms.ModelForm):
                 "for unlimited."
             )
 
+        timezone_field = self.fields.get("club_timezone")
+        if timezone_field:
+            tz_choices = [(tz, tz) for tz in sorted(available_timezones())]
+            current_tz = (
+                self.initial.get("club_timezone")
+                or getattr(self.instance, "club_timezone", None)
+                or "UTC"
+            )
+            if current_tz and current_tz not in dict(tz_choices):
+                tz_choices.insert(0, (current_tz, current_tz))
+
+            self.fields["club_timezone"] = forms.ChoiceField(
+                choices=tz_choices,
+                required=True,
+                initial=current_tz,
+                label="Club timezone",
+                help_text=(
+                    "IANA timezone used for club-local operational dates and scheduling. "
+                    "Reference: https://www.iana.org/time-zones"
+                ),
+            )
+
 
 class DutyRoleDefinitionInline(admin.TabularInline):
     model = DutyRoleDefinition
@@ -125,6 +149,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "club_name",
                     "domain_name",
                     "canonical_url",
+                    "club_timezone",
                     "club_abbreviation",
                     "club_logo",
                     "club_nickname",

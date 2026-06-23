@@ -1,9 +1,9 @@
 from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
-from django.utils.timezone import now
 
 from duty_roster.utils.email import get_email_config
 from logsheet.models import AircraftMeister, MaintenanceIssue
+from siteconfig.timezone_utils import get_club_today
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url
@@ -13,7 +13,7 @@ class Command(BaseCommand):
     help = "Send weekly maintenance summary to aircraft meisters"
 
     def handle(self, *args, **options):
-        today = now().date()
+        today = get_club_today()
         open_issues = MaintenanceIssue.objects.filter(resolved=False).order_by(
             "report_date"
         )

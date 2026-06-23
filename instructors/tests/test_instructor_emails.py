@@ -7,7 +7,8 @@ Tests the email notifications for:
 - 48-hour summary email (management command)
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from datetime import timezone as dt_timezone
 from io import StringIO
 
 import pytest
@@ -526,3 +527,40 @@ class TestInstructorSummaryCommand:
         # Check pending action reminder is shown
         assert "Action Required" in html_content
         assert "1 pending instruction request" in html_content
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+        TIME_ZONE="UTC",
+    )
+    def test_default_hours_ahead_uses_club_local_now(
+        self, site_config, instructor, monkeypatch
+    ):
+        """Default target date should come from club-local now + hours-ahead."""
+        import siteconfig.timezone_utils as tz_utils
+
+        site_config.club_timezone = "America/Los_Angeles"
+        site_config.save(update_fields=["club_timezone"])
+
+        # 01:30 UTC Jan 2 is 17:30 Jan 1 in America/Los_Angeles.
+        # +48h => Jan 3 local (whereas UTC +48h would date to Jan 4).
+        frozen_utc = datetime(2026, 1, 2, 1, 30, 0, tzinfo=dt_timezone.utc)
+        monkeypatch.setattr(tz_utils.timezone, "now", lambda: frozen_utc)
+
+        target_date = date(2026, 1, 3)
+        DutyAssignment.objects.create(
+            date=target_date,
+            is_scheduled=True,
+            instructor=instructor,
+        )
+
+        mail.outbox.clear()
+        out = StringIO()
+        call_command("send_instructor_summary_emails", stdout=out)
+
+        assert len(mail.outbox) == 1
+        assert (
+            mail.outbox[0].subject == "In 2 days: No students scheduled for instruction"
+        )

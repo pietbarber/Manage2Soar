@@ -1,6 +1,7 @@
 import logging
 from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
@@ -206,6 +207,14 @@ class SiteConfiguration(models.Model):
             "Do NOT include trailing slash. Leave blank to use SITE_URL environment variable."
         ),
         verbose_name="Canonical Email URL",
+    )
+    club_timezone = models.CharField(
+        max_length=64,
+        default="UTC",
+        help_text=(
+            "IANA timezone for club-local operational dates/times "
+            "(for example, America/New_York)."
+        ),
     )
     club_abbreviation = models.CharField(
         max_length=20, help_text="Short abbreviation (e.g. SSS)"
@@ -790,6 +799,15 @@ class SiteConfiguration(models.Model):
                 errors["canonical_url"] = (
                     "Canonical URL must be an origin only (e.g., https://www.example.org). "
                     "Do not include a query string or fragment."
+                )
+
+        # Validate club timezone as an IANA key.
+        if self.club_timezone:
+            try:
+                ZoneInfo(self.club_timezone)
+            except ZoneInfoNotFoundError:
+                errors["club_timezone"] = (
+                    "Enter a valid IANA timezone (for example, America/New_York)."
                 )
 
         if errors:

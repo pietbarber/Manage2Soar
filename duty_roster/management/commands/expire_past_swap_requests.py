@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from duty_roster.models import DutySwapRequest
 from duty_roster.views_swap import send_request_expired_notifications
+from siteconfig.timezone_utils import get_club_today
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
@@ -19,7 +20,7 @@ class Command(BaseCronJobCommand):
     )  # Matches K8s CronJob activeDeadlineSeconds=300
 
     def execute_job(self, *args, **options):
-        today = timezone.now().date()
+        today = get_club_today()
         dry_run = options.get("dry_run", False)
 
         stale_request_ids = list(

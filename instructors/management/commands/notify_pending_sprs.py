@@ -13,6 +13,7 @@ from instructors.utils import (
 from logsheet.models import Logsheet
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
+from siteconfig.timezone_utils import get_club_today
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
@@ -45,7 +46,7 @@ class Command(BaseCronJobCommand):
         )
 
     def execute_job(self, *args, **options):
-        today = timezone.now().date()
+        today = get_club_today()
         pending_sprs = None  # may be pre-populated by the default discovery loop
         if options.get("flight_date"):
             target_date = options["flight_date"]

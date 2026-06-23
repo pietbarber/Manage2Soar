@@ -1,8 +1,7 @@
 from datetime import timedelta
 
-from django.utils import timezone
-
 from duty_roster.views_swap import send_periodic_open_swap_reminder_notifications
+from siteconfig.timezone_utils import get_club_today
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
@@ -15,7 +14,7 @@ class Command(BaseCronJobCommand):
 
     def execute_job(self, *args, **options):
         dry_run = options.get("dry_run", False)
-        today = timezone.now().date()
+        today = get_club_today()
 
         summary = send_periodic_open_swap_reminder_notifications(
             today=today,

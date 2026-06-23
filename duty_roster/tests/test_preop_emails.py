@@ -9,8 +9,10 @@ Tests the HTML email generation with all the new features:
 - Role titles from siteconfig
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from datetime import timezone as dt_timezone
 from io import StringIO
+from unittest.mock import patch
 
 import pytest
 from django.core import mail
@@ -1018,3 +1020,36 @@ class TestSendDutyPreopEmails:
         # Future-tense wording must NOT appear for a past date
         assert "Operations are planned" not in html_content
         assert "Operations are planned" not in text_content
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+        TIME_ZONE="UTC",
+    )
+    @patch("siteconfig.timezone_utils.timezone.now")
+    def test_default_date_uses_club_local_tomorrow(
+        self, mock_now, site_config, members
+    ):
+        """When --date is omitted, target day should be based on club-local tomorrow."""
+        site_config.club_timezone = "America/Los_Angeles"
+        site_config.save(update_fields=["club_timezone"])
+
+        # 01:30 UTC Jan 2 is Jan 1 in America/Los_Angeles, so local tomorrow is Jan 2.
+        mock_now.return_value = datetime(2026, 1, 2, 1, 30, 0, tzinfo=dt_timezone.utc)
+
+        local_tomorrow = date(2026, 1, 2)
+        DutyAssignment.objects.create(
+            date=local_tomorrow,
+            is_scheduled=True,
+            instructor=members["instructor"],
+            tow_pilot=members["tow_pilot"],
+            duty_officer=members["duty_officer"],
+        )
+
+        out = StringIO()
+        call_command("send_duty_preop_emails", stdout=out)
+
+        assert len(mail.outbox) == 3
+        assert f"Pre-Ops Report for {local_tomorrow}" in mail.outbox[0].subject
