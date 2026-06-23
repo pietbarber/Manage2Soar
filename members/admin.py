@@ -325,6 +325,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "webmaster",
                     "secretary",
                     "treasurer",
+                    "stats_monger",
                     "safety_officer",
                 )
             },
