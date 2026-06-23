@@ -633,7 +633,7 @@ def _stats_dump_duration_text(duration):
 @active_member_required
 def stats_dump_csv(request):
     """Export raw historical flight operations data as a CSV stream."""
-    if not getattr(request.user, "is_stats_monger", False):
+    if not getattr(request.user, "stats_monger", False):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     flights = (

@@ -190,8 +190,10 @@ def _build_resources_nav_items(request, footer=None):
             }
         )
 
-    if request.user.is_authenticated and getattr(
-        request.user, "is_stats_monger", False
+    if (
+        request.user.is_authenticated
+        and is_active_member(request.user)
+        and getattr(request.user, "stats_monger", False)
     ):
         items.append(
             {

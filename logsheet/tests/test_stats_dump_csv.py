@@ -14,7 +14,7 @@ def test_stats_dump_csv_requires_stats_monger_permission(client):
         username="no_stats_access",
         password="pass",
         membership_status="Full Member",
-        is_stats_monger=False,
+        stats_monger=False,
     )
     client.force_login(user)
 
@@ -29,7 +29,7 @@ def test_stats_dump_csv_includes_expected_columns_and_data(client):
         username="stats_owner",
         password="pass",
         membership_status="Full Member",
-        is_stats_monger=True,
+        stats_monger=True,
         first_name="Stats",
         last_name="Owner",
     )

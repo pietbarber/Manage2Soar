@@ -6,7 +6,7 @@ from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
 class TestStatsDumpNav(DjangoPlaywrightTestCase):
     def test_stats_dump_link_visible_for_stats_monger(self):
         member = self.create_test_member(
-            username="stats_monger_user", is_stats_monger=True
+            username="stats_monger_user", stats_monger=True
         )
         self.login(username=member.username)
 
@@ -18,9 +18,7 @@ class TestStatsDumpNav(DjangoPlaywrightTestCase):
         assert link.count() == 1
 
     def test_stats_dump_link_hidden_for_non_stats_monger(self):
-        member = self.create_test_member(
-            username="non_stats_user", is_stats_monger=False
-        )
+        member = self.create_test_member(username="non_stats_user", stats_monger=False)
         self.login(username=member.username)
 
         self.page.goto(f"{self.live_server_url}{reverse('home')}")

@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name="member",
-            name="is_stats_monger",
+            name="stats_monger",
             field=models.BooleanField(
                 default=False,
                 help_text="Allows the member to export raw flight statistics CSV dumps.",
