@@ -644,6 +644,8 @@ def stats_dump_csv(request):
             "passenger",
             "glider",
             "instructor",
+            "towplane",
+            "towplane__charge_scheme",
             "tow_pilot",
         )
         .order_by("logsheet__log_date", "pk")
