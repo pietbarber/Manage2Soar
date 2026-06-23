@@ -1,4 +1,5 @@
 import os
+from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
@@ -113,7 +114,7 @@ class Member(AbstractUser):
 
     membership_status = models.CharField(
         max_length=50,  # Increased length to accommodate longer status names
-        choices=get_membership_status_choices,
+        choices=cast(Any, get_membership_status_choices),
         default="Non-Member",
         blank=True,
         null=True,
