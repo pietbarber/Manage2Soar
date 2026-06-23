@@ -112,3 +112,57 @@ def test_stats_dump_csv_includes_expected_columns_and_data(client):
     assert "Instructor Three" in content
     assert "Tow Pilot" in content
     assert "KFRR" in content
+
+
+@pytest.mark.django_db
+def test_stats_dump_csv_prefers_flight_airfield_when_different(client):
+    creator = Member.objects.create_user(
+        username="stats_owner_airfield",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=True,
+    )
+    pilot = Member.objects.create_user(
+        username="pilot_airfield",
+        password="pass",
+        membership_status="Full Member",
+        first_name="Pilot",
+        last_name="Airfield",
+    )
+
+    logsheet_airfield = Airfield.objects.create(
+        identifier="KLS1", name="Logsheet Field"
+    )
+    flight_airfield = Airfield.objects.create(identifier="KFL1", name="Flight Field")
+    glider = Glider.objects.create(
+        make="Schleicher",
+        model="ASK-21",
+        n_number="N124AA",
+        rental_rate=Decimal("45.00"),
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date.today() - timedelta(days=1),
+        airfield=logsheet_airfield,
+        created_by=creator,
+        finalized=False,
+    )
+
+    Flight.objects.create(
+        logsheet=logsheet,
+        airfield=flight_airfield,
+        pilot=pilot,
+        glider=glider,
+        flight_type="Dual",
+        launch_time=time(10, 0, 0),
+        landing_time=time(10, 20, 0),
+        release_altitude=2000,
+    )
+
+    client.force_login(creator)
+    resp = client.get(reverse("logsheet:stats_dump_csv"))
+
+    assert resp.status_code == 200
+    content = b"".join(resp.streaming_content).decode("utf-8")
+    assert "KFL1" in content

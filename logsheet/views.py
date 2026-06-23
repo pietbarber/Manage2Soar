@@ -29,7 +29,11 @@ from django.views.decorators.http import require_GET, require_POST
 from duty_roster.models import GliderReservation
 from members.decorators import active_member_required
 from members.models import Member
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import (
+    MembershipBillingRule,
+    MembershipGliderRentalRule,
+    SiteConfiguration,
+)
 from siteconfig.utils import get_role_title
 from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 
@@ -59,6 +63,7 @@ from .models import (
     RevisionLog,
     Towplane,
     TowplaneChargeScheme,
+    TowplaneChargeTier,
     TowplaneCloseout,
 )
 from .utils.finalization_email import enqueue_finalization_summary_email_job
@@ -640,6 +645,7 @@ def stats_dump_csv(request):
         Flight.objects.select_related(
             "logsheet",
             "logsheet__airfield",
+            "airfield",
             "pilot",
             "passenger",
             "glider",
@@ -655,6 +661,31 @@ def stats_dump_csv(request):
     def row_generator():
         pseudo_buffer = _CSVBuffer()
         writer = csv.writer(pseudo_buffer)
+
+        # Preload rule/tier data once to avoid per-flight lookup churn.
+        active_tiers_by_scheme = {}
+        for tier in (
+            TowplaneChargeTier.objects.filter(
+                is_active=True,
+                charge_scheme__is_active=True,
+            )
+            .select_related("charge_scheme")
+            .order_by("charge_scheme_id", "altitude_start")
+        ):
+            active_tiers_by_scheme.setdefault(tier.charge_scheme_id, []).append(tier)
+
+        billing_rules_by_status = {
+            rule.membership_status.name: rule
+            for rule in MembershipBillingRule.objects.select_related(
+                "membership_status"
+            ).filter(is_active=True)
+        }
+        glider_rules_by_status_glider = {
+            (rule.membership_status.name, rule.glider_id): rule
+            for rule in MembershipGliderRentalRule.objects.select_related(
+                "membership_status", "glider"
+            ).filter(is_active=True)
+        }
 
         yield writer.writerow(
             [
@@ -681,6 +712,37 @@ def stats_dump_csv(request):
         for flight in flights:
             flight._site_config_cache = site_config
 
+            pilot_status = (
+                flight.pilot.membership_status
+                if flight.pilot and flight.pilot.membership_status
+                else None
+            )
+            if pilot_status:
+                flight._membership_billing_rule_cache = (
+                    billing_rules_by_status.get(pilot_status) or False
+                )
+                if flight.glider and flight.glider.pk:
+                    flight._membership_glider_rental_rule_cache = (
+                        glider_rules_by_status_glider.get(
+                            (pilot_status, flight.glider.pk)
+                        )
+                        or False
+                    )
+                else:
+                    flight._membership_glider_rental_rule_cache = False
+            else:
+                flight._membership_billing_rule_cache = False
+                flight._membership_glider_rental_rule_cache = False
+
+            if flight.towplane_id:
+                try:
+                    scheme = flight.towplane.charge_scheme
+                    scheme._active_charge_tiers = active_tiers_by_scheme.get(
+                        scheme.pk, []
+                    )
+                except TowplaneChargeScheme.DoesNotExist:
+                    pass
+
             if flight.logsheet.finalized:
                 tow_cost = flight.tow_cost_actual
                 if tow_cost is None:
@@ -704,12 +766,21 @@ def stats_dump_csv(request):
             )
 
             airfield_label = ""
-            if flight.logsheet and flight.logsheet.airfield:
-                airfield_label = (
-                    flight.logsheet.airfield.identifier
-                    or flight.logsheet.airfield.name
-                    or ""
-                )
+            field_airfield = None
+            if (
+                flight.airfield_id
+                and flight.logsheet
+                and flight.logsheet.airfield_id
+                and flight.airfield_id != flight.logsheet.airfield_id
+            ):
+                field_airfield = flight.airfield
+            elif flight.logsheet and flight.logsheet.airfield:
+                field_airfield = flight.logsheet.airfield
+            elif flight.airfield_id:
+                field_airfield = flight.airfield
+
+            if field_airfield:
+                airfield_label = field_airfield.identifier or field_airfield.name or ""
 
             yield writer.writerow(
                 [
