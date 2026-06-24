@@ -1,4 +1,5 @@
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
+from datetime import timezone as dt_timezone
 
 import pytest
 from django.core import mail
@@ -414,3 +415,48 @@ def test_notify_pending_sprs_skips_emailless_date_and_falls_back_to_older(
     )
     assert older_date.strftime("%B %d, %Y") in mail.outbox[0].subject
     assert mail.outbox[0].to == [emailable_instructor.email]
+
+
+@pytest.mark.django_db
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_DEV_MODE=False,
+    DEFAULT_FROM_EMAIL="noreply@test.com",
+    SITE_URL="https://test.manage2soar.com",
+    TIME_ZONE="UTC",
+)
+def test_notify_pending_sprs_days_ago_uses_club_local_today(
+    site_config, airfield, instructor, student_one, monkeypatch
+):
+    """days-ago targeting should anchor to club-local today, not raw UTC date."""
+    from django.utils import timezone
+
+    import siteconfig.timezone_utils as tz_utils
+
+    site_config.club_timezone = "America/Los_Angeles"
+    site_config.save(update_fields=["club_timezone"])
+
+    # 01:30 UTC is still previous day in America/Los_Angeles.
+    frozen_utc = timezone.make_aware(
+        datetime(2026, 1, 2, 1, 30, 0),
+        dt_timezone.utc,
+    )
+    monkeypatch.setattr(tz_utils.timezone, "now", lambda: frozen_utc)
+
+    target_date = date(2026, 1, 1)
+    logsheet = Logsheet.objects.create(
+        log_date=target_date,
+        airfield=airfield,
+        created_by=instructor,
+        finalized=True,
+    )
+    create_flight(logsheet, student_one, instructor, 10)
+
+    mail.outbox.clear()
+    Notification.objects.all().delete()
+
+    call_command("notify_pending_sprs", "--days-ago=0")
+
+    assert len(mail.outbox) == 1
+    assert target_date.strftime("%B %d, %Y") in mail.outbox[0].subject
+    assert mail.outbox[0].to == [instructor.email]

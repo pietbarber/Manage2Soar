@@ -35,7 +35,9 @@ Instructor SPR reminders now happen in three layers:
 
 ### Timezone note
 
-The first implementation uses a UTC Cron schedule and computes the target date from UTC (via `timezone.now().date()`), so the "previous day" boundary is always midnight UTC regardless of the server's local timezone. The job is intended to run after the previous flying day has closed, but tenant-specific timezone delivery is not yet configurable in `SiteConfiguration`.
+Pending SPR digest scheduling now uses club-local operational dates. The CronJob still runs on a UTC schedule, but the command computes date boundaries using the club timezone configured in SiteConfiguration (`club_timezone`, IANA key such as `America/New_York`).
+
+This means the reminder date window aligns with the club's local calendar day rather than midnight UTC.
 
 ### When emails are sent
 

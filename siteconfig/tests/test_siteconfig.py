@@ -19,6 +19,18 @@ from utils.favicon import PWA_CLUB_ICON_NAME
 User = get_user_model()
 
 
+def test_siteconfiguration_admin_form_timezone_is_dropdown_with_iana_help():
+    from siteconfig.admin import SiteConfigurationAdminForm
+
+    form = SiteConfigurationAdminForm()
+    timezone_field = form.fields["club_timezone"]
+    timezone_values = {value for value, _ in timezone_field.choices}
+
+    assert "UTC" in timezone_values
+    assert "America/New_York" in timezone_values
+    assert "iana.org/time-zones" in timezone_field.help_text
+
+
 @pytest.mark.django_db
 def test_create_siteconfiguration():
     SiteConfiguration.objects.create(
@@ -36,6 +48,32 @@ def test_update_siteconfiguration():
     c.save()
     c.refresh_from_db()
     assert c.club_name == "New Name"
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_club_timezone_defaults_to_utc():
+    config = SiteConfiguration.objects.create(
+        club_name="Timezone Club",
+        domain_name="example.org",
+        club_abbreviation="TZC",
+    )
+
+    assert config.club_timezone == "UTC"
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_club_timezone_rejects_invalid_iana_key():
+    config = SiteConfiguration(
+        club_name="Timezone Club",
+        domain_name="example.org",
+        club_abbreviation="TZC",
+        club_timezone="Not/ARealTimezone",
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        config.full_clean()
+
+    assert "club_timezone" in exc_info.value.message_dict
 
 
 @pytest.mark.django_db

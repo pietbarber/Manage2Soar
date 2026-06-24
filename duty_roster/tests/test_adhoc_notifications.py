@@ -6,7 +6,8 @@ Covers:
 - Confirmed and future unconfirmed days are left untouched
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
@@ -222,3 +223,38 @@ class TestExpireAdHocDaysDeadline(TestCase):
             "Dry run should not delete the assignment.",
         )
         mock_send.assert_not_called()
+
+    @patch("siteconfig.timezone_utils.timezone.now")
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    def test_uses_club_local_today_for_expiration(self, mock_send, mock_now):
+        """Command should expire based on club-local date, not UTC date."""
+        config = SiteConfiguration.objects.first()
+        config.club_timezone = "America/Los_Angeles"
+        config.save(update_fields=["club_timezone"])
+
+        # 01:30 UTC on Jan 2 is still Jan 1 in America/Los_Angeles.
+        mock_now.return_value = datetime(2026, 1, 2, 1, 30, 0, tzinfo=dt_timezone.utc)
+
+        local_today_assignment = DutyAssignment.objects.create(
+            date=datetime(2026, 1, 1).date(),
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+        utc_today_assignment = DutyAssignment.objects.create(
+            date=datetime(2026, 1, 2).date(),
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+
+        cmd = ExpireCommand()
+        cmd.execute_job(dry_run=False)
+
+        self.assertFalse(
+            DutyAssignment.objects.filter(pk=local_today_assignment.pk).exists(),
+            "Club-local today's unconfirmed ad-hoc day should be cancelled.",
+        )
+        self.assertTrue(
+            DutyAssignment.objects.filter(pk=utc_today_assignment.pk).exists(),
+            "UTC-today assignment should remain when it is not yet club-local today.",
+        )
+        mock_send.assert_called_once()

@@ -139,9 +139,36 @@ Uses PostgreSQL's atomic operations:
 - **Recipients Fixed**: Issue #288 resolved - now sends only to member_manager=True users
 
 ### Time Zone Considerations
-- All schedules in UTC for consistency
-- Notifications will be sent in UTC time but can reference local times in content
-- Consider club's operational time zone for optimal delivery times
+- Kubernetes CronJob schedules remain in UTC for consistent deployment behavior.
+- Operational date boundaries are evaluated in the configured club timezone (`SiteConfiguration.club_timezone`, IANA key).
+- Commands should use shared timezone helpers to compute club-local `today` and date windows, rather than `timezone.now().date()` directly.
+- This avoids hidden East Coast assumptions and keeps behavior consistent for clubs in different US time zones.
+
+### Timezone Migration Status
+
+Use this checklist when adding or modifying scheduled jobs so UTC date-boundary logic is not reintroduced.
+
+Completed (club-local helper based):
+- [x] `instructors/management/commands/notify_pending_sprs.py`
+- [x] `instructors/management/commands/send_instructor_summary_emails.py`
+- [x] `duty_roster/management/commands/expire_ad_hoc_days.py`
+- [x] `duty_roster/management/commands/expire_past_swap_requests.py`
+- [x] `duty_roster/management/commands/remind_open_swap_requests.py`
+- [x] `duty_roster/management/commands/send_duty_preop_emails.py`
+- [x] `duty_roster/management/commands/send_maintenance_digest.py`
+- [x] `duty_roster/management/commands/report_duty_delinquents.py`
+
+Remaining (still using UTC/server date anchors):
+- [ ] `instructors/management/commands/notify_late_sprs.py`
+- [ ] `instructors/management/commands/notify_aging_logsheets.py`
+
+Not a production scheduler target (sample/dev tooling):
+- [ ] `logsheet/management/commands/load_sample_logsheets.py`
+
+Rule of thumb for future jobs:
+- Keep CronJob schedules in UTC.
+- Convert operational date windows with shared club timezone helpers (`get_club_today`, `get_club_now`).
+- Add at least one boundary test that freezes UTC time near midnight and asserts expected club-local date behavior.
 
 ## Monitoring & Observability
 

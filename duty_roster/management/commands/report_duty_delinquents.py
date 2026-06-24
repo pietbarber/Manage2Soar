@@ -3,13 +3,13 @@ from datetime import timedelta
 from django.conf import settings
 from django.db.models import Count, Q
 from django.template.loader import render_to_string
-from django.utils.timezone import now
 
 from duty_roster.utils.delinquents import apply_duty_delinquent_exemptions
 from logsheet.models import Flight, Logsheet
 from members.models import Member
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
+from siteconfig.timezone_utils import get_club_today
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
@@ -48,7 +48,7 @@ class Command(BaseCronJobCommand):
         min_membership_months = options.get("min_membership_months", 3)
 
         # Calculate date ranges
-        today = now().date()
+        today = get_club_today()
         duty_cutoff_date = today - timedelta(days=lookback_months * 30)  # Approximate
         membership_cutoff_date = today - timedelta(days=min_membership_months * 30)
 
@@ -145,7 +145,7 @@ class Command(BaseCronJobCommand):
 
         # Step 4: Generate and send report
         if not options.get("dry_run"):
-            self._send_delinquency_report(duty_delinquents, lookback_months)
+            self._send_delinquency_report(duty_delinquents, lookback_months, today)
             self.log_success("Duty delinquency report sent to Member Meister")
         else:
             # Check member managers for dry-run logging
@@ -229,7 +229,7 @@ class Command(BaseCronJobCommand):
         else:
             return "Unknown (no join date)"
 
-    def _send_delinquency_report(self, duty_delinquents, lookback_months):
+    def _send_delinquency_report(self, duty_delinquents, lookback_months, today):
         """Send the duty delinquency report to appropriate personnel"""
 
         # Find Member Managers (use the proper member_manager boolean field)
@@ -255,7 +255,6 @@ class Command(BaseCronJobCommand):
             )
 
         # Build report content
-        today = now().date()
         subject = f"Monthly Duty Delinquency Report - {len(duty_delinquents)} Member(s)"
 
         # Prepare template context

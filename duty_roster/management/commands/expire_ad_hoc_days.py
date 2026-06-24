@@ -1,10 +1,10 @@
 from datetime import timedelta
 
 from django.template.loader import render_to_string
-from django.utils.timezone import now
 
 from duty_roster.models import DutyAssignment
 from duty_roster.utils.email import get_email_config, get_mailing_list
+from siteconfig.timezone_utils import get_club_today
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
@@ -25,7 +25,7 @@ class Command(BaseCronJobCommand):
         # Previously this checked `tomorrow` and ran at 6 PM UTC (1-2 PM EST),
         # which cancelled days mid-afternoon before members had a chance to
         # respond (issue #654).
-        today = now().date()
+        today = get_club_today()
 
         assignments = DutyAssignment.objects.filter(
             is_scheduled=False, is_confirmed=False, date=today
