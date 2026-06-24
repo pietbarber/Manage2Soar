@@ -159,7 +159,8 @@ Completed (club-local helper based):
 - [x] `duty_roster/management/commands/report_duty_delinquents.py`
 
 Remaining (still using UTC/server date anchors):
-- [ ] None for production scheduler commands.
+- [ ] `instructors/management/commands/notify_late_sprs.py`
+- [ ] `instructors/management/commands/notify_aging_logsheets.py`
 
 Not a production scheduler target (sample/dev tooling):
 - [ ] `logsheet/management/commands/load_sample_logsheets.py`

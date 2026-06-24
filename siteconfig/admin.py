@@ -81,13 +81,14 @@ class SiteConfigurationAdminForm(forms.ModelForm):
 
         timezone_field = self.fields.get("club_timezone")
         if timezone_field:
-            tz_choices = [(tz, tz) for tz in sorted(available_timezones())]
+            tz_set = available_timezones()
+            tz_choices = [(tz, tz) for tz in sorted(tz_set)]
             current_tz = (
                 self.initial.get("club_timezone")
                 or getattr(self.instance, "club_timezone", None)
                 or "UTC"
             )
-            if current_tz and current_tz not in dict(tz_choices):
+            if current_tz and current_tz not in tz_set:
                 tz_choices.insert(0, (current_tz, current_tz))
 
             self.fields["club_timezone"] = forms.ChoiceField(
