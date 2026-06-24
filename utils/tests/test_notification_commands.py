@@ -469,7 +469,9 @@ class TestDutyDelinquentsCommand(TestCase):
                 "duty_roster.management.commands.report_duty_delinquents.Notification.objects.create"
             ) as mock_notification:
                 # Call _send_delinquency_report directly
-                self.command._send_delinquency_report(test_delinquents, 12)
+                self.command._send_delinquency_report(
+                    test_delinquents, 12, timezone.now().date()
+                )
 
         # Verify only active member manager received email
         mock_mail.assert_called_once()
