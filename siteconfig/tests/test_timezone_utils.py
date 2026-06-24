@@ -28,8 +28,8 @@ def test_get_club_timezone_name_uses_configured_value():
 
 
 @pytest.mark.django_db
-@override_settings(TIME_ZONE="UTC")
-def test_get_club_timezone_name_falls_back_to_settings():
+@override_settings(TIME_ZONE="America/New_York")
+def test_get_club_timezone_name_falls_back_to_utc():
     assert get_club_timezone_name() == "UTC"
 
 

@@ -51,7 +51,7 @@ class Command(BaseCronJobCommand):
         if options.get("flight_date"):
             target_date = options["flight_date"]
         elif options.get("days_ago") is not None:
-            # Explicit --days-ago override: compute from UTC midnight.
+            # Explicit --days-ago override: compute from club-local midnight.
             target_date = today - timedelta(days=options["days_ago"])
         else:
             # Default: find the most recent finalized flying day that still

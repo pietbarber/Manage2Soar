@@ -145,7 +145,7 @@ class Command(BaseCronJobCommand):
 
         # Step 4: Generate and send report
         if not options.get("dry_run"):
-            self._send_delinquency_report(duty_delinquents, lookback_months)
+            self._send_delinquency_report(duty_delinquents, lookback_months, today)
             self.log_success("Duty delinquency report sent to Member Meister")
         else:
             # Check member managers for dry-run logging
@@ -229,7 +229,7 @@ class Command(BaseCronJobCommand):
         else:
             return "Unknown (no join date)"
 
-    def _send_delinquency_report(self, duty_delinquents, lookback_months):
+    def _send_delinquency_report(self, duty_delinquents, lookback_months, today):
         """Send the duty delinquency report to appropriate personnel"""
 
         # Find Member Managers (use the proper member_manager boolean field)
@@ -255,7 +255,6 @@ class Command(BaseCronJobCommand):
             )
 
         # Build report content
-        today = get_club_today()
         subject = f"Monthly Duty Delinquency Report - {len(duty_delinquents)} Member(s)"
 
         # Prepare template context

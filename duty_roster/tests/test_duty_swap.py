@@ -2464,7 +2464,6 @@ class TestOpenSwapPeriodicReminders:
         ]
 
     def test_command_passes_dry_run_and_today(self, site_config, monkeypatch):
-        site_config = SiteConfiguration.objects.first()
         site_config.club_timezone = "America/Los_Angeles"
         site_config.save(update_fields=["club_timezone"])
 

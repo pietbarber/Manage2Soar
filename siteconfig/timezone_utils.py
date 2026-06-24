@@ -7,11 +7,11 @@ from siteconfig.models import SiteConfiguration
 
 
 def get_club_timezone_name():
-    """Return configured club timezone name with safe settings fallback."""
+    """Return configured club timezone name with explicit UTC fallback."""
     config = SiteConfiguration.objects.only("club_timezone").first()
     if config and config.club_timezone:
         return config.club_timezone
-    return settings.TIME_ZONE
+    return "UTC"
 
 
 def get_club_tzinfo():
