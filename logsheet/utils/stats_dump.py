@@ -160,6 +160,7 @@ def iter_stats_dump_rows():
                 else:
                     flight._membership_glider_rental_rule_cache = False
             else:
+                flight._membership_billing_rule_cache = False
                 flight._membership_glider_rental_rule_cache = False
         else:
             flight._membership_billing_rule_cache = False
@@ -264,7 +265,10 @@ def process_stats_dump_outbox_job(outbox_id):
     """Process one durable outbox entry and generate stats dump CSV."""
     with transaction.atomic():
         outbox = StatsDumpOutbox.objects.select_for_update().get(pk=outbox_id)
-        if outbox.status == StatsDumpOutbox.STATUS_READY and outbox.result_file:
+        if outbox.status not in [
+            StatsDumpOutbox.STATUS_PENDING,
+            StatsDumpOutbox.STATUS_FAILED,
+        ]:
             return
 
         outbox.status = StatsDumpOutbox.STATUS_PROCESSING

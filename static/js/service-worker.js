@@ -259,10 +259,7 @@ function isLogsheetAjaxRequest(pathname) {
 // Check if request is for a downloadable export that should bypass SW caching.
 function isDownloadRequest(pathname) {
     return (
-        pathname === '/logsheet/stats-dump/export/csv/' ||
-        pathname === '/logsheet/stats-dump/export/csv' ||
-        pathname.endsWith('/export/csv/') ||
-        pathname.endsWith('/export/csv')
+        pathname.includes('/export/download/')
     );
 }
 

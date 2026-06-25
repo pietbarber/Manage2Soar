@@ -4,6 +4,8 @@ from logsheet.models import StatsDumpOutbox
 from logsheet.utils.stats_dump import process_stats_dump_outbox_job
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
+MAX_ATTEMPTS = 5
+
 
 class Command(BaseCronJobCommand):
     help = "Process pending/failed stats dump export outbox jobs"
@@ -27,7 +29,8 @@ class Command(BaseCronJobCommand):
                 status__in=[
                     StatsDumpOutbox.STATUS_PENDING,
                     StatsDumpOutbox.STATUS_FAILED,
-                ]
+                ],
+                attempt_count__lt=MAX_ATTEMPTS,
             )
             .order_by("queued_at")
             .values_list("id", flat=True)[:limit]

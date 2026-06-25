@@ -5,7 +5,9 @@ from unittest.mock import patch
 import pytest
 from django.core.management import call_command
 
+from logsheet.management.commands.process_stats_dump_outbox import MAX_ATTEMPTS
 from logsheet.models import Airfield, Flight, Glider, Logsheet, StatsDumpOutbox
+from logsheet.utils.stats_dump import process_stats_dump_outbox_job
 from members.models import Member
 
 
@@ -88,3 +90,47 @@ class TestStatsDumpOutboxCommand:
         assert outbox.status == StatsDumpOutbox.STATUS_FAILED
         assert outbox.attempt_count == 1
         assert "boom" in outbox.last_error
+
+    def test_command_skips_jobs_at_max_attempts(self):
+        """Jobs that have exhausted MAX_ATTEMPTS retries are not re-queued."""
+        outbox = StatsDumpOutbox.objects.create(
+            requested_by=self.requester,
+            status=StatsDumpOutbox.STATUS_FAILED,
+            attempt_count=MAX_ATTEMPTS,
+        )
+
+        call_command("process_stats_dump_outbox", limit=10, verbosity=0)
+
+        outbox.refresh_from_db()
+        assert outbox.status == StatsDumpOutbox.STATUS_FAILED
+        assert outbox.attempt_count == MAX_ATTEMPTS
+
+    def test_process_job_skips_already_processing_job(self, settings, tmp_path):
+        """process_stats_dump_outbox_job is idempotent for STATUS_PROCESSING."""
+        settings.MEDIA_ROOT = str(tmp_path)
+        outbox = StatsDumpOutbox.objects.create(
+            requested_by=self.requester,
+            status=StatsDumpOutbox.STATUS_PROCESSING,
+            attempt_count=1,
+        )
+
+        process_stats_dump_outbox_job(outbox.pk)
+
+        outbox.refresh_from_db()
+        assert outbox.status == StatsDumpOutbox.STATUS_PROCESSING
+        assert outbox.attempt_count == 1
+
+    def test_process_job_skips_already_ready_job(self, settings, tmp_path):
+        """process_stats_dump_outbox_job is idempotent for STATUS_READY."""
+        settings.MEDIA_ROOT = str(tmp_path)
+        outbox = StatsDumpOutbox.objects.create(
+            requested_by=self.requester,
+            status=StatsDumpOutbox.STATUS_READY,
+            attempt_count=1,
+        )
+
+        process_stats_dump_outbox_job(outbox.pk)
+
+        outbox.refresh_from_db()
+        assert outbox.status == StatsDumpOutbox.STATUS_READY
+        assert outbox.attempt_count == 1
