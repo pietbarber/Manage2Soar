@@ -23,6 +23,22 @@ def test_stats_dump_csv_requires_stats_monger_permission(client):
 
 
 @pytest.mark.django_db
+def test_stats_dump_csv_get_renders_queue_page(client):
+    requester = Member.objects.create_user(
+        username="stats_owner_get",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=True,
+    )
+
+    client.force_login(requester)
+    resp = client.get(reverse("logsheet:stats_dump_csv"))
+
+    assert resp.status_code == 200
+    assert StatsDumpOutbox.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_stats_dump_csv_queues_job_and_redirects_to_status(client):
     requester = Member.objects.create_user(
         username="stats_owner",
@@ -32,7 +48,7 @@ def test_stats_dump_csv_queues_job_and_redirects_to_status(client):
     )
 
     client.force_login(requester)
-    resp = client.get(reverse("logsheet:stats_dump_csv"))
+    resp = client.post(reverse("logsheet:stats_dump_csv"))
 
     assert resp.status_code == 302
     outbox = StatsDumpOutbox.objects.get()
@@ -58,6 +74,22 @@ def test_stats_dump_status_rejects_other_non_superusers(client):
     outbox = StatsDumpOutbox.objects.create(requested_by=requester)
 
     client.force_login(other)
+    resp = client.get(reverse("logsheet:stats_dump_export_status", args=[outbox.pk]))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_stats_dump_status_rejects_non_superuser_when_requested_by_missing(client):
+    requester = Member.objects.create_user(
+        username="stats_owner_missing_requester",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=True,
+    )
+    outbox = StatsDumpOutbox.objects.create(requested_by=None)
+
+    client.force_login(requester)
     resp = client.get(reverse("logsheet:stats_dump_export_status", args=[outbox.pk]))
 
     assert resp.status_code == 403
@@ -113,3 +145,24 @@ def test_stats_dump_download_redirects_when_not_ready(client):
 
     assert resp.status_code == 302
     assert resp.url == reverse("logsheet:stats_dump_export_status", args=[outbox.pk])
+
+
+@pytest.mark.django_db
+def test_stats_dump_download_rejects_non_superuser_when_requested_by_missing(
+    client,
+):
+    requester = Member.objects.create_user(
+        username="stats_owner_download_missing_requester",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=True,
+    )
+    outbox = StatsDumpOutbox.objects.create(
+        requested_by=None,
+        status=StatsDumpOutbox.STATUS_READY,
+    )
+
+    client.force_login(requester)
+    resp = client.get(reverse("logsheet:stats_dump_export_download", args=[outbox.pk]))
+
+    assert resp.status_code == 403

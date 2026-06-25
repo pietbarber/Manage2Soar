@@ -604,9 +604,15 @@ def tow_pilot_logbook_csv(request):
 
 @active_member_required
 def stats_dump_csv(request):
-    """Queue asynchronous raw historical flight operations CSV export."""
+    """Render queue page on GET and enqueue asynchronous export on POST."""
     if not getattr(request.user, "stats_monger", False):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
+
+    if request.method == "GET":
+        return render(request, "logsheet/stats_dump_export_start.html")
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["GET", "POST"])
 
     outbox = StatsDumpOutbox.objects.create(
         requested_by=request.user,
@@ -626,11 +632,7 @@ def stats_dump_export_status(request, pk):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     export_job = get_object_or_404(StatsDumpOutbox, pk=pk)
-    if (
-        export_job.requested_by_id
-        and export_job.requested_by_id != request.user.id
-        and not request.user.is_superuser
-    ):
+    if not request.user.is_superuser and export_job.requested_by_id != request.user.id:
         return HttpResponseForbidden("You do not have permission to view this export.")
 
     return render(
@@ -654,11 +656,7 @@ def stats_dump_export_download(request, pk):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     export_job = get_object_or_404(StatsDumpOutbox, pk=pk)
-    if (
-        export_job.requested_by_id
-        and export_job.requested_by_id != request.user.id
-        and not request.user.is_superuser
-    ):
+    if not request.user.is_superuser and export_job.requested_by_id != request.user.id:
         return HttpResponseForbidden("You do not have permission to view this export.")
 
     if export_job.status != StatsDumpOutbox.STATUS_READY or not export_job.result_file:
@@ -670,6 +668,7 @@ def stats_dump_export_download(request, pk):
         export_job.result_file.open("rb"),
         as_attachment=True,
         filename=filename,
+        content_type="text/csv",
     )
 
 
