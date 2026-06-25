@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Stats Dump Export</h1>
+    <a href="{% url 'logsheet:stats_dump_csv' %}" class="btn btn-outline-primary btn-sm">
+      Queue New Export
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <dl class="row mb-0">
+        <dt class="col-sm-3">Job ID</dt>
+        <dd class="col-sm-9">{{ export_job.id }}</dd>
+
+        <dt class="col-sm-3">Status</dt>
+        <dd class="col-sm-9 text-capitalize">{{ export_job.status }}</dd>
+
+        <dt class="col-sm-3">Queued</dt>
+        <dd class="col-sm-9">{{ export_job.queued_at|date:"Y-m-d H:i:s" }}</dd>
+
+        <dt class="col-sm-3">Started</dt>
+        <dd class="col-sm-9">
+          {% if export_job.started_at %}
+            {{ export_job.started_at|date:"Y-m-d H:i:s" }}
+          {% else %}
+            -
+          {% endif %}
+        </dd>
+
+        <dt class="col-sm-3">Completed</dt>
+        <dd class="col-sm-9">
+          {% if export_job.completed_at %}
+            {{ export_job.completed_at|date:"Y-m-d H:i:s" }}
+          {% else %}
+            -
+          {% endif %}
+        </dd>
+      </dl>
+    </div>
+  </div>
+
+  {% if export_job.status == 'ready' and export_job.result_file %}
+    <div class="alert alert-success mt-3 mb-0">
+      Export is ready.
+      <a href="{% url 'logsheet:stats_dump_export_download' export_job.pk %}" class="alert-link">
+        Download CSV
+      </a>
+    </div>
+  {% elif export_job.status == 'failed' %}
+    <div class="alert alert-danger mt-3 mb-0">
+      Export failed.
+      {% if export_job.last_error %}
+        <div class="mt-2"><small>{{ export_job.last_error }}</small></div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="alert alert-info mt-3 mb-0">
+      Export is being prepared. This page refreshes automatically.
+    </div>
+  {% endif %}
+</div>
+
+{% if polling %}
+  <script>
+    setTimeout(function () {
+      window.location.reload();
+    }, 5000);
+  </script>
+{% endif %}
+{% endblock %}

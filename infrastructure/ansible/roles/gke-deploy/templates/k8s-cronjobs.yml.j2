@@ -207,6 +207,65 @@ spec:
                 secretName: {{ gke_gcp_sa_secret_name }}
 
 ---
+# Every 10 minutes: Durable stats dump outbox processing
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ gke_deployment_name }}-process-stats-dump-outbox
+  namespace: {{ gke_namespace }}
+  labels:
+    app: {{ gke_deployment_name }}
+    cronjob: process-stats-dump-outbox
+{% if gke_multi_tenant %}
+    tenant: {{ gke_club_prefix }}
+{% endif %}
+spec:
+  schedule: "*/10 * * * *"  # Every 10 minutes
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1200  # 20 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: process-stats-dump-outbox
+              image: {{ gke_image_name }}:{{ gke_computed_image_tag | trim }}
+              command:
+                - python
+                - manage.py
+                - process_stats_dump_outbox
+                - --limit=20
+                - --verbosity=1
+              workingDir: /app
+              envFrom:
+                - secretRef:
+                    name: {{ gke_secret_name }}
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: {{ gke_gcp_credentials_path }}
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: {{ gke_gcp_credentials_path }}
+                  subPath: {{ gke_gcp_credentials_filename }}
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "200m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: {{ gke_gcp_sa_secret_name }}
+
+---
 # ============================================================
 # DUTY ROSTER TASKS (PRODUCTION)
 # ============================================================

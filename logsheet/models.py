@@ -55,6 +55,7 @@ class Flight(models.Model):
             models.Index(fields=["instructor"]),
             models.Index(fields=["passenger"]),
             models.Index(fields=["logsheet"]),
+            models.Index(fields=["logsheet", "id"]),
             models.Index(fields=["towplane", "logsheet"]),
             models.Index(fields=["tow_pilot", "logsheet"]),
         ]
@@ -951,6 +952,48 @@ class FinalizationEmailOutbox(models.Model):
 
     def __str__(self):
         return f"FinalizationEmailOutbox(logsheet={self.logsheet_id}, status={self.status})"
+
+
+class StatsDumpOutbox(models.Model):
+    """Durable queue record for asynchronous stats dump CSV generation."""
+
+    STATUS_PENDING = "pending"
+    STATUS_PROCESSING = "processing"
+    STATUS_READY = "ready"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_PROCESSING, "Processing"),
+        (STATUS_READY, "Ready"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    requested_by = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="stats_dump_exports",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    result_file = models.FileField(upload_to="exports/stats_dumps/", blank=True)
+    result_filename = models.CharField(max_length=255, blank=True)
+    attempt_count = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    queued_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-queued_at"]
+
+    def __str__(self):
+        return f"StatsDumpOutbox(id={self.pk}, status={self.status})"
 
 
 ####################################################

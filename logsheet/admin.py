@@ -255,8 +255,8 @@ class FlightAdmin(AdminHelperMixin, admin.ModelAdmin):
         "tow_cost_actual",
         "rental_cost_actual",
     )
-    # Filter by related fields that are indexed; avoid expensive filters on non-indexed text
-    list_filter = ("logsheet", "glider", "towplane", "instructor")
+    # Keep logsheet filter bounded for long-running clubs with many years of data.
+    list_filter = (RecentLogsheetFilter, "glider", "towplane", "instructor")
     search_fields = (
         "pilot__first_name",
         "pilot__last_name",
@@ -271,15 +271,20 @@ class FlightAdmin(AdminHelperMixin, admin.ModelAdmin):
     # Show a date drill-down if admins want to quickly jump by log date
     date_hierarchy = "logsheet__log_date"
 
-    # Use select_related for FK fields used in list_display to avoid extra queries
+    # Use select_related for FK fields used in list_display to avoid extra queries.
+    # Include logsheet__airfield because Logsheet.__str__ references airfield.
     list_select_related = (
         "logsheet",
+        "logsheet__airfield",
         "pilot",
         "instructor",
         "glider",
         "towplane",
         "tow_pilot",
     )
+
+    # Avoid expensive exact total counts on very large tables.
+    show_full_result_count = False
 
     # list_select_related is sufficient here; Django will apply the necessary
     # select_related on the changelist queryset. Keeping an explicit

@@ -1,13 +1,10 @@
-apiVersion: cloud.google.com/v1
-kind: BackendConfig
-metadata:
-  name: django-app-config
-spec:
-  healthCheck:
-    checkIntervalSec: 15
-    timeoutSec: 10
-    healthyThreshold: 1
-    unhealthyThreshold: 3
-    type: HTTP
-    requestPath: /health/
-    port: 8000
+deprecated: true
+resource: BackendConfig
+status: not-used-with-gateway-api
+reason: >-
+  GKE Gateway API deployment is the active ingress path for this project.
+  BackendConfig is a GCE Ingress resource and is intentionally not applied.
+notes:
+  - Kept as reference for historical Ingress-based deployments only.
+  - Health checks are managed via HealthCheckPolicy templates in
+    infrastructure/ansible/roles/gke-deploy/templates/.

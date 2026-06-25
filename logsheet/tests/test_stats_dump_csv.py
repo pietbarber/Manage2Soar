@@ -1,10 +1,9 @@
-from datetime import date, time, timedelta
-from decimal import Decimal
-
 import pytest
+from django.core.files.base import ContentFile
 from django.urls import reverse
+from django.utils import timezone
 
-from logsheet.models import Airfield, Flight, Glider, Logsheet
+from logsheet.models import StatsDumpOutbox
 from members.models import Member
 
 
@@ -24,145 +23,93 @@ def test_stats_dump_csv_requires_stats_monger_permission(client):
 
 
 @pytest.mark.django_db
-def test_stats_dump_csv_includes_expected_columns_and_data(client):
-    creator = Member.objects.create_user(
+def test_stats_dump_csv_queues_job_and_redirects_to_status(client):
+    requester = Member.objects.create_user(
         username="stats_owner",
         password="pass",
         membership_status="Full Member",
         stats_monger=True,
-        first_name="Stats",
-        last_name="Owner",
-    )
-    pilot = Member.objects.create_user(
-        username="pilot_member",
-        password="pass",
-        membership_status="Full Member",
-        first_name="Pilot",
-        last_name="One",
-    )
-    passenger = Member.objects.create_user(
-        username="passenger_member",
-        password="pass",
-        membership_status="Full Member",
-        first_name="Passenger",
-        last_name="Two",
-    )
-    instructor = Member.objects.create_user(
-        username="instructor_member",
-        password="pass",
-        membership_status="Full Member",
-        first_name="Instructor",
-        last_name="Three",
-    )
-    towpilot = Member.objects.create_user(
-        username="towpilot_member",
-        password="pass",
-        membership_status="Full Member",
-        first_name="Tow",
-        last_name="Pilot",
     )
 
-    airfield = Airfield.objects.create(identifier="KFRR", name="Front Royal")
-    glider = Glider.objects.create(
-        make="Schleicher",
-        model="ASK-21",
-        n_number="N123AA",
-        rental_rate=Decimal("45.00"),
-        club_owned=True,
-        is_active=True,
-    )
-    logsheet = Logsheet.objects.create(
-        log_date=date.today() - timedelta(days=1),
-        airfield=airfield,
-        created_by=creator,
-        finalized=False,
-    )
-
-    Flight.objects.create(
-        logsheet=logsheet,
-        pilot=pilot,
-        passenger=passenger,
-        instructor=instructor,
-        tow_pilot=towpilot,
-        glider=glider,
-        flight_type="Dual",
-        launch_time=time(10, 0, 0),
-        landing_time=time(10, 20, 0),
-        release_altitude=2500,
-    )
-
-    client.force_login(creator)
+    client.force_login(requester)
     resp = client.get(reverse("logsheet:stats_dump_csv"))
 
-    assert resp.status_code == 200
-    assert resp["Content-Type"].startswith("text/csv")
-    assert 'attachment; filename="stats_dump_' in resp["Content-Disposition"]
-
-    content = b"".join(resp.streaming_content).decode("utf-8")
-    lines = [line for line in content.splitlines() if line.strip()]
-
-    assert lines
-    assert (
-        lines[0]
-        == "flight_tracking_id,flight_date,pilot,passenger,glider,instructor,towpilot,flight_type,takeoff_time,landing_time,flight_time,release_altitude,flight_cost,tow_cost,total_cost,field"
-    )
-
-    assert "Pilot One" in content
-    assert "Passenger Two" in content
-    assert "Instructor Three" in content
-    assert "Tow Pilot" in content
-    assert "KFRR" in content
+    assert resp.status_code == 302
+    outbox = StatsDumpOutbox.objects.get()
+    assert outbox.requested_by == requester
+    assert outbox.status == StatsDumpOutbox.STATUS_PENDING
+    assert resp.url == reverse("logsheet:stats_dump_export_status", args=[outbox.pk])
 
 
 @pytest.mark.django_db
-def test_stats_dump_csv_prefers_flight_airfield_when_different(client):
-    creator = Member.objects.create_user(
-        username="stats_owner_airfield",
+def test_stats_dump_status_rejects_other_non_superusers(client):
+    requester = Member.objects.create_user(
+        username="stats_owner_access",
         password="pass",
         membership_status="Full Member",
         stats_monger=True,
     )
-    pilot = Member.objects.create_user(
-        username="pilot_airfield",
+    other = Member.objects.create_user(
+        username="stats_other_access",
         password="pass",
         membership_status="Full Member",
-        first_name="Pilot",
-        last_name="Airfield",
+        stats_monger=True,
+    )
+    outbox = StatsDumpOutbox.objects.create(requested_by=requester)
+
+    client.force_login(other)
+    resp = client.get(reverse("logsheet:stats_dump_export_status", args=[outbox.pk]))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_stats_dump_download_returns_file_for_ready_export(client, tmp_path, settings):
+    settings.MEDIA_ROOT = str(tmp_path)
+    requester = Member.objects.create_user(
+        username="stats_owner_download",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=True,
+    )
+    outbox = StatsDumpOutbox.objects.create(
+        requested_by=requester,
+        status=StatsDumpOutbox.STATUS_READY,
+        completed_at=timezone.now(),
+        result_filename="stats_dump_test.csv",
+    )
+    outbox.result_file.save(
+        "stats_dump_test.csv",
+        ContentFile("flight_tracking_id\n1\n"),
+        save=True,
     )
 
-    logsheet_airfield = Airfield.objects.create(
-        identifier="KLS1", name="Logsheet Field"
-    )
-    flight_airfield = Airfield.objects.create(identifier="KFL1", name="Flight Field")
-    glider = Glider.objects.create(
-        make="Schleicher",
-        model="ASK-21",
-        n_number="N124AA",
-        rental_rate=Decimal("45.00"),
-        club_owned=True,
-        is_active=True,
-    )
-    logsheet = Logsheet.objects.create(
-        log_date=date.today() - timedelta(days=1),
-        airfield=logsheet_airfield,
-        created_by=creator,
-        finalized=False,
-    )
-
-    Flight.objects.create(
-        logsheet=logsheet,
-        airfield=flight_airfield,
-        pilot=pilot,
-        glider=glider,
-        flight_type="Dual",
-        launch_time=time(10, 0, 0),
-        landing_time=time(10, 20, 0),
-        release_altitude=2000,
-    )
-
-    client.force_login(creator)
-    resp = client.get(reverse("logsheet:stats_dump_csv"))
+    client.force_login(requester)
+    resp = client.get(reverse("logsheet:stats_dump_export_download", args=[outbox.pk]))
 
     assert resp.status_code == 200
-    content = b"".join(resp.streaming_content).decode("utf-8")
-    assert "KFL1" in content
+    assert resp["Content-Type"].startswith("text/csv")
+    assert 'attachment; filename="stats_dump_test.csv"' in resp["Content-Disposition"]
+
+
+@pytest.mark.django_db
+def test_stats_dump_download_redirects_when_not_ready(client):
+    requester = Member.objects.create_user(
+        username="stats_owner_waiting",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=True,
+    )
+    outbox = StatsDumpOutbox.objects.create(
+        requested_by=requester,
+        status=StatsDumpOutbox.STATUS_PENDING,
+    )
+
+    client.force_login(requester)
+    resp = client.get(
+        reverse("logsheet:stats_dump_export_download", args=[outbox.pk]),
+        follow=False,
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("logsheet:stats_dump_export_status", args=[outbox.pk])

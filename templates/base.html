@@ -196,6 +196,9 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="logsheetDropdown">
               <li><a class="dropdown-item" href="{% url 'logsheet:index' %}"><i class="bi bi-journal-text me-1"></i> Manage Log Sheets</a></li>
+              {% if user.is_active_member and user.stats_monger %}
+              <li><a class="dropdown-item" href="{% url 'logsheet:stats_dump_csv' %}"><i class="bi bi-download me-1"></i> Stats Dump Export</a></li>
+              {% endif %}
               {% if siteconfig and siteconfig.commercial_rides_enabled and user.is_authenticated %}
               {% if user.is_active_member or user.is_superuser %}
               {% if user.duty_officer or user.treasurer %}
