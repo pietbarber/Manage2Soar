@@ -265,9 +265,9 @@ def process_stats_dump_outbox_job(outbox_id):
     """Process one durable outbox entry and generate stats dump CSV."""
     with transaction.atomic():
         outbox = StatsDumpOutbox.objects.select_for_update().get(pk=outbox_id)
-        if outbox.status not in [
-            StatsDumpOutbox.STATUS_PENDING,
-            StatsDumpOutbox.STATUS_FAILED,
+        if outbox.status in [
+            StatsDumpOutbox.STATUS_PROCESSING,
+            StatsDumpOutbox.STATUS_READY,
         ]:
             return
 

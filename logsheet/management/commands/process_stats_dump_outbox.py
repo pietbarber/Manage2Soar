@@ -4,7 +4,7 @@ from logsheet.models import StatsDumpOutbox
 from logsheet.utils.stats_dump import process_stats_dump_outbox_job
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
-MAX_ATTEMPTS = 5
+MAX_ATTEMPTS = 5  # Maximum retries before a job is permanently abandoned.
 
 
 class Command(BaseCronJobCommand):
