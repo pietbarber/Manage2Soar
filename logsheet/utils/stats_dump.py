@@ -113,7 +113,12 @@ def iter_stats_dump_rows():
     for flight in flights:
         flight._site_config_cache = site_config
 
-        if not flight.logsheet.finalized:
+        needs_calculated_pricing = (not flight.logsheet.finalized) or (
+            flight.logsheet.finalized
+            and (flight.tow_cost_actual is None or flight.rental_cost_actual is None)
+        )
+
+        if needs_calculated_pricing:
             if not pricing_caches_loaded:
                 for tier in (
                     TowplaneChargeTier.objects.filter(
@@ -166,7 +171,7 @@ def iter_stats_dump_rows():
             flight._membership_billing_rule_cache = False
             flight._membership_glider_rental_rule_cache = False
 
-        if not flight.logsheet.finalized and flight.towplane_id:
+        if needs_calculated_pricing and flight.towplane_id:
             try:
                 scheme = flight.towplane.charge_scheme
                 scheme._active_charge_tiers = active_tiers_by_scheme.get(scheme.pk, [])

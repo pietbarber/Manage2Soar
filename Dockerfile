@@ -1,5 +1,5 @@
 # Dockerfile for Django + Gunicorn
-# Use explicit Python patch tag for predictable security updates.
+# Use Python 3.13 with Debian trixie base for predictable distro behavior.
 FROM python:3.13-slim-trixie
 
 WORKDIR /app
