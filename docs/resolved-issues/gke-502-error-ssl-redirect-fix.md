@@ -111,7 +111,7 @@ curl http://pod-ip:8000/health/
 
 - `utils/middleware.py` - Health check middleware
 - `manage2soar/settings.py` - Added health check middleware to MIDDLEWARE list
-- `backend-config.yaml` - GKE health check configuration  
+- `backend-config.yaml.disabled` - Historical GKE Ingress BackendConfig reference (not applied in Gateway API deployments)
 - ~~`k8s-deployment.yaml`~~ *(now managed via Ansible IaC in infrastructure/ansible/roles/gke-deploy/)*
 - Kubernetes secret: `SECURE_SSL_REDIRECT=False`
 
