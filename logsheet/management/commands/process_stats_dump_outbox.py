@@ -1,5 +1,8 @@
 from datetime import timedelta
 
+from django.db.models import Q
+from django.utils import timezone
+
 from logsheet.models import StatsDumpOutbox
 from logsheet.utils.stats_dump import process_stats_dump_outbox_job
 from utils.management.commands.base_cronjob import BaseCronJobCommand
@@ -23,6 +26,26 @@ class Command(BaseCronJobCommand):
 
     def execute_job(self, *args, **options):
         limit = options.get("limit", 20)
+        stale_cutoff = timezone.now() - self.max_execution_time
+
+        recovered_count = (
+            StatsDumpOutbox.objects.filter(
+                status=StatsDumpOutbox.STATUS_PROCESSING,
+            )
+            .filter(Q(started_at__isnull=True) | Q(started_at__lt=stale_cutoff))
+            .update(
+                status=StatsDumpOutbox.STATUS_FAILED,
+                last_error=(
+                    "Marked failed for retry after stale processing timeout in "
+                    "process_stats_dump_outbox."
+                ),
+                completed_at=timezone.now(),
+            )
+        )
+        if recovered_count:
+            self.log_info(
+                f"Recovered {recovered_count} stale processing outbox job(s)."
+            )
 
         outbox_ids = list(
             StatsDumpOutbox.objects.filter(

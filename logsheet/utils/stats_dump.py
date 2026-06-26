@@ -20,6 +20,8 @@ from siteconfig.models import (
 )
 from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 
+MAX_LAST_ERROR_LENGTH = 2000
+
 
 def _effective_rental_cost(flight):
     """Return effective rental cost with historical snapshot priority."""
@@ -279,9 +281,16 @@ def process_stats_dump_outbox_job(outbox_id):
         outbox.status = StatsDumpOutbox.STATUS_PROCESSING
         outbox.attempt_count += 1
         outbox.started_at = timezone.now()
+        outbox.completed_at = None
         outbox.last_error = ""
         outbox.save(
-            update_fields=["status", "attempt_count", "started_at", "last_error"]
+            update_fields=[
+                "status",
+                "attempt_count",
+                "started_at",
+                "completed_at",
+                "last_error",
+            ]
         )
 
     filename = _build_stats_dump_filename(outbox_id)
@@ -322,7 +331,7 @@ def process_stats_dump_outbox_job(outbox_id):
     except Exception as exc:
         StatsDumpOutbox.objects.filter(pk=outbox_id).update(
             status=StatsDumpOutbox.STATUS_FAILED,
-            last_error=str(exc),
+            last_error=str(exc)[:MAX_LAST_ERROR_LENGTH],
             completed_at=timezone.now(),
         )
     finally:

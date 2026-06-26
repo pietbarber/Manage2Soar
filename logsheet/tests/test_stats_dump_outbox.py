@@ -4,10 +4,14 @@ from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
+from django.utils import timezone
 
 from logsheet.management.commands.process_stats_dump_outbox import MAX_ATTEMPTS
 from logsheet.models import Airfield, Flight, Glider, Logsheet, StatsDumpOutbox
-from logsheet.utils.stats_dump import process_stats_dump_outbox_job
+from logsheet.utils.stats_dump import (
+    MAX_LAST_ERROR_LENGTH,
+    process_stats_dump_outbox_job,
+)
 from members.models import Member
 
 
@@ -134,3 +138,49 @@ class TestStatsDumpOutboxCommand:
         outbox.refresh_from_db()
         assert outbox.status == StatsDumpOutbox.STATUS_READY
         assert outbox.attempt_count == 1
+
+    def test_command_recovers_stale_processing_job(self):
+        """Stale processing jobs are moved back into retry flow."""
+        outbox = StatsDumpOutbox.objects.create(
+            requested_by=self.requester,
+            status=StatsDumpOutbox.STATUS_PROCESSING,
+            started_at=timezone.now() - timedelta(hours=1),
+            attempt_count=0,
+        )
+
+        call_command("process_stats_dump_outbox", limit=10, verbosity=0)
+
+        outbox.refresh_from_db()
+        assert outbox.status == StatsDumpOutbox.STATUS_READY
+        assert outbox.attempt_count == 1
+
+    @patch(
+        "logsheet.utils.stats_dump.iter_stats_dump_rows",
+        side_effect=Exception("x" * 5000),
+    )
+    def test_process_job_truncates_last_error(self, _mock_rows):
+        outbox = StatsDumpOutbox.objects.create(
+            requested_by=self.requester,
+            status=StatsDumpOutbox.STATUS_PENDING,
+        )
+
+        process_stats_dump_outbox_job(outbox.pk)
+
+        outbox.refresh_from_db()
+        assert outbox.status == StatsDumpOutbox.STATUS_FAILED
+        assert len(outbox.last_error) == MAX_LAST_ERROR_LENGTH
+
+    def test_process_job_refreshes_completed_at_on_retry(self):
+        stale_completed_at = timezone.now() - timedelta(days=2)
+        outbox = StatsDumpOutbox.objects.create(
+            requested_by=self.requester,
+            status=StatsDumpOutbox.STATUS_FAILED,
+            completed_at=stale_completed_at,
+        )
+
+        process_stats_dump_outbox_job(outbox.pk)
+
+        outbox.refresh_from_db()
+        assert outbox.status == StatsDumpOutbox.STATUS_READY
+        assert outbox.completed_at is not None
+        assert outbox.completed_at > stale_completed_at
