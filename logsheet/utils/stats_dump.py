@@ -102,7 +102,7 @@ def iter_stats_dump_rows():
             "towplane__charge_scheme",
             "tow_pilot",
         )
-        .order_by("logsheet_id", "pk")
+        .order_by("logsheet__log_date", "logsheet_id", "pk")
         .iterator(chunk_size=2000)
     )
 

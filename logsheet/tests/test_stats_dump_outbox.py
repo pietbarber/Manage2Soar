@@ -10,6 +10,7 @@ from logsheet.management.commands.process_stats_dump_outbox import MAX_ATTEMPTS
 from logsheet.models import Airfield, Flight, Glider, Logsheet, StatsDumpOutbox
 from logsheet.utils.stats_dump import (
     MAX_LAST_ERROR_LENGTH,
+    iter_stats_dump_rows,
     process_stats_dump_outbox_job,
 )
 from members.models import Member
@@ -184,3 +185,27 @@ class TestStatsDumpOutboxCommand:
         assert outbox.status == StatsDumpOutbox.STATUS_READY
         assert outbox.completed_at is not None
         assert outbox.completed_at > stale_completed_at
+
+    def test_iter_stats_dump_rows_orders_by_flight_date(self):
+        older_logsheet = Logsheet.objects.create(
+            log_date=self.logsheet.log_date - timedelta(days=7),
+            airfield=self.airfield,
+            created_by=self.requester,
+            finalized=False,
+        )
+        Flight.objects.create(
+            logsheet=older_logsheet,
+            pilot=self.pilot,
+            glider=self.glider,
+            flight_type="Dual",
+            launch_time=time(9, 0, 0),
+            landing_time=time(9, 20, 0),
+            release_altitude=2000,
+        )
+
+        rows = list(iter_stats_dump_rows())
+        data_rows = rows[1:]
+
+        assert len(data_rows) >= 2
+        flight_dates = [row[1] for row in data_rows]
+        assert flight_dates == sorted(flight_dates)
