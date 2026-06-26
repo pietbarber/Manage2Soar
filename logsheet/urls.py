@@ -38,7 +38,7 @@ urlpatterns = [
         views.personal_charges_summary_csv,
         name="personal_charges_csv",
     ),
-    path("stats-dump/export/csv/", views.stats_dump_csv, name="stats_dump_csv"),
+    path("stats-dump/export/", views.stats_dump_csv, name="stats_dump_csv"),
     path(
         "stats-dump/export/status/<int:pk>/",
         views.stats_dump_export_status,
