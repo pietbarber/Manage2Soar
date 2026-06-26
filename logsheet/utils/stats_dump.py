@@ -13,6 +13,9 @@ from logsheet.models import (
     TowplaneChargeScheme,
     TowplaneChargeTier,
 )
+from logsheet.utils.flight_charges import (
+    effective_rental_cost as _effective_rental_cost,
+)
 from siteconfig.models import (
     MembershipBillingRule,
     MembershipGliderRentalRule,
@@ -21,17 +24,6 @@ from siteconfig.models import (
 from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 
 MAX_LAST_ERROR_LENGTH = 2000
-
-
-def _effective_rental_cost(flight):
-    """Return effective rental cost with historical snapshot priority."""
-    if flight.logsheet.finalized and flight.rental_cost_actual is not None:
-        if flight.glider and flight.glider.max_rental_rate is not None:
-            max_rate = Decimal(str(flight.glider.max_rental_rate))
-            return min(flight.rental_cost_actual, max_rate)
-        return flight.rental_cost_actual
-
-    return flight.rental_cost
 
 
 def _stats_dump_person_name(*, member=None, guest_name=None, legacy_name=None):

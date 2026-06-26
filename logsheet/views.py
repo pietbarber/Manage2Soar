@@ -68,7 +68,11 @@ from .models import (
     TowplaneCloseout,
 )
 from .utils.finalization_email import enqueue_finalization_summary_email_job
-from .utils.flight_charges import quantize_currency, split_flight_costs
+from .utils.flight_charges import effective_rental_cost as _effective_rental_cost
+from .utils.flight_charges import (
+    quantize_currency,
+    split_flight_costs,
+)
 from .utils.tow_logbook import (
     TOW_LOGBOOK_ESTIMATED_HOBBS_PER_TOW,
     TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW,
@@ -360,21 +364,6 @@ def _csv_towplane_product_name(towplane):
 
     name = (towplane.name or "").strip()
     return _sanitize_csv_cell(name or "Towplane")
-
-
-def _effective_rental_cost(flight):
-    """Return effective rental cost with historical snapshot priority.
-
-    For finalized logsheets, prefer locked actual values and only clamp against
-    the glider max-rental cap when configured.
-    """
-    if flight.logsheet.finalized and flight.rental_cost_actual is not None:
-        if flight.glider and flight.glider.max_rental_rate is not None:
-            max_rate = Decimal(str(flight.glider.max_rental_rate))
-            return min(flight.rental_cost_actual, max_rate)
-        return flight.rental_cost_actual
-
-    return flight.rental_cost
 
 
 def _member_flight_charge_breakdown(flight, member):
