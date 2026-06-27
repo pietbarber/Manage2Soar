@@ -14,7 +14,7 @@ class TestStatsDumpNav(DjangoPlaywrightTestCase):
         self.page.click("#logsheetDropdown")
         self.page.wait_for_selector("#logsheetDropdown + .dropdown-menu.show")
 
-        href = reverse("logsheet:stats_dump_csv")
+        href = reverse("logsheet:stats_dump_export_queue")
         link = self.page.locator(f'a.dropdown-item[href="{href}"]')
         assert link.count() == 1
 
@@ -26,6 +26,6 @@ class TestStatsDumpNav(DjangoPlaywrightTestCase):
         self.page.click("#logsheetDropdown")
         self.page.wait_for_selector("#logsheetDropdown + .dropdown-menu.show")
 
-        href = reverse("logsheet:stats_dump_csv")
+        href = reverse("logsheet:stats_dump_export_queue")
         link = self.page.locator(f'a.dropdown-item[href="{href}"]')
         assert link.count() == 0

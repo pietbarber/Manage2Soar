@@ -9,7 +9,7 @@
 
   <div class="card">
     <div class="card-body">
-      <form method="post" action="{% url 'logsheet:stats_dump_csv' %}">
+      <form method="post" action="{% url 'logsheet:stats_dump_export_queue' %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-primary">
           Queue New Export

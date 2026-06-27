@@ -592,9 +592,9 @@ def tow_pilot_logbook_csv(request):
 
 
 @active_member_required
-def stats_dump_csv(request):
+def stats_dump_export_queue(request):
     """Render queue page on GET and enqueue asynchronous export on POST."""
-    if not getattr(request.user, "stats_monger", False):
+    if not (request.user.is_superuser or getattr(request.user, "stats_monger", False)):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     if request.method == "GET":
@@ -617,7 +617,7 @@ def stats_dump_csv(request):
 @active_member_required
 def stats_dump_export_status(request, pk):
     """Display status for an asynchronous stats dump export job."""
-    if not getattr(request.user, "stats_monger", False):
+    if not (request.user.is_superuser or getattr(request.user, "stats_monger", False)):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     export_job = get_object_or_404(StatsDumpOutbox, pk=pk)
@@ -641,7 +641,7 @@ def stats_dump_export_status(request, pk):
 @active_member_required
 def stats_dump_export_download(request, pk):
     """Download a completed asynchronous stats dump export file."""
-    if not getattr(request.user, "stats_monger", False):
+    if not (request.user.is_superuser or getattr(request.user, "stats_monger", False)):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     export_job = get_object_or_404(StatsDumpOutbox, pk=pk)

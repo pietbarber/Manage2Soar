@@ -17,7 +17,7 @@ def test_stats_dump_csv_requires_stats_monger_permission(client):
     )
     client.force_login(user)
 
-    resp = client.get(reverse("logsheet:stats_dump_csv"))
+    resp = client.get(reverse("logsheet:stats_dump_export_queue"))
 
     assert resp.status_code == 403
 
@@ -32,7 +32,7 @@ def test_stats_dump_csv_get_renders_queue_page(client):
     )
 
     client.force_login(requester)
-    resp = client.get(reverse("logsheet:stats_dump_csv"))
+    resp = client.get(reverse("logsheet:stats_dump_export_queue"))
 
     assert resp.status_code == 200
     assert StatsDumpOutbox.objects.count() == 0
@@ -48,7 +48,7 @@ def test_stats_dump_csv_queues_job_and_redirects_to_status(client):
     )
 
     client.force_login(requester)
-    resp = client.post(reverse("logsheet:stats_dump_csv"))
+    resp = client.post(reverse("logsheet:stats_dump_export_queue"))
 
     assert resp.status_code == 302
     outbox = StatsDumpOutbox.objects.get()
