@@ -171,6 +171,25 @@ class TestStatsDumpOutboxCommand:
         assert outbox.status == StatsDumpOutbox.STATUS_FAILED
         assert len(outbox.last_error) == MAX_LAST_ERROR_LENGTH
 
+    @patch("logsheet.utils.stats_dump.logger.exception")
+    @patch(
+        "logsheet.utils.stats_dump.iter_stats_dump_rows",
+        side_effect=Exception("boom"),
+    )
+    def test_process_job_logs_exception_when_generation_fails(
+        self,
+        _mock_rows,
+        mock_log_exception,
+    ):
+        outbox = StatsDumpOutbox.objects.create(
+            requested_by=self.requester,
+            status=StatsDumpOutbox.STATUS_PENDING,
+        )
+
+        process_stats_dump_outbox_job(outbox.pk)
+
+        mock_log_exception.assert_called_once()
+
     def test_process_job_refreshes_completed_at_on_retry(self):
         stale_completed_at = timezone.now() - timedelta(days=2)
         outbox = StatsDumpOutbox.objects.create(

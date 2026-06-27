@@ -53,7 +53,7 @@
   {% elif export_job.status == 'failed' %}
     <div class="alert alert-danger mt-3 mb-0">
       Export failed.
-      {% if export_job.last_error %}
+      {% if user.is_superuser and export_job.last_error %}
         <div class="mt-2"><small>{{ export_job.last_error }}</small></div>
       {% endif %}
     </div>

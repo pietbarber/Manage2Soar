@@ -1,4 +1,5 @@
 import csv
+import logging
 import os
 import tempfile
 from decimal import ROUND_HALF_UP, Decimal
@@ -24,6 +25,7 @@ from siteconfig.models import (
 from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
 
 MAX_LAST_ERROR_LENGTH = 2000
+logger = logging.getLogger(__name__)
 
 
 def _stats_dump_person_name(*, member=None, guest_name=None, legacy_name=None):
@@ -321,6 +323,10 @@ def process_stats_dump_outbox_job(outbox_id):
             ]
         )
     except Exception as exc:
+        logger.exception(
+            "Stats dump outbox job failed for outbox_id=%s",
+            outbox_id,
+        )
         StatsDumpOutbox.objects.filter(pk=outbox_id).update(
             status=StatsDumpOutbox.STATUS_FAILED,
             last_error=str(exc)[:MAX_LAST_ERROR_LENGTH],

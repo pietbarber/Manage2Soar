@@ -166,3 +166,50 @@ def test_stats_dump_download_rejects_non_superuser_when_requested_by_missing(
     resp = client.get(reverse("logsheet:stats_dump_export_download", args=[outbox.pk]))
 
     assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_stats_dump_status_hides_last_error_for_non_superuser(client):
+    requester = Member.objects.create_user(
+        username="stats_owner_failed_hidden",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=True,
+    )
+    outbox = StatsDumpOutbox.objects.create(
+        requested_by=requester,
+        status=StatsDumpOutbox.STATUS_FAILED,
+        last_error="internal traceback details",
+    )
+
+    client.force_login(requester)
+    resp = client.get(reverse("logsheet:stats_dump_export_status", args=[outbox.pk]))
+
+    assert resp.status_code == 200
+    content = resp.content.decode("utf-8")
+    assert "Export failed." in content
+    assert "internal traceback details" not in content
+
+
+@pytest.mark.django_db
+def test_stats_dump_status_shows_last_error_for_superuser(client):
+    superuser = Member.objects.create_user(
+        username="stats_superuser_failed_visible",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=False,
+        is_superuser=True,
+    )
+    outbox = StatsDumpOutbox.objects.create(
+        requested_by=None,
+        status=StatsDumpOutbox.STATUS_FAILED,
+        last_error="internal traceback details",
+    )
+
+    client.force_login(superuser)
+    resp = client.get(reverse("logsheet:stats_dump_export_status", args=[outbox.pk]))
+
+    assert resp.status_code == 200
+    content = resp.content.decode("utf-8")
+    assert "Export failed." in content
+    assert "internal traceback details" in content
