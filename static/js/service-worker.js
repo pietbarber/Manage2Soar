@@ -87,6 +87,13 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
+    // Bypass service-worker interception for large CSV exports/downloads.
+    // These responses are attachment-style and should stream directly from
+    // network without clone/cache side effects.
+    if (isDownloadRequest(url.pathname)) {
+        return;
+    }
+
     // Only handle GET requests for caching
     // POST requests for offline API are handled separately
     if (request.method !== 'GET') {
@@ -247,6 +254,13 @@ function isLogsheetAjaxRequest(pathname) {
         /^\/logsheet\/api\/(?!offline)/,  // Non-offline logsheet APIs
     ];
     return logsheetPatterns.some(pattern => pattern.test(pathname));
+}
+
+// Check if request is for a downloadable export that should bypass SW caching.
+function isDownloadRequest(pathname) {
+    return (
+        pathname.startsWith('/logsheet/') && pathname.includes('/export/download/')
+    );
 }
 
 // Handle GET requests for offline API (reference data, sync status)

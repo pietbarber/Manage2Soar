@@ -1,6 +1,21 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 
+def effective_rental_cost(flight):
+    """Return effective rental cost with historical snapshot priority.
+
+    For finalized logsheets, prefer locked actual values and only clamp against
+    the glider max-rental cap when configured.
+    """
+    if flight.logsheet.finalized and flight.rental_cost_actual is not None:
+        if flight.glider and flight.glider.max_rental_rate is not None:
+            max_rate = Decimal(str(flight.glider.max_rental_rate))
+            return min(flight.rental_cost_actual, max_rate)
+        return flight.rental_cost_actual
+
+    return flight.rental_cost
+
+
 def split_flight_costs(
     pilot,
     partner,

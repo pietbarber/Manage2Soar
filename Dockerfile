@@ -1,6 +1,6 @@
 # Dockerfile for Django + Gunicorn
-# Use Python 3.13 with latest security patches
-FROM python:3.13-slim-bookworm
+# Use an explicit Python patch tag with Debian trixie for predictable distro behavior.
+FROM python:3.14.6-slim-trixie
 
 WORKDIR /app
 
@@ -27,11 +27,10 @@ ENV BUILD_HASH=${BUILD_HASH}
 ENV DJANGO_SETTINGS_MODULE=manage2soar.settings
 ENV PYTHONUNBUFFERED=1
 
-# Install Node.js (for vendoring frontend deps) and run npm vendor steps
-# Use Node 18 from nodesource
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends nodejs \
+# Install Node.js + npm (for vendoring frontend deps) from Debian repos.
+# This avoids external NodeSource keyserver/network failures during CI deploys.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
