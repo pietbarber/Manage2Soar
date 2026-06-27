@@ -1,6 +1,6 @@
 # Dockerfile for Django + Gunicorn
-# Use Python 3.13 with Debian trixie base for predictable distro behavior.
-FROM python:3.13-slim-trixie
+# Use an explicit Python patch tag with Debian trixie for predictable distro behavior.
+FROM python:3.14.6-slim-trixie
 
 WORKDIR /app
 
