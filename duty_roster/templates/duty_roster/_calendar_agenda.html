@@ -184,6 +184,67 @@
                 {% endwith %}
               </div>
 
+              {% if can_view_agenda_reservations %}
+                {% with reservation_schedule=agenda_reservation_schedule_by_date|dict_get:day %}
+                  {% if reservation_schedule %}
+                    <section class="mt-3" aria-labelledby="agenda-reservations-{{ day|date:'Ymd' }}">
+                      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <h6 id="agenda-reservations-{{ day|date:'Ymd' }}" class="mb-0 text-primary">
+                          <i class="bi bi-calendar-check me-2" aria-hidden="true"></i>Glider Reservations
+                        </h6>
+                        <span class="badge bg-primary rounded-pill">
+                          {{ reservation_schedule.count }} reservation{{ reservation_schedule.count|pluralize }}
+                        </span>
+                      </div>
+
+                      <div class="agenda-reservation-timetable" aria-label="Glider reservation timetable">
+                        <div class="agenda-reservation-timetable-header" aria-hidden="true">
+                          <span>Time</span>
+                          <span>Reserved aircraft</span>
+                        </div>
+                        <div class="agenda-reservation-periods">
+                          {% for period in reservation_schedule.periods %}
+                            <div class="agenda-reservation-period">
+                              <div class="agenda-reservation-period-label">
+                                <i class="bi bi-clock me-1" aria-hidden="true"></i>{{ period.label }}
+                              </div>
+                              <div class="agenda-reservation-aircraft">
+                                {% for reservation in period.reservations %}
+                                  <article class="agenda-reservation-aircraft-card">
+                                    <div class="agenda-reservation-aircraft-name">
+                                      <i class="bi bi-airplane me-1" aria-hidden="true"></i>{{ reservation.glider }}
+                                    </div>
+                                    <div class="small text-muted">
+                                      {{ reservation.member.full_display_name }}
+                                      <span aria-hidden="true">·</span>
+                                      {{ reservation.get_reservation_type_display }}
+                                    </div>
+                                    {% if reservation.purpose %}
+                                      <details class="small mt-2">
+                                        <summary class="text-primary">View reservation notes</summary>
+                                        <div class="mt-1 text-body-secondary">
+                                          {{ reservation.purpose|linebreaksbr }}
+                                        </div>
+                                      </details>
+                                    {% endif %}
+                                    {% if reservation.member_id == user.id %}
+                                      <a href="{% url 'duty_roster:reservation_edit' reservation.id %}"
+                                         class="btn btn-sm btn-outline-primary mt-2">
+                                        <i class="fas fa-pen me-1" aria-hidden="true"></i>Edit
+                                      </a>
+                                    {% endif %}
+                                  </article>
+                                {% endfor %}
+                              </div>
+                            </div>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    </section>
+                  {% endif %}
+                {% endwith %}
+              {% endif %}
+
               <!-- Quick Actions -->
               <div class="mt-3 agenda-quick-actions" aria-label="Quick actions for {{ day|date:'F j, Y' }}">
                 <div class="agenda-quick-actions-buttons">

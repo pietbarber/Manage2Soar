@@ -805,6 +805,81 @@ table .duty-badge.badge-warning {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
+.agenda-reservation-timetable {
+  --agenda-time-column: 9rem;
+  background: #fff;
+  border: 1px solid #cfd8e3;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 6px rgba(33, 37, 41, 0.06);
+  overflow: hidden;
+}
+
+.agenda-reservation-timetable-header {
+  background: #e9f2ff;
+  color: #334155;
+  display: grid;
+  font-size: 0.75rem;
+  font-weight: 700;
+  grid-template-columns: var(--agenda-time-column) minmax(0, 1fr);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agenda-reservation-timetable-header span {
+  padding: 0.55rem 0.75rem;
+}
+
+.agenda-reservation-timetable-header span:first-child {
+  border-right: 1px solid #cfd8e3;
+}
+
+.agenda-reservation-period {
+  border-top: 1px solid #dee2e6;
+  display: grid;
+  grid-template-columns: var(--agenda-time-column) minmax(0, 1fr);
+}
+
+.agenda-reservation-period-label {
+  align-items: flex-start;
+  background: #f4f8fd;
+  border-right: 1px solid #cfd8e3;
+  color: #334155;
+  display: flex;
+  font-size: 0.875rem;
+  font-weight: 700;
+  padding: 0.85rem 0.75rem;
+}
+
+.agenda-reservation-aircraft {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.65rem;
+}
+
+.agenda-reservation-aircraft-card {
+  background: #fff;
+  border: 1px solid #d7dee8;
+  border-left: 4px solid #0d6efd;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgba(33, 37, 41, 0.08);
+  flex: 0 1 18rem;
+  max-width: 22rem;
+  padding: 0.65rem 0.75rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.agenda-reservation-aircraft-card:hover {
+  border-color: #8bb9ff;
+  box-shadow: 0 3px 8px rgba(13, 110, 253, 0.12);
+}
+
+.agenda-reservation-aircraft-name {
+  color: #0b57b7;
+  font-weight: 700;
+}
+
 .agenda-quick-actions-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -836,6 +911,29 @@ table .duty-badge.badge-warning {
 }
 
 @media (max-width: 576px) {
+  .agenda-reservation-timetable-header {
+    display: none;
+  }
+
+  .agenda-reservation-period {
+    display: block;
+  }
+
+  .agenda-reservation-period:first-child {
+    border-top: 0;
+  }
+
+  .agenda-reservation-period-label {
+    border-bottom: 1px solid #dbe5f0;
+    border-right: 0;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .agenda-reservation-aircraft-card {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
   .agenda-quick-actions-buttons {
     gap: 0.4rem;
   }
