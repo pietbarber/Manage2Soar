@@ -15,7 +15,7 @@ from datetime import date, timedelta
 
 from django.contrib import messages
 from django.db import IntegrityError, transaction
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -26,6 +26,7 @@ from .forms import GliderReservationCancelForm, GliderReservationForm
 from .models import GliderReservation, OpsIntent
 
 logger = logging.getLogger("duty_roster.reservations")
+AUTO_RESERVATION_INTENT_NOTE = "Auto-created from glider reservation"
 
 
 def _reservation_default_available_as(reservation):
@@ -35,6 +36,53 @@ def _reservation_default_available_as(reservation):
     if reservation.glider and reservation.glider.seats >= 2:
         return ["club_two"]
     return ["club_single"]
+
+
+def _sync_reservation_ops_intent(member, reservation, previous_date=None):
+    """Create or update the automatic flying intent associated with a reservation."""
+    try:
+        with transaction.atomic():
+            intent, created = OpsIntent.objects.get_or_create(
+                member=member,
+                date=reservation.date,
+                defaults={
+                    "available_as": _reservation_default_available_as(reservation),
+                    "glider": reservation.glider,
+                    "notes": AUTO_RESERVATION_INTENT_NOTE,
+                },
+            )
+    except IntegrityError:
+        intent = OpsIntent.objects.filter(
+            member=member,
+            date=reservation.date,
+        ).first()
+        if intent is None:
+            raise
+        created = False
+
+    # Preserve intents the member created or customized themselves. Automatic
+    # intents can safely follow edits to the reservation's aircraft/type.
+    if not created and intent.notes == AUTO_RESERVATION_INTENT_NOTE:
+        intent.available_as = _reservation_default_available_as(reservation)
+        intent.glider = reservation.glider
+        intent.save(update_fields=["available_as", "glider"])
+
+    if previous_date and previous_date != reservation.date:
+        has_other_reservation = (
+            GliderReservation.objects.filter(
+                member=member,
+                date=previous_date,
+                status="confirmed",
+            )
+            .exclude(pk=reservation.pk)
+            .exists()
+        )
+        if not has_other_reservation:
+            OpsIntent.objects.filter(
+                member=member,
+                date=previous_date,
+                notes=AUTO_RESERVATION_INTENT_NOTE,
+            ).delete()
 
 
 @active_member_required
@@ -193,27 +241,7 @@ def reservation_create(request, year=None, month=None, day=None):
                 reservation = form.save()
                 # Check if save was actually successful (form.save() may add errors without raising)
                 if reservation.pk:
-                    try:
-                        # Isolate potential unique-key races so the outer reservation
-                        # transaction remains valid and can still commit.
-                        with transaction.atomic():
-                            OpsIntent.objects.get_or_create(
-                                member=member,
-                                date=reservation.date,
-                                defaults={
-                                    "available_as": _reservation_default_available_as(
-                                        reservation
-                                    ),
-                                    "glider": reservation.glider,
-                                    "notes": "Auto-created from glider reservation",
-                                },
-                            )
-                    except IntegrityError:
-                        if not OpsIntent.objects.filter(
-                            member=member,
-                            date=reservation.date,
-                        ).exists():
-                            raise
+                    _sync_reservation_ops_intent(member, reservation)
 
                     expired_deadlines = []
                     if reservation.glider:
@@ -314,6 +342,152 @@ def reservation_create(request, year=None, month=None, day=None):
     }
 
     return render(request, "duty_roster/reservations/create.html", context)
+
+
+@active_member_required
+def reservation_edit(request, reservation_id):
+    """Allow a member to edit their own active reservation."""
+    member = request.user
+    today = timezone.now().date()
+    reservation_queryset = GliderReservation.objects.select_related("glider").filter(
+        pk=reservation_id,
+        member=member,
+        status="confirmed",
+        date__gte=today,
+    )
+    reservation = get_object_or_404(reservation_queryset)
+    config = SiteConfiguration.objects.first()
+
+    if request.method == "POST":
+        with transaction.atomic():
+            reservation = get_object_or_404(reservation_queryset.select_for_update())
+            previous_date = reservation.date
+            form = GliderReservationForm(
+                request.POST,
+                instance=reservation,
+                member=member,
+            )
+            if form.is_valid():
+                reservation = form.save()
+                if not form.errors:
+                    _sync_reservation_ops_intent(
+                        member,
+                        reservation,
+                        previous_date=previous_date,
+                    )
+                    messages.success(
+                        request,
+                        f"Reservation for {reservation.glider} on "
+                        f"{reservation.date} has been updated.",
+                    )
+                    logger.info(
+                        "Reservation updated: %s updated reservation %s",
+                        member.full_display_name,
+                        reservation.pk,
+                    )
+                    return redirect(
+                        "duty_roster:reservation_detail",
+                        reservation_id=reservation.pk,
+                    )
+    else:
+        form = GliderReservationForm(instance=reservation, member=member)
+
+    available_gliders = form.fields["glider"].queryset
+    from logsheet.models import MaintenanceDeadline, MaintenanceIssue
+
+    grounded_glider_ids = set(
+        MaintenanceIssue.objects.filter(
+            glider__in=available_gliders,
+            grounded=True,
+            resolved=False,
+        ).values_list("glider_id", flat=True)
+    )
+    expired_deadline_glider_ids = set(
+        MaintenanceDeadline.objects.filter(
+            glider__in=available_gliders,
+            due_date__lt=today,
+        )
+        .values_list("glider_id", flat=True)
+        .distinct()
+    )
+    selected_glider_id = request.POST.get("glider") or reservation.glider_id
+    selected_glider = available_gliders.filter(pk=selected_glider_id).first()
+    selected_glider_expired_deadlines = (
+        list(selected_glider.get_expired_maintenance_deadlines())
+        if selected_glider
+        else []
+    )
+
+    context = {
+        "form": form,
+        "reservation": reservation,
+        "is_editing": True,
+        "available_gliders": available_gliders,
+        "grounded_glider_ids": grounded_glider_ids,
+        "expired_deadline_glider_ids": expired_deadline_glider_ids,
+        "selected_glider": selected_glider,
+        "selected_glider_expired_deadlines": selected_glider_expired_deadlines,
+        "max_per_year": config.max_reservations_per_year if config else 3,
+        "max_per_period": config.max_reservations_per_year if config else 3,
+        "reservation_limit_period": (
+            config.reservation_limit_period if config else ReservationLimitPeriod.YEARLY
+        ),
+    }
+    return render(request, "duty_roster/reservations/create.html", context)
+
+
+@active_member_required
+def reservation_time_availability(request):
+    """Return available time-preference choices for a selected date and glider."""
+    date_value = request.GET.get("date", "")
+    glider_value = request.GET.get("glider", "")
+    try:
+        reservation_date = date.fromisoformat(date_value)
+        glider_id = int(glider_value)
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {"error": "A valid date and glider are required."}, status=400
+        )
+
+    from logsheet.models import Glider
+
+    glider = get_object_or_404(
+        Glider,
+        pk=glider_id,
+        is_active=True,
+        club_owned=True,
+    )
+    exclude_pk = None
+    exclude_value = request.GET.get("exclude", "")
+    if exclude_value:
+        try:
+            candidate_pk = int(exclude_value)
+        except (TypeError, ValueError):
+            candidate_pk = None
+        if (
+            candidate_pk
+            and GliderReservation.objects.filter(
+                pk=candidate_pk,
+                member=request.user,
+                status="confirmed",
+            ).exists()
+        ):
+            exclude_pk = candidate_pk
+
+    unavailable = GliderReservation.get_unavailable_time_preferences(
+        glider,
+        reservation_date,
+        exclude_pk=exclude_pk,
+    )
+    choices = [
+        {
+            "value": value,
+            "label": label,
+            "available": value not in unavailable,
+        }
+        for value, label in GliderReservation.TIME_PREFERENCE_CHOICES
+    ]
+    return JsonResponse({"choices": choices})
 
 
 @active_member_required

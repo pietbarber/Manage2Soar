@@ -666,9 +666,16 @@
             <span class="text-muted ms-2">{{ res.member.full_display_name }}</span>
             <div class="small text-muted">{{ res.get_reservation_type_display }}</div>
           </div>
-          {% if res.is_trainer %}
-          <span class="badge bg-info" title="Two-seater">2S</span>
-          {% endif %}
+          <div class="d-flex align-items-center gap-2">
+            {% if res.is_trainer %}
+            <span class="badge bg-info" title="Two-seater">2S</span>
+            {% endif %}
+            {% if res.member_id == user.id %}
+            <a href="{% url 'duty_roster:reservation_edit' res.id %}" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-pen me-1" aria-hidden="true"></i>Edit
+            </a>
+            {% endif %}
+          </div>
         </li>
         {% endfor %}
       </ul>

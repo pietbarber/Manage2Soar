@@ -116,6 +116,16 @@ urlpatterns = [
         name="reservation_create_for_day",
     ),
     path(
+        "reservations/time-availability/",
+        views_reservation.reservation_time_availability,
+        name="reservation_time_availability",
+    ),
+    path(
+        "reservations/<int:reservation_id>/edit/",
+        views_reservation.reservation_edit,
+        name="reservation_edit",
+    ),
+    path(
         "reservations/<int:reservation_id>/",
         views_reservation.reservation_detail,
         name="reservation_detail",

@@ -1212,6 +1212,27 @@ class GliderReservation(models.Model):
         )
 
     @classmethod
+    def get_unavailable_time_preferences(
+        cls, glider, reservation_date, exclude_pk=None
+    ):
+        """Return time preferences blocked for an aircraft on a date."""
+        conflicts = cls.objects.filter(
+            glider=glider,
+            date=reservation_date,
+            status="confirmed",
+        )
+        if exclude_pk is not None:
+            conflicts = conflicts.exclude(pk=exclude_pk)
+
+        reserved_preferences = set(conflicts.values_list("time_preference", flat=True))
+        all_preferences = {value for value, _label in cls.TIME_PREFERENCE_CHOICES}
+        if "full_day" in reserved_preferences:
+            return all_preferences
+        if reserved_preferences:
+            reserved_preferences.add("full_day")
+        return reserved_preferences
+
+    @classmethod
     def can_member_reserve(cls, member, year=None, month=None, config=None):
         """
         Check if a member can make a new reservation based on configured primary period
@@ -1307,11 +1328,10 @@ class GliderReservation(models.Model):
                     "Start time is required when using specific time preference."
                 )
 
-        # Check for existing reservation conflicts (use transaction and locking to prevent race conditions)
-        # NOTE: select_for_update() only provides effective locking if the entire validation-save
-        # cycle is within a transaction. The form's clean() method wraps the yearly limit check
-        # in transaction.atomic() for that specific query. The UniqueConstraint at the database
-        # level provides the final safety net against race conditions.
+        # Check existing reservation conflicts. GliderReservationForm.save() locks
+        # the aircraft row across this validation and write, serializing all time
+        # preferences for one aircraft. The database UniqueConstraint provides a
+        # second safety net for identical slots.
         if self.status == "confirmed":
             with transaction.atomic():
                 # Lock existing reservations for this glider/date to prevent concurrent modifications

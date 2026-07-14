@@ -207,6 +207,49 @@ class TestGliderReservationModel:
         assert future_date.year in yearly
         assert yearly[future_date.year] == 1
 
+    def test_unavailable_time_preferences_include_reserved_slot_and_full_day(
+        self, site_config, member, glider, future_date
+    ):
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        unavailable = GliderReservation.get_unavailable_time_preferences(
+            glider,
+            future_date,
+        )
+        assert unavailable == {"morning", "full_day"}
+
+        available_when_editing = GliderReservation.get_unavailable_time_preferences(
+            glider,
+            future_date,
+            exclude_pk=reservation.pk,
+        )
+        assert available_when_editing == set()
+
+    def test_full_day_reservation_blocks_every_time_preference(
+        self, site_config, member, glider, future_date
+    ):
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="full_day",
+        )
+
+        unavailable = GliderReservation.get_unavailable_time_preferences(
+            glider,
+            future_date,
+        )
+        assert unavailable == {
+            value for value, _label in GliderReservation.TIME_PREFERENCE_CHOICES
+        }
+
     def test_can_member_reserve_with_limit(
         self, site_config, member, glider, future_date
     ):
@@ -766,6 +809,156 @@ class TestGliderReservationViews:
         response = client.get(url)
         assert response.status_code == 200
         assert response.context["reservation"] == reservation
+        assert reverse("duty_roster:reservation_edit", args=[reservation.pk]) in (
+            response.content.decode("utf-8")
+        )
+
+    def test_reservation_edit_view_updates_reservation_and_moves_automatic_intent(
+        self, client, site_config, member, glider, future_date
+    ):
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        OpsIntent.objects.create(
+            member=member,
+            date=future_date,
+            available_as=["club_two"],
+            glider=glider,
+            notes="Auto-created from glider reservation",
+        )
+        new_date = future_date + timedelta(days=2)
+
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_edit", args=[reservation.pk])
+        get_response = client.get(url)
+        assert get_response.status_code == 200
+        assert get_response.context["form"].instance == reservation
+        assert get_response.context["is_editing"] is True
+
+        response = client.post(
+            url,
+            {
+                "glider": glider.pk,
+                "date": new_date.isoformat(),
+                "reservation_type": "guest",
+                "time_preference": "specific",
+                "start_time": "09:15",
+                "end_time": "11:45",
+                "purpose": "Updated reservation details",
+            },
+        )
+
+        assert response.status_code == 302
+        reservation.refresh_from_db()
+        assert reservation.date == new_date
+        assert reservation.reservation_type == "guest"
+        assert reservation.time_preference == "specific"
+        assert reservation.purpose == "Updated reservation details"
+        assert not OpsIntent.objects.filter(member=member, date=future_date).exists()
+        moved_intent = OpsIntent.objects.get(member=member, date=new_date)
+        assert moved_intent.glider == glider
+        assert moved_intent.available_as == ["guest"]
+
+    def test_reservation_edit_is_owner_only(
+        self,
+        client,
+        site_config,
+        member,
+        glider,
+        future_date,
+        django_user_model,
+    ):
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        other_member = django_user_model.objects.create_user(
+            username="reservation_edit_other",
+            email="reservation-edit-other@example.com",
+            password="testpass123",
+            membership_status="Full Member",
+        )
+
+        client.force_login(other_member)
+        response = client.get(
+            reverse("duty_roster:reservation_edit", args=[reservation.pk])
+        )
+
+        assert response.status_code == 404
+
+    def test_reservation_edit_rejects_cancelled_or_past_reservations(
+        self, client, site_config, member, glider, future_date
+    ):
+        cancelled = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+            status="cancelled",
+        )
+        past = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=timezone.now().date() - timedelta(days=1),
+            reservation_type="solo",
+            time_preference="afternoon",
+        )
+
+        client.force_login(member)
+        assert (
+            client.get(
+                reverse("duty_roster:reservation_edit", args=[cancelled.pk])
+            ).status_code
+            == 404
+        )
+        assert (
+            client.get(
+                reverse("duty_roster:reservation_edit", args=[past.pk])
+            ).status_code
+            == 404
+        )
+
+    def test_reservation_time_availability_endpoint_filters_reserved_periods(
+        self, client, site_config, member, glider, future_date
+    ):
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_time_availability")
+
+        response = client.get(
+            url,
+            {"date": future_date.isoformat(), "glider": glider.pk},
+        )
+        assert response.status_code == 200
+        choices = {choice["value"]: choice for choice in response.json()["choices"]}
+        assert choices["morning"]["available"] is False
+        assert choices["full_day"]["available"] is False
+        assert choices["afternoon"]["available"] is True
+
+        edit_response = client.get(
+            url,
+            {
+                "date": future_date.isoformat(),
+                "glider": glider.pk,
+                "exclude": reservation.pk,
+            },
+        )
+        assert edit_response.status_code == 200
+        assert all(choice["available"] for choice in edit_response.json()["choices"])
 
     def test_reservation_cancel_view(
         self, client, site_config, member, glider, future_date
@@ -1018,14 +1211,14 @@ class TestGliderReservationViews:
             date=target_date,
             available_as=["club_single"],
         )
-        GliderReservation.objects.create(
+        member_reservation = GliderReservation.objects.create(
             member=member,
             glider=glider,
             date=target_date,
             reservation_type="solo",
             time_preference="morning",
         )
-        GliderReservation.objects.create(
+        other_reservation = GliderReservation.objects.create(
             member=other_member,
             glider=glider,
             date=target_date,
@@ -1046,6 +1239,14 @@ class TestGliderReservationViews:
         assert "Pilots Planning to Fly (2):" in content
         assert member.full_display_name in content
         assert other_member.full_display_name in content
+        assert (
+            reverse("duty_roster:reservation_edit", args=[member_reservation.pk])
+            in content
+        )
+        assert (
+            reverse("duty_roster:reservation_edit", args=[other_reservation.pk])
+            not in content
+        )
 
     def test_calendar_day_modal_other_pilots_excludes_instruction_students(
         self, client, site_config, member, glider, django_user_model
@@ -1385,6 +1586,32 @@ class TestGetReservationsForDate:
 
 class TestConcurrentReservations:
     """Tests for concurrent reservation creation and race condition handling."""
+
+    def test_form_locks_aircraft_during_validation_and_save(
+        self, site_config, member, glider, future_date
+    ):
+        from unittest.mock import patch
+
+        form = GliderReservationForm(
+            data={
+                "glider": glider.pk,
+                "date": future_date,
+                "reservation_type": "solo",
+                "time_preference": "morning",
+            },
+            member=member,
+        )
+        assert form.is_valid()
+
+        with patch(
+            "duty_roster.forms.Glider.objects.select_for_update"
+        ) as select_for_update:
+            select_for_update.return_value.get.return_value = glider
+            reservation = form.save()
+
+        assert reservation.pk is not None
+        select_for_update.assert_called_once_with()
+        select_for_update.return_value.get.assert_called_once_with(pk=glider.pk)
 
     def test_duplicate_reservation_raises_integrity_error(
         self, site_config, member, glider, future_date

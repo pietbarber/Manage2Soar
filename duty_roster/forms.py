@@ -992,15 +992,20 @@ class GliderReservationForm(forms.ModelForm):
 
     def save(self, commit=True):
         from django.core.exceptions import ValidationError as DjangoValidationError
-        from django.db import IntegrityError
+        from django.db import IntegrityError, transaction
 
         instance = super().save(commit=False)
         instance.member = self.member
 
         if commit:
             try:
-                instance.full_clean()
-                instance.save()
+                # Serialize every reservation write for selected aircraft. This
+                # closes full-day-versus-partial-slot races that cannot be covered
+                # by unique_active_reservation_per_slot alone.
+                with transaction.atomic():
+                    Glider.objects.select_for_update().get(pk=instance.glider_id)
+                    instance.full_clean()
+                    instance.save()
             except DjangoValidationError as e:
                 # Re-add validation errors to the form for proper display
                 if hasattr(e, "error_dict") and e.error_dict:
