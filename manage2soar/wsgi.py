@@ -11,6 +11,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mange2soar.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "manage2soar.settings")
 
 application = get_wsgi_application()
