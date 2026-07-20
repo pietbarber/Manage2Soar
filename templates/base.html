@@ -127,10 +127,10 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="guestDutyrosterDropdown">
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=calendar"><i class="fas fa-calendar-alt me-1"></i> Calendar</a>
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=calendar" data-duty-calendar-view="calendar"><i class="fas fa-calendar-alt me-1"></i> Calendar</a>
               </li>
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=agenda"><i class="fas fa-list me-1"></i> Roster Agenda</a>
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=agenda" data-duty-calendar-view="agenda"><i class="fas fa-list me-1"></i> Roster Agenda</a>
               </li>
             </ul>
           </li>
@@ -153,10 +153,10 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="dutyrosterDropdown">
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=calendar"><i class="fas fa-calendar-alt me-1"></i> Calendar</a>
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=calendar" data-duty-calendar-view="calendar"><i class="fas fa-calendar-alt me-1"></i> Calendar</a>
               </li>
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=agenda"><i class="fas fa-list me-1"></i> Roster Agenda</a>
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=agenda" data-duty-calendar-view="agenda"><i class="fas fa-list me-1"></i> Roster Agenda</a>
               </li>
               {% if user.is_active_member %}
               <li class="nav-item">

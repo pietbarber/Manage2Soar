@@ -57,7 +57,13 @@
     {% include "duty_roster/_calendar_month_nav.html" with show_full_header=False margin_class="mt-4" %}
 
     <script>
-      function toggleCalendarView(view) {
+      function setCalendarViewUrl(view) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('view', view);
+        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+      }
+
+      function toggleCalendarView(view, updateUrl = true) {
         const calendarView = document.getElementById('calendar-view-content');
         const agendaView = document.getElementById('agenda-view-content');
 
@@ -71,6 +77,9 @@
 
         // Store the current view preference
         localStorage.setItem('duty-roster-view', view);
+        if (updateUrl) {
+          setCalendarViewUrl(view);
+        }
       }
 
       // Restore view state after HTMX loads new content
@@ -85,11 +94,11 @@
         if (savedView === 'agenda') {
           agendaRadio.checked = true;
           calendarRadio.checked = false;
-          toggleCalendarView('agenda');
+          toggleCalendarView('agenda', false);
         } else {
           calendarRadio.checked = true;
           agendaRadio.checked = false;
-          toggleCalendarView('calendar');
+          toggleCalendarView('calendar', false);
         }
       }
 

@@ -65,6 +65,33 @@ document.addEventListener('DOMContentLoaded', function () {
     // Active page highlighting based on current URL
     const currentPath = window.location.pathname;
     const currentSearch = window.location.search;
+
+    document.querySelectorAll('[data-duty-calendar-view]').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            const requestedView = link.dataset.dutyCalendarView;
+            if (requestedView) {
+                localStorage.setItem('duty-roster-view', requestedView);
+            }
+
+            let parsedUrl;
+            try {
+                parsedUrl = new URL(link.href, window.location.origin);
+            } catch (error) {
+                return;
+            }
+
+            if (
+                parsedUrl.origin === window.location.origin &&
+                parsedUrl.pathname === window.location.pathname &&
+                typeof window.toggleCalendarView === 'function'
+            ) {
+                event.preventDefault();
+                window.history.replaceState({}, '', parsedUrl.pathname + parsedUrl.search + parsedUrl.hash);
+                window.toggleCalendarView(requestedView);
+            }
+        });
+    });
+
     document.querySelectorAll('.navbar-nav .nav-link, .navbar-nav .dropdown-item').forEach(function (link) {
         const href = link.getAttribute('href');
         if (!href || href === '#') return;
