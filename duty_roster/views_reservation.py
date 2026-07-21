@@ -575,6 +575,7 @@ def day_reservations(request, year, month, day):
     context = {
         "reservations": reservations,
         "date": target_date,
+        "today": timezone.now().date(),
         "can_reserve": GliderReservation.can_member_reserve(
             request.user,
             year=target_date.year,

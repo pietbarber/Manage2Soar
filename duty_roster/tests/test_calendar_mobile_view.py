@@ -326,6 +326,55 @@ def test_agenda_shows_confirmed_reservation_aircraft_member_and_times(client):
 
 
 @pytest.mark.django_db
+def test_agenda_hides_edit_link_for_past_reservations(client):
+    day = date.today() - timedelta(days=1)
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        allow_glider_reservations=True,
+    )
+    viewer = Member.objects.create_user(
+        username="agenda_edit_owner",
+        email="agenda_edit_owner@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    glider = Glider.objects.create(
+        make="Schleicher",
+        model="ASK 21",
+        n_number="N324AG",
+        competition_number="AG4",
+        seats=2,
+        is_active=True,
+        club_owned=True,
+    )
+    DutyAssignment.objects.create(date=day)
+    reservation = GliderReservation.objects.create(
+        member=viewer,
+        glider=glider,
+        date=day,
+        reservation_type="solo",
+        time_preference="morning",
+    )
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": day.year, "month": day.month},
+        )
+        + "?view=agenda"
+    )
+
+    assert response.status_code == 200
+    assert reverse(
+        "duty_roster:reservation_edit", args=[reservation.pk]
+    ) not in response.content.decode("utf-8")
+
+
+@pytest.mark.django_db
 def test_agenda_quick_actions_open_modal_panel_urls(client):
     day = date.today() + timedelta(days=5)
 

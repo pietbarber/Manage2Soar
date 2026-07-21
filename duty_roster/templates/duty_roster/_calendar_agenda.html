@@ -227,7 +227,7 @@
                                         </div>
                                       </details>
                                     {% endif %}
-                                    {% if reservation.member_id == user.id %}
+                                    {% if reservation.member_id == user.id and day >= today %}
                                       <a href="{% url 'duty_roster:reservation_edit' reservation.id %}"
                                          class="btn btn-sm btn-outline-primary mt-2">
                                         <i class="fas fa-pen me-1" aria-hidden="true"></i>Edit

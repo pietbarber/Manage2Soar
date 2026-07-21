@@ -1132,6 +1132,32 @@ class TestGliderReservationViews:
         assert response.status_code == 200
         assert "Reserve a Glider" in response.content.decode("utf-8")
 
+    def test_day_reservations_hides_edit_link_for_past_reservations(
+        self, client, site_config, member, glider
+    ):
+        """Past-day reservations should not render edit links in the day partial."""
+        past_day = timezone.now().date() - timedelta(days=1)
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=past_day,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:day_reservations",
+                args=[past_day.year, past_day.month, past_day.day],
+            )
+        )
+
+        assert response.status_code == 200
+        assert reverse(
+            "duty_roster:reservation_edit", args=[reservation.pk]
+        ) not in response.content.decode("utf-8")
+
     def test_calendar_day_modal_uses_period_aware_remaining_label_and_value(
         self, client, site_config, member, glider
     ):
@@ -1164,6 +1190,33 @@ class TestGliderReservationViews:
         assert response.status_code == 200
         content = response.content.decode("utf-8")
         assert "Reservations remaining this quarter: <strong>1</strong>" in content
+
+    def test_calendar_day_modal_hides_edit_link_for_past_reservations(
+        self, client, site_config, member, glider
+    ):
+        """Past-day reservations should not render edit links in the day modal."""
+        past_day = timezone.now().date() - timedelta(days=1)
+        DutyAssignment.objects.create(date=past_day)
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=past_day,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        client.force_login(member)
+        response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                args=[past_day.year, past_day.month, past_day.day],
+            )
+        )
+
+        assert response.status_code == 200
+        assert reverse(
+            "duty_roster:reservation_edit", args=[reservation.pk]
+        ) not in response.content.decode("utf-8")
 
     def test_calendar_day_modal_uses_quarter_label_when_user_cannot_reserve(
         self, client, site_config, member
