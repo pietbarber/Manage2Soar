@@ -2,12 +2,14 @@
 {% load static %}
 {% load siteconfig_tags %}
 
-{% block title %}Reserve a Glider{% endblock %}
+{% block title %}{% if is_editing %}Edit Reservation{% else %}Reserve a Glider{% endif %}{% endblock %}
 
 {% block content %}
 <div class="container my-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="fas fa-plane me-2"></i>Reserve a Glider</h1>
+    <h1>
+      <i class="fas fa-plane me-2"></i>{% if is_editing %}Edit Reservation{% else %}Reserve a Glider{% endif %}
+    </h1>
     <a href="{% url 'duty_roster:reservation_list' %}" class="btn btn-outline-secondary">
       <i class="fas fa-arrow-left me-1"></i>Back to My Reservations
     </a>
@@ -19,7 +21,10 @@
     <div class="col-lg-8">
       <div class="card shadow-sm">
         <div class="card-header bg-primary text-white">
-          <h5 class="mb-0"><i class="fas fa-calendar-plus me-2"></i>New Reservation</h5>
+          <h5 class="mb-0">
+            <i class="fas {% if is_editing %}fa-pen{% else %}fa-calendar-plus{% endif %} me-2"></i>
+            {% if is_editing %}Update Reservation{% else %}New Reservation{% endif %}
+          </h5>
         </div>
         <div class="card-body">
           <form method="post" novalidate>
@@ -82,13 +87,18 @@
 
             <div class="mb-3">
               <label for="id_time_preference" class="form-label">Time Preference <span class="text-danger">*</span></label>
-              {{ form.time_preference }}
+              <div id="reservation-time-availability"
+                   data-url="{% url 'duty_roster:reservation_time_availability' %}"
+                   data-exclude-id="{% if is_editing %}{{ reservation.id }}{% endif %}">
+                {{ form.time_preference }}
+              </div>
               {% if form.time_preference.errors %}
                 <div class="invalid-feedback d-block">
                   {% for error in form.time_preference.errors %}{{ error }}{% endfor %}
                 </div>
               {% endif %}
               <div class="form-text">{{ form.time_preference.help_text }}</div>
+              <div id="time-availability-status" class="form-text" role="status" aria-live="polite"></div>
             </div>
 
             <div id="specific-time-fields" class="row mb-3 d-none">
@@ -125,11 +135,11 @@
             <hr>
 
             <div class="d-flex justify-content-between">
-              <a href="{% url 'duty_roster:reservation_list' %}" class="btn btn-outline-secondary">
+              <a href="{% if is_editing %}{% url 'duty_roster:reservation_detail' reservation.id %}{% else %}{% url 'duty_roster:reservation_list' %}{% endif %}" class="btn btn-outline-secondary">
                 <i class="fas fa-times me-1"></i>Cancel
               </a>
               <button type="submit" class="btn btn-primary">
-                <i class="fas fa-check me-1"></i>Confirm Reservation
+                <i class="fas fa-check me-1"></i>{% if is_editing %}Save Changes{% else %}Confirm Reservation{% endif %}
               </button>
             </div>
           </form>
@@ -198,9 +208,80 @@
   document.addEventListener('DOMContentLoaded', function() {
     const timePreference = document.getElementById('id_time_preference');
     const specificTimeFields = document.getElementById('specific-time-fields');
+    const dateField = document.getElementById('id_date');
+    const gliderField = document.getElementById('id_glider');
+    const availabilityContainer = document.getElementById('reservation-time-availability');
+    const availabilityStatus = document.getElementById('time-availability-status');
 
     if (!timePreference || !specificTimeFields) {
       return; // Exit gracefully if elements don't exist
+    }
+    const originalOptions = Array.from(timePreference.options).map((option) => ({
+      value: option.value,
+      label: option.textContent,
+    }));
+
+    function rebuildTimeOptions(choices) {
+      const selectedValue = timePreference.value;
+      const availableValues = new Set(
+        choices.filter((choice) => choice.available).map((choice) => choice.value)
+      );
+      timePreference.replaceChildren();
+      originalOptions.forEach((optionData) => {
+        if (optionData.value && !availableValues.has(optionData.value)) {
+          return;
+        }
+        const option = document.createElement('option');
+        option.value = optionData.value;
+        option.textContent = optionData.label;
+        timePreference.appendChild(option);
+      });
+      if (availableValues.has(selectedValue)) {
+        timePreference.value = selectedValue;
+      } else {
+        timePreference.value = '';
+      }
+      toggleSpecificTimeFields();
+    }
+
+    function restoreTimeOptions() {
+      rebuildTimeOptions(
+        originalOptions
+          .filter((option) => option.value)
+          .map((option) => ({value: option.value, available: true}))
+      );
+    }
+
+    async function refreshTimeAvailability() {
+      if (!dateField || !gliderField || !availabilityContainer || !dateField.value || !gliderField.value) {
+        restoreTimeOptions();
+        if (availabilityStatus) availabilityStatus.textContent = 'Select a date and glider to see available periods.';
+        return;
+      }
+
+      const url = new URL(availabilityContainer.dataset.url, window.location.origin);
+      url.searchParams.set('date', dateField.value);
+      url.searchParams.set('glider', gliderField.value);
+      if (availabilityContainer.dataset.excludeId) {
+        url.searchParams.set('exclude', availabilityContainer.dataset.excludeId);
+      }
+      if (availabilityStatus) availabilityStatus.textContent = 'Checking availability…';
+
+      try {
+        const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        if (!response.ok) throw new Error('Availability request failed');
+        const data = await response.json();
+        rebuildTimeOptions(data.choices || []);
+        const availableCount = (data.choices || []).filter((choice) => choice.available).length;
+        if (availabilityStatus) {
+          availabilityStatus.textContent = availableCount
+            ? `${availableCount} time period${availableCount === 1 ? '' : 's'} available.`
+            : 'No time periods are available for this aircraft on this date.';
+        }
+      } catch (error) {
+        restoreTimeOptions();
+        if (availabilityStatus) availabilityStatus.textContent = 'Availability could not be loaded. Your selection will still be validated when saved.';
+      }
     }
     function toggleSpecificTimeFields() {
       if (timePreference.value === 'specific') {
@@ -215,7 +296,10 @@
     }
 
     timePreference.addEventListener('change', toggleSpecificTimeFields);
+    if (dateField) dateField.addEventListener('change', refreshTimeAvailability);
+    if (gliderField) gliderField.addEventListener('change', refreshTimeAvailability);
     toggleSpecificTimeFields(); // Run on page load
+    refreshTimeAvailability();
   });
 </script>
 {% endblock %}

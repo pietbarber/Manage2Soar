@@ -4,6 +4,7 @@ import logging
 from collections import defaultdict
 from datetime import date
 from datetime import date as dt_date
+from datetime import time as dt_time
 from datetime import timedelta
 
 from django.conf import settings
@@ -944,6 +945,34 @@ def _build_agenda_quick_actions(
     return actions
 
 
+def _agenda_reservation_period(reservation):
+    """Return a display label and stable vertical sort key for an agenda slot."""
+    slot_order = {
+        "full_day": 0,
+        "morning": 1,
+        "midday": 2,
+        "afternoon": 3,
+        "specific": 4,
+    }
+    if reservation.time_preference == "specific" and reservation.start_time:
+        start_label = reservation.start_time.strftime("%I:%M %p").lstrip("0")
+        label = start_label
+        if reservation.end_time:
+            end_label = reservation.end_time.strftime("%I:%M %p").lstrip("0")
+            label = f"{start_label}–{end_label}"
+        return label, (
+            slot_order["specific"],
+            reservation.start_time,
+            reservation.end_time or dt_time.max,
+        )
+
+    return reservation.get_time_preference_display(), (
+        slot_order.get(reservation.time_preference, 5),
+        dt_time.min,
+        dt_time.min,
+    )
+
+
 def duty_calendar_view(request, year=None, month=None):
     today = date.today()
     year = int(year) if year else today.year
@@ -1120,6 +1149,45 @@ def duty_calendar_view(request, year=None, month=None):
             open_swap_keys=open_swap_keys,
         )
 
+    # Keep reservation details private to active members, matching the access
+    # rule used by the calendar day-detail modal.  Grouping once here avoids a
+    # query per agenda card while still giving the template a simple lookup.
+    can_view_agenda_reservations = bool(
+        request.user.is_authenticated
+        and request.user.is_active
+        and request.user.membership_status in active_statuses
+    )
+    agenda_reservation_groups = defaultdict(dict)
+    if can_view_agenda_reservations:
+        agenda_reservations = (
+            GliderReservation.objects.filter(
+                date__in=visible_dates,
+                status="confirmed",
+            )
+            .select_related("member", "glider")
+            .order_by(
+                "date",
+                "time_preference",
+                "start_time",
+                "glider__competition_number",
+            )
+        )
+        for reservation in agenda_reservations:
+            period_label, period_sort_key = _agenda_reservation_period(reservation)
+            period = agenda_reservation_groups[reservation.date].setdefault(
+                period_sort_key,
+                {"label": period_label, "reservations": []},
+            )
+            period["reservations"].append(reservation)
+
+    agenda_reservation_schedule_by_date = {}
+    for reservation_date, periods_by_key in agenda_reservation_groups.items():
+        periods = [periods_by_key[key] for key in sorted(periods_by_key)]
+        agenda_reservation_schedule_by_date[reservation_date] = {
+            "count": sum(len(period["reservations"]) for period in periods),
+            "periods": periods,
+        }
+
     prev_year, prev_month, next_year, next_month = get_adjacent_months(year, month)
 
     # Then safely run these:
@@ -1186,6 +1254,8 @@ def duty_calendar_view(request, year=None, month=None):
         "next_month": next_month,
         "today": today,
         "agenda_quick_actions_by_date": agenda_quick_actions_by_date,
+        "agenda_reservation_schedule_by_date": agenda_reservation_schedule_by_date,
+        "can_view_agenda_reservations": can_view_agenda_reservations,
         "surge_needed_by_date": surge_needed_by_date,
         "tow_surge_threshold": tow_surge_threshold,
         "instruction_surge_threshold": instruction_surge_threshold,
