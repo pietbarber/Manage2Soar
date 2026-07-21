@@ -20,7 +20,7 @@ cyclonedx-python-lib==9.1.0
 defusedxml==0.7.1
 diff-match-patch==20241021
 distlib==0.4.0
-Django==5.2.14
+Django==5.2.15
 django-crispy-forms==2.4
 django-extensions==4.1
 django-htmx==1.23.2
@@ -68,7 +68,7 @@ ortools==9.15.6755
 packageurl-python==0.17.5
 packaging==25.0
 pathspec==1.0.4
-pillow==12.2.0
+pillow==12.3.0
 pip-api==0.0.34
 pip-requirements-parser==32.0.1
 pip_audit==2.9.0
