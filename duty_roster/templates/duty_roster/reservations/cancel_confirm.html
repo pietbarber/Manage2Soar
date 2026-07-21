@@ -57,14 +57,14 @@
             <div class="d-flex flex-wrap justify-content-between gap-2">
               <div class="d-flex flex-wrap gap-2">
                 <a href="{% url 'duty_roster:reservation_detail' reservation.id %}" class="btn btn-outline-secondary">
-                  <i class="fas fa-arrow-left me-1"></i>Keep Reservation
+                  <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Keep Reservation
                 </a>
                 <a href="{% url 'duty_roster:reservation_edit' reservation.id %}" class="btn btn-outline-primary">
-                  <i class="fas fa-pen me-1"></i>Edit Instead
+                  <i class="fas fa-pen me-1" aria-hidden="true"></i>Edit Instead
                 </a>
               </div>
               <button type="submit" class="btn btn-danger">
-                <i class="fas fa-times me-1"></i>Yes, Cancel Reservation
+                <i class="fas fa-times me-1" aria-hidden="true"></i>Yes, Cancel Reservation
               </button>
             </div>
           </form>
