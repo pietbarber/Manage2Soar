@@ -17,12 +17,24 @@
       nginx_ssl_enabled: false because the public proxy owns HTTPS/certs.
   when: nginx_public_proxy_mode | bool
 
-- name: Install NGINX
+- name: Install NGINX (public proxy mode)
   ansible.builtin.apt:
-    name: "{{ ['nginx'] + ([] if (nginx_public_proxy_mode | bool) else ['certbot', 'python3-certbot-nginx']) }}"
+    name: nginx
     state: present
     update_cache: true
   become: true
+  when: nginx_public_proxy_mode | bool
+
+- name: Install NGINX with Certbot dependencies
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: true
+  become: true
+  when: not (nginx_public_proxy_mode | bool)
 
 - name: Ensure NGINX is started and enabled
   ansible.builtin.systemd:

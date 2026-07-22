@@ -128,7 +128,10 @@
           Server: {{ inventory_hostname }}
           Domain: {{ m2s_domain }}
           Mode: {{ 'Public proxy backend' if (nginx_public_proxy_mode | default(false) | bool) else 'Standalone' }}
-          URL: {{ nginx_external_scheme | default('https') if (nginx_public_proxy_mode | default(false) | bool) else ('https' if (nginx_ssl_enabled | default(false) | bool) else 'http') }}://{{ m2s_domain }}/
+          {% set _public_proxy_mode = nginx_public_proxy_mode | default(false) | bool %}
+          {% set _url_scheme = nginx_external_scheme | default('https') if _public_proxy_mode else ('https' if (nginx_ssl_enabled | default(false) | bool) else 'http') %}
+          {% set _url_port = (nginx_external_port | default(443 if _url_scheme == 'https' else 80) | int) if _public_proxy_mode else ((nginx_https_port | default(443) | int) if (nginx_ssl_enabled | default(false) | bool) else (nginx_http_port | default(80) | int)) %}
+          URL: {{ _url_scheme }}://{{ m2s_domain }}{% if (_url_scheme == 'https' and _url_port != 443) or (_url_scheme == 'http' and _url_port != 80) %}:{{ _url_port }}{% endif %}/
           {% if nginx_public_proxy_mode | default(false) | bool %}
           Internal NGINX backend: http://{{ nginx_proxy_listen_address | default('127.0.0.1') }}:{{ nginx_proxy_http_port | default(8080) }}
           Public URL and TLS certificates are owned by the same-host public proxy.
