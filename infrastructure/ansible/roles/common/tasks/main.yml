@@ -190,7 +190,7 @@
 - name: Remove legacy open HTTP rule
   community.general.ufw:
     rule: allow
-    port: "{{ nginx_http_port | default(80) | string }}"
+    port: "80"
     proto: tcp
     delete: true
   when:
@@ -200,7 +200,7 @@
 - name: Deny HTTP
   community.general.ufw:
     rule: deny
-    port: "{{ nginx_http_port | default(80) | string }}"
+    port: "80"
     proto: tcp
   when:
     - not (nginx_public_proxy_mode | default(false) | bool)
@@ -209,7 +209,7 @@
 - name: Remove HTTP deny rule when Let's Encrypt is enabled
   community.general.ufw:
     rule: deny
-    port: "{{ nginx_http_port | default(80) | string }}"
+    port: "80"
     proto: tcp
     delete: true
   when:
@@ -219,7 +219,7 @@
 - name: Allow HTTP for Let's Encrypt HTTP-01 challenge
   community.general.ufw:
     rule: allow
-    port: "{{ nginx_http_port | default(80) | string }}"
+    port: "80"
     proto: tcp
   when:
     - not (nginx_public_proxy_mode | default(false) | bool)
