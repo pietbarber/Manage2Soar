@@ -6,6 +6,7 @@ Part of Issue #315: PWA Fully-offline Logsheet data entry
 
 import json
 from datetime import date
+from unittest.mock import patch
 
 import pytest
 from django.test import Client
@@ -442,6 +443,44 @@ class TestFlightsSyncEndpoint:
 
         # Verify both flights created
         assert Flight.objects.filter(logsheet=logsheet).count() == 2
+
+    def test_unexpected_sync_exception_does_not_leak_internal_details(
+        self, db, authenticated_client, logsheet, active_member, glider, airfield
+    ):
+        """Unexpected sync exceptions should return a generic per-flight error message."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "test-key-exception-no-leak",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": active_member.id,
+                        "glider_id": glider.id,
+                        "airfield_id": airfield.id,
+                        "flight_type": "solo",
+                    },
+                }
+            ]
+        }
+
+        with patch(
+            "logsheet.api._create_flight_from_offline",
+            side_effect=RuntimeError("SECRET_STACK_TRACE_DETAIL"),
+        ):
+            response = authenticated_client.post(
+                url, data=json.dumps(payload), content_type="application/json"
+            )
+
+        data = response.json()
+        assert data["success"] is True
+        assert data["results"][0]["status"] == "error"
+        assert (
+            data["results"][0]["error"]
+            == "An internal error occurred while processing this flight."
+        )
+        assert "SECRET_STACK_TRACE_DETAIL" not in response.content.decode("utf-8")
 
 
 class TestSyncStatusEndpoint:
