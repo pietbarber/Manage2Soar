@@ -18,13 +18,20 @@
         msg: |
           Testing NGINX role on {{ inventory_hostname }}
           Domain: {{ m2s_domain }}
+          Public Proxy Mode: {{ nginx_public_proxy_mode | default(false) }}
           SSL Enabled: {{ nginx_ssl_enabled }}
+          Backend URL: http://{{ nginx_proxy_listen_address | default('127.0.0.1') }}:{{ nginx_proxy_http_port | default(8080) }}
           Static Root: {{ nginx_static_root }}
 
   roles:
     - role: nginx
 
   post_tasks:
+    - name: Set expected NGINX test endpoint
+      ansible.builtin.set_fact:
+        nginx_test_http_host: "{{ nginx_proxy_listen_address | default('127.0.0.1') if (nginx_public_proxy_mode | default(false) | bool) else 'localhost' }}"
+        nginx_test_http_port: "{{ nginx_proxy_http_port | default(8080) if (nginx_public_proxy_mode | default(false) | bool) else nginx_http_port | default(80) }}"
+
     - name: Verify NGINX is running
       ansible.builtin.systemd:
         name: nginx
@@ -37,16 +44,17 @@
       register: nginx_test
       changed_when: false
 
-    - name: Check if NGINX is listening on port 80
+    - name: Check if NGINX is listening on expected HTTP port
       ansible.builtin.wait_for:
-        port: 80
+        host: "{{ nginx_test_http_host }}"
+        port: "{{ nginx_test_http_port }}"
         timeout: 5
-      register: port_80_check
+      register: http_port_check
       ignore_errors: true
 
     - name: Test HTTP response
       ansible.builtin.uri:
-        url: "http://localhost/"
+        url: "http://{{ nginx_test_http_host }}{% if (nginx_test_http_port | int) != 80 %}:{{ nginx_test_http_port }}{% endif %}/"
         status_code: [200, 301, 302, 502]
         validate_certs: false
       register: http_response
@@ -60,9 +68,14 @@
           ========================================
           Service Status: {{ 'Running' if nginx_status.status.ActiveState == 'active' else 'Not Running' }}
           Config Test: {{ 'Passed' if nginx_test.rc == 0 else 'Failed' }}
-          Port 80: {{ 'Listening' if port_80_check is success else 'Not Listening' }}
+          Mode: {{ 'Public proxy backend' if (nginx_public_proxy_mode | default(false) | bool) else 'Standalone' }}
+          HTTP Port {{ nginx_test_http_port }}: {{ 'Listening' if http_port_check is success else 'Not Listening' }}
           HTTP Response: {{ http_response.status | default('N/A') }}
 
+          {% if nginx_public_proxy_mode | default(false) | bool %}
+          Public proxy should forward to: http://{{ nginx_proxy_listen_address | default('127.0.0.1') }}:{{ nginx_proxy_http_port | default(8080) }}
+          Public URL/certs are owned by the public proxy.
+          {% endif %}
           Static files: {{ nginx_static_root }}
           Media files: {{ nginx_media_root }}
           Upstream: {{ nginx_upstream_server }}

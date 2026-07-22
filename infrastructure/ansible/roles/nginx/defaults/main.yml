@@ -9,6 +9,20 @@ nginx_ssl_enabled: true
 nginx_ssl_certificate: "/etc/letsencrypt/live/{{ nginx_server_name }}/fullchain.pem"
 nginx_ssl_certificate_key: "/etc/letsencrypt/live/{{ nginx_server_name }}/privkey.pem"
 
+# Listener ports. Override these in group_vars/host_vars for non-standard ports.
+nginx_http_port: 80
+nginx_https_port: 443
+
+# Public proxy mode
+# Enable when another same-host proxy owns public 80/443 and TLS certificates.
+# M2S nginx will listen on a localhost-only HTTP backend for that proxy.
+nginx_public_proxy_mode: false
+nginx_proxy_listen_address: "127.0.0.1"
+nginx_proxy_http_port: 8080
+nginx_external_scheme: "https"
+nginx_external_port: 443
+nginx_public_proxy_real_ip_from: "127.0.0.1"
+
 # Let's Encrypt
 letsencrypt_email: "admin@{{ nginx_server_name }}"
 

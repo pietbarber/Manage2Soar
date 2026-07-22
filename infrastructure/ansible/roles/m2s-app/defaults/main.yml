@@ -9,7 +9,7 @@ m2s_app_home: "/opt/m2s"
 m2s_app_name: "manage2soar"
 
 # Repository settings
-m2s_git_repo: "https://github.com/pietbarber/Manage2Soar.git"
+m2s_git_repo: "https://github.com/invrtd/Manage2Soar.git"
 m2s_git_branch: "main"
 m2s_git_force_update: false
 

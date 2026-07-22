@@ -6,8 +6,8 @@ upstream {{ nginx_upstream_name }} {
 }
 
 server {
-    listen 80;
-    listen [::]:80;
+    listen {{ nginx_http_port }};
+    listen [::]:{{ nginx_http_port }};
     server_name {{ nginx_server_name }};
 
 {% if nginx_security_headers_enabled %}
@@ -54,20 +54,20 @@ server {
     # Rate-limited endpoints
     location /accounts/login/ {
         limit_req zone={{ nginx_rate_limit_zone }} burst={{ nginx_rate_limit_burst }} nodelay;
-        include /etc/nginx/proxy_params;
+        include /etc/nginx/snippets/m2s-proxy-headers.conf;
         proxy_pass http://{{ nginx_upstream_name }};
     }
 
     location /api/ {
         limit_req zone={{ nginx_rate_limit_zone }} burst={{ nginx_rate_limit_burst }} nodelay;
-        include /etc/nginx/proxy_params;
+        include /etc/nginx/snippets/m2s-proxy-headers.conf;
         proxy_pass http://{{ nginx_upstream_name }};
     }
 {% endif %}
 
     # Django application
     location / {
-        include /etc/nginx/proxy_params;
+        include /etc/nginx/snippets/m2s-proxy-headers.conf;
         proxy_pass http://{{ nginx_upstream_name }};
 
         # WebSocket support (if needed)

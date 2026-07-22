@@ -87,6 +87,8 @@ m2s_venv_path: "{{ m2s_app_home }}/venv"
 m2s_django_settings_module: "manage2soar.settings_single_host"
 m2s_django_debug: false  # MUST be false in production!
 m2s_django_allowed_hosts: "{{ m2s_domain }},localhost,127.0.0.1"
+m2s_site_url: "{{ nginx_external_scheme | default('https') if (nginx_public_proxy_mode | default(false) | bool) else ('https' if (nginx_ssl_enabled | default(false) | bool) else 'http') }}://{{ m2s_domain }}"
+m2s_csrf_trusted_origins: "{{ m2s_site_url }}"
 m2s_django_static_root: "/var/www/m2s/static"
 m2s_django_media_root: "/var/www/m2s/media"
 
@@ -118,6 +120,27 @@ m2s_db_user: "{{ postgresql_user }}"
 # SSL configuration
 nginx_ssl_enabled: true  # Enable for production
 letsencrypt_email: "admin@your-club.com"
+
+# Standard ports are used by default. Override only if you intentionally need
+# non-standard listener ports, for example nginx_http_port: 8080.
+nginx_http_port: 80
+nginx_https_port: 443
+
+# Public proxy mode
+# Enable only when another same-host public proxy owns public 80/443 and TLS
+# certificates, then forwards Manage2Soar traffic to this local nginx backend.
+nginx_public_proxy_mode: false
+nginx_proxy_listen_address: "127.0.0.1"
+nginx_proxy_http_port: 8080
+nginx_external_scheme: "https"
+nginx_external_port: 443
+nginx_public_proxy_real_ip_from: "127.0.0.1"
+
+# If nginx_public_proxy_mode is true, also set:
+# nginx_ssl_enabled: false
+# letsencrypt_email: ""
+# Configure your public proxy to forward to:
+#   http://127.0.0.1:8080
 
 nginx_http2_enabled: true
 nginx_rate_limit_enabled: true

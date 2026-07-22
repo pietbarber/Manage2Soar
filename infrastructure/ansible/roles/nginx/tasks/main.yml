@@ -1,11 +1,25 @@
 # NGINX Role - Main Tasks
 ---
+- name: Validate public proxy mode configuration
+  ansible.builtin.assert:
+    that:
+      - nginx_proxy_listen_address in ["127.0.0.1", "localhost"]
+      - (nginx_proxy_http_port | int) > 0
+      - (nginx_proxy_http_port | int) < 65536
+      - nginx_external_scheme in ["http", "https"]
+      - (nginx_external_port | int) > 0
+      - (nginx_external_port | int) < 65536
+      - nginx_public_proxy_real_ip_from in ["127.0.0.1", "localhost"]
+      - not (nginx_ssl_enabled | bool)
+    fail_msg: >-
+      nginx_public_proxy_mode is same-host only. Set nginx_proxy_listen_address
+      to 127.0.0.1 or localhost, set a valid nginx_proxy_http_port, and set
+      nginx_ssl_enabled: false because the public proxy owns HTTPS/certs.
+  when: nginx_public_proxy_mode | bool
+
 - name: Install NGINX
   ansible.builtin.apt:
-    name:
-      - nginx
-      - certbot
-      - python3-certbot-nginx
+    name: "{{ ['nginx'] + ([] if (nginx_public_proxy_mode | bool) else ['certbot', 'python3-certbot-nginx']) }}"
     state: present
     update_cache: true
   become: true
@@ -53,12 +67,24 @@
     mode: "0644"
   become: true
   notify: Reload NGINX
-  when: nginx_ssl_enabled | bool
+  when:
+    - nginx_ssl_enabled | bool
+    - not (nginx_public_proxy_mode | bool)
 
 - name: Deploy security headers snippet
   ansible.builtin.template:
     src: security-headers.conf.j2
     dest: /etc/nginx/snippets/security-headers.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Reload NGINX
+
+- name: Deploy M2S proxy headers snippet
+  ansible.builtin.template:
+    src: m2s-proxy-headers.conf.j2
+    dest: /etc/nginx/snippets/m2s-proxy-headers.conf
     owner: root
     group: root
     mode: "0644"
@@ -87,7 +113,20 @@
     path: "{{ nginx_ssl_certificate }}"
   register: ssl_cert_exists
   become: true
-  when: nginx_ssl_enabled | bool
+  when:
+    - nginx_ssl_enabled | bool
+    - not (nginx_public_proxy_mode | bool)
+
+- name: Deploy M2S site configuration (public proxy backend)
+  ansible.builtin.template:
+    src: m2s-public-proxy.conf.j2
+    dest: /etc/nginx/sites-available/m2s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: nginx_public_proxy_mode | bool
+  notify: Reload NGINX
 
 - name: Deploy M2S site configuration (HTTP only for initial setup)
   ansible.builtin.template:
@@ -97,7 +136,10 @@
     group: root
     mode: "0644"
   become: true
-  when: (nginx_ssl_enabled | bool) and not (ssl_cert_exists.stat.exists | default(false))
+  when:
+    - not (nginx_public_proxy_mode | bool)
+    - nginx_ssl_enabled | bool
+    - not (ssl_cert_exists.stat.exists | default(false))
   notify: Reload NGINX
 
 - name: Deploy M2S site configuration (with SSL)
@@ -108,7 +150,10 @@
     group: root
     mode: "0644"
   become: true
-  when: (nginx_ssl_enabled | bool) and (ssl_cert_exists.stat.exists | default(false))
+  when:
+    - not (nginx_public_proxy_mode | bool)
+    - nginx_ssl_enabled | bool
+    - ssl_cert_exists.stat.exists | default(false)
   notify: Reload NGINX
 
 - name: Deploy M2S site configuration (no SSL)
@@ -119,7 +164,9 @@
     group: root
     mode: "0644"
   become: true
-  when: not (nginx_ssl_enabled | bool)
+  when:
+    - not (nginx_public_proxy_mode | bool)
+    - not (nginx_ssl_enabled | bool)
   notify: Reload NGINX
 
 - name: Enable M2S site
@@ -135,6 +182,17 @@
   become: true
   changed_when: false
 
+- name: Remove local certbot renewal in public proxy mode
+  ansible.builtin.cron:
+    name: "Certbot renewal"
+    state: absent
+    user: root
+  become: true
+  when: nginx_public_proxy_mode | bool
+
 - name: Include SSL certificate tasks
   ansible.builtin.include_tasks: ssl.yml
-  when: (nginx_ssl_enabled | bool) and not (ssl_cert_exists.stat.exists | default(true))
+  when:
+    - not (nginx_public_proxy_mode | bool)
+    - nginx_ssl_enabled | bool
+    - not (ssl_cert_exists.stat.exists | default(true))

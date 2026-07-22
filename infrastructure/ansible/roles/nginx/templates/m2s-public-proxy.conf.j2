@@ -1,47 +1,28 @@
-# M2S NGINX Configuration - With SSL
+# M2S NGINX Configuration - Public Proxy Backend
 # Managed by Ansible - do not edit manually
+#
+# This mode is for same-host deployments where another public proxy owns
+# ports 80/443 and TLS certificates, then forwards to this local HTTP backend.
 
 upstream {{ nginx_upstream_name }} {
     server {{ nginx_upstream_server }};
 }
 
-# Redirect HTTP to HTTPS
 server {
-    listen {{ nginx_http_port }};
-    listen [::]:{{ nginx_http_port }};
+    listen {{ nginx_proxy_listen_address }}:{{ nginx_proxy_http_port }};
     server_name {{ nginx_server_name }};
 
-    # For Let's Encrypt certificate renewal
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-
-    location / {
-        return 301 https://$host{% if (nginx_https_port | int) != 443 %}:{{ nginx_https_port }}{% endif %}$request_uri;
-    }
-}
-
-# HTTPS server
-server {
-{% if nginx_http2_enabled %}
-    listen {{ nginx_https_port }} ssl http2;
-    listen [::]:{{ nginx_https_port }} ssl http2;
-{% else %}
-    listen {{ nginx_https_port }} ssl;
-    listen [::]:{{ nginx_https_port }} ssl;
-{% endif %}
-    server_name {{ nginx_server_name }};
-
-    # SSL certificates
-    ssl_certificate {{ nginx_ssl_certificate }};
-    ssl_certificate_key {{ nginx_ssl_certificate_key }};
-
-    # SSL parameters
-    include /etc/nginx/snippets/ssl-params.conf;
+    # Trust only the same-host public proxy for original client IPs.
+    set_real_ip_from {{ nginx_public_proxy_real_ip_from }};
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
 
 {% if nginx_security_headers_enabled %}
-    # Security headers
-    include /etc/nginx/snippets/security-headers.conf;
+    # Security headers (HSTS belongs on the public TLS proxy)
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 {% endif %}
 
     # Logging
@@ -53,9 +34,6 @@ server {
         alias {{ nginx_static_root }}/;
         expires {{ nginx_static_cache_time }};
         add_header Cache-Control "public, immutable";
-
-        # Gzip static files
-        gzip_static on;
     }
 
     # Media files (user uploads)
