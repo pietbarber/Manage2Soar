@@ -17,7 +17,7 @@ server {
     }
 
     location / {
-        return 301 https://$host{% if (nginx_https_port | int) != 443 %}:{{ nginx_https_port }}{% endif %}$request_uri;
+        return 301 https://{{ nginx_server_name }}{% if (nginx_https_port | int) != 443 %}:{{ nginx_https_port }}{% endif %}$request_uri;
     }
 }
 
