@@ -3,18 +3,34 @@
 - name: Validate public proxy mode configuration
   ansible.builtin.assert:
     that:
-      - nginx_proxy_listen_address == "127.0.0.1"
+      - >-
+        nginx_proxy_listen_address in ["127.0.0.1", "localhost"] or
+        (
+          (nginx_public_proxy_allow_private_bind | default(false) | bool) and
+          (
+            nginx_proxy_listen_address == "0.0.0.0" or
+            ((nginx_proxy_listen_address | regex_search('^(10\\.([0-9]{1,3}\\.){2}[0-9]{1,3}|172\\.(1[6-9]|2[0-9]|3[0-1])\\.[0-9]{1,3}\\.[0-9]{1,3}|192\\.168\\.[0-9]{1,3}\\.[0-9]{1,3})$')) is not none)
+          )
+        )
       - (nginx_proxy_http_port | int) > 0
       - (nginx_proxy_http_port | int) < 65536
       - nginx_external_scheme in ["http", "https"]
       - (nginx_external_port | int) > 0
       - (nginx_external_port | int) < 65536
-      - nginx_public_proxy_real_ip_from == "127.0.0.1"
+      - >-
+        nginx_public_proxy_real_ip_from in ["127.0.0.1", "localhost"] or
+        (
+          (nginx_public_proxy_allow_private_bind | default(false) | bool) and
+          ((nginx_public_proxy_real_ip_from | regex_search('^(10\\.([0-9]{1,3}\\.){2}[0-9]{1,3}|172\\.(1[6-9]|2[0-9]|3[0-1])\\.[0-9]{1,3}\\.[0-9]{1,3}|192\\.168\\.[0-9]{1,3}\\.[0-9]{1,3})(/[0-9]{1,2})?$')) is not none)
+        )
       - not (nginx_ssl_enabled | bool)
     fail_msg: >-
-      nginx_public_proxy_mode is same-host only. Set nginx_proxy_listen_address
-      to 127.0.0.1, set nginx_public_proxy_real_ip_from to 127.0.0.1, set a valid nginx_proxy_http_port, and set
-      nginx_ssl_enabled: false because the public proxy owns HTTPS/certs.
+      nginx_public_proxy_mode defaults to same-host only. Use
+      nginx_proxy_listen_address: 127.0.0.1 and nginx_public_proxy_real_ip_from:
+      127.0.0.1, or explicitly set nginx_public_proxy_allow_private_bind: true
+      when a public proxy reaches M2S over a private/container network. Also set
+      a valid nginx_proxy_http_port and nginx_ssl_enabled: false because the
+      public proxy owns HTTPS/certs.
   when: nginx_public_proxy_mode | bool
 
 - name: Validate Let's Encrypt HTTP-01 compatibility
