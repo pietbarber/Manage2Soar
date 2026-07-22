@@ -80,7 +80,7 @@ proto-plus==1.26.1
 protobuf>=3.19.5,<7.0.0,!=3.20.0,!=3.20.1,!=4.21.0,!=4.21.1,!=4.21.2,!=4.21.3,!=4.21.4,!=4.21.5,!=5.29.0,!=6.33.0,!=6.33.1,!=6.33.2,!=6.33.3,!=6.33.4
 psycopg2-binary==2.9.10
 py-serializable==2.1.0
-pyasn1==0.6.3
+pyasn1==0.6.4
 pyasn1_modules==0.4.2
 pycodestyle==2.14.0
 pycparser==2.22
@@ -115,7 +115,7 @@ ruamel.yaml.clib==0.2.14
 ruff==0.14.1
 safety==3.7.0
 safety-schemas==0.0.16
-setuptools==80.9.0
+setuptools==83.0.0
 shellingham==1.5.4
 six==1.17.0
 sniffio==1.3.1
