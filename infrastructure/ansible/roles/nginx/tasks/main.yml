@@ -3,17 +3,17 @@
 - name: Validate public proxy mode configuration
   ansible.builtin.assert:
     that:
-      - nginx_proxy_listen_address in ["127.0.0.1", "localhost"]
+      - nginx_proxy_listen_address == "127.0.0.1"
       - (nginx_proxy_http_port | int) > 0
       - (nginx_proxy_http_port | int) < 65536
       - nginx_external_scheme in ["http", "https"]
       - (nginx_external_port | int) > 0
       - (nginx_external_port | int) < 65536
-      - nginx_public_proxy_real_ip_from in ["127.0.0.1", "localhost"]
+      - nginx_public_proxy_real_ip_from == "127.0.0.1"
       - not (nginx_ssl_enabled | bool)
     fail_msg: >-
       nginx_public_proxy_mode is same-host only. Set nginx_proxy_listen_address
-      to 127.0.0.1 or localhost, set a valid nginx_proxy_http_port, and set
+      to 127.0.0.1, set nginx_public_proxy_real_ip_from to 127.0.0.1, set a valid nginx_proxy_http_port, and set
       nginx_ssl_enabled: false because the public proxy owns HTTPS/certs.
   when: nginx_public_proxy_mode | bool
 

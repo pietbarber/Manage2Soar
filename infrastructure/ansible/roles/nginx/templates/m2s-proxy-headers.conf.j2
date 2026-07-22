@@ -3,7 +3,11 @@
 
 proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;
+{% if nginx_public_proxy_mode | bool %}
+proxy_set_header X-Forwarded-For $remote_addr;
+{% else %}
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+{% endif %}
 proxy_set_header X-Forwarded-Host $host;
 {% if nginx_public_proxy_mode | bool %}
 proxy_set_header X-Forwarded-Proto {{ nginx_external_scheme }};
