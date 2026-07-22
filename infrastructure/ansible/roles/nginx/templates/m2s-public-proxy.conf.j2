@@ -1,17 +1,24 @@
-# M2S NGINX Configuration - No SSL (for development/testing)
+# M2S NGINX Configuration - Public Proxy Backend
 # Managed by Ansible - do not edit manually
+#
+# This mode is for same-host deployments where another public proxy owns
+# ports 80/443 and TLS certificates, then forwards to this local HTTP backend.
 
 upstream {{ nginx_upstream_name }} {
     server {{ nginx_upstream_server }};
 }
 
 server {
-    listen {{ nginx_http_port }};
-    listen [::]:{{ nginx_http_port }};
+    listen {{ nginx_proxy_listen_address }}:{{ nginx_proxy_http_port }};
     server_name {{ nginx_server_name }};
 
+    # Trust only the same-host public proxy for original client IPs.
+    set_real_ip_from {{ nginx_public_proxy_real_ip_from }};
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
 {% if nginx_security_headers_enabled %}
-    # Security headers (without HSTS for non-SSL)
+    # Security headers (HSTS belongs on the public TLS proxy)
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
