@@ -17,6 +17,20 @@
       nginx_ssl_enabled: false because the public proxy owns HTTPS/certs.
   when: nginx_public_proxy_mode | bool
 
+- name: Validate Let's Encrypt HTTP-01 compatibility
+  ansible.builtin.assert:
+    that:
+      - (nginx_http_port | int) == 80
+    fail_msg: >-
+      Let's Encrypt HTTP-01 with certbot --nginx requires nginx_http_port: 80.
+      Set nginx_http_port to 80, or disable automatic SSL issuance (for example,
+      use nginx_ssl_enabled: false/public proxy mode or provide certificates
+      outside this role).
+  when:
+    - not (nginx_public_proxy_mode | bool)
+    - nginx_ssl_enabled | bool
+    - letsencrypt_email | default('') | trim | length > 0
+
 - name: Install NGINX (public proxy mode)
   ansible.builtin.apt:
     name: nginx
