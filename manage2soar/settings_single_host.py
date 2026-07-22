@@ -15,13 +15,11 @@ import re
 from pathlib import Path
 
 from django.contrib.messages import constants as messages
-
-# Import all base settings first
-# We'll override the storage-related ones below
-
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
@@ -45,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "reversion",
     "django_htmx",
+    "django_extensions",
     "tinymce",
     "social_django",
     "members",
@@ -57,6 +56,7 @@ INSTALLED_APPS = [
     "siteconfig",
     "knowledgetest",
     "utils",
+    "widget_tweaks",
 ]
 
 MIDDLEWARE = [
@@ -205,6 +205,8 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() in ("true", "1", "ye
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@example.com")
+EMAIL_DEV_MODE = os.getenv("EMAIL_DEV_MODE", "false").lower() in ("true", "1", "yes")
+EMAIL_DEV_MODE_REDIRECT_TO = os.getenv("EMAIL_DEV_MODE_REDIRECT_TO", "")
 
 # Security settings for production
 # Only enable SSL-related settings if SSL is actually configured
@@ -212,6 +214,7 @@ SSL_ENABLED = os.getenv("SSL_ENABLED", "False").lower() in ("true", "1", "yes")
 
 if not DEBUG:
     if SSL_ENABLED:
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
         SECURE_SSL_REDIRECT = True
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
