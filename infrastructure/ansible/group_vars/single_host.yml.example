@@ -68,14 +68,9 @@ django_timezone: "America/New_York"
 # DEPLOYMENT SETTINGS
 # ============================================================
 
-# Deployment method: "git" or "upload"
-# - git: Clone from GitHub repository
-# - upload: Upload from local machine (for private forks)
-deploy_method: "git"
-
-# Git settings (if deploy_method is "git")
-git_repo: "https://github.com/pietbarber/Manage2Soar.git"
-git_branch: "main"
+# Git repository settings
+m2s_git_repo: "https://github.com/pietbarber/Manage2Soar.git"
+m2s_git_branch: "main"
 
 # Application paths
 m2s_app_dir: "/opt/m2s/app"
