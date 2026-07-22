@@ -190,7 +190,7 @@
 - name: Remove legacy open HTTP rule
   community.general.ufw:
     rule: allow
-    port: "80"
+    port: "{{ nginx_http_port | default(80) | string }}"
     proto: tcp
     delete: true
   when:
@@ -200,7 +200,7 @@
 - name: Deny HTTP
   community.general.ufw:
     rule: deny
-    port: "80"
+    port: "{{ nginx_http_port | default(80) | string }}"
     proto: tcp
   when:
     - not (nginx_public_proxy_mode | default(false) | bool)
@@ -209,7 +209,7 @@
 - name: Remove HTTP deny rule when Let's Encrypt is enabled
   community.general.ufw:
     rule: deny
-    port: "80"
+    port: "{{ nginx_http_port | default(80) | string }}"
     proto: tcp
     delete: true
   when:
@@ -219,7 +219,7 @@
 - name: Allow HTTP for Let's Encrypt HTTP-01 challenge
   community.general.ufw:
     rule: allow
-    port: "80"
+    port: "{{ nginx_http_port | default(80) | string }}"
     proto: tcp
   when:
     - not (nginx_public_proxy_mode | default(false) | bool)
@@ -250,6 +250,7 @@
 - name: Obtain Let's Encrypt certificate (if not exists)
   ansible.builtin.command: >
     certbot certonly --standalone --non-interactive --agree-tos
+    --http-01-port {{ nginx_http_port | default(80) }}
     --email {{ letsencrypt_email }}
     --domains {{ mail_hostname }}
   args:
