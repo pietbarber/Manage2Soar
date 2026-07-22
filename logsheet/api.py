@@ -297,7 +297,9 @@ def flights_sync(request):
             except Exception as e:
                 logger.exception(f"Error processing flight sync: {idempotency_key}")
                 result["status"] = "error"
-                result["error"] = str(e)
+                result["error"] = (
+                    "An internal error occurred while processing this flight."
+                )
 
             results.append(result)
 
