@@ -4,7 +4,7 @@
   ansible.builtin.assert:
     that:
       - >-
-        nginx_proxy_listen_address in ["127.0.0.1", "localhost"] or
+        nginx_proxy_listen_address in ["127.0.0.1"] or
         (
           (nginx_public_proxy_allow_private_bind | default(false) | bool) and
           (
