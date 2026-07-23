@@ -14,14 +14,18 @@ nginx_http_port: 80
 nginx_https_port: 443
 
 # Public proxy mode
-# Enable when another same-host proxy owns public 80/443 and TLS certificates.
-# M2S nginx will listen on a localhost-only HTTP backend for that proxy.
+# Enable when another proxy owns public 80/443 and TLS certificates.
+# M2S nginx listens on an HTTP backend for that proxy.
+# By default the backend is localhost-only. Set
+# nginx_public_proxy_allow_private_bind: true only when the public proxy reaches
+# M2S over a private/container network.
 nginx_public_proxy_mode: false
 nginx_proxy_listen_address: "127.0.0.1"
 nginx_proxy_http_port: 8080
 nginx_external_scheme: "https"
 nginx_external_port: 443
 nginx_public_proxy_real_ip_from: "127.0.0.1"
+nginx_public_proxy_allow_private_bind: false
 
 # Let's Encrypt
 letsencrypt_email: "admin@{{ nginx_server_name }}"

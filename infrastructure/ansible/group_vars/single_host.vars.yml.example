@@ -131,14 +131,18 @@ nginx_http_port: 80
 nginx_https_port: 443
 
 # Public proxy mode
-# Enable only when another same-host public proxy owns public 80/443 and TLS
-# certificates, then forwards Manage2Soar traffic to this local nginx backend.
+# Enable when another public proxy owns public 80/443 and TLS certificates,
+# then forwards Manage2Soar traffic to this local nginx backend.
 nginx_public_proxy_mode: false
 nginx_proxy_listen_address: "127.0.0.1"
 nginx_proxy_http_port: 8080
 nginx_external_scheme: "https"
 nginx_external_port: 443
 nginx_public_proxy_real_ip_from: "127.0.0.1"
+# Keep false for same-host localhost proxying. Set true only when the public
+# proxy reaches this backend over a private/container network, then bind to a
+# private IP or 0.0.0.0 and restrict access with firewall/container networking.
+nginx_public_proxy_allow_private_bind: false
 
 # If nginx_public_proxy_mode is true, also set:
 # nginx_ssl_enabled: false
