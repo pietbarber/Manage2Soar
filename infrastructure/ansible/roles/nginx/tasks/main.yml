@@ -18,7 +18,7 @@
       - (nginx_external_port | int) > 0
       - (nginx_external_port | int) < 65536
       - >-
-        nginx_public_proxy_real_ip_from in ["127.0.0.1", "localhost"] or
+        nginx_public_proxy_real_ip_from in ["127.0.0.1"] or
         (
           (nginx_public_proxy_allow_private_bind | default(false) | bool) and
           ((nginx_public_proxy_real_ip_from | regex_search('^(10\\.([0-9]{1,3}\\.){2}[0-9]{1,3}|172\\.(1[6-9]|2[0-9]|3[0-1])\\.[0-9]{1,3}\\.[0-9]{1,3}|192\\.168\\.[0-9]{1,3}\\.[0-9]{1,3})(/[0-9]{1,2})?$')) is not none)
