@@ -36,7 +36,19 @@
 
     - name: Set expected NGINX test endpoint
       ansible.builtin.set_fact:
-        nginx_test_http_host: "{{ nginx_proxy_listen_address | default('127.0.0.1') if (nginx_public_proxy_mode | default(false) | bool) else '127.0.0.1' }}"
+        nginx_test_http_host: >-
+          {{
+            '127.0.0.1'
+            if (
+              (nginx_public_proxy_mode | default(false) | bool) and
+              ((nginx_proxy_listen_address | default('127.0.0.1')) == '0.0.0.0')
+            )
+            else (
+              (nginx_proxy_listen_address | default('127.0.0.1'))
+              if (nginx_public_proxy_mode | default(false) | bool)
+              else '127.0.0.1'
+            )
+          }}
         nginx_test_http_port: "{{ nginx_proxy_http_port | default(8080) if (nginx_public_proxy_mode | default(false) | bool) else nginx_http_port | default(80) }}"
 
     - name: Test NGINX configuration
