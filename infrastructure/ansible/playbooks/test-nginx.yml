@@ -13,6 +13,19 @@
   become: true
 
   pre_tasks:
+    - name: Set public proxy debug endpoint details
+      ansible.builtin.set_fact:
+        nginx_debug_bind_host: "{{ nginx_proxy_listen_address | default('127.0.0.1') }}"
+        nginx_debug_connect_host: >-
+          {{
+            '127.0.0.1'
+            if (
+              (nginx_public_proxy_mode | default(false) | bool) and
+              ((nginx_proxy_listen_address | default('127.0.0.1')) == '0.0.0.0')
+            )
+            else (nginx_proxy_listen_address | default('127.0.0.1'))
+          }}
+
     - name: Display target info
       ansible.builtin.debug:
         msg: |
@@ -20,7 +33,8 @@
           Domain: {{ m2s_domain }}
           Public Proxy Mode: {{ nginx_public_proxy_mode | default(false) }}
           SSL Enabled: {{ nginx_ssl_enabled }}
-          Backend URL: http://{{ nginx_proxy_listen_address | default('127.0.0.1') }}:{{ nginx_proxy_http_port | default(8080) }}
+          Backend bind address: {{ nginx_debug_bind_host }}:{{ nginx_proxy_http_port | default(8080) }}
+          Backend connect URL: http://{{ nginx_debug_connect_host }}:{{ nginx_proxy_http_port | default(8080) }}
           Static Root: {{ nginx_static_root }}
 
   roles:
