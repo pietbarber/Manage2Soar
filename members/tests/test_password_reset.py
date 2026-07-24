@@ -101,6 +101,35 @@ def test_password_reset_uses_canonical_url(client):
 
 
 @pytest.mark.django_db
+@override_settings(SITE_URL="https://deployment.example.com")
+def test_password_reset_uses_deployment_site_url_when_canonical_url_is_blank(client):
+    """Reset links use deployment SITE_URL when no DB override is configured."""
+    from siteconfig.models import SiteConfiguration
+
+    config = SiteConfiguration.objects.first()
+    if config:
+        config.canonical_url = ""
+        config.domain_name = ""
+        config.save(update_fields=["canonical_url", "domain_name"])
+
+    Member.objects.create_user(
+        username="deploymentuser",
+        email="deploymentuser@example.com",
+        password="oldpassword",
+        membership_status="Full Member",
+    )
+
+    response = client.post(
+        reverse("password_reset"),
+        {"email": "deploymentuser@example.com"},
+    )
+
+    assert response.status_code == 302
+    assert len(mail.outbox) == 1
+    assert "https://deployment.example.com/reset/" in mail.outbox[0].body
+
+
+@pytest.mark.django_db
 @override_settings(
     EMAIL_DEV_MODE=True,
     EMAIL_DEV_MODE_REDIRECT_TO="dev1@example.com,dev2@example.com",
