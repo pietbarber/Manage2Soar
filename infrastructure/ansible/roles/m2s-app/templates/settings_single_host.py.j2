@@ -26,6 +26,14 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+# Public origin used for links in transactional emails.
+SITE_URL = os.getenv("SITE_URL", "")
+if not SITE_URL:
+    raise ValueError(
+        "SITE_URL environment variable must be set for single-host deployments. "
+        "Example: SITE_URL=https://manage2soar.yourclub.org"
+    )
+
 # Application definition
 INSTALLED_APPS = [
     "import_export",
