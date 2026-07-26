@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from billing.models import FlightChargeSnapshot, Ledger, LedgerEntry
+from billing.permissions import require_audit_text, require_manual_transaction_access
 
 MONEY_QUANTUM = Decimal("0.01")
 CHARGE_KINDS = {
@@ -298,6 +299,88 @@ def post_credit(
         description=description,
         internal_note=internal_note,
         source_key=source_key,
+    )
+
+
+def post_manual_charge(
+    *, member, actor, amount, effective_date, description, reason, source_key=None
+):
+    require_manual_transaction_access(actor)
+    description = require_audit_text(description, "member description")
+    reason = require_audit_text(reason, "reason")
+    return post_charge(
+        member=member,
+        actor=actor,
+        amount=amount,
+        effective_date=effective_date,
+        description=description,
+        source_key=source_key,
+        internal_note=reason,
+    )
+
+
+def post_manual_payment(
+    *, member, actor, amount, effective_date, description, reason, source_key=None
+):
+    require_manual_transaction_access(actor)
+    description = require_audit_text(description, "member description")
+    reason = require_audit_text(reason, "reason")
+    return post_credit(
+        member=member,
+        actor=actor,
+        amount=amount,
+        effective_date=effective_date,
+        description=description,
+        source_key=source_key,
+        internal_note=reason,
+    )
+
+
+def post_manual_credit(
+    *, member, actor, amount, effective_date, description, reason, source_key=None
+):
+    require_manual_transaction_access(actor)
+    description = require_audit_text(description, "member description")
+    reason = require_audit_text(reason, "reason")
+    return post_credit(
+        member=member,
+        actor=actor,
+        amount=amount,
+        effective_date=effective_date,
+        description=description,
+        kind=LedgerEntry.Kind.CREDIT,
+        source_key=source_key,
+        internal_note=reason,
+    )
+
+
+def post_opening_balance(
+    *, member, actor, amount, effect, effective_date, description, reason
+):
+    require_manual_transaction_access(actor)
+    description = require_audit_text(description, "member description")
+    reason = require_audit_text(reason, "reason")
+    if effect not in LedgerEntry.Effect.values:
+        raise ValidationError("Opening balance must specify a debit or credit effect.")
+    return post_entry(
+        member=member,
+        actor=actor,
+        kind=LedgerEntry.Kind.OPENING_BALANCE,
+        effect=effect,
+        amount=amount,
+        effective_date=effective_date,
+        description=description,
+        internal_note=reason,
+    )
+
+
+def reverse_manual_entry(*, entry, actor, effective_date, reason):
+    require_manual_transaction_access(actor)
+    return reverse_entry(
+        entry=entry,
+        actor=actor,
+        effective_date=effective_date,
+        reason=reason,
     )
 
 

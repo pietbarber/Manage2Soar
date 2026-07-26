@@ -1,0 +1,127 @@
+from datetime import date
+from decimal import Decimal
+
+import pytest
+from django.core.exceptions import ValidationError
+
+from billing.models import LedgerEntry
+from billing.services import (
+    get_balance,
+    post_manual_charge,
+    post_manual_credit,
+    post_manual_payment,
+    post_opening_balance,
+    reverse_manual_entry,
+)
+from members.models import Member
+
+
+@pytest.fixture
+def member(db):
+    return Member.objects.create_user(username="manual-member")
+
+
+@pytest.fixture
+def treasurer(db):
+    return Member.objects.create_user(username="manual-treasurer", treasurer=True)
+
+
+def test_manual_posting_requires_treasurer_or_superuser(member):
+    with pytest.raises(ValidationError, match="Only treasurers"):
+        post_manual_charge(
+            member=member,
+            actor=member,
+            amount="10",
+            effective_date=date.today(),
+            description="Manual charge",
+            reason="Correction",
+        )
+
+    assert not hasattr(member, "billing_ledger")
+
+
+def test_manual_entries_record_audit_fields_and_balance(member, treasurer):
+    charge = post_manual_charge(
+        member=member,
+        actor=treasurer,
+        amount="100",
+        effective_date=date.today(),
+        description="Club merchandise",
+        reason="Member purchase",
+    )
+    payment = post_manual_payment(
+        member=member,
+        actor=treasurer,
+        amount="60",
+        effective_date=date.today(),
+        description="Payment received",
+        reason="Cash receipt 42",
+    )
+    credit = post_manual_credit(
+        member=member,
+        actor=treasurer,
+        amount="10",
+        effective_date=date.today(),
+        description="Courtesy credit",
+        reason="Board-approved adjustment",
+    )
+
+    assert get_balance(member.billing_ledger) == Decimal("30.00")
+    assert charge.created_by_id == treasurer.pk
+    assert charge.member_description == "Club merchandise"
+    assert charge.internal_note == "Member purchase"
+    assert payment.kind == LedgerEntry.Kind.PAYMENT
+    assert credit.kind == LedgerEntry.Kind.CREDIT
+
+
+def test_opening_balance_supports_both_directions(member, treasurer):
+    debit = post_opening_balance(
+        member=member,
+        actor=treasurer,
+        amount="25",
+        effect=LedgerEntry.Effect.DEBIT,
+        effective_date=date.today(),
+        description="Opening receivable",
+        reason="Imported opening balance",
+    )
+    credit = post_opening_balance(
+        member=member,
+        actor=treasurer,
+        amount="5",
+        effect=LedgerEntry.Effect.CREDIT,
+        effective_date=date.today(),
+        description="Opening credit",
+        reason="Imported opening balance",
+    )
+
+    assert debit.kind == LedgerEntry.Kind.OPENING_BALANCE
+    assert credit.effect == LedgerEntry.Effect.CREDIT
+    assert get_balance(member.billing_ledger) == Decimal("20.00")
+
+
+def test_manual_reversal_requires_staff_and_preserves_reason(member, treasurer):
+    entry = post_manual_charge(
+        member=member,
+        actor=treasurer,
+        amount="25",
+        effective_date=date.today(),
+        description="Manual charge",
+        reason="Correction",
+    )
+    with pytest.raises(ValidationError, match="Only treasurers"):
+        reverse_manual_entry(
+            entry=entry,
+            actor=member,
+            effective_date=date.today(),
+            reason="Unauthorized reversal",
+        )
+
+    reversal = reverse_manual_entry(
+        entry=entry,
+        actor=treasurer,
+        effective_date=date.today(),
+        reason="Entry posted in error",
+    )
+    assert reversal.reverses_id == entry.pk
+    assert reversal.internal_note == "Entry posted in error"
+    assert get_balance(member.billing_ledger) == Decimal("0.00")
