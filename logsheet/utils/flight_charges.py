@@ -13,7 +13,14 @@ def effective_rental_cost(flight):
             return min(flight.rental_cost_actual, max_rate)
         return flight.rental_cost_actual
 
-    return flight.rental_cost
+    # Keep the calculated amount unrounded until allocation can distribute any
+    # fractional cent deterministically between members.
+    cost = flight.rental_cost_calculated
+    if cost is None:
+        return None
+    if flight.glider and flight.glider.max_rental_rate is not None:
+        cost = min(cost, Decimal(str(flight.glider.max_rental_rate)))
+    return cost
 
 
 def split_flight_costs(
@@ -32,20 +39,25 @@ def split_flight_costs(
     allocations = {}
     primary = pilot or partner
 
+    def split_even(value):
+        """Split cents deterministically, assigning any remainder to partner."""
+        first = quantize_currency(value / 2)
+        return quantize_currency(value - first), first
+
     if split_type:
         if pilot and partner and split_type == "even":
-            half_tow = tow / 2
-            half_rental = rental / 2
-            half_instruction = instruction / 2
+            pilot_tow, partner_tow = split_even(tow)
+            pilot_rental, partner_rental = split_even(rental)
+            pilot_instruction, partner_instruction = split_even(instruction)
             allocations[pilot] = {
-                "tow": half_tow,
-                "rental": half_rental,
-                "instruction": half_instruction,
+                "tow": pilot_tow,
+                "rental": pilot_rental,
+                "instruction": pilot_instruction,
             }
             allocations[partner] = {
-                "tow": half_tow,
-                "rental": half_rental,
-                "instruction": half_instruction,
+                "tow": partner_tow,
+                "rental": partner_rental,
+                "instruction": partner_instruction,
             }
         elif pilot and partner and split_type == "tow":
             allocations[pilot] = {
@@ -98,7 +110,7 @@ def quantize_currency(value):
     )
 
 
-def get_billing_allocations(flight):
+def get_billing_allocations(flight, allocation_version=1):
     """Return the frozen member allocation input consumed by Billing."""
     if flight.commercial_ride:
         return []
@@ -126,7 +138,10 @@ def get_billing_allocations(flight):
                 "instruction": instruction,
                 "total": total,
                 "allocation_rule": flight.split_type or "full",
-                "allocation_version": 1,
+                "allocation_version": allocation_version,
+                "source_key": (
+                    f"flight:{flight.pk}:member:{member.pk}:v{allocation_version}"
+                ),
                 "allocation_snapshot": {
                     "split_type": flight.split_type,
                     "pilot_id": flight.pilot_id,

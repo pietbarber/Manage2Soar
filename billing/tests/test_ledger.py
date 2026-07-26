@@ -8,6 +8,7 @@ from django.db import DatabaseError, close_old_connections, connection, transact
 
 from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.services import (
+    correct_flight_charges,
     get_balance,
     get_or_create_ledger,
     post_charge,
@@ -16,6 +17,7 @@ from billing.services import (
     reverse_entry,
 )
 from logsheet.models import Airfield, Flight, Logsheet
+from logsheet.utils.flight_charges import split_flight_costs
 from members.models import Member
 
 
@@ -45,6 +47,27 @@ def test_entries_derive_balance(member, actor):
         description="Payment",
     )
     assert get_balance(member.billing_ledger) == Decimal("40.00")
+
+
+def test_even_split_preserves_odd_cents(member, actor):
+    partner = Member.objects.create_user(username="split-partner")
+    allocations = split_flight_costs(
+        member,
+        partner,
+        "even",
+        Decimal("0.01"),
+        Decimal("0.03"),
+        Decimal("0.01"),
+    )
+    for component, expected in (
+        ("tow", Decimal("0.01")),
+        ("rental", Decimal("0.03")),
+        ("instruction", Decimal("0.01")),
+    ):
+        assert (
+            sum((row[component] for row in allocations.values()), Decimal("0"))
+            == expected
+        )
 
 
 def test_source_posting_is_idempotent(member, actor):
@@ -287,6 +310,7 @@ def test_flight_charge_posts_immutable_snapshot_once(member, actor, db):
         "total": Decimal("40.00"),
         "allocation_rule": "full",
         "allocation_version": 1,
+        "source_key": f"flight:{flight.pk}:member:{member.pk}:v1",
         "allocation_snapshot": {"pilot_id": member.pk},
     }
     first = post_flight_charges(flight=flight, actor=actor, allocations=[allocation])
@@ -303,6 +327,73 @@ def test_flight_charge_posts_immutable_snapshot_once(member, actor, db):
     with pytest.raises(DatabaseError):
         with transaction.atomic():
             FlightChargeSnapshot.objects.filter(pk=snapshot.pk).delete()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_flight_charge_posting_is_idempotent(member, actor):
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=Airfield.objects.create(identifier="KSTEP5", name="Step Five"),
+        created_by=actor,
+    )
+    flight = Flight.objects.create(logsheet=logsheet, pilot=member, flight_type="solo")
+    allocation = {
+        "member": member,
+        "tow": Decimal("10.00"),
+        "rental": Decimal("10.00"),
+        "instruction": Decimal("0.00"),
+        "total": Decimal("20.00"),
+        "allocation_version": 1,
+        "source_key": f"flight:{flight.pk}:member:{member.pk}:v1",
+        "allocation_snapshot": {"source": "concurrent-test"},
+    }
+
+    def post():
+        close_old_connections()
+        try:
+            return post_flight_charges(
+                flight=Flight.objects.get(pk=flight.pk),
+                actor=Member.objects.get(pk=actor.pk),
+                allocations=[dict(allocation, member=Member.objects.get(pk=member.pk))],
+            )[0].pk
+        finally:
+            close_old_connections()
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: post(), range(2)))
+    assert results[0] == results[1]
+    assert LedgerEntry.objects.filter(flight=flight).count() == 1
+    assert FlightChargeSnapshot.objects.filter(flight=flight).count() == 1
+
+
+def test_flight_charge_posting_rolls_back_partial_batch(member, actor):
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=Airfield.objects.create(identifier="KSTEP6", name="Step Six"),
+        created_by=actor,
+    )
+    flight = Flight.objects.create(logsheet=logsheet, pilot=member, flight_type="solo")
+    valid = {
+        "member": member,
+        "tow": Decimal("10.00"),
+        "rental": Decimal("0.00"),
+        "instruction": Decimal("0.00"),
+        "total": Decimal("10.00"),
+        "allocation_version": 1,
+        "source_key": f"flight:{flight.pk}:member:{member.pk}:v1",
+        "allocation_snapshot": {"source": "rollback-test"},
+    }
+    other_member = Member.objects.create_user(username="rollback-other")
+    invalid = dict(
+        valid,
+        member=other_member,
+        total=Decimal("5.00"),
+        source_key=f"flight:{flight.pk}:member:{other_member.pk}:v1",
+    )
+    with pytest.raises(ValidationError):
+        post_flight_charges(flight=flight, actor=actor, allocations=[valid, invalid])
+    assert not LedgerEntry.objects.filter(flight=flight).exists()
 
 
 def test_snapshot_validates_entry_kind_and_member(member, actor):
@@ -344,7 +435,7 @@ def test_snapshot_validates_entry_kind_and_member(member, actor):
         kind=LedgerEntry.Kind.FLIGHT_CHARGE,
         flight=flight,
     )
-    with pytest.raises(DatabaseError):
+    with pytest.raises(ValidationError):
         FlightChargeSnapshot.objects.bulk_create(
             [
                 FlightChargeSnapshot(
@@ -360,3 +451,95 @@ def test_snapshot_validates_entry_kind_and_member(member, actor):
                 )
             ]
         )
+
+
+def test_flight_charge_correction_replaces_the_full_allocation(member, actor):
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=Airfield.objects.create(identifier="KSTEP4", name="Step Four"),
+        created_by=actor,
+    )
+    partner = Member.objects.create_user(username="correction-partner")
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=member,
+        split_with=partner,
+        flight_type="solo",
+    )
+    initial = {
+        "member": member,
+        "tow": Decimal("10.00"),
+        "rental": Decimal("10.00"),
+        "instruction": Decimal("0.00"),
+        "total": Decimal("20.00"),
+        "allocation_rule": "full",
+        "allocation_version": 1,
+        "source_key": f"flight:{flight.pk}:member:{member.pk}:v1",
+    }
+    partner_initial = dict(
+        initial,
+        member=partner,
+        total=Decimal("10.00"),
+        rental=Decimal("0.00"),
+        source_key=f"flight:{flight.pk}:member:{partner.pk}:v1",
+    )
+    originals = post_flight_charges(
+        flight=flight, actor=actor, allocations=[initial, partner_initial]
+    )
+    replacement = dict(
+        initial,
+        total=Decimal("15.00"),
+        rental=Decimal("5.00"),
+        allocation_version=2,
+        source_key=f"flight:{flight.pk}:member:{member.pk}:v2",
+    )
+    partner_replacement = dict(
+        partner_initial,
+        total=Decimal("15.00"),
+        rental=Decimal("5.00"),
+        allocation_version=2,
+        source_key=f"flight:{flight.pk}:member:{partner.pk}:v2",
+    )
+    reversals, replacement_entries = correct_flight_charges(
+        flight=flight,
+        actor=actor,
+        allocations=[replacement, partner_replacement],
+        effective_date=date.today(),
+        reason="Corrected rental rate",
+    )
+    assert {reversal.reverses_id for reversal in reversals} == {
+        original.pk for original in originals
+    }
+    assert {entry.source_key for entry in replacement_entries} == {
+        f"flight:{flight.pk}:member:{member.pk}:v2",
+        f"flight:{flight.pk}:member:{partner.pk}:v2",
+    }
+    groups = {entry.correction_group for entry in reversals + replacement_entries}
+    assert len(groups) == 1
+    assert groups.pop() is not None
+    assert get_balance(member.billing_ledger) == Decimal("15.00")
+    assert get_balance(partner.billing_ledger) == Decimal("15.00")
+
+
+def test_reversal_rejects_cross_ledger_and_same_effect(member, actor):
+    original = post_charge(
+        member=member,
+        actor=actor,
+        amount="10",
+        effective_date=date.today(),
+        description="Charge",
+    )
+    other_member = Member.objects.create_user(username="reversal-other")
+    malformed = LedgerEntry(
+        ledger=get_or_create_ledger(other_member),
+        kind=LedgerEntry.Kind.REVERSAL,
+        effect=LedgerEntry.Effect.DEBIT,
+        amount=Decimal("10"),
+        effective_date=date.today(),
+        member_description="Malformed reversal",
+        created_by=actor,
+        reverses=original,
+    )
+    malformed._service_created = True
+    with pytest.raises(ValidationError):
+        malformed.save()

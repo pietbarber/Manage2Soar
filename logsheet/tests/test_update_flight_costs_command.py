@@ -6,6 +6,8 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
+from billing.models import LedgerEntry
+from billing.services import post_charge
 from logsheet.models import Flight, Glider, Logsheet
 
 
@@ -42,6 +44,48 @@ def test_updates_rental_when_tow_actual_already_set(airfield, active_member):
     flight.refresh_from_db()
     assert flight.tow_cost_actual == Decimal("25.00")
     assert flight.rental_cost_actual == Decimal("20.00")
+
+
+@pytest.mark.django_db
+def test_skips_flights_with_posted_billing_entries(airfield, active_member):
+    glider = Glider.objects.create(
+        make="Schleicher",
+        model="ASK-21",
+        n_number="NTESTBILL",
+        rental_rate=Decimal("20.00"),
+        club_owned=True,
+        is_active=True,
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=date(2026, 3, 8),
+        airfield=airfield,
+        created_by=active_member,
+        finalized=True,
+    )
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        flight_type="solo",
+        launch_time=time(10, 0),
+        landing_time=time(11, 0),
+        tow_cost_actual=Decimal("25.00"),
+        rental_cost_actual=Decimal("0.00"),
+    )
+    post_charge(
+        member=active_member,
+        actor=active_member,
+        amount="25.00",
+        effective_date=logsheet.log_date,
+        description="Posted flight",
+        kind=LedgerEntry.Kind.FLIGHT_CHARGE,
+        flight=flight,
+    )
+
+    call_command("update_flight_costs", after="2026-03-01")
+
+    flight.refresh_from_db()
+    assert flight.rental_cost_actual == Decimal("0.00")
 
 
 @pytest.mark.django_db

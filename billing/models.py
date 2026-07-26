@@ -3,6 +3,13 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 
+class SnapshotManager(models.Manager):
+    def bulk_create(self, *args, **kwargs):
+        raise ValidationError(
+            "Flight charge snapshots must be created through the billing service."
+        )
+
+
 class Ledger(models.Model):
     """The immutable financial history belonging to one member."""
 
@@ -55,6 +62,7 @@ class LedgerEntry(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     source_key = models.CharField(max_length=160, blank=True, null=True)
+    correction_group = models.UUIDField(blank=True, null=True, db_index=True)
     flight = models.ForeignKey(
         "logsheet.Flight",
         on_delete=models.PROTECT,
@@ -135,6 +143,18 @@ class LedgerEntry(models.Model):
             raise ValidationError("A reversal must identify the original entry.")
         if self.kind == self.Kind.FLIGHT_CHARGE and not self.flight_id:
             raise ValidationError("Flight charges must identify a flight.")
+        if self.kind == self.Kind.REVERSAL:
+            if not getattr(self, "_service_created", False):
+                raise ValidationError(
+                    "Reversals must be created through billing services."
+                )
+            original = self.reverses
+            if original.ledger_id != self.ledger_id:
+                raise ValidationError("A reversal must use the original ledger.")
+            if original.amount != self.amount:
+                raise ValidationError("A reversal must match the original amount.")
+            if original.effect == self.effect:
+                raise ValidationError("A reversal must have the opposite effect.")
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -175,6 +195,7 @@ class FlightChargeSnapshot(models.Model):
     allocation_version = models.PositiveIntegerField()
     allocation_snapshot = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
+    objects = SnapshotManager()
 
     class Meta:
         constraints = [

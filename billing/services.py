@@ -1,5 +1,5 @@
-from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -13,6 +13,12 @@ CHARGE_KINDS = {
     LedgerEntry.Kind.MANUAL_CHARGE,
 }
 REVERSIBLE_KINDS = set(LedgerEntry.Kind.values) - {LedgerEntry.Kind.REVERSAL}
+
+
+def _club_today():
+    from siteconfig.timezone_utils import get_club_today
+
+    return get_club_today()
 
 
 def _money(amount):
@@ -33,7 +39,15 @@ def get_or_create_ledger(member):
 
 
 def _validate_existing_source(
-    existing, *, ledger, kind, effect, amount, effective_date, flight=None
+    existing,
+    *,
+    ledger,
+    kind,
+    effect,
+    amount,
+    effective_date,
+    flight=None,
+    correction_group=None,
 ):
     if not existing:
         raise IntegrityError("Source key insert failed without a persisted entry.")
@@ -44,6 +58,7 @@ def _validate_existing_source(
         and existing.amount == amount
         and existing.effective_date == effective_date
         and existing.flight_id == getattr(flight, "pk", None)
+        and existing.correction_group == correction_group
     )
     if not values_match:
         raise ValidationError("Source key already identifies a different entry.")
@@ -63,11 +78,12 @@ def post_entry(
     internal_note="",
     source_key=None,
     flight=None,
+    correction_group=None,
 ):
     """Post one immutable entry, returning an existing identical source entry."""
     if actor is None:
         raise ValidationError("A posting actor is required.")
-    if effective_date > date.today():
+    if effective_date > _club_today():
         raise ValidationError("Future effective dates are not allowed.")
     if source_key is not None:
         if not isinstance(source_key, str):
@@ -85,6 +101,7 @@ def post_entry(
                 and existing.amount == amount
                 and existing.effective_date == effective_date
                 and existing.flight_id == getattr(flight, "pk", None)
+                and existing.correction_group == correction_group
             )
             if not values_match:
                 raise ValidationError(
@@ -102,6 +119,7 @@ def post_entry(
         created_by=actor,
         source_key=source_key,
         flight=flight,
+        correction_group=correction_group,
     )
     try:
         with transaction.atomic():
@@ -118,11 +136,12 @@ def post_entry(
             amount=amount,
             effective_date=effective_date,
             flight=flight,
+            correction_group=correction_group,
         )
 
 
 @transaction.atomic
-def post_flight_charges(*, flight, actor, allocations):
+def post_flight_charges(*, flight, actor, allocations, correction_group=None):
     """Record frozen Logsheet allocations exactly once per billed member."""
     posted = []
     for allocation in allocations:
@@ -131,7 +150,9 @@ def post_flight_charges(*, flight, actor, allocations):
         total = _money(allocation["total"])
         member = allocation["member"]
         version = allocation.get("allocation_version", 1)
-        source_key = f"flight:{flight.pk}:member:{member.pk}:v{version}"
+        source_key = allocation.get("source_key")
+        if not source_key:
+            raise ValidationError("Flight allocations must provide a source key.")
         entry = post_entry(
             member=member,
             actor=actor,
@@ -142,6 +163,7 @@ def post_flight_charges(*, flight, actor, allocations):
             description=f"Flight charge #{flight.pk}",
             source_key=source_key,
             flight=flight,
+            correction_group=correction_group,
         )
         snapshot_defaults = {
             "flight": flight,
@@ -154,7 +176,8 @@ def post_flight_charges(*, flight, actor, allocations):
                 "allocation_rule", flight.split_type or "full"
             ),
             "allocation_version": version,
-            "allocation_snapshot": allocation.get("allocation_snapshot", {}),
+            "allocation_snapshot": allocation.get("allocation_snapshot")
+            or {"allocation_version": version},
         }
         snapshot, created = FlightChargeSnapshot.objects.get_or_create(
             ledger_entry=entry, defaults=snapshot_defaults
@@ -175,6 +198,51 @@ def post_flight_charges(*, flight, actor, allocations):
                     )
         posted.append(entry)
     return posted
+
+
+@transaction.atomic
+def correct_flight_charges(*, flight, actor, allocations, effective_date, reason):
+    """Replace every active charge for one flight with a complete allocation."""
+    if not allocations:
+        raise ValidationError("A correction requires replacement allocations.")
+    versions = {allocation.get("allocation_version") for allocation in allocations}
+    if len(versions) != 1 or None in versions:
+        raise ValidationError("Correction allocations must share one version.")
+    version = versions.pop()
+    active_ids = list(
+        LedgerEntry.objects.filter(
+            flight=flight,
+            kind=LedgerEntry.Kind.FLIGHT_CHARGE,
+            reversal__isnull=True,
+        ).values_list("pk", flat=True)
+    )
+    originals = list(LedgerEntry.objects.select_for_update().filter(pk__in=active_ids))
+    if not originals:
+        raise ValidationError("The flight has no active charges to correct.")
+    current_version = max(
+        entry.flight_snapshot.allocation_version for entry in originals
+    )
+    if version != current_version + 1:
+        raise ValidationError("Correction allocations must use the next version.")
+
+    correction_group = uuid4()
+    reversals = [
+        reverse_entry(
+            entry=entry,
+            actor=actor,
+            effective_date=effective_date,
+            reason=reason,
+            correction_group=correction_group,
+        )
+        for entry in originals
+    ]
+    replacements = post_flight_charges(
+        flight=flight,
+        actor=actor,
+        allocations=allocations,
+        correction_group=correction_group,
+    )
+    return reversals, replacements
 
 
 def post_charge(
@@ -234,19 +302,19 @@ def post_credit(
 
 
 @transaction.atomic
-def reverse_entry(*, entry, actor, effective_date, reason):
+def reverse_entry(*, entry, actor, effective_date, reason, correction_group=None):
     if actor is None:
         raise ValidationError("A reversal actor is required.")
-    if effective_date > date.today():
+    if effective_date > _club_today():
         raise ValidationError("Future effective dates are not allowed.")
     if not isinstance(reason, str) or not reason.strip():
         raise ValidationError("A reversal reason is required.")
     original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
-    if original.kind == LedgerEntry.Kind.REVERSAL:
+    if original.kind not in REVERSIBLE_KINDS:
         raise ValidationError("A reversal cannot itself be reversed.")
     if hasattr(original, "reversal"):
         raise ValidationError("This entry has already been reversed.")
-    return LedgerEntry.objects.create(
+    reversal = LedgerEntry(
         ledger=original.ledger,
         kind=LedgerEntry.Kind.REVERSAL,
         effect=(
@@ -260,7 +328,11 @@ def reverse_entry(*, entry, actor, effective_date, reason):
         internal_note=reason,
         created_by=actor,
         reverses=original,
+        correction_group=correction_group,
     )
+    reversal._service_created = True
+    reversal.save()
+    return reversal
 
 
 def get_balance(ledger, as_of=None):

@@ -4,7 +4,10 @@ from decimal import Decimal
 import pytest
 from django.urls import reverse
 
+from billing.models import FlightChargeSnapshot, LedgerEntry
+from billing.services import post_flight_charges
 from logsheet.models import Flight
+from logsheet.utils.flight_charges import get_billing_allocations
 from siteconfig.models import (
     BillingPricingMode,
     MembershipBillingRule,
@@ -288,6 +291,46 @@ def test_clear_flight_split_ajax(client, active_member, logsheet_with_flights):
     flight.refresh_from_db()
     assert flight.split_with is None
     assert flight.split_type is None
+
+
+@pytest.mark.django_db
+def test_treasurer_split_change_corrects_finalized_flight(
+    client, active_member, another_member, logsheet_with_flights
+):
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    flight.tow_cost_actual = Decimal("20.00")
+    flight.rental_cost_actual = Decimal("10.00")
+    flight.save(update_fields=["tow_cost_actual", "rental_cost_actual"])
+    logsheet_with_flights.finalized = True
+    logsheet_with_flights.save(update_fields=["finalized"])
+    active_member.treasurer = True
+    active_member.save(update_fields=["treasurer"])
+
+    post_flight_charges(
+        flight=flight,
+        actor=active_member,
+        allocations=get_billing_allocations(flight),
+    )
+
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:update_flight_split", args=[flight.pk]),
+        {
+            "split_with": another_member.pk,
+            "split_type": "rental",
+            "reason": "Corrected payer allocation",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True, "corrected": True}
+    assert LedgerEntry.objects.filter(flight=flight).count() == 4
+    assert LedgerEntry.objects.filter(kind=LedgerEntry.Kind.REVERSAL).count() == 2
+    assert set(
+        FlightChargeSnapshot.objects.filter(flight=flight).values_list(
+            "allocation_version", flat=True
+        )
+    ) == {1, 2}
 
 
 @pytest.mark.django_db
