@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "tinymce",
     "members",
     "logsheet",
+    "billing.apps.BillingConfig",
     "duty_roster",
     "analytics",
     "cms",
