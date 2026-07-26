@@ -98,6 +98,34 @@ def test_source_semantic_conflict_is_rejected(member, actor):
         )
 
 
+def test_flight_charge_requires_a_flight(member, actor):
+    with pytest.raises(ValidationError):
+        post_charge(
+            member=member,
+            actor=actor,
+            amount="10",
+            effective_date=date.today(),
+            description="Missing source flight",
+            kind=LedgerEntry.Kind.FLIGHT_CHARGE,
+        )
+
+    ledger = get_or_create_ledger(member)
+    with pytest.raises(DatabaseError):
+        LedgerEntry.objects.bulk_create(
+            [
+                LedgerEntry(
+                    ledger=ledger,
+                    kind=LedgerEntry.Kind.FLIGHT_CHARGE,
+                    effect=LedgerEntry.Effect.DEBIT,
+                    amount="10",
+                    effective_date=date.today(),
+                    member_description="Bypass",
+                    created_by=actor,
+                )
+            ]
+        )
+
+
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_identical_source_posting_is_idempotent(member, actor):
     def post():
@@ -275,3 +303,60 @@ def test_flight_charge_posts_immutable_snapshot_once(member, actor, db):
     with pytest.raises(DatabaseError):
         with transaction.atomic():
             FlightChargeSnapshot.objects.filter(pk=snapshot.pk).delete()
+
+
+def test_snapshot_validates_entry_kind_and_member(member, actor):
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=Airfield.objects.create(identifier="KSTEP3", name="Step Three"),
+        created_by=actor,
+    )
+    flight = Flight.objects.create(logsheet=logsheet, pilot=member, flight_type="solo")
+    entry = post_charge(
+        member=member,
+        actor=actor,
+        amount="10",
+        effective_date=date.today(),
+        description="Flight charge",
+        kind=LedgerEntry.Kind.FLIGHT_CHARGE,
+        flight=flight,
+    )
+    other_member = Member.objects.create_user(username="other-member")
+    with pytest.raises(ValidationError):
+        FlightChargeSnapshot.objects.create(
+            ledger_entry=entry,
+            flight=flight,
+            billed_member=other_member,
+            tow_amount="10",
+            rental_amount="0",
+            instruction_amount="0",
+            total_amount="10",
+            allocation_rule="full",
+            allocation_version=1,
+        )
+
+    entry_two = post_charge(
+        member=member,
+        actor=actor,
+        amount="10",
+        effective_date=date.today(),
+        description="Another flight charge",
+        kind=LedgerEntry.Kind.FLIGHT_CHARGE,
+        flight=flight,
+    )
+    with pytest.raises(DatabaseError):
+        FlightChargeSnapshot.objects.bulk_create(
+            [
+                FlightChargeSnapshot(
+                    ledger_entry=entry_two,
+                    flight=flight,
+                    billed_member=member,
+                    tow_amount="9",
+                    rental_amount="0",
+                    instruction_amount="0",
+                    total_amount="10",
+                    allocation_rule="full",
+                    allocation_version=1,
+                )
+            ]
+        )

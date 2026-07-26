@@ -105,6 +105,11 @@ class LedgerEntry(models.Model):
                 condition=~models.Q(kind="reversal") | models.Q(reverses__isnull=False),
                 name="billing_reversal_has_original",
             ),
+            models.CheckConstraint(
+                condition=~models.Q(kind="flight_charge")
+                | models.Q(flight__isnull=False),
+                name="billing_flight_charge_has_flight",
+            ),
         ]
         indexes = [
             models.Index(
@@ -128,6 +133,8 @@ class LedgerEntry(models.Model):
             raise ValidationError("Payment and credit entries must be credits.")
         if self.kind == self.Kind.REVERSAL and not self.reverses_id:
             raise ValidationError("A reversal must identify the original entry.")
+        if self.kind == self.Kind.FLIGHT_CHARGE and not self.flight_id:
+            raise ValidationError("Flight charges must identify a flight.")
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -180,12 +187,29 @@ class FlightChargeSnapshot(models.Model):
                 ),
                 name="billing_snapshot_amounts_valid",
             ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    tow_amount=models.F("total_amount")
+                    - models.F("rental_amount")
+                    - models.F("instruction_amount")
+                ),
+                name="billing_snapshot_components_equal_total",
+            ),
         ]
 
     def clean(self):
         super().clean()
         if self.ledger_entry_id and self.total_amount != self.ledger_entry.amount:
             raise ValidationError("Snapshot total must match the ledger entry amount.")
+        if not self.ledger_entry_id:
+            raise ValidationError("A snapshot must identify a ledger entry.")
+        entry = self.ledger_entry
+        if entry.kind != LedgerEntry.Kind.FLIGHT_CHARGE:
+            raise ValidationError("Snapshots require a flight charge entry.")
+        if entry.ledger.member_id != self.billed_member_id:
+            raise ValidationError("Snapshot member must match the ledger member.")
+        if entry.flight_id != self.flight_id:
+            raise ValidationError("Snapshot flight must match the ledger entry flight.")
         if (
             self.tow_amount + self.rental_amount + self.instruction_amount
             != self.total_amount

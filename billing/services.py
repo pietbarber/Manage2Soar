@@ -187,9 +187,12 @@ def post_charge(
     kind=LedgerEntry.Kind.MANUAL_CHARGE,
     source_key=None,
     internal_note="",
+    flight=None,
 ):
     if kind not in CHARGE_KINDS:
         raise ValidationError("The selected kind is not a charge kind.")
+    if kind == LedgerEntry.Kind.FLIGHT_CHARGE and flight is None:
+        raise ValidationError("Flight charges must identify a flight.")
     return post_entry(
         member=member,
         actor=actor,
@@ -200,6 +203,7 @@ def post_charge(
         description=description,
         internal_note=internal_note,
         source_key=source_key,
+        flight=flight,
     )
 
 
