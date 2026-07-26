@@ -96,3 +96,42 @@ def quantize_currency(value):
     return Decimal(str(value or Decimal("0.00"))).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
+
+
+def get_billing_allocations(flight):
+    """Return the frozen member allocation input consumed by Billing."""
+    if flight.commercial_ride:
+        return []
+    allocations = split_flight_costs(
+        flight.pilot,
+        flight.split_with,
+        flight.split_type,
+        flight.tow_cost_actual,
+        flight.rental_cost_actual,
+        flight.instruction_fee_actual,
+    )
+    result = []
+    for member, components in allocations.items():
+        tow = quantize_currency(components["tow"])
+        rental = quantize_currency(components["rental"])
+        instruction = quantize_currency(components["instruction"])
+        total = quantize_currency(tow + rental + instruction)
+        if total <= Decimal("0.00"):
+            continue
+        result.append(
+            {
+                "member": member,
+                "tow": tow,
+                "rental": rental,
+                "instruction": instruction,
+                "total": total,
+                "allocation_rule": flight.split_type or "full",
+                "allocation_version": 1,
+                "allocation_snapshot": {
+                    "split_type": flight.split_type,
+                    "pilot_id": flight.pilot_id,
+                    "split_with_id": flight.split_with_id,
+                },
+            }
+        )
+    return result

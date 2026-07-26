@@ -4,7 +4,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
-from billing.models import Ledger, LedgerEntry
+from billing.models import FlightChargeSnapshot, Ledger, LedgerEntry
 
 MONEY_QUANTUM = Decimal("0.01")
 CHARGE_KINDS = {
@@ -33,7 +33,7 @@ def get_or_create_ledger(member):
 
 
 def _validate_existing_source(
-    existing, *, ledger, kind, effect, amount, effective_date
+    existing, *, ledger, kind, effect, amount, effective_date, flight=None
 ):
     if not existing:
         raise IntegrityError("Source key insert failed without a persisted entry.")
@@ -43,6 +43,7 @@ def _validate_existing_source(
         and existing.effect == effect
         and existing.amount == amount
         and existing.effective_date == effective_date
+        and existing.flight_id == getattr(flight, "pk", None)
     )
     if not values_match:
         raise ValidationError("Source key already identifies a different entry.")
@@ -61,6 +62,7 @@ def post_entry(
     description,
     internal_note="",
     source_key=None,
+    flight=None,
 ):
     """Post one immutable entry, returning an existing identical source entry."""
     if actor is None:
@@ -82,6 +84,7 @@ def post_entry(
                 and existing.effect == effect
                 and existing.amount == amount
                 and existing.effective_date == effective_date
+                and existing.flight_id == getattr(flight, "pk", None)
             )
             if not values_match:
                 raise ValidationError(
@@ -98,6 +101,7 @@ def post_entry(
         internal_note=internal_note,
         created_by=actor,
         source_key=source_key,
+        flight=flight,
     )
     try:
         with transaction.atomic():
@@ -113,7 +117,64 @@ def post_entry(
             effect=effect,
             amount=amount,
             effective_date=effective_date,
+            flight=flight,
         )
+
+
+@transaction.atomic
+def post_flight_charges(*, flight, actor, allocations):
+    """Record frozen Logsheet allocations exactly once per billed member."""
+    posted = []
+    for allocation in allocations:
+        if Decimal(str(allocation["total"])) <= 0:
+            continue
+        total = _money(allocation["total"])
+        member = allocation["member"]
+        version = allocation.get("allocation_version", 1)
+        source_key = f"flight:{flight.pk}:member:{member.pk}:v{version}"
+        entry = post_entry(
+            member=member,
+            actor=actor,
+            kind=LedgerEntry.Kind.FLIGHT_CHARGE,
+            effect=LedgerEntry.Effect.DEBIT,
+            amount=total,
+            effective_date=flight.logsheet.log_date,
+            description=f"Flight charge #{flight.pk}",
+            source_key=source_key,
+            flight=flight,
+        )
+        snapshot_defaults = {
+            "flight": flight,
+            "billed_member": member,
+            "tow_amount": allocation["tow"],
+            "rental_amount": allocation["rental"],
+            "instruction_amount": allocation["instruction"],
+            "total_amount": total,
+            "allocation_rule": allocation.get(
+                "allocation_rule", flight.split_type or "full"
+            ),
+            "allocation_version": version,
+            "allocation_snapshot": allocation.get("allocation_snapshot", {}),
+        }
+        snapshot, created = FlightChargeSnapshot.objects.get_or_create(
+            ledger_entry=entry, defaults=snapshot_defaults
+        )
+        if not created:
+            for field, expected in snapshot_defaults.items():
+                actual = (
+                    getattr(snapshot, f"{field}_id", None)
+                    if field in {"flight", "billed_member"}
+                    else getattr(snapshot, field)
+                )
+                expected_value = (
+                    expected.pk if field in {"flight", "billed_member"} else expected
+                )
+                if actual != expected_value:
+                    raise ValidationError(
+                        "Existing flight charge snapshot conflicts with allocation."
+                    )
+        posted.append(entry)
+    return posted
 
 
 def post_charge(

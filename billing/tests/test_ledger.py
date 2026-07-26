@@ -6,14 +6,16 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, close_old_connections, connection, transaction
 
-from billing.models import LedgerEntry
+from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.services import (
     get_balance,
     get_or_create_ledger,
     post_charge,
     post_credit,
+    post_flight_charges,
     reverse_entry,
 )
+from logsheet.models import Airfield, Flight, Logsheet
 from members.models import Member
 
 
@@ -233,3 +235,43 @@ def test_reversal_requires_string_reason(member, actor):
             effective_date=date.today(),
             reason=None,
         )
+
+
+def test_flight_charge_posts_immutable_snapshot_once(member, actor, db):
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(),
+        airfield=Airfield.objects.create(identifier="KSTEP2", name="Step Two"),
+        created_by=actor,
+    )
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=member,
+        flight_type="solo",
+        tow_cost_actual=Decimal("20.00"),
+        rental_cost_actual=Decimal("15.00"),
+        instruction_fee_actual=Decimal("5.00"),
+    )
+    allocation = {
+        "member": member,
+        "tow": Decimal("20.00"),
+        "rental": Decimal("15.00"),
+        "instruction": Decimal("5.00"),
+        "total": Decimal("40.00"),
+        "allocation_rule": "full",
+        "allocation_version": 1,
+        "allocation_snapshot": {"pilot_id": member.pk},
+    }
+    first = post_flight_charges(flight=flight, actor=actor, allocations=[allocation])
+    second = post_flight_charges(flight=flight, actor=actor, allocations=[allocation])
+    assert first[0].pk == second[0].pk
+    snapshot = FlightChargeSnapshot.objects.get(flight=flight)
+    assert FlightChargeSnapshot.objects.filter(flight=flight).count() == 1
+    assert get_balance(member.billing_ledger) == Decimal("40.00")
+    with pytest.raises(DatabaseError):
+        with transaction.atomic():
+            FlightChargeSnapshot.objects.filter(pk=snapshot.pk).update(
+                total_amount=Decimal("1.00")
+            )
+    with pytest.raises(DatabaseError):
+        with transaction.atomic():
+            FlightChargeSnapshot.objects.filter(pk=snapshot.pk).delete()

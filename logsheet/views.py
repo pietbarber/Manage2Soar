@@ -26,6 +26,7 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
+from billing.services import post_flight_charges
 from duty_roster.models import GliderReservation
 from members.decorators import active_member_required
 from members.models import Member
@@ -70,6 +71,7 @@ from .models import (
 from .utils.finalization_email import enqueue_finalization_summary_email_job
 from .utils.flight_charges import effective_rental_cost as _effective_rental_cost
 from .utils.flight_charges import (
+    get_billing_allocations,
     quantize_currency,
     split_flight_costs,
 )
@@ -1414,6 +1416,11 @@ def manage_logsheet(request, pk):
                 if flight.instruction_fee_actual is None:
                     flight.instruction_fee_actual = flight.instruction_fee_calculated
                 flight.save()
+                post_flight_charges(
+                    flight=flight,
+                    actor=request.user,
+                    allocations=get_billing_allocations(flight),
+                )
 
             locked_logsheet.finalized = True
             locked_logsheet.save()
@@ -2503,6 +2510,11 @@ def manage_logsheet_finances(request, pk):
                             flight.instruction_fee_calculated
                         )
                     flight.save()
+                    post_flight_charges(
+                        flight=flight,
+                        actor=request.user,
+                        allocations=get_billing_allocations(flight),
+                    )
 
                 locked_logsheet.finalized = True
                 locked_logsheet.save()

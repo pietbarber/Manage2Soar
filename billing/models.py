@@ -55,6 +55,13 @@ class LedgerEntry(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     source_key = models.CharField(max_length=160, blank=True, null=True)
+    flight = models.ForeignKey(
+        "logsheet.Flight",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="billing_entries",
+    )
     reverses = models.OneToOneField(
         "self",
         on_delete=models.PROTECT,
@@ -139,3 +146,57 @@ class LedgerEntry(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()}: {self.amount}"
+
+
+class FlightChargeSnapshot(models.Model):
+    """Frozen Logsheet allocation evidence for a posted flight charge."""
+
+    ledger_entry = models.OneToOneField(
+        LedgerEntry,
+        on_delete=models.PROTECT,
+        related_name="flight_snapshot",
+    )
+    flight = models.ForeignKey("logsheet.Flight", on_delete=models.PROTECT)
+    billed_member = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+    )
+    tow_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    rental_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    instruction_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    allocation_rule = models.CharField(max_length=50)
+    allocation_version = models.PositiveIntegerField()
+    allocation_snapshot = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(tow_amount__gte=0)
+                    & models.Q(rental_amount__gte=0)
+                    & models.Q(instruction_amount__gte=0)
+                    & models.Q(total_amount__gt=0)
+                ),
+                name="billing_snapshot_amounts_valid",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.ledger_entry_id and self.total_amount != self.ledger_entry.amount:
+            raise ValidationError("Snapshot total must match the ledger entry amount.")
+        if (
+            self.tow_amount + self.rental_amount + self.instruction_amount
+            != self.total_amount
+        ):
+            raise ValidationError("Snapshot components must equal the total amount.")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Flight charge snapshots cannot be edited.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Flight charge snapshots cannot be deleted.")
