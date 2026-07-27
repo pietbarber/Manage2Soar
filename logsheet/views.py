@@ -2681,7 +2681,18 @@ def edit_logsheet_closeout(request, pk):
         duty_form = LogsheetDutyCrewForm(request.POST, instance=logsheet)
         formset = formset_class(request.POST, queryset=queryset)
 
-        if form.is_valid() and duty_form.is_valid() and formset.is_valid():
+        forms_valid = form.is_valid() and duty_form.is_valid() and formset.is_valid()
+        if forms_valid and logsheet.finalized:
+            billing_fields = {"rental_hours_chargeable", "rental_charged_to"}
+            for closeout_form in formset.forms:
+                if billing_fields.intersection(closeout_form.changed_data):
+                    closeout_form.add_error(
+                        None,
+                        "Towplane rental charges require an audited billing correction.",
+                    )
+                    forms_valid = False
+
+        if forms_valid:
             form.save()
             duty_form.save()
             formset.save()
@@ -2860,6 +2871,7 @@ def view_logsheet_closeout(request, pk):
     # Check if towplane rentals are enabled for conditional display
     config = SiteConfiguration.objects.first()
     towplane_rental_enabled = config.allow_towplane_rental if config else False
+    from logsheet.utils.permissions import can_edit_logsheet
 
     return render(
         request,
@@ -2870,6 +2882,7 @@ def view_logsheet_closeout(request, pk):
             "towplanes": towplanes,
             "maintenance_issues": maintenance_issues,
             "towplane_rental_enabled": towplane_rental_enabled,
+            "can_edit_closeout": can_edit_logsheet(request.user, logsheet),
         },
     )
 

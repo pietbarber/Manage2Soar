@@ -191,6 +191,8 @@ def test_reversal_is_linked_and_changes_balance(member, actor):
 
 
 def test_invalid_amount_and_future_date_rejected(member, actor):
+    from billing.services import _club_today
+
     with pytest.raises(ValidationError):
         post_charge(
             member=member,
@@ -204,7 +206,7 @@ def test_invalid_amount_and_future_date_rejected(member, actor):
             member=member,
             actor=actor,
             amount="1",
-            effective_date=date.today() + timedelta(days=1),
+            effective_date=_club_today() + timedelta(days=1),
             description="Future",
         )
 
