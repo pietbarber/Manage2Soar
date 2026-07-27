@@ -1,6 +1,6 @@
 import csv
 import re
-from datetime import time, timedelta
+from datetime import date, time, timedelta
 from decimal import Decimal
 from io import StringIO
 
@@ -8,6 +8,7 @@ import pytest
 from django.urls import reverse
 from django.utils import timezone
 
+from billing.services import post_manual_charge
 from logsheet.models import (
     Airfield,
     Flight,
@@ -181,6 +182,27 @@ class TestPersonalChargesView:
         )
         assert len(sortable_tables) == 2
         assert "Instruction Cost" in content
+
+    def test_personal_charges_view_shows_current_ledger_balance(self, client):
+        self.other_member.treasurer = True
+        self.other_member.save(update_fields=["treasurer"])
+        post_manual_charge(
+            member=self.member,
+            actor=self.other_member,
+            amount=Decimal("42.50"),
+            effective_date=date.today(),
+            description="Account charge",
+            reason="Test balance display",
+        )
+
+        client.force_login(self.member)
+        response = client.get(reverse("logsheet:personal_charges"))
+
+        assert response.status_code == 200
+        assert response.context["ledger_balance"] == Decimal("42.50")
+        assert "Current account balance" in response.content.decode()
+        assert "Amount due" in response.content.decode()
+        assert "$42.50" in response.content.decode()
 
     def test_personal_charges_csv_exports_flights_and_misc(self, client):
         client.force_login(self.member)

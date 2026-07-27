@@ -666,8 +666,12 @@ def stats_dump_export_download(request, pk):
 @active_member_required
 def personal_charges_summary(request):
     """Show a member's personal flight and miscellaneous charges for the last year."""
+    from billing.models import Ledger
+    from billing.services import get_balance
+
     start_date = timezone.localdate() - timedelta(days=365)
     flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+    ledger = Ledger.objects.filter(member=request.user).first()
 
     total_flight_cost = sum((row["total_cost"] for row in flight_rows), Decimal("0.00"))
     total_misc_cost = sum(
@@ -682,6 +686,7 @@ def personal_charges_summary(request):
             "misc_charges": misc_charges,
             "total_flight_cost": total_flight_cost,
             "total_misc_cost": total_misc_cost,
+            "ledger_balance": get_balance(ledger) if ledger else Decimal("0.00"),
             "start_date": start_date,
         },
     )
