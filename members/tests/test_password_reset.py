@@ -101,6 +101,49 @@ def test_password_reset_uses_canonical_url(client):
 
 
 @pytest.mark.django_db
+@override_settings(SITE_URL="https://deployment.example.com")
+def test_password_reset_uses_deployment_site_url_when_canonical_url_is_blank(client):
+    """Reset links use deployment SITE_URL when no DB override is configured."""
+    from siteconfig.models import SiteConfiguration
+
+    config = SiteConfiguration.objects.first()
+    if not config:
+        config = SiteConfiguration.objects.create(
+            club_name="Test Soaring Club",
+            club_abbreviation="TSC",
+            domain_name="test.example.com",
+        )
+config.canonical_url = ""
+config.save(update_fields=["canonical_url"])
+
+    Member.objects.create_user(
+        username="deploymentuser",
+        email="deploymentuser@example.com",
+        password="oldpassword",
+        membership_status="Full Member",
+    )
+
+    response = client.post(
+        reverse("password_reset"),
+        {"email": "deploymentuser@example.com"},
+    )
+
+    assert response.status_code == 302
+    assert len(mail.outbox) == 1
+
+    # Verify that deployment SITE_URL is used in the password reset link
+    email_body = mail.outbox[0].body
+    assert (
+        "https://deployment.example.com/reset/" in email_body
+    ), "Password reset email should use deployment SITE_URL when canonical_url is blank"
+
+    # Verify HTML part also uses deployment SITE_URL (if present)
+    if hasattr(mail.outbox[0], "alternatives") and mail.outbox[0].alternatives:
+        html_body = mail.outbox[0].alternatives[0][0]
+        assert "https://deployment.example.com/reset/" in html_body
+
+
+@pytest.mark.django_db
 @override_settings(
     EMAIL_DEV_MODE=True,
     EMAIL_DEV_MODE_REDIRECT_TO="dev1@example.com,dev2@example.com",

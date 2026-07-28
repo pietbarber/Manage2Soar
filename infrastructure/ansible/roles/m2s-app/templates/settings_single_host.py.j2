@@ -26,6 +26,12 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+# Deployment/bootstrap fallback for links when SiteConfiguration is unavailable.
+# Once the database is available, SiteConfiguration.canonical_url is authoritative.
+SITE_URL = os.getenv("SITE_URL")
+if not SITE_URL:
+    raise ValueError("SITE_URL not set in environment!")
+
 # Application definition
 INSTALLED_APPS = [
     "import_export",
