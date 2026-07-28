@@ -107,10 +107,15 @@ def test_password_reset_uses_deployment_site_url_when_canonical_url_is_blank(cli
     from siteconfig.models import SiteConfiguration
 
     config = SiteConfiguration.objects.first()
-    if config:
-        config.canonical_url = ""
-        config.domain_name = ""
-        config.save(update_fields=["canonical_url", "domain_name"])
+    if not config:
+        config = SiteConfiguration.objects.create(
+            club_name="Test Soaring Club",
+            club_abbreviation="TSC",
+            domain_name="test.example.com",
+        )
+    config.canonical_url = ""
+    config.domain_name = ""
+    config.save(update_fields=["canonical_url", "domain_name"])
 
     Member.objects.create_user(
         username="deploymentuser",
@@ -126,7 +131,17 @@ def test_password_reset_uses_deployment_site_url_when_canonical_url_is_blank(cli
 
     assert response.status_code == 302
     assert len(mail.outbox) == 1
-    assert "https://deployment.example.com/reset/" in mail.outbox[0].body
+
+    # Verify that deployment SITE_URL is used in the password reset link
+    email_body = mail.outbox[0].body
+    assert (
+        "https://deployment.example.com/reset/" in email_body
+    ), "Password reset email should use deployment SITE_URL when canonical_url is blank"
+
+    # Verify HTML part also uses deployment SITE_URL (if present)
+    if hasattr(mail.outbox[0], "alternatives") and mail.outbox[0].alternatives:
+        html_body = mail.outbox[0].alternatives[0][0]
+        assert "https://deployment.example.com/reset/" in html_body
 
 
 @pytest.mark.django_db
