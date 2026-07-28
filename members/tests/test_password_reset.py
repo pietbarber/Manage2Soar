@@ -113,8 +113,8 @@ def test_password_reset_uses_deployment_site_url_when_canonical_url_is_blank(cli
             club_abbreviation="TSC",
             domain_name="test.example.com",
         )
-config.canonical_url = ""
-config.save(update_fields=["canonical_url"])
+    config.canonical_url = ""
+    config.save(update_fields=["canonical_url"])
 
     Member.objects.create_user(
         username="deploymentuser",
