@@ -1,6 +1,23 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 
+MONEY_QUANTUM = Decimal("0.01")
+
+
+def split_even(total_cost):
+    """Split a monetary amount evenly and assign odd-cent remainder to partner."""
+    total = Decimal(str(total_cost or Decimal("0.00"))).quantize(
+        MONEY_QUANTUM, rounding=ROUND_HALF_UP
+    )
+    total_cents = int((total * 100).to_integral_value(rounding=ROUND_HALF_UP))
+    pilot_cents = total_cents // 2
+    partner_cents = total_cents - pilot_cents
+    return (
+        Decimal(pilot_cents).scaleb(-2),
+        Decimal(partner_cents).scaleb(-2),
+    )
+
+
 def effective_rental_cost(flight):
     """Return effective rental cost with historical snapshot priority.
 
@@ -34,18 +51,18 @@ def split_flight_costs(
 
     if split_type:
         if pilot and partner and split_type == "even":
-            half_tow = tow / 2
-            half_rental = rental / 2
-            half_instruction = instruction / 2
+            pilot_tow, partner_tow = split_even(tow)
+            pilot_rental, partner_rental = split_even(rental)
+            pilot_instruction, partner_instruction = split_even(instruction)
             allocations[pilot] = {
-                "tow": half_tow,
-                "rental": half_rental,
-                "instruction": half_instruction,
+                "tow": pilot_tow,
+                "rental": pilot_rental,
+                "instruction": pilot_instruction,
             }
             allocations[partner] = {
-                "tow": half_tow,
-                "rental": half_rental,
-                "instruction": half_instruction,
+                "tow": partner_tow,
+                "rental": partner_rental,
+                "instruction": partner_instruction,
             }
         elif pilot and partner and split_type == "tow":
             allocations[pilot] = {
@@ -94,5 +111,5 @@ def split_flight_costs(
 def quantize_currency(value):
     """Quantize a value to cents using billing-standard half-up rounding."""
     return Decimal(str(value or Decimal("0.00"))).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
+        MONEY_QUANTUM, rounding=ROUND_HALF_UP
     )
