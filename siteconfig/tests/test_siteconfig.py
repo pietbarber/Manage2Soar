@@ -62,6 +62,17 @@ def test_siteconfiguration_club_timezone_defaults_to_utc():
 
 
 @pytest.mark.django_db
+def test_siteconfiguration_billing_app_defaults_to_disabled():
+    config = SiteConfiguration.objects.create(
+        club_name="No Billing Club",
+        domain_name="no-billing.example.org",
+        club_abbreviation="NBC",
+    )
+
+    assert config.billing_app_enabled is False
+
+
+@pytest.mark.django_db
 def test_siteconfiguration_club_timezone_rejects_invalid_iana_key():
     config = SiteConfiguration(
         club_name="Timezone Club",

@@ -2,11 +2,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.contrib.messages import get_messages
 from django.urls import reverse
 
 from billing.models import LedgerEntry
 from billing.services import get_balance
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.fixture
@@ -37,6 +39,28 @@ def test_ledger_list_requires_treasurer(client, member, treasurer):
     response = client.get(url)
     assert response.status_code == 200
     assert "Member Billing" in response.content.decode()
+
+
+def test_ledger_list_redirects_when_billing_is_disabled(client, treasurer):
+    SiteConfiguration.objects.update(billing_app_enabled=False)
+    client.force_login(treasurer)
+
+    response = client.get(reverse("billing:ledger_list"), follow=True)
+
+    assert response.redirect_chain == [("/", 302)]
+    assert [str(message) for message in get_messages(response.wsgi_request)] == [
+        "Billing is disabled for this site."
+    ]
+
+
+def test_billing_navigation_is_hidden_when_disabled(client, treasurer):
+    SiteConfiguration.objects.update(billing_app_enabled=False)
+    client.force_login(treasurer)
+
+    response = client.get("/")
+
+    assert reverse("billing:ledger_list") not in response.content.decode()
+    assert reverse("logsheet:personal_charges") not in response.content.decode()
 
 
 def test_ledger_detail_posts_manual_charge_and_shows_audit(client, member, treasurer):

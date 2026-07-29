@@ -9,6 +9,7 @@ from django.core.management.base import CommandError
 from billing.models import LedgerEntry
 from billing.services import post_charge
 from logsheet.models import Flight, Glider, Logsheet
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -48,6 +49,12 @@ def test_updates_rental_when_tow_actual_already_set(airfield, active_member):
 
 @pytest.mark.django_db
 def test_skips_flights_with_posted_billing_entries(airfield, active_member):
+    SiteConfiguration.objects.create(
+        club_name="Flight Cost Test Club",
+        domain_name="flight-cost.example.com",
+        club_abbreviation="FCT",
+        billing_app_enabled=True,
+    )
     glider = Glider.objects.create(
         make="Schleicher",
         model="ASK-21",

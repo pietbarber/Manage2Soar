@@ -297,6 +297,13 @@ def test_clear_flight_split_ajax(client, active_member, logsheet_with_flights):
 def test_treasurer_split_change_corrects_finalized_flight(
     client, active_member, another_member, logsheet_with_flights
 ):
+    config = SiteConfiguration.objects.first() or SiteConfiguration.objects.create(
+        club_name="Split Correction Test Club",
+        domain_name="split-correction.example.com",
+        club_abbreviation="SCT",
+    )
+    config.billing_app_enabled = True
+    config.save(update_fields=["billing_app_enabled"])
     flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
     flight.tow_cost_actual = Decimal("20.00")
     flight.rental_cost_actual = Decimal("10.00")

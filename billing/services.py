@@ -4,6 +4,7 @@ from uuid import uuid4
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
+from billing.exceptions import BillingDisabledError
 from billing.models import FlightChargeSnapshot, Ledger, LedgerEntry
 from billing.permissions import require_audit_text, require_manual_transaction_access
 
@@ -14,6 +15,13 @@ CHARGE_KINDS = {
     LedgerEntry.Kind.MANUAL_CHARGE,
 }
 REVERSIBLE_KINDS = set(LedgerEntry.Kind.values) - {LedgerEntry.Kind.REVERSAL}
+
+
+def _require_billing_enabled():
+    from siteconfig.models import SiteConfiguration
+
+    if not SiteConfiguration.objects.filter(billing_app_enabled=True).exists():
+        raise BillingDisabledError("Billing is disabled for this site.")
 
 
 def _club_today():
@@ -30,6 +38,7 @@ def _money(amount):
 
 
 def get_or_create_ledger(member):
+    _require_billing_enabled()
     try:
         with transaction.atomic():
             ledger, _ = Ledger.objects.get_or_create(member=member)
@@ -82,6 +91,7 @@ def post_entry(
     correction_group=None,
 ):
     """Post one immutable entry, returning an existing identical source entry."""
+    _require_billing_enabled()
     if actor is None:
         raise ValidationError("A posting actor is required.")
     if effective_date > _club_today():
@@ -144,6 +154,7 @@ def post_entry(
 @transaction.atomic
 def post_flight_charges(*, flight, actor, allocations, correction_group=None):
     """Record frozen Logsheet allocations exactly once per billed member."""
+    _require_billing_enabled()
     posted = []
     for allocation in allocations:
         if Decimal(str(allocation["total"])) <= 0:
@@ -204,6 +215,7 @@ def post_flight_charges(*, flight, actor, allocations, correction_group=None):
 @transaction.atomic
 def correct_flight_charges(*, flight, actor, allocations, effective_date, reason):
     """Replace every active charge for one flight with a complete allocation."""
+    _require_billing_enabled()
     if not allocations:
         raise ValidationError("A correction requires replacement allocations.")
     versions = {allocation.get("allocation_version") for allocation in allocations}
@@ -386,6 +398,7 @@ def reverse_manual_entry(*, entry, actor, effective_date, reason):
 
 @transaction.atomic
 def reverse_entry(*, entry, actor, effective_date, reason, correction_group=None):
+    _require_billing_enabled()
     if actor is None:
         raise ValidationError("A reversal actor is required.")
     if effective_date > _club_today():

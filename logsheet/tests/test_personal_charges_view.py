@@ -5,6 +5,7 @@ from decimal import Decimal
 from io import StringIO
 
 import pytest
+from django.contrib.messages import get_messages
 from django.urls import reverse
 from django.utils import timezone
 
@@ -27,6 +28,12 @@ from siteconfig.models import ChargeableItem, MembershipStatus, SiteConfiguratio
 @pytest.mark.django_db
 class TestPersonalChargesView:
     def setup_method(self):
+        SiteConfiguration.objects.create(
+            club_name="Personal Charges Test Club",
+            domain_name="personal-charges-test.example.com",
+            club_abbreviation="PCT",
+            billing_app_enabled=True,
+        )
         MembershipStatus.objects.update_or_create(
             name="Full Member", defaults={"is_active": True}
         )
@@ -218,6 +225,24 @@ class TestPersonalChargesView:
         assert "Misc" in content
         assert "T-Shirt" in content
         assert str(self.old_date) not in content
+
+    @pytest.mark.parametrize(
+        "url_name",
+        ["logsheet:personal_charges", "logsheet:personal_charges_csv"],
+    )
+    def test_personal_charge_endpoints_redirect_when_billing_is_disabled(
+        self, client, url_name
+    ):
+        SiteConfiguration.objects.update(billing_app_enabled=False)
+        client.force_login(self.member)
+
+        response = client.get(reverse(url_name))
+
+        assert response.status_code == 302
+        assert response.url == "/"
+        assert [str(message) for message in get_messages(response.wsgi_request)] == [
+            "Billing is disabled for this site."
+        ]
 
     def test_personal_charges_csv_sanitizes_formula_like_cells(self, client):
         bad_glider = Glider.objects.create(

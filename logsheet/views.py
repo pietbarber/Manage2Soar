@@ -26,6 +26,7 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
+from billing.decorators import billing_app_required
 from duty_roster.models import GliderReservation
 from members.decorators import active_member_required
 from members.models import Member
@@ -664,6 +665,7 @@ def stats_dump_export_download(request, pk):
 
 
 @active_member_required
+@billing_app_required
 def personal_charges_summary(request):
     """Show a member's personal flight and miscellaneous charges for the last year."""
     from billing.models import Ledger
@@ -693,6 +695,7 @@ def personal_charges_summary(request):
 
 
 @active_member_required
+@billing_app_required
 def personal_charges_summary_csv(request):
     """Export a member's personal charges (flight + misc) as CSV."""
     start_date = timezone.localdate() - timedelta(days=365)

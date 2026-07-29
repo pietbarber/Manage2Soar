@@ -6,11 +6,22 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from billing.models import LedgerEntry
+from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.services import get_balance
 from logsheet import services as logsheet_services
 from logsheet.models import Airfield, Flight, Logsheet, RevisionLog
 from members.models import Member
+from siteconfig.models import SiteConfiguration
+
+
+@pytest.fixture(autouse=True)
+def enable_billing_app(db):
+    return SiteConfiguration.objects.create(
+        club_name="Finalization Test Club",
+        domain_name="finalization-test.example.com",
+        club_abbreviation="FTC",
+        billing_app_enabled=True,
+    )
 
 
 @pytest.fixture
@@ -116,3 +127,35 @@ def test_finalization_rolls_back_cost_freezes_and_charges(member, monkeypatch):
     assert not logsheet.finalized
     assert not LedgerEntry.objects.filter(flight__logsheet=logsheet).exists()
     assert not RevisionLog.objects.filter(logsheet=logsheet).exists()
+
+
+@pytest.mark.django_db
+def test_finalization_skips_cost_freezes_and_ledger_when_billing_is_disabled(
+    member, enable_billing_app
+):
+    enable_billing_app.billing_app_enabled = False
+    enable_billing_app.save(update_fields=["billing_app_enabled"])
+    airfield = Airfield.objects.create(identifier="KOFF", name="Billing Disabled")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    flight = _flight(logsheet, member, with_actual=False)
+    enqueue_summary = Mock()
+
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        assert logsheet_services.finalize_logsheet_financials(
+            logsheet_id=logsheet.pk,
+            actor=member,
+            enqueue_summary=enqueue_summary,
+        )
+
+    flight.refresh_from_db()
+    logsheet.refresh_from_db()
+    assert logsheet.finalized
+    assert flight.tow_cost_actual is None
+    assert flight.rental_cost_actual is None
+    assert flight.instruction_fee_actual is None
+    assert not LedgerEntry.objects.filter(flight=flight).exists()
+    assert not FlightChargeSnapshot.objects.filter(flight=flight).exists()
+    assert RevisionLog.objects.filter(logsheet=logsheet).count() == 1
+    enqueue_summary.assert_called_once_with(logsheet.pk)

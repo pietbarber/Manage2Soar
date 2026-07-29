@@ -39,6 +39,21 @@ payment provider.
 8. The first release should solve member balances well. It should not become a
    general accounts-receivable, payment-processing, or guest-settlement system.
 
+## 2.1 Tenant Billing Activation
+
+Billing is tenant-configurable through `SiteConfiguration.billing_app_enabled`
+(default `False`).
+
+When the flag is disabled:
+
+- Billing ledger staff views are redirected and hidden from navigation.
+- Member personal charge history endpoints are redirected.
+- Ledger mutation services reject writes.
+- Logsheet finalization still completes operationally, but skips cost freezing
+  and ledger posting.
+
+When enabled, all MVP behaviors in this document apply.
+
 ## 3. MVP Outcome
 
 The MVP must provide:

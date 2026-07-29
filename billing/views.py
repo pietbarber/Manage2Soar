@@ -8,6 +8,7 @@ from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from billing.decorators import billing_app_required
 from billing.forms import ManualEntryForm, ReverseEntryForm
 from billing.models import Ledger, LedgerEntry
 from billing.services import (
@@ -33,6 +34,7 @@ def treasurer_required(view_func):
     return wrapper
 
 
+@billing_app_required
 @treasurer_required
 def ledger_list(request):
     query = request.GET.get("q", "").strip()
@@ -58,6 +60,7 @@ def ledger_list(request):
     return render(request, "billing/ledger_list.html", {"rows": rows, "query": query})
 
 
+@billing_app_required
 @treasurer_required
 def ledger_detail(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
@@ -116,6 +119,7 @@ def ledger_detail(request, member_id):
 
 
 @require_POST
+@billing_app_required
 @treasurer_required
 def reverse_entry(request, entry_id):
     entry = get_object_or_404(LedgerEntry, pk=entry_id)
