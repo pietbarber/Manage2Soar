@@ -313,6 +313,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             "Billing Rules",
             {
                 "fields": (
+                    "billing_app_enabled",
                     "billing_rules_enabled",
                     "instructor_time_charges_enabled",
                     "billing_pricing_mode",
@@ -321,6 +322,9 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "default_instructor_rate_multiplier",
                 ),
                 "description": (
+                    "The billing app switch controls access to the member ledger and "
+                    "automatic ledger posting. The remaining settings only apply when "
+                    "the billing app is enabled. "
                     "Enable configurable billing rules keyed by membership status. "
                     "When enabled, membership-specific modifiers can adjust tow, "
                     "rental, and instruction billing behavior. "

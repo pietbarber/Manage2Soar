@@ -26,6 +26,7 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
+from billing.decorators import billing_app_required
 from duty_roster.models import GliderReservation
 from members.decorators import active_member_required
 from members.models import Member
@@ -67,9 +68,11 @@ from .models import (
     TowplaneChargeTier,
     TowplaneCloseout,
 )
+from .services import finalize_logsheet_financials
 from .utils.finalization_email import enqueue_finalization_summary_email_job
 from .utils.flight_charges import effective_rental_cost as _effective_rental_cost
 from .utils.flight_charges import (
+    get_billing_allocations,
     quantize_currency,
     split_flight_costs,
 )
@@ -662,10 +665,15 @@ def stats_dump_export_download(request, pk):
 
 
 @active_member_required
+@billing_app_required
 def personal_charges_summary(request):
     """Show a member's personal flight and miscellaneous charges for the last year."""
+    from billing.models import Ledger
+    from billing.services import get_balance
+
     start_date = timezone.localdate() - timedelta(days=365)
     flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+    ledger = Ledger.objects.filter(member=request.user).first()
 
     total_flight_cost = sum((row["total_cost"] for row in flight_rows), Decimal("0.00"))
     total_misc_cost = sum(
@@ -680,12 +688,14 @@ def personal_charges_summary(request):
             "misc_charges": misc_charges,
             "total_flight_cost": total_flight_cost,
             "total_misc_cost": total_misc_cost,
+            "ledger_balance": get_balance(ledger) if ledger else Decimal("0.00"),
             "start_date": start_date,
         },
     )
 
 
 @active_member_required
+@billing_app_required
 def personal_charges_summary_csv(request):
     """Export a member's personal charges (flight + misc) as CSV."""
     start_date = timezone.localdate() - timedelta(days=365)
@@ -938,9 +948,20 @@ def update_flight_split(request, flight_id):
     flight = get_object_or_404(Flight, id=flight_id)
     logsheet = flight.logsheet
     if logsheet.finalized:
-        return JsonResponse(
-            {"success": False, "error": "Logsheet is finalized."}, status=403
-        )
+        if not (request.user.is_superuser or request.user.treasurer):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Finalized flights require an audited correction.",
+                },
+                status=403,
+            )
+        reason = (request.POST.get("reason") or "").strip()
+        if not reason:
+            return JsonResponse(
+                {"success": False, "error": "A correction reason is required."},
+                status=400,
+            )
 
     split_with_id = request.POST.get("split_with")
     split_type = request.POST.get("split_type")
@@ -962,6 +983,57 @@ def update_flight_split(request, flight_id):
         return JsonResponse(
             {"success": False, "error": "Invalid split type."}, status=400
         )
+
+    if logsheet.finalized and (not split_with or not split_type_value):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Finalized corrections require a shared-flight split.",
+            },
+            status=400,
+        )
+
+    if logsheet.finalized:
+        from billing.models import FlightChargeSnapshot
+        from billing.services import correct_flight_charges
+        from siteconfig.timezone_utils import get_club_today
+
+        current_version = (
+            FlightChargeSnapshot.objects.filter(flight=flight)
+            .order_by("-allocation_version")
+            .values_list("allocation_version", flat=True)
+            .first()
+        )
+        if current_version is None:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "The flight has no posted billing allocation.",
+                },
+                status=400,
+            )
+
+        with transaction.atomic():
+            flight.split_with = split_with
+            flight.split_type = split_type_value
+            allocations = get_billing_allocations(
+                flight, allocation_version=current_version + 1
+            )
+            try:
+                correct_flight_charges(
+                    flight=flight,
+                    actor=request.user,
+                    allocations=allocations,
+                    effective_date=get_club_today(),
+                    reason=reason,
+                )
+            except ValidationError as exc:
+                return JsonResponse(
+                    {"success": False, "error": get_validation_message(exc)},
+                    status=400,
+                )
+            flight.save(update_fields=["split_with", "split_type"])
+        return JsonResponse({"success": True, "corrected": True})
 
     flight.split_with = split_with
     flight.split_type = split_type_value
@@ -1396,39 +1468,13 @@ def manage_logsheet(request, pk):
         # on_commit() is registered inside the block so the summary email,
         # and any post-finalization behavior outside this block, run after
         # the DB commit rather than inline.
-        with transaction.atomic():
-            locked_logsheet = Logsheet.objects.select_for_update().get(pk=logsheet.pk)
-            if locked_logsheet.finalized:
-                messages.info(request, "This logsheet has already been finalized.")
-                return redirect("logsheet:manage", pk=locked_logsheet.pk)
-
-            # Lock in cost values
-            # That means take the temporary values we calculated for the costs
-            # and place them in these other variables that get perma-written to the database.
-            # Use unfiltered queryset to lock in costs for all flights
-            for flight in all_flights:
-                if flight.tow_cost_actual is None:
-                    flight.tow_cost_actual = flight.tow_cost_calculated
-                if flight.rental_cost_actual is None:
-                    flight.rental_cost_actual = flight.rental_cost
-                if flight.instruction_fee_actual is None:
-                    flight.instruction_fee_actual = flight.instruction_fee_calculated
-                flight.save()
-
-            locked_logsheet.finalized = True
-            locked_logsheet.save()
-
-            RevisionLog.objects.create(
-                logsheet=locked_logsheet,
-                revised_by=request.user,
-                note="Logsheet finalized",
-            )
-
-            # Queue summary email dispatch after commit so request latency
-            # does not scale with recipient count.
-            transaction.on_commit(
-                lambda: enqueue_finalization_summary_email_job(locked_logsheet.pk)
-            )
+        if not finalize_logsheet_financials(
+            logsheet_id=logsheet.pk,
+            actor=request.user,
+            enqueue_summary=enqueue_finalization_summary_email_job,
+        ):
+            messages.info(request, "This logsheet has already been finalized.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
 
         # Retire visiting pilot token when logsheet is finalized
         config = SiteConfiguration.objects.first()
@@ -1454,7 +1500,18 @@ def manage_logsheet(request, pk):
     elif request.method == "POST":
 
         if "revise" in request.POST:
+            from billing.models import LedgerEntry
             from logsheet.utils.permissions import can_unfinalize_logsheet
+
+            if LedgerEntry.objects.filter(
+                flight__logsheet=logsheet,
+                kind=LedgerEntry.Kind.FLIGHT_CHARGE,
+            ).exists():
+                messages.error(
+                    request,
+                    "This logsheet has posted billing entries and requires an audited billing correction.",
+                )
+                return redirect("logsheet:manage", pk=logsheet.pk)
 
             if can_unfinalize_logsheet(request.user, logsheet):
                 logsheet.finalized = False
@@ -2475,47 +2532,13 @@ def manage_logsheet_finances(request, pk):
                 )
                 return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
-            # Keep finalization DB writes atomic and register post-commit email
-            # so the sender sees committed state and mail failures cannot roll
-            # back financial finalization.
-            with transaction.atomic():
-                locked_logsheet = Logsheet.objects.select_for_update().get(
-                    pk=logsheet.pk
-                )
-                if locked_logsheet.finalized:
-                    messages.info(request, "This logsheet has already been finalized.")
-                    return redirect("logsheet:manage", pk=locked_logsheet.pk)
-
-                # Re-query and lock flight rows inside the transaction so
-                # cost lock-in writes operate on transaction-consistent data.
-                locked_flights = Flight.objects.select_for_update().filter(
-                    logsheet=locked_logsheet
-                )
-
-                # Lock in costs
-                for flight in locked_flights:
-                    if flight.tow_cost_actual is None:
-                        flight.tow_cost_actual = flight.tow_cost_calculated
-                    if flight.rental_cost_actual is None:
-                        flight.rental_cost_actual = flight.rental_cost
-                    if flight.instruction_fee_actual is None:
-                        flight.instruction_fee_actual = (
-                            flight.instruction_fee_calculated
-                        )
-                    flight.save()
-
-                locked_logsheet.finalized = True
-                locked_logsheet.save()
-
-                RevisionLog.objects.create(
-                    logsheet=locked_logsheet,
-                    revised_by=request.user,
-                    note="Logsheet finalized",
-                )
-
-                transaction.on_commit(
-                    lambda: enqueue_finalization_summary_email_job(locked_logsheet.pk)
-                )
+            if not finalize_logsheet_financials(
+                logsheet_id=logsheet.pk,
+                actor=request.user,
+                enqueue_summary=enqueue_finalization_summary_email_job,
+            ):
+                messages.info(request, "This logsheet has already been finalized.")
+                return redirect("logsheet:manage", pk=logsheet.pk)
 
             messages.success(
                 request, "Logsheet has been finalized and all costs locked in."
@@ -2667,7 +2690,18 @@ def edit_logsheet_closeout(request, pk):
         duty_form = LogsheetDutyCrewForm(request.POST, instance=logsheet)
         formset = formset_class(request.POST, queryset=queryset)
 
-        if form.is_valid() and duty_form.is_valid() and formset.is_valid():
+        forms_valid = form.is_valid() and duty_form.is_valid() and formset.is_valid()
+        if forms_valid and logsheet.finalized:
+            billing_fields = {"rental_hours_chargeable", "rental_charged_to"}
+            for closeout_form in formset.forms:
+                if billing_fields.intersection(closeout_form.changed_data):
+                    closeout_form.add_error(
+                        None,
+                        "Towplane rental charges require an audited billing correction.",
+                    )
+                    forms_valid = False
+
+        if forms_valid:
             form.save()
             duty_form.save()
             formset.save()
@@ -2846,6 +2880,7 @@ def view_logsheet_closeout(request, pk):
     # Check if towplane rentals are enabled for conditional display
     config = SiteConfiguration.objects.first()
     towplane_rental_enabled = config.allow_towplane_rental if config else False
+    from logsheet.utils.permissions import can_edit_logsheet
 
     return render(
         request,
@@ -2856,6 +2891,7 @@ def view_logsheet_closeout(request, pk):
             "towplanes": towplanes,
             "maintenance_issues": maintenance_issues,
             "towplane_rental_enabled": towplane_rental_enabled,
+            "can_edit_closeout": can_edit_logsheet(request.user, logsheet),
         },
     )
 

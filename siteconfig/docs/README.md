@@ -47,6 +47,7 @@ The `SiteConfiguration` model stores site-wide settings and customizable role ti
 This app configures site-wide variables including:
 - Whether the club uses a duty roster to assign instructors or duties
 - Site-wide configuration like club name, URL, and logo
+- Billing workflow activation via `billing_app_enabled`
 - **Configurable membership statuses** (new feature) - allows clubs to customize their membership status types
 
 The app also includes the `MembershipStatus` model which allows clubs to define their own membership statuses instead of using hardcoded values.
@@ -70,6 +71,15 @@ The app also includes the `MembershipStatus` model which allows clubs to define 
   - New: customizable label for the person who manages membership (e.g. "Membership Manager", "Member Meister").
   - Default: `"Membership Manager"`
   - Used in templates (for example, the members detail page) so UI text can refer to the club's preferred job title.
+
+- `billing_app_enabled` (BooleanField)
+  - Master switch for tenant billing workflows.
+  - Default: `False`.
+  - When `False`, billing ledger views are redirected, member personal charge pages are gated, and logsheet finalization completes without posting ledger entries.
+
+- `billing_rules_enabled` (BooleanField)
+  - Enables membership-status pricing modifiers.
+  - Only has effect when `billing_app_enabled` is `True`.
 
 - `equipment_manager_title` (CharField)
   - Customizable label for equipment manager.
@@ -105,6 +115,7 @@ from siteconfig.models import SiteConfiguration
 sc = SiteConfiguration.objects.first()
 print(sc.club_name)
 print(sc.membership_manager_title)
+print(sc.billing_app_enabled)
 
 # Access the dedupe window
 print(sc.redaction_notification_dedupe_minutes)
@@ -117,6 +128,7 @@ from siteconfig.models import SiteConfiguration
 sc = SiteConfiguration.objects.first()
 sc.membership_manager_title = 'Membership Meister'
 sc.redaction_notification_dedupe_minutes = 120
+sc.billing_app_enabled = True
 sc.save()
 ```
 

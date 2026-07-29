@@ -192,6 +192,7 @@ def apple_touch_icon_view(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("members/", include("members.urls")),
+    path("billing/", include(("billing.urls", "billing"), namespace="billing")),
     path("logsheet/", include(("logsheet.urls", "logsheet"), namespace="logsheet")),
     path("instructors/", include("instructors.urls")),
     path("duty_roster/", include("duty_roster.urls")),

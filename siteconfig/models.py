@@ -483,6 +483,14 @@ class SiteConfiguration(models.Model):
     )
 
     # Membership-based billing rules (Issue #936)
+    billing_app_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Enable the member billing ledger, billing views, and automatic "
+            "ledger posting for this site. Billing rule settings only apply "
+            "when this master switch is enabled."
+        ),
+    )
     billing_rules_enabled = models.BooleanField(
         default=False,
         help_text=(

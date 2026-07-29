@@ -36,17 +36,20 @@ class Command(BaseCommand):
         # Cache site configuration once for this run; cost properties read
         # retrieve-waiver flags from this model.
         site_config = SiteConfiguration.objects.first()
+        from billing.models import LedgerEntry
 
         total_updated = 0
         for logsheet in logsheets:
             flights = (
                 Flight.objects.filter(logsheet=logsheet)
+                .exclude(billing_entries__kind=LedgerEntry.Kind.FLIGHT_CHARGE)
                 .filter(
                     Q(tow_cost_actual__isnull=True)
                     | Q(tow_cost_actual=0)
                     | Q(rental_cost_actual__isnull=True)
                     | Q(rental_cost_actual=0)
                 )
+                .distinct()
                 .select_related("glider", "towplane__charge_scheme")
                 .prefetch_related("towplane__charge_scheme__charge_tiers")
             )

@@ -30,7 +30,14 @@ def effective_rental_cost(flight):
             return min(flight.rental_cost_actual, max_rate)
         return flight.rental_cost_actual
 
-    return flight.rental_cost
+    # Keep the calculated amount unrounded until allocation can distribute any
+    # fractional cent deterministically between members.
+    cost = flight.rental_cost_calculated
+    if cost is None:
+        return None
+    if flight.glider and flight.glider.max_rental_rate is not None:
+        cost = min(cost, Decimal(str(flight.glider.max_rental_rate)))
+    return cost
 
 
 def split_flight_costs(
@@ -48,6 +55,11 @@ def split_flight_costs(
 
     allocations = {}
     primary = pilot or partner
+
+    def split_even(value):
+        """Split cents deterministically, assigning any remainder to partner."""
+        first = quantize_currency(value / 2)
+        return first, quantize_currency(value - first)
 
     if split_type:
         if pilot and partner and split_type == "even":
@@ -113,3 +125,45 @@ def quantize_currency(value):
     return Decimal(str(value or Decimal("0.00"))).quantize(
         MONEY_QUANTUM, rounding=ROUND_HALF_UP
     )
+
+
+def get_billing_allocations(flight, allocation_version=1):
+    """Return the frozen member allocation input consumed by Billing."""
+    if flight.commercial_ride:
+        return []
+    allocations = split_flight_costs(
+        flight.pilot,
+        flight.split_with,
+        flight.split_type,
+        flight.tow_cost_actual,
+        flight.rental_cost_actual,
+        flight.instruction_fee_actual,
+    )
+    result = []
+    for member, components in allocations.items():
+        tow = quantize_currency(components["tow"])
+        rental = quantize_currency(components["rental"])
+        instruction = quantize_currency(components["instruction"])
+        total = quantize_currency(tow + rental + instruction)
+        if total <= Decimal("0.00"):
+            continue
+        result.append(
+            {
+                "member": member,
+                "tow": tow,
+                "rental": rental,
+                "instruction": instruction,
+                "total": total,
+                "allocation_rule": flight.split_type or "full",
+                "allocation_version": allocation_version,
+                "source_key": (
+                    f"flight:{flight.pk}:member:{member.pk}:v{allocation_version}"
+                ),
+                "allocation_snapshot": {
+                    "split_type": flight.split_type,
+                    "pilot_id": flight.pilot_id,
+                    "split_with_id": flight.split_with_id,
+                },
+            }
+        )
+    return result

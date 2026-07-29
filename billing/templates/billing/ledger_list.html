@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Member Billing{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <p class="text-uppercase text-muted small mb-1">Treasurer workspace</p>
+      <h1 class="h3 mb-0">Member Billing</h1>
+    </div>
+  </div>
+  <form method="get" class="row g-2 mb-4">
+    <div class="col-sm-8 col-lg-6">
+      <label class="visually-hidden" for="member-search">Search members</label>
+      <input id="member-search" class="form-control" name="q" value="{{ query }}" placeholder="Name or username">
+    </div>
+    <div class="col-auto"><button class="btn btn-outline-primary" type="submit">Search</button></div>
+  </form>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Member</th><th>Username</th><th class="text-end">Balance</th><th></th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>{{ row.member.get_full_name|default:row.member.username }}</td>
+          <td>{{ row.member.username }}</td>
+          <td class="text-end {% if row.balance > 0 %}text-danger{% elif row.balance < 0 %}text-success{% endif %}">${{ row.balance|floatformat:2 }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:ledger_detail' row.member.pk %}">View ledger</a></td>
+        </tr>
+        {% empty %}<tr><td colspan="4" class="text-muted">No members found.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

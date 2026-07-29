@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "tinymce",
     "social_django",
     "members",
+    "billing.apps.BillingConfig",
     "logsheet",
     "duty_roster",
     "analytics",

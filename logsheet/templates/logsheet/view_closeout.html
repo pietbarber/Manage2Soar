@@ -9,6 +9,7 @@
 {% endblock %}
 
 {% block content %}
+{% get_siteconfig as config %}
 <div class="closeout-header">
   <div class="container">
     <div class="closeout-breadcrumb">
@@ -35,8 +36,13 @@
       <div class="col-md-4 text-md-end">
         <div class="logsheet-status {% if logsheet.finalized %}logsheet-status-finalized{% else %}logsheet-status-editable{% endif %}">
           {% if logsheet.finalized %}
-            <i class="bi bi-lock-fill me-1"></i>
-            Finalized - View Only
+            {% if config and config.billing_app_enabled %}
+              <i class="bi bi-lock-fill me-1"></i>
+              Finalized - Billing Locked
+            {% else %}
+              <i class="bi bi-check-circle-fill me-1"></i>
+              Finalized
+            {% endif %}
           {% else %}
             <i class="bi bi-pencil-square me-1"></i>
             Editable
@@ -44,10 +50,29 @@
         </div>
       </div>
     </div>
+    {% if logsheet.finalized and can_edit_closeout %}
+      <div class="mt-3 d-flex justify-content-end">
+        <a class="btn btn-outline-light" href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}">
+          <i class="bi bi-pencil-square me-1"></i> Edit Operational Closeout
+        </a>
+      </div>
+    {% endif %}
   </div>
 </div>
 
 <div class="container">
+
+{% if logsheet.finalized %}
+  <div class="alert alert-info mt-3">
+    {% if config and config.billing_app_enabled %}
+      Billing entries are locked. Authorized staff can still update operational closeout
+      details such as the summary, notes, fuel, and tach readings.
+    {% else %}
+      This logsheet is finalized. Billing is disabled for this site, so no ledger entries
+      were posted during finalization.
+    {% endif %}
+  </div>
+{% endif %}
 
 {% if closeout %}
   <div class="closeout-section">
@@ -74,7 +99,6 @@
   </div>
 {% endif %}
 
-{% get_siteconfig as config %}
 <div class="closeout-section">
   <h4><i class="bi bi-people-fill"></i>Duty Crew</h4>
   <div class="duty-crew-list">

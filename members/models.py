@@ -201,6 +201,7 @@ class Member(AbstractUser):
     instructor = models.BooleanField(default=False)
     stats_monger = models.BooleanField(
         default=False,
+        db_column="is_stats_monger",
         help_text="Allows the member to export raw flight statistics CSV dumps.",
     )
     towpilot = models.BooleanField(default=False)
