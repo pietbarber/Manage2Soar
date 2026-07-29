@@ -1,37 +1,132 @@
 {% extends "base.html" %}
+{% load widget_tweaks %}
 
 {% block title %}Billing: {{ member }}{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-  <a href="{% url 'billing:ledger_list' %}" class="text-decoration-none">&larr; Member Billing</a>
-  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mt-3 mb-4">
-    <div><p class="text-uppercase text-muted small mb-1">Member ledger</p><h1 class="h3 mb-0">{{ member.get_full_name|default:member.username }}</h1><div class="text-muted">{{ member.username }}</div></div>
-    <div class="text-end"><div class="text-muted small">Current balance</div><div class="display-6 {% if balance > 0 %}text-danger{% elif balance < 0 %}text-success{% endif %}">${{ balance|floatformat:2 }}</div></div>
+  <a href="{% url 'billing:ledger_list' %}" class="btn btn-link ps-0 text-decoration-none">&larr; Member Billing</a>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <p class="text-uppercase text-muted small mb-1">Member ledger</p>
+        <h1 class="h3 mb-0">{{ member.get_full_name|default:member.username }}</h1>
+        <div class="text-muted">{{ member.username }}</div>
+      </div>
+      <div class="text-end">
+        <div class="text-muted small">Current balance</div>
+        <div class="display-6 mb-0 {% if balance > 0 %}text-danger{% elif balance < 0 %}text-success{% endif %}">
+          ${{ balance|floatformat:2 }}
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="row g-4">
     <div class="col-lg-4">
-      <div class="card shadow-sm"><div class="card-body">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
         <h2 class="h5">Post manual entry</h2>
         <p class="small text-muted">Every entry records you as creator. Use the reason for internal audit context.</p>
         <form method="post">
           {% csrf_token %}
-          {{ form.non_field_errors }}
-          {% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger" role="alert">
+            {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          {% for field in form %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {% if field.errors %}
+              {% if field.field.widget.input_type == 'select' %}
+                {{ field|add_class:"form-select is-invalid" }}
+              {% elif field.field.widget.input_type == 'textarea' %}
+                {{ field|add_class:"form-control is-invalid" }}
+              {% else %}
+                {{ field|add_class:"form-control is-invalid" }}
+              {% endif %}
+            {% else %}
+              {% if field.field.widget.input_type == 'select' %}
+                {{ field|add_class:"form-select" }}
+              {% elif field.field.widget.input_type == 'textarea' %}
+                {{ field|add_class:"form-control" }}
+              {% else %}
+                {{ field|add_class:"form-control" }}
+              {% endif %}
+            {% endif %}
+            {% if field.help_text %}
+              <div class="form-text">{{ field.help_text }}</div>
+            {% endif %}
+            {% for error in field.errors %}
+              <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+
           <button class="btn btn-primary w-100" type="submit">Post entry</button>
         </form>
-      </div></div>
+      </div>
+      </div>
     </div>
+
     <div class="col-lg-8">
-      <div class="table-responsive"><table class="table table-sm align-middle">
-        <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="text-end">Amount</th><th>Audit</th><th></th></tr></thead>
-        <tbody>
-        {% for entry in entries %}
-          <tr><td>{{ entry.effective_date }}</td><td>{{ entry.get_kind_display }}</td><td>{{ entry.member_description }}</td><td class="text-end">{% if entry.effect == 'credit' %}-{% endif %}${{ entry.amount|floatformat:2 }}</td><td class="small text-muted">{{ entry.created_by }}<br>{{ entry.internal_note }}</td><td>{% if not entry.reversal and entry.kind != 'reversal' %}<form method="post" action="{% url 'billing:entry_reverse' entry.pk %}">{% csrf_token %}<input type="hidden" name="reason" value="Manual reversal from ledger detail"><button class="btn btn-sm btn-outline-danger" type="submit">Reverse</button></form>{% endif %}</td></tr>
-        {% empty %}<tr><td colspan="6" class="text-muted">No entries posted.</td></tr>{% endfor %}
-        </tbody>
-      </table></div>
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-light-subtle d-flex justify-content-between align-items-center">
+          <h2 class="h5 mb-0">Ledger entries</h2>
+          <span class="text-muted small">Most recent first</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Type</th>
+                <th scope="col">Description</th>
+                <th scope="col" class="text-end">Amount</th>
+                <th scope="col">Audit</th>
+                <th scope="col" class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for entry in entries %}
+              <tr>
+                <td class="text-nowrap">{{ entry.effective_date }}</td>
+                <td>{{ entry.get_kind_display }}</td>
+                <td>{{ entry.member_description }}</td>
+                <td class="text-end fw-semibold {% if entry.effect == 'debit' %}text-danger{% else %}text-success{% endif %}">
+                  {% if entry.effect == 'credit' %}-{% endif %}${{ entry.amount|floatformat:2 }}
+                </td>
+                <td class="small text-muted">
+                  {{ entry.created_by }}<br>
+                  {{ entry.internal_note }}
+                </td>
+                <td class="text-end">
+                  {% if not entry.reversal and entry.kind != 'reversal' %}
+                  <form method="post" action="{% url 'billing:entry_reverse' entry.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="reason" value="Manual reversal from ledger detail">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Reverse</button>
+                  </form>
+                  {% else %}
+                  <span class="badge text-bg-secondary">Reversed</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4">No entries posted.</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
