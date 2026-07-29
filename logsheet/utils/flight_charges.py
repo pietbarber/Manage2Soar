@@ -42,7 +42,7 @@ def split_flight_costs(
     def split_even(value):
         """Split cents deterministically, assigning any remainder to partner."""
         first = quantize_currency(value / 2)
-        return quantize_currency(value - first), first
+        return first, quantize_currency(value - first)
 
     if split_type:
         if pilot and partner and split_type == "even":
