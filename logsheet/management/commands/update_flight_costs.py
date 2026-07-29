@@ -38,24 +38,18 @@ class Command(BaseCommand):
         site_config = SiteConfiguration.objects.first()
         from billing.models import LedgerEntry
 
-        posted_flight_ids = set(
-            LedgerEntry.objects.filter(
-                kind=LedgerEntry.Kind.FLIGHT_CHARGE,
-                flight__isnull=False,
-            ).values_list("flight_id", flat=True)
-        )
-
         total_updated = 0
         for logsheet in logsheets:
             flights = (
                 Flight.objects.filter(logsheet=logsheet)
-                .exclude(pk__in=posted_flight_ids)
+                .exclude(billing_entries__kind=LedgerEntry.Kind.FLIGHT_CHARGE)
                 .filter(
                     Q(tow_cost_actual__isnull=True)
                     | Q(tow_cost_actual=0)
                     | Q(rental_cost_actual__isnull=True)
                     | Q(rental_cost_actual=0)
                 )
+                .distinct()
                 .select_related("glider", "towplane__charge_scheme")
                 .prefetch_related("towplane__charge_scheme__charge_tiers")
             )

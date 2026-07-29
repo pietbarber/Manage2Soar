@@ -24,6 +24,7 @@ class FinalizedCloseoutEditingTests(TestCase):
             domain_name="test.example.com",
             club_abbreviation="TC",
             allow_towplane_rental=True,
+            billing_app_enabled=True,
         )
         self.member = Member.objects.create_user(
             username="closeout-editor",

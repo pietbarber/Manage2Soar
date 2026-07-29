@@ -3,7 +3,8 @@ from functools import wraps
 from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
+from django.db.models.functions import Coalesce
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -47,14 +48,33 @@ def ledger_list(request):
         )
 
     rows = []
-    ledgers = Ledger.objects.filter(member__in=members).select_related("member")
+    ledgers = (
+        Ledger.objects.filter(member__in=members)
+        .select_related("member")
+        .annotate(
+            running_balance=Coalesce(
+                Sum(
+                    Case(
+                        When(
+                            entries__effect=LedgerEntry.Effect.CREDIT,
+                            then=-F("entries__amount"),
+                        ),
+                        default=F("entries__amount"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2),
+                    )
+                ),
+                Value(0),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
+    )
     ledger_by_member = {ledger.member_id: ledger for ledger in ledgers}
     for member in members:
         ledger = ledger_by_member.get(member.pk)
         rows.append(
             {
                 "member": member,
-                "balance": get_balance(ledger) if ledger else 0,
+                "balance": ledger.running_balance if ledger else 0,
             }
         )
     return render(request, "billing/ledger_list.html", {"rows": rows, "query": query})
@@ -65,7 +85,11 @@ def ledger_list(request):
 def ledger_detail(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     ledger = Ledger.objects.filter(member=member).first()
-    entries = ledger.entries.select_related("created_by") if ledger else []
+    entries = (
+        ledger.entries.select_related("created_by").order_by("-effective_date", "-id")
+        if ledger
+        else []
+    )
     form = ManualEntryForm(request.POST or None)
 
     if request.method == "POST":

@@ -996,6 +996,7 @@ def update_flight_split(request, flight_id):
     if logsheet.finalized:
         from billing.models import FlightChargeSnapshot
         from billing.services import correct_flight_charges
+        from siteconfig.timezone_utils import get_club_today
 
         current_version = (
             FlightChargeSnapshot.objects.filter(flight=flight)
@@ -1023,7 +1024,7 @@ def update_flight_split(request, flight_id):
                     flight=flight,
                     actor=request.user,
                     allocations=allocations,
-                    effective_date=date.today(),
+                    effective_date=get_club_today(),
                     reason=reason,
                 )
             except ValidationError as exc:
