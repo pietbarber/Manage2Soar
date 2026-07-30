@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 
 from siteconfig.models import SiteConfiguration
 
+from .account_emails import send_account_setup_email
 from .decorators import active_member_required
 from .forms_applications import (
     MembershipApplicationForm,
@@ -19,6 +20,17 @@ from .forms_applications import (
 from .models_applications import MembershipApplication
 
 logger = logging.getLogger(__name__)
+
+
+def _send_account_setup_email_safely(member, application_id):
+    try:
+        send_account_setup_email(member)
+    except Exception:
+        logger.exception(
+            "Failed to send account setup email for application %s and member %s",
+            application_id,
+            member.pk,
+        )
 
 
 def _can_view_membership_applications(user):
@@ -256,18 +268,28 @@ def membership_application_detail(request, application_id):
                     application = review_form.save(commit=False)
 
                     if review_action == "approve":
+                        account_already_exists = bool(
+                            application.status == "approved"
+                            and application.member_account_id
+                        )
                         # Approve the application and create member account
                         member = application.approve_application(
                             reviewed_by=request.user
                         )
+                        if not account_already_exists:
+                            transaction.on_commit(
+                                lambda: _send_account_setup_email_safely(
+                                    member, application.application_id
+                                )
+                            )
 
                         messages.success(
                             request,
                             f"Application approved! Member account created for {application.full_name}. "
-                            f"They have been assigned the status '{member.membership_status}'.",
+                            f"They have been assigned the status '{member.membership_status}', "
+                            f"and an account setup email will be sent.",
                         )
 
-                        # TODO: Send approval email to applicant
                         logger.info(
                             f"Application {application.application_id} approved by {request.user}"
                         )

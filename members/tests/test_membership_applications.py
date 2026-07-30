@@ -2,7 +2,10 @@
 Tests for the membership application system.
 """
 
+from unittest.mock import patch
+
 import pytest
+from django.core import mail
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -348,6 +351,93 @@ class MembershipApplicationViewTests(TestCase):
         )
         self.client.force_login(director)
         return director
+
+    def test_approval_sends_account_setup_email_after_commit(self):
+        self._create_manager()
+        application = MembershipApplication.objects.create(
+            first_name="New",
+            last_name="Pilot",
+            email="newpilot@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="VA",
+            zip_code="22630",
+            emergency_contact_name="Existing Pilot",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Learn to soar",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse(
+                    "members:membership_application_detail",
+                    args=[application.application_id],
+                ),
+                {"review_action": "approve", "admin_notes": ""},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        application.refresh_from_db()
+        self.assertEqual(application.status, "approved")
+        self.assertIsNotNone(application.member_account)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [application.email])
+        self.assertIn("account is ready", mail.outbox[0].subject)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            repeat_response = self.client.post(
+                reverse(
+                    "members:membership_application_detail",
+                    args=[application.application_id],
+                ),
+                {"review_action": "approve", "admin_notes": ""},
+            )
+
+        self.assertEqual(repeat_response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_approval_persists_when_account_setup_email_fails(self):
+        self._create_manager()
+        application = MembershipApplication.objects.create(
+            first_name="Mail",
+            last_name="Failure",
+            email="mailfailure@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="VA",
+            zip_code="22630",
+            emergency_contact_name="Existing Pilot",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Learn to soar",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        with patch(
+            "members.views_applications.send_account_setup_email",
+            side_effect=RuntimeError("SMTP unavailable"),
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse(
+                        "members:membership_application_detail",
+                        args=[application.application_id],
+                    ),
+                    {"review_action": "approve", "admin_notes": ""},
+                )
+
+        self.assertEqual(response.status_code, 302)
+        application.refresh_from_db()
+        self.assertEqual(application.status, "approved")
+        self.assertIsNotNone(application.member_account)
 
     def _create_waitlisted_app(self, first_name, email):
         """Create and return a waitlisted application."""

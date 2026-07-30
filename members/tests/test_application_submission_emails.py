@@ -99,6 +99,14 @@ class ApplicationSubmissionEmailTests(TestCase):
         # Verify plain text fallback also has content
         self.assertIn("John Applicant", email.body)
         self.assertIn("john@example.com", email.body)
+        review_url = (
+            f"https://testclub.com/members/applications/{application.application_id}/"
+        )
+        list_url = "https://testclub.com/members/applications/"
+        self.assertIn(review_url, email.body)
+        self.assertIn(list_url, email.body)
+        self.assertIn(review_url, html_content)
+        self.assertIn(list_url, html_content)
 
         # Verify recipients
         expected_recipients = {"manager1@test.com", "manager2@test.com"}
@@ -207,3 +215,11 @@ class ApplicationSubmissionEmailTests(TestCase):
         self.assertIn("text/html", email.alternatives[0][1])
         self.assertIn("New Membership Application", email.alternatives[0][0])
         self.assertIn("Legacy Applicant", email.body)
+        review_url = (
+            f"https://testclub.com/members/applications/{application.application_id}/"
+        )
+        list_url = "https://testclub.com/members/applications/"
+        self.assertIn(review_url, email.body)
+        self.assertIn(list_url, email.body)
+        self.assertIn(review_url, email.alternatives[0][0])
+        self.assertIn(list_url, email.alternatives[0][0])

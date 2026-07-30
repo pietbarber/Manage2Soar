@@ -1,12 +1,13 @@
 import csv
 import logging
 
+from django import forms
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.http import HttpResponse
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
@@ -15,6 +16,7 @@ from tinymce.widgets import TinyMCE
 
 from utils.admin_helpers import AdminHelperMixin
 
+from .account_emails import send_account_setup_email
 from .models import (
     Badge,
     Biography,
@@ -27,6 +29,8 @@ from .models import (
 from .models_applications import MembershipApplication
 from .resources import MEMBER_CSV_FIELDS, MemberResource
 from .utils.image_processing import generate_profile_thumbnails
+
+logger = logging.getLogger(__name__)
 
 # --- Register or replace social_django admin entries with helpful admin banners ---
 try:
@@ -201,9 +205,38 @@ class CustomMemberChangeForm(UserChangeForm):
 
 
 class CustomMemberCreationForm(UserCreationForm):
+    send_account_setup_email = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Email the new member a secure link to choose their password.",
+    )
+
     class Meta:
         model = Member
         fields = ("username", "email", "first_name", "last_name")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["password1"].required = False
+        self.fields["password2"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("send_account_setup_email") and not cleaned_data.get(
+            "email"
+        ):
+            self.add_error(
+                "email", "An email address is required to send an account setup email."
+            )
+        return cleaned_data
+
+    def save(self, commit=True):
+        member = super().save(commit=False)
+        if not self.cleaned_data.get("password1"):
+            member.set_unusable_password()
+        if commit:
+            member.save()
+        return member
 
 
 #########################
@@ -377,6 +410,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "last_name",
                     "password1",
                     "password2",
+                    "send_account_setup_email",
                 ),
             },
         ),
@@ -445,6 +479,19 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                 raise ValidationError(f"Photo processing failed: {e}")
 
         super().save_model(request, obj, form, change)
+
+        if not change and form.cleaned_data.get("send_account_setup_email"):
+            transaction.on_commit(lambda: self._send_account_setup_email_safely(obj))
+
+    @staticmethod
+    def _send_account_setup_email_safely(member):
+        try:
+            send_account_setup_email(member)
+        except Exception:
+            logger.exception(
+                "Failed to send account setup email for admin-created member %s",
+                member.pk,
+            )
 
 
 # --- MembershipApplication Admin ---
