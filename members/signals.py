@@ -22,6 +22,18 @@ from .models import Member
 logger = logging.getLogger(__name__)
 
 
+def _membership_application_email_urls(application, site_url):
+    review_path = reverse(
+        "members:membership_application_detail",
+        args=[application.application_id],
+    )
+    list_path = reverse("members:membership_applications_list")
+    return {
+        "review_application_url": build_absolute_url(review_path, canonical=site_url),
+        "all_applications_url": build_absolute_url(list_path, canonical=site_url),
+    }
+
+
 def _create_notification_if_not_exists(user, message, url=None):
     """Create notification if similar one doesn't already exist (dedupe)."""
     try:
@@ -262,16 +274,10 @@ def notify_membership_managers_of_new_application(application):
                     "submitted_at": application.submitted_at.strftime(
                         "%Y-%m-%d %H:%M:%S"
                     ),
-                    "review_application_url": build_absolute_url(
-                        f"/members/applications/{application.application_id}/",
-                        canonical=site_url,
-                    ),
-                    "all_applications_url": build_absolute_url(
-                        "/members/applications/", canonical=site_url
-                    ),
                     "club_name": config.club_name if config else "Club",
                     "club_logo_url": get_absolute_club_logo_url(config),
                     "site_url": site_url,
+                    **_membership_application_email_urls(application, site_url),
                 }
 
                 # Render HTML and plain text templates
@@ -375,16 +381,10 @@ def notify_membership_managers_of_application(application):
                     "submitted_at": application.submitted_at.strftime(
                         "%Y-%m-%d %H:%M:%S"
                     ),
-                    "review_application_url": build_absolute_url(
-                        f"/members/applications/{application.application_id}/",
-                        canonical=site_url,
-                    ),
-                    "all_applications_url": build_absolute_url(
-                        "/members/applications/", canonical=site_url
-                    ),
                     "club_name": config.club_name if config else "Club",
                     "club_logo_url": get_absolute_club_logo_url(config),
                     "site_url": site_url,
+                    **_membership_application_email_urls(application, site_url),
                 }
 
                 html_message = render_to_string(

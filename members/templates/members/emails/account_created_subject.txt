@@ -1,0 +1,1 @@
+Your {{ club_name }} account is ready
