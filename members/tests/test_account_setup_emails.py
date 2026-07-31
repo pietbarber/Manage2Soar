@@ -40,7 +40,7 @@ def test_account_setup_email_contains_valid_canonical_password_token():
 
     assert len(mail.outbox) == 1
     message = mail.outbox[0]
-    assert message.to == ["newpilot@example.com"]
+    assert message.to == ["developer@example.com"]
     assert message.from_email == "noreply@testclub.example"
     assert message.alternatives[0][1] == "text/html"
     assert config.club_name in message.body

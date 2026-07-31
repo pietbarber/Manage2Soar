@@ -44,7 +44,10 @@ def send_account_setup_email(member):
     subject = "".join(subject.splitlines())
     text_message = render_to_string("members/emails/account_created.txt", context)
     html_message = render_to_string("members/emails/account_created.html", context)
-    message = EmailMultiAlternatives(
+
+    from utils.email import DevModeEmailMultiAlternatives
+
+    message = DevModeEmailMultiAlternatives(
         subject=subject,
         body=text_message,
         from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
