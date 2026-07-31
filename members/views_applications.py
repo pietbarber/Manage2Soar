@@ -283,12 +283,19 @@ def membership_application_detail(request, application_id):
                                 )
                             )
 
-                        messages.success(
-                            request,
-                            f"Application approved! Member account created for {application.full_name}. "
-                            f"They have been assigned the status '{member.membership_status}', "
-                            f"and an account setup email will be sent.",
-                        )
+                        if account_already_exists:
+                            messages.success(
+                                request,
+                                f"Application was already approved for {application.full_name}. "
+                                f"Member status remains '{member.membership_status}'.",
+                            )
+                        else:
+                            messages.success(
+                                request,
+                                f"Application approved! Member account created for {application.full_name}. "
+                                f"They have been assigned the status '{member.membership_status}'. "
+                                "An account setup email has been queued.",
+                            )
 
                         logger.info(
                             f"Application {application.application_id} approved by {request.user}"
