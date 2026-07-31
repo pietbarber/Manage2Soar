@@ -294,7 +294,7 @@ def membership_application_detail(request, application_id):
                                 request,
                                 f"Application approved! Member account created for {application.full_name}. "
                                 f"They have been assigned the status '{member.membership_status}'. "
-                                "An account setup email has been queued.",
+                                "An account setup email will be attempted after this change is saved.",
                             )
 
                         logger.info(

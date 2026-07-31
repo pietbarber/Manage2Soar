@@ -225,7 +225,11 @@ class CustomMemberCreationForm(UserCreationForm):
         password2 = self.cleaned_data.get("password2")
         # Allow password-less creation only when the admin chooses to send an
         # account setup email.
-        if self.cleaned_data.get("send_account_setup_email") and not password1 and not password2:
+        if (
+            self.cleaned_data.get("send_account_setup_email")
+            and not password1
+            and not password2
+        ):
             return password2
         return super().clean_password2()
 
@@ -252,9 +256,9 @@ class CustomMemberCreationForm(UserCreationForm):
 
     def save(self, commit=True):
         member = super().save(commit=False)
-        if self.cleaned_data.get("send_account_setup_email") and not self.cleaned_data.get(
-            "password1"
-        ):
+        if self.cleaned_data.get(
+            "send_account_setup_email"
+        ) and not self.cleaned_data.get("password1"):
             member.set_unusable_password()
         if commit:
             member.save()

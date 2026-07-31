@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core import mail
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from members.forms_applications import MembershipApplicationForm
@@ -352,6 +352,7 @@ class MembershipApplicationViewTests(TestCase):
         self.client.force_login(director)
         return director
 
+    @override_settings(EMAIL_DEV_MODE=False)
     def test_approval_sends_account_setup_email_after_commit(self):
         self._create_manager()
         application = MembershipApplication.objects.create(

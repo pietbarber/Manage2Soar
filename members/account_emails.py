@@ -2,7 +2,6 @@ import math
 
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.encoding import force_bytes
@@ -27,8 +26,11 @@ def send_account_setup_email(member):
         "password_reset_confirm",
         kwargs={"uidb64": uidb64, "token": token},
     )
-    setup_url = build_absolute_url(setup_path, canonical=get_canonical_url())
     config = SiteConfiguration.objects.first()
+    setup_url = build_absolute_url(
+        setup_path,
+        canonical=get_canonical_url(config),
+    )
     timeout_hours = math.ceil(settings.PASSWORD_RESET_TIMEOUT / 3600)
     context = {
         "club_name": config.club_name if config else "Manage2Soar",
