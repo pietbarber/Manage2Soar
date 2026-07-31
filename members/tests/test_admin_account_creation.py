@@ -115,3 +115,21 @@ def test_admin_creation_form_requires_email_when_sending_setup_email():
 
     assert not form.is_valid()
     assert "email" in form.errors
+
+
+@pytest.mark.django_db
+def test_admin_creation_form_requires_password_confirmation_without_setup_email():
+    form = CustomMemberCreationForm(
+        data={
+            "username": "halfpassword",
+            "email": "halfpassword@example.com",
+            "first_name": "Half",
+            "last_name": "Password",
+            "password1": "A-strong-admin-password-979",
+            "password2": "",
+            "send_account_setup_email": False,
+        }
+    )
+
+    assert not form.is_valid()
+    assert "password2" in form.errors

@@ -7,7 +7,7 @@ Your username: {{ member.username }}
 Choose a password using this secure link:
 {{ setup_url }}
 
-This link expires after {{ password_reset_timeout_hours }} hours. After choosing a password, you can sign in with your username and password. If your club offers another sign-in method, you may continue to use it as well.
+This link expires after {{ password_reset_timeout_hours }} hours. After choosing a password, your account access will follow your club's current membership status and sign-in settings. If your club offers another sign-in method, you may continue to use it as well.
 
 If you were not expecting this account, please contact {{ club_name }} and do not use the link.
 

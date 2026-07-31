@@ -220,36 +220,27 @@ class CustomMemberCreationForm(UserCreationForm):
         self.fields["password1"].required = False
         self.fields["password2"].required = False
 
-    def clean_password2(self):
-        password1 = self.cleaned_data.get("password1")
-        password2 = self.cleaned_data.get("password2")
-        # Allow password-less creation only when the admin chooses to send an
-        # account setup email.
-        if (
-            self.cleaned_data.get("send_account_setup_email")
-            and not password1
-            and not password2
-        ):
-            return password2
-        return super().clean_password2()
-
     def clean(self):
         cleaned_data = super().clean()
         send_email = cleaned_data.get("send_account_setup_email")
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
 
         if send_email and not cleaned_data.get("email"):
             self.add_error(
                 "email", "An email address is required to send an account setup email."
             )
 
-        if not send_email and not cleaned_data.get("password1"):
+        if not send_email and not password1:
             self.add_error(
                 "password1",
                 "A password is required when not sending an account setup email.",
             )
+
+        if not send_email and not password2:
             self.add_error(
                 "password2",
-                "A password is required when not sending an account setup email.",
+                "Password confirmation is required when not sending an account setup email.",
             )
 
         return cleaned_data
