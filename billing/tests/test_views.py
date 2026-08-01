@@ -41,9 +41,7 @@ def test_ledger_list_requires_treasurer(client, member, treasurer):
     assert "Member Billing" in response.content.decode()
 
 
-def test_member_cannot_access_or_modify_another_members_ledger(
-    client, member, treasurer
-):
+def test_non_treasurer_cannot_access_treasurer_ledger_endpoints(client, member, treasurer):
     other_member = Member.objects.create_user(
         username="other-billing-member", is_active=True, membership_status="Full Member"
     )
@@ -82,7 +80,11 @@ def test_member_cannot_access_or_modify_another_members_ledger(
         ).status_code
         == 403
     )
-    assert LedgerEntry.objects.filter(ledger__member=member).count() == 1
+    entry.refresh_from_db()
+    assert entry.reversal is None
+    assert not LedgerEntry.objects.filter(
+        ledger__member=member, member_description="Unauthorized charge"
+    ).exists()
 
 
 def test_ledger_list_redirects_when_billing_is_disabled(client, treasurer):
