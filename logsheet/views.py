@@ -1023,8 +1023,16 @@ def update_flight_split(request, flight_id):
                 expires_at=timezone.now() + timedelta(days=7),
             )
             transaction.on_commit(lambda: _send_split_request_email(split_request))
+        request_url = reverse(
+            "logsheet:flight_split_request_detail", args=[split_request.token]
+        )
         return JsonResponse(
-            {"success": True, "request_pending": True, "request_id": split_request.pk}
+            {
+                "success": True,
+                "request_pending": True,
+                "request_id": split_request.pk,
+                "request_url": request_url,
+            }
         )
 
     flight.split_with = split_with
@@ -1101,11 +1109,27 @@ def flight_split_request_detail(request, token):
     } and not (request.user.is_superuser or request.user.treasurer):
         return HttpResponseForbidden("You cannot view this split request.")
 
+    period_closed = is_period_closed(split_request.flight.logsheet.log_date)
+    is_treasurer = request.user.is_superuser or request.user.treasurer
+    treasurer_can_act = (
+        period_closed
+        and is_treasurer
+        and split_request.status
+        in (
+            FlightSplitRequest.Status.PENDING,
+            FlightSplitRequest.Status.LOCKED,
+        )
+    )
     if request.method == "GET":
         return render(
             request,
             "logsheet/flight_split_request_detail.html",
-            {"split_request": split_request},
+            {
+                "split_request": split_request,
+                "period_closed": period_closed,
+                "is_treasurer": is_treasurer,
+                "treasurer_can_act": treasurer_can_act,
+            },
         )
     if request.method != "POST":
         return HttpResponseNotAllowed(["GET", "POST"])
@@ -1125,8 +1149,6 @@ def flight_split_request_detail(request, token):
         return redirect(
             "logsheet:flight_split_request_detail", token=split_request.token
         )
-    period_closed = is_period_closed(split_request.flight.logsheet.log_date)
-    is_treasurer = request.user.is_superuser or request.user.treasurer
     if request.user != split_request.requested_member and not (
         period_closed and is_treasurer
     ):

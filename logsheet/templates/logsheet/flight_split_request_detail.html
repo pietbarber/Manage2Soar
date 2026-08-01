@@ -7,11 +7,23 @@
   <p><strong>Requested split:</strong> {{ split_request.get_split_type_display }}</p>
   <p><strong>Status:</strong> {{ split_request.get_status_display }}</p>
   {% if split_request.reason %}<p><strong>Reason:</strong> {{ split_request.reason }}</p>{% endif %}
-  {% if split_request.status == "pending" and user == split_request.requested_member %}
+  {% if not period_closed and split_request.status == "pending" and user == split_request.requested_member %}
     <form method="post">
       {% csrf_token %}
       <button class="btn btn-success" name="decision" value="accept">Accept split</button>
       <button class="btn btn-outline-danger" name="decision" value="reject">Reject split</button>
+    </form>
+  {% endif %}
+  {% if treasurer_can_act %}
+    <form method="post" class="mt-3">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label for="treasurer_reason" class="form-label fw-semibold">Correction reason (required)</label>
+        <textarea class="form-control" id="treasurer_reason" name="treasurer_reason" rows="3" required
+          placeholder="Provide an audit reason for this closed-period correction"></textarea>
+      </div>
+      <button class="btn btn-success" name="decision" value="accept">Approve split (treasurer)</button>
+      <button class="btn btn-outline-danger ms-2" name="decision" value="reject">Reject split (treasurer)</button>
     </form>
   {% endif %}
   {% if split_request.status == "pending" and user == split_request.requester %}
