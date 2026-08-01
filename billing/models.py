@@ -30,6 +30,54 @@ class Ledger(models.Model):
         return get_balance(self)
 
 
+class BillingPeriod(models.Model):
+    """The mutable closed/open state for one calendar billing month."""
+
+    year = models.PositiveIntegerField()
+    month = models.PositiveSmallIntegerField()
+    is_closed = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("year", "month"), name="billing_period_unique_month"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(month__gte=1, month__lte=12),
+                name="billing_period_month_valid",
+            ),
+        ]
+        ordering = ("-year", "-month")
+
+    def __str__(self):
+        return (
+            f"{self.year}-{self.month:02d} ({'closed' if self.is_closed else 'open'})"
+        )
+
+
+class BillingPeriodEvent(models.Model):
+    class Action(models.TextChoices):
+        CLOSED = "closed", "Closed"
+        REOPENED = "reopened", "Reopened"
+
+    period = models.ForeignKey(
+        BillingPeriod, on_delete=models.CASCADE, related_name="events"
+    )
+    action = models.CharField(max_length=10, choices=Action.choices)
+    reason = models.TextField()
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="billing_period_events",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+
+
 class LedgerEntry(models.Model):
     class Kind(models.TextChoices):
         FLIGHT_CHARGE = "flight_charge", "Flight charge"
