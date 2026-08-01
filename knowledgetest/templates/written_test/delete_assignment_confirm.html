@@ -17,7 +17,7 @@
             <li><strong>Assigned on:</strong> {{ assignment.assigned_at|date:"F j, Y" }}</li>
           </ul>
           <div class="alert alert-warning">
-            <strong>Warning:</strong> This action will also delete the test template and its questions.
+            <strong>Warning:</strong> This action will delete this test assignment. If there are no other assignments using this test template, the template and its questions will also be deleted.
             This cannot be undone.
           </div>
           <form method="post">

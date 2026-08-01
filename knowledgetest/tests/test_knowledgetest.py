@@ -940,6 +940,27 @@ class ZeroQuestionTestPreventionTests(TestCase):
 
     def setUp(self):
         self.cat = QuestionCategory.objects.create(code="ZZZ", description="Test Cat")
+        # Create a couple of questions so weight-based selection and must-include Q-numbers are valid
+        Question.objects.create(
+            qnum=5,
+            category=self.cat,
+            question_text="Q5",
+            option_a="A",
+            option_b="B",
+            option_c="C",
+            option_d="D",
+            correct_answer="A",
+        )
+        Question.objects.create(
+            qnum=42,
+            category=self.cat,
+            question_text="Q42",
+            option_a="A",
+            option_b="B",
+            option_c="C",
+            option_d="D",
+            correct_answer="A",
+        )
         self.student = User.objects.create_user(
             username="student-test", password="pass"
         )
@@ -1020,8 +1041,8 @@ class WrittenTestAssignmentDeleteTests(TestCase):
         self.instructor_user = User.objects.create_user(
             username="instr-test", password="pass"
         )
-        self.instructor.membership_status = "Full Member"
-        self.instructor.save()
+        self.instructor_user.membership_status = "Full Member"
+        self.instructor_user.save()
 
         self.staff_user = User.objects.create_user(
             username="staff-test", password="pass", is_staff=True

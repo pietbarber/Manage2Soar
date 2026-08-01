@@ -701,9 +701,8 @@ class WrittenTestAssignmentDeleteView(View):
             )
             return redirect(reverse("knowledgetest:quiz-pending"))
         with transaction.atomic():
-            # Delete the assignment first (cascades through to template questions via
-            # WrittenTestTemplateQuestion's CASCADE) then delete the template.
-            tmpl = asn.template
+            # Delete the assignment. If this was the last assignment for the template,
+            # also delete the template (which CASCADES to WrittenTestTemplateQuestion rows).
             asn.delete()
             if not WrittenTestAssignment.objects.filter(template=tmpl).exists():
                 # No remaining assignments for this template, delete it too
