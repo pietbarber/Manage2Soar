@@ -509,7 +509,7 @@ class SiteConfiguration(models.Model):
     )
     billing_period_close_policy = models.CharField(
         max_length=32,
-        choices=BillingPeriodClosePolicy,
+        choices=tuple(BillingPeriodClosePolicy.choices),
         default=BillingPeriodClosePolicy.MANUAL,
         help_text=(
             "Choose manual close, an Nth weekday, or a number of days before month-end. "

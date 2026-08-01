@@ -151,13 +151,12 @@ def close_due_periods(now=None, dry_run=False):
     from logsheet.models import Logsheet
 
     closed = []
-    for log_date in Logsheet.objects.values_list("log_date", flat=True).distinct():
-        close_at = automatic_close_at(log_date.year, log_date.month)
+    for year, month in (
+        Logsheet.objects.values_list("log_date__year", "log_date__month").distinct()
+    ):
+        close_at = automatic_close_at(year, month)
         if close_at is not None and now >= close_at:
-            period = BillingPeriod.objects.filter(
-                year=log_date.year, month=log_date.month
-            ).first()
-            reopened = (
+            period = BillingPeriod.objects.filter(year=year, month=month).first()
                 period
                 and period.events.filter(
                     action=BillingPeriodEvent.Action.REOPENED

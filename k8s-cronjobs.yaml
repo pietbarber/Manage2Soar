@@ -9,7 +9,7 @@ metadata:
   name: close-billing-periods
   namespace: default
 spec:
-  schedule: "5 12 * * *"
+  schedule: "*/15 * * * *"
   timeZone: "UTC"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
