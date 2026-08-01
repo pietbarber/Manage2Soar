@@ -95,20 +95,65 @@
           <td>{{ form.must_include }}</td>
         </tr>
       </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3">
-            <button type="submit" class="btn btn-primary">
-              Create Test
-            </button>
-          </td>
-        </tr>
-      </tfoot>
     </table>
 
+    <div class="d-flex align-items-center mb-3">
+      <span id="question-count" class="fw-bold me-3">0 questions</span>
+      <span id="question-warning" class="text-danger d-none">No questions selected!</span>
+    </div>
+
+    <button type="submit" class="btn btn-primary" id="create-test-btn">
+      Create Test
+    </button>
+
     {% if form.non_field_errors %}
-    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
     {% endif %}
   </form>
 </div>
+
+<script>
+(function() {
+  var weightFields = document.querySelectorAll('input[name^="weight_"]');
+  var mustInclude = document.getElementById('id_must_include');
+  var countEl = document.getElementById('question-count');
+  var warningEl = document.getElementById('question-warning');
+  var submitBtn = document.getElementById('create-test-btn');
+
+  function updateCount() {
+    var total = 0;
+    weightFields.forEach(function(input) {
+      var val = parseInt(input.value, 10);
+      if (!isNaN(val)) {
+        total += val;
+      }
+    });
+    // Add must-include count (estimate from text)
+    if (mustInclude && mustInclude.value.trim()) {
+      var nums = mustInclude.value.trim().match(/\d+/g);
+      if (nums) {
+        total += nums.length;
+      }
+    }
+    countEl.textContent = total + ' question' + (total !== 1 ? 's' : '');
+    if (total === 0) {
+      warningEl.classList.remove('d-none');
+      submitBtn.disabled = true;
+      submitBtn.classList.add('disabled');
+    } else {
+      warningEl.classList.add('d-none');
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('disabled');
+    }
+  }
+
+  weightFields.forEach(function(input) {
+    input.addEventListener('input', updateCount);
+  });
+  if (mustInclude) {
+    mustInclude.addEventListener('input', updateCount);
+  }
+  updateCount();
+})();
+</script>
 {% endblock %}

@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from decimal import Decimal
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -927,3 +928,215 @@ class PendingTestsViewAccessTests(TestCase):
         response = self.client.get(reverse("knowledgetest:quiz-pending"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["assignments"]), 1)
+
+
+# ################################################################
+# Issue #969 Tests: Delete pending test & zero-question prevention
+# ################################################################
+
+
+class ZeroQuestionTestPreventionTests(TestCase):
+    """Tests for preventing zero-question test creation (issue #969)."""
+
+    def setUp(self):
+        self.cat = QuestionCategory.objects.create(code="ZZZ", description="Test Cat")
+        self.student = User.objects.create_user(
+            username="student-test", password="pass"
+        )
+        self.student.membership_status = "Full Member"
+        self.student.save()
+        self.client.login(username="student-test", password="pass")
+
+    def test_all_zero_weights_prevented(self):
+        """Setting all weights to zero should prevent test creation."""
+        # Get the categories that exist
+        code_list = list(QuestionCategory.objects.values_list("code", flat=True))
+        # Build form data with all weights at 0
+        data = {
+            "student": self.student.pk,
+            "pass_percentage": "100",
+            "description": "",
+            "must_include": "",
+        }
+        for code in code_list:
+            data[f"weight_{code}"] = 0
+
+        url = reverse("knowledgetest:create")
+        resp = self.client.post(url, data)
+        # Should re-render the form with an error
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(
+            "No questions selected",
+            str(resp.content),
+        )
+
+    def test_must_include_only_allows_creation(self):
+        """Only must-include question numbers should allow creation."""
+        code_list = list(QuestionCategory.objects.values_list("code", flat=True))
+        # Add a valid Q-number via must_include
+        data = {
+            "student": self.student.pk,
+            "pass_percentage": "100",
+            "description": "",
+            "must_include": "5, 42",
+        }
+        for code in code_list:
+            data[f"weight_{code}"] = 0
+
+        url = reverse("knowledgetest:create")
+        resp = self.client.post(url, data)
+        # Should redirect (success) because must-include provides questions
+        self.assertEqual(resp.status_code, 302)
+        # Verify template was created with the must-include questions
+        tmpl = WrittenTestTemplate.objects.filter(created_by=self.student).last()
+        self.assertIsNotNone(tmpl)
+
+    def test_non_zero_weight_allows_creation(self):
+        """At least one non-zero weight should allow creation."""
+        code_list = list(QuestionCategory.objects.values_list("code", flat=True))
+        # Set at least one weight > 0
+        data = {
+            "student": self.student.pk,
+            "pass_percentage": "100",
+            "description": "",
+            "must_include": "",
+        }
+        for code in code_list:
+            data[f"weight_{code}"] = 0
+        # Pick the first category and give it weight > 0
+        if code_list:
+            data[f"weight_{code_list[0]}"] = 1
+
+        url = reverse("knowledgetest:create")
+        resp = self.client.post(url, data)
+        # Should redirect (success)
+        self.assertEqual(resp.status_code, 302)
+
+
+class WrittenTestAssignmentDeleteTests(TestCase):
+    """Tests for deleting pending test assignments (issue #969)."""
+
+    def setUp(self):
+        self.instructor_user = User.objects.create_user(
+            username="instr-test", password="pass"
+        )
+        self.instructor.membership_status = "Full Member"
+        self.instructor.save()
+
+        self.staff_user = User.objects.create_user(
+            username="staff-test", password="pass", is_staff=True
+        )
+        self.student = User.objects.create_user(
+            username="student-delete", password="pass"
+        )
+        self.student.membership_status = "Full Member"
+        self.student.save()
+
+        # Create a test template and assignment
+        self.tmpl = WrittenTestTemplate.objects.create(
+            name="Test to Delete",
+            pass_percentage=Decimal("100"),
+            created_by=self.instructor_user,
+        )
+        self.assignment = WrittenTestAssignment.objects.create(
+            template=self.tmpl,
+            student=self.student,
+            instructor=self.instructor_user,
+        )
+        self.delete_url = reverse(
+            "knowledgetest:assignment-delete", args=[self.assignment.pk]
+        )
+
+    def test_instructor_can_delete_own_assignment(self):
+        """The assigning instructor should be able to delete their pending assignment."""
+        self.client.login(username="instr-test", password="pass")
+
+        # First GET the confirmation page
+        resp = self.client.get(self.delete_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Confirm Deletion")
+
+        # POST to confirm deletion
+        resp = self.client.post(self.delete_url)
+        self.assertEqual(resp.status_code, 302)
+
+        # Assignment should be gone
+        self.assertFalse(
+            WrittenTestAssignment.objects.filter(pk=self.assignment.pk).exists()
+        )
+        # Template should also be gone (no remaining assignments)
+        self.assertFalse(WrittenTestTemplate.objects.filter(pk=self.tmpl.pk).exists())
+
+    def test_staff_can_delete_any_assignment(self):
+        """Staff users should be able to delete any pending assignment."""
+        self.client.login(username="staff-test", password="pass")
+
+        resp = self.client.post(self.delete_url)
+        self.assertEqual(resp.status_code, 302)
+
+        # Assignment and template should be deleted
+        self.assertFalse(
+            WrittenTestAssignment.objects.filter(pk=self.assignment.pk).exists()
+        )
+        self.assertFalse(WrittenTestTemplate.objects.filter(pk=self.tmpl.pk).exists())
+
+    def test_non_instructor_cannot_delete(self):
+        """A non-instructor, non-staff user should get 403."""
+        other_user = User.objects.create_user(username="other-test", password="pass")
+        self.client.login(username="other-test", password="pass")
+
+        resp = self.client.post(self.delete_url)
+        self.assertEqual(resp.status_code, 403)
+
+        # Assignment should still exist
+        self.assertTrue(
+            WrittenTestAssignment.objects.filter(pk=self.assignment.pk).exists()
+        )
+
+    def test_attempt_prevents_deletion(self):
+        """Assignments with attempts cannot be deleted."""
+        # Create an attempt tied to the template
+        attempt = WrittenTestAttempt.objects.create(
+            template=self.tmpl, student=self.student
+        )
+        self.assignment.attempt = attempt
+        self.assignment.save(update_fields=["attempt"])
+
+        self.client.login(username="instr-test", password="pass")
+
+        resp = self.client.post(self.delete_url)
+        # Should redirect back to pending (not delete)
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/pending/", resp.url)
+
+        # Assignment should still exist (cannot delete with active attempt)
+        self.assertTrue(
+            WrittenTestAssignment.objects.filter(pk=self.assignment.pk).exists()
+        )
+        # Template should also still exist
+        self.assertTrue(WrittenTestTemplate.objects.filter(pk=self.tmpl.pk).exists())
+
+    def test_delete_redirects_to_pending(self):
+        """Successful deletion redirects to the Pending Tests page."""
+        self.client.login(username="instr-test", password="pass")
+
+        resp = self.client.post(self.delete_url)
+        self.assertRedirects(
+            resp, reverse("knowledgetest:quiz-pending"), fetch_redirect_response=False
+        )
+
+    def test_student_can_delete_own_pending_assignment(self):
+        """The student who is assigned should be able to delete their own pending (unattempted) assignment."""
+        # Reset the assignment's attempt so it's still pending
+        self.assignment.attempt = None
+        self.assignment.save(update_fields=["attempt"])
+
+        self.client.login(username="student-delete", password="pass")
+
+        resp = self.client.post(self.delete_url)
+        self.assertEqual(resp.status_code, 302)
+
+        # Assignment and template should be deleted
+        self.assertFalse(
+            WrittenTestAssignment.objects.filter(pk=self.assignment.pk).exists()
+        )

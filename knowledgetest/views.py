@@ -226,6 +226,15 @@ class CreateWrittenTestView(FormView):
             if data[f"weight_{code}"] > 0
         }
         total = sum(weights.values())
+
+        # Guard: prevent creation of zero-question tests (issue #969)
+        if total == 0 and len(must) == 0:
+            form.add_error(
+                None,
+                "No questions selected. Set weights for at least one category or specify must-include question numbers.",
+            )
+            return self.form_invalid(form)
+
         MAX_QUESTIONS = 50
         import random
 
@@ -633,3 +642,74 @@ class InstructorRecentTestsView(ListView):
             }
         )
         return context
+
+
+# ################################################################
+# Delete pending test assignment
+# ################################################################
+
+
+@method_decorator(active_member_required, name="dispatch")
+class WrittenTestAssignmentDeleteView(View):
+    """Allow the assigning instructor (or staff) to delete a pending test assignment."""
+
+    template_name = "written_test/delete_assignment_confirm.html"
+
+    def _check_permission(self, user, asn):
+        """Check if user can delete this assignment.
+
+        Allowed if:
+        - User is staff, OR
+        - User is the instructor who created the assignment, OR
+        - User is the student assigned AND no attempt has been made yet
+        """
+        return (
+            user.is_staff
+            or (asn.instructor and asn.instructor == user)
+            or (asn.student == user and asn.attempt is None)
+        )
+
+    def get(self, request, pk):
+        asn = get_object_or_404(WrittenTestAssignment, pk=pk)
+        if not self._check_permission(request.user, asn):
+            return HttpResponseForbidden("Not allowed to delete this assignment.")
+        # Guard against deleting assignments that have been attempted
+        if asn.attempt is not None:
+            messages.error(
+                request,
+                "This test has already been attempted and cannot be deleted. "
+                "Contact staff if you need it removed.",
+            )
+            return redirect(reverse("knowledgetest:quiz-pending"))
+        return render(
+            request,
+            self.template_name,
+            {
+                "assignment": asn,
+            },
+        )
+
+    def post(self, request, pk):
+        asn = get_object_or_404(WrittenTestAssignment, pk=pk)
+        if not self._check_permission(request.user, asn):
+            return HttpResponseForbidden("Not allowed to delete this assignment.")
+        # Guard against deleting assignments that have been attempted
+        if asn.attempt is not None:
+            messages.error(
+                request,
+                "This test has already been attempted and cannot be deleted.",
+            )
+            return redirect(reverse("knowledgetest:quiz-pending"))
+        with transaction.atomic():
+            # Delete the assignment first (cascades through to template questions via
+            # WrittenTestTemplateQuestion's CASCADE) then delete the template.
+            tmpl = asn.template
+            asn.delete()
+            if not WrittenTestAssignment.objects.filter(template=tmpl).exists():
+                # No remaining assignments for this template, delete it too
+                tmpl.delete()
+        messages.success(
+            request,
+            f"Test assignment '{tmpl.name}' has been deleted.",
+        )
+        return redirect(reverse("knowledgetest:quiz-pending"))

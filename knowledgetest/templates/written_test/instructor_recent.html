@@ -117,6 +117,14 @@
                        title="View student's instruction record">
                       📘 Record
                     </a>
+                    {% if not assignment.attempt %}
+                    <a href="{% url 'knowledgetest:assignment-delete' assignment.pk %}"
+                       class="btn btn-outline-danger btn-sm ms-1"
+                       title="Delete pending test assignment"
+                       onclick="return confirm('Delete this pending test assignment?')">
+                      🗑️
+                    </a>
+                    {% endif %}
                   </td>
                 </tr>
               {% endfor %}

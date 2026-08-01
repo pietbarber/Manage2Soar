@@ -23,6 +23,11 @@
       <a href="{% url 'knowledgetest:quiz-start' asn.template.pk %}" class="btn btn-primary">
         Start Test{% if asn.template.description %}: {{ asn.template.description|truncatechars:40 }}{% endif %}
       </a>
+      {% if not asn.attempt %}
+      <a href="{% url 'knowledgetest:assignment-delete' asn.pk %}" class="btn btn-outline-danger btn-sm ms-2">
+        Delete
+      </a>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
