@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+  <h1>Flight Cost Split Request</h1>
+  <p><strong>Requested by:</strong> {{ split_request.requester|full_display_name }}</p>
+  <p><strong>Requested split:</strong> {{ split_request.get_split_type_display }}</p>
+  <p><strong>Status:</strong> {{ split_request.get_status_display }}</p>
+  {% if split_request.reason %}<p><strong>Reason:</strong> {{ split_request.reason }}</p>{% endif %}
+  {% if split_request.status == "pending" and user == split_request.requested_member %}
+    <form method="post">
+      {% csrf_token %}
+      <button class="btn btn-success" name="decision" value="accept">Accept split</button>
+      <button class="btn btn-outline-danger" name="decision" value="reject">Reject split</button>
+    </form>
+  {% endif %}
+  {% if split_request.status == "pending" and user == split_request.requester %}
+    <form method="post" class="mt-3">
+      {% csrf_token %}
+      <button class="btn btn-outline-secondary" name="decision" value="cancel">Cancel request</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

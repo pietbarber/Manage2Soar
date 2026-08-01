@@ -4,6 +4,7 @@ import logging
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.paginator import Paginator
@@ -37,6 +38,7 @@ from siteconfig.models import (
 )
 from siteconfig.utils import get_role_title
 from utils.csv import sanitize_csv_cell as _sanitize_csv_cell
+from utils.email import send_mail
 
 from .forms import (
     CommercialTicketEditForm,
@@ -54,6 +56,7 @@ from .models import (
     CommercialRide,
     CommercialTicket,
     Flight,
+    FlightSplitRequest,
     Glider,
     Logsheet,
     LogsheetCloseout,
@@ -665,41 +668,30 @@ def stats_dump_export_download(request, pk):
 
 
 @active_member_required
-@billing_app_required
 def personal_charges_summary(request):
-    """Show a member's personal flight and miscellaneous charges for the last year."""
+    """Show the authenticated member's immutable billing statement."""
     from billing.models import Ledger
-    from billing.services import get_balance
+    from billing.services import get_balance, get_statement_rows
 
-    start_date = timezone.localdate() - timedelta(days=365)
-    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
     ledger = Ledger.objects.filter(member=request.user).first()
-
-    total_flight_cost = sum((row["total_cost"] for row in flight_rows), Decimal("0.00"))
-    total_misc_cost = sum(
-        (charge.total_price for charge in misc_charges), Decimal("0.00")
-    )
 
     return render(
         request,
         "logsheet/personal_charges_summary.html",
         {
-            "flight_rows": flight_rows,
-            "misc_charges": misc_charges,
-            "total_flight_cost": total_flight_cost,
-            "total_misc_cost": total_misc_cost,
+            "statement_rows": list(reversed(get_statement_rows(ledger))),
             "ledger_balance": get_balance(ledger) if ledger else Decimal("0.00"),
-            "start_date": start_date,
         },
     )
 
 
 @active_member_required
-@billing_app_required
 def personal_charges_summary_csv(request):
-    """Export a member's personal charges (flight + misc) as CSV."""
-    start_date = timezone.localdate() - timedelta(days=365)
-    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+    """Export the authenticated member's ledger statement as CSV."""
+    from billing.models import Ledger
+    from billing.services import get_statement_rows
+
+    ledger = Ledger.objects.filter(member=request.user).first()
 
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = (
@@ -707,50 +699,17 @@ def personal_charges_summary_csv(request):
     )
 
     writer = csv.writer(response)
-    writer.writerow(
-        [
-            "Date",
-            "Charge Type",
-            "Glider",
-            "Item",
-            "Tow Cost",
-            "Rental Cost",
-            "Instruction Cost",
-            "Misc Cost",
-            "Total",
-            "Notes",
-        ]
-    )
-
-    for row in flight_rows:
+    writer.writerow(["Date", "Type", "Description", "Debit", "Credit", "Balance"])
+    for row in get_statement_rows(ledger):
+        entry = row["entry"]
         writer.writerow(
             [
-                row["flight_date"].isoformat(),
-                "Flight",
-                _sanitize_csv_cell(str(row["glider"]) if row["glider"] else "—"),
-                "",
-                f"{row['tow_cost']:.2f}",
-                f"{row['rental_cost']:.2f}",
-                f"{row['instruction_cost']:.2f}",
-                "",
-                f"{row['total_cost']:.2f}",
-                "",
-            ]
-        )
-
-    for charge in misc_charges:
-        writer.writerow(
-            [
-                charge.date.isoformat(),
-                "Misc",
-                "",
-                _sanitize_csv_cell(charge.chargeable_item.name),
-                "",
-                "",
-                "",
-                f"{charge.total_price:.2f}",
-                f"{charge.total_price:.2f}",
-                _sanitize_csv_cell(charge.notes),
+                entry.effective_date.isoformat(),
+                _sanitize_csv_cell(entry.get_kind_display()),
+                _sanitize_csv_cell(entry.member_description),
+                f"{entry.amount:.2f}" if entry.effect == "debit" else "",
+                f"{entry.amount:.2f}" if entry.effect == "credit" else "",
+                f"{row['running_balance']:.2f}",
             ]
         )
 
@@ -948,11 +907,15 @@ def update_flight_split(request, flight_id):
     flight = get_object_or_404(Flight, id=flight_id)
     logsheet = flight.logsheet
     if logsheet.finalized:
-        if not (request.user.is_superuser or request.user.treasurer):
+        if not (
+            request.user.is_superuser
+            or request.user.treasurer
+            or request.user == flight.pilot
+        ):
             return JsonResponse(
                 {
                     "success": False,
-                    "error": "Finalized flights require an audited correction.",
+                    "error": "Only the pilot or a treasurer can request a finalized split.",
                 },
                 status=403,
             )
@@ -995,8 +958,24 @@ def update_flight_split(request, flight_id):
 
     if logsheet.finalized:
         from billing.models import FlightChargeSnapshot
-        from billing.services import correct_flight_charges
-        from siteconfig.timezone_utils import get_club_today
+        from billing.periods import is_period_closed, lock_period_for_date
+
+        if split_with == request.user:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "You cannot request a split with yourself.",
+                },
+                status=400,
+            )
+        if is_period_closed(logsheet.log_date):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "This flight's billing period is closed. Contact a treasurer for a correction.",
+                },
+                status=400,
+            )
 
         current_version = (
             FlightChargeSnapshot.objects.filter(flight=flight)
@@ -1013,32 +992,256 @@ def update_flight_split(request, flight_id):
                 status=400,
             )
 
-        with transaction.atomic():
-            flight.split_with = split_with
-            flight.split_type = split_type_value
-            allocations = get_billing_allocations(
-                flight, allocation_version=current_version + 1
+        if not split_with or not split_type_value:
+            return JsonResponse(
+                {"success": False, "error": "A split partner and type are required."},
+                status=400,
             )
-            try:
-                correct_flight_charges(
-                    flight=flight,
-                    actor=request.user,
-                    allocations=allocations,
-                    effective_date=get_club_today(),
-                    reason=reason,
-                )
-            except ValidationError as exc:
+
+        with transaction.atomic():
+            if lock_period_for_date(logsheet.log_date):
                 return JsonResponse(
-                    {"success": False, "error": get_validation_message(exc)},
+                    {
+                        "success": False,
+                        "error": "This flight's billing period is closed. Contact a treasurer for a correction.",
+                    },
                     status=400,
                 )
-            flight.save(update_fields=["split_with", "split_type"])
-        return JsonResponse({"success": True, "corrected": True})
+            FlightSplitRequest.objects.filter(
+                flight=flight, status=FlightSplitRequest.Status.PENDING
+            ).update(
+                status=FlightSplitRequest.Status.CANCELLED,
+                resolved_at=timezone.now(),
+            )
+            split_request = FlightSplitRequest.objects.create(
+                flight=flight,
+                requester=request.user,
+                requested_member=split_with,
+                split_type=split_type_value,
+                reason=reason,
+                allocation_version=current_version,
+                expires_at=timezone.now() + timedelta(days=7),
+            )
+            transaction.on_commit(lambda: _send_split_request_email(split_request))
+        return JsonResponse(
+            {"success": True, "request_pending": True, "request_id": split_request.pk}
+        )
 
     flight.split_with = split_with
     flight.split_type = split_type_value
     flight.save(update_fields=["split_with", "split_type"])
     return JsonResponse({"success": True})
+
+
+def _send_split_request_email(split_request):
+    """Notify the proposed payer only after its request is committed."""
+    recipient = split_request.requested_member
+    if not recipient.email:
+        logger.warning("Split request %s has no recipient email", split_request.pk)
+        return
+    url = f"{settings.SITE_URL.rstrip('/')}{reverse('logsheet:flight_split_request_detail', args=[split_request.token])}"
+    send_mail(
+        subject="Flight cost split approval requested",
+        message=(
+            f"{split_request.requester.get_full_name() or split_request.requester.username} "
+            f"requested a {split_request.get_split_type_display()} split for flight "
+            f"#{split_request.flight_id}. Review it at {url}"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[recipient.email],
+        fail_silently=False,
+    )
+
+
+def _send_split_request_resolution_email(split_request):
+    recipient = split_request.requester
+    if not recipient.email:
+        return
+    send_mail(
+        subject=f"Flight cost split request {split_request.get_status_display().lower()}",
+        message=(
+            f"Your {split_request.get_split_type_display()} split request for flight "
+            f"#{split_request.flight_id} was {split_request.get_status_display().lower()}."
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[recipient.email],
+        fail_silently=False,
+    )
+
+
+@active_member_required
+def flight_split_request_list(request):
+    if not (request.user.is_superuser or request.user.treasurer):
+        return HttpResponseForbidden("Treasurer access is required.")
+    now = timezone.now()
+    FlightSplitRequest.objects.filter(
+        status=FlightSplitRequest.Status.PENDING, expires_at__lte=now
+    ).update(status=FlightSplitRequest.Status.EXPIRED, resolved_at=now)
+    requests = FlightSplitRequest.objects.filter(
+        status=FlightSplitRequest.Status.PENDING
+    ).select_related("flight", "requester", "requested_member")
+    return render(
+        request, "logsheet/flight_split_request_list.html", {"requests": requests}
+    )
+
+
+@active_member_required
+def flight_split_request_detail(request, token):
+    from billing.periods import is_period_closed, lock_period_for_date
+
+    split_request = get_object_or_404(
+        FlightSplitRequest.objects.select_related(
+            "flight", "requester", "requested_member"
+        ),
+        token=token,
+    )
+    if request.user not in {
+        split_request.requester,
+        split_request.requested_member,
+    } and not (request.user.is_superuser or request.user.treasurer):
+        return HttpResponseForbidden("You cannot view this split request.")
+
+    if request.method == "GET":
+        return render(
+            request,
+            "logsheet/flight_split_request_detail.html",
+            {"split_request": split_request},
+        )
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["GET", "POST"])
+    if (
+        request.user == split_request.requester
+        and request.POST.get("decision") == "cancel"
+    ):
+        with transaction.atomic():
+            split_request = FlightSplitRequest.objects.select_for_update().get(
+                pk=split_request.pk
+            )
+            if split_request.status == FlightSplitRequest.Status.PENDING:
+                split_request.status = FlightSplitRequest.Status.CANCELLED
+                split_request.resolved_at = timezone.now()
+                split_request.save(update_fields=["status", "resolved_at"])
+                messages.info(request, "The flight split request was cancelled.")
+        return redirect(
+            "logsheet:flight_split_request_detail", token=split_request.token
+        )
+    period_closed = is_period_closed(split_request.flight.logsheet.log_date)
+    is_treasurer = request.user.is_superuser or request.user.treasurer
+    if request.user != split_request.requested_member and not (
+        period_closed and is_treasurer
+    ):
+        return HttpResponseForbidden("Only the requested member can decide this split.")
+    decision = request.POST.get("decision")
+    if decision not in {"accept", "reject"}:
+        return HttpResponseNotAllowed(["accept", "reject", "cancel"])
+    treasurer_reason = request.POST.get("treasurer_reason", "").strip()
+    if period_closed and request.user == split_request.requested_member:
+        messages.error(request, "This billing period is closed. Contact a treasurer.")
+        return redirect(
+            "logsheet:flight_split_request_detail", token=split_request.token
+        )
+    if period_closed and is_treasurer and not treasurer_reason:
+        messages.error(request, "A treasurer correction reason is required.")
+        return redirect(
+            "logsheet:flight_split_request_detail", token=split_request.token
+        )
+
+    with transaction.atomic():
+        split_request = (
+            FlightSplitRequest.objects.select_for_update()
+            .select_related("flight")
+            .get(pk=split_request.pk)
+        )
+        period_closed = lock_period_for_date(split_request.flight.logsheet.log_date)
+        allowed_statuses = {FlightSplitRequest.Status.PENDING}
+        if period_closed and is_treasurer:
+            allowed_statuses.add(FlightSplitRequest.Status.LOCKED)
+        if split_request.status not in allowed_statuses:
+            messages.error(request, "This split request has already been resolved.")
+            return redirect(
+                "logsheet:flight_split_request_detail", token=split_request.token
+            )
+        if split_request.expires_at <= timezone.now():
+            split_request.status = FlightSplitRequest.Status.EXPIRED
+            split_request.resolved_at = timezone.now()
+            split_request.save(update_fields=["status", "resolved_at"])
+            messages.error(request, "This split request has expired.")
+            return redirect(
+                "logsheet:flight_split_request_detail", token=split_request.token
+            )
+        if decision == "reject":
+            split_request.status = FlightSplitRequest.Status.REJECTED
+            split_request.resolved_at = timezone.now()
+            split_request.save(update_fields=["status", "resolved_at"])
+            transaction.on_commit(
+                lambda: _send_split_request_resolution_email(split_request)
+            )
+            messages.info(
+                request, "The flight split request was rejected. No charges changed."
+            )
+            return redirect(
+                "logsheet:flight_split_request_detail", token=split_request.token
+            )
+
+        from billing.models import FlightChargeSnapshot
+        from billing.services import correct_flight_charges
+        from siteconfig.timezone_utils import get_club_today
+
+        current_version = (
+            FlightChargeSnapshot.objects.filter(flight=split_request.flight)
+            .order_by("-allocation_version")
+            .values_list("allocation_version", flat=True)
+            .first()
+        )
+        if current_version != split_request.allocation_version:
+            split_request.status = FlightSplitRequest.Status.STALE
+            split_request.resolved_at = timezone.now()
+            split_request.save(update_fields=["status", "resolved_at"])
+            transaction.on_commit(
+                lambda: _send_split_request_resolution_email(split_request)
+            )
+            messages.error(
+                request, "The flight charges changed; submit a new split request."
+            )
+            return redirect(
+                "logsheet:flight_split_request_detail", token=split_request.token
+            )
+
+        flight = split_request.flight
+        flight.split_with = split_request.requested_member
+        flight.split_type = split_request.split_type
+        allocations = get_billing_allocations(
+            flight, allocation_version=current_version + 1
+        )
+        try:
+            correct_flight_charges(
+                flight=flight,
+                actor=request.user,
+                allocations=allocations,
+                effective_date=get_club_today(),
+                reason=(
+                    f"Treasurer correction for closed period: {treasurer_reason}; "
+                    if period_closed
+                    else ""
+                )
+                + f"Approved split request #{split_request.pk}: {split_request.reason}",
+            )
+        except ValidationError as exc:
+            messages.error(request, get_validation_message(exc))
+            return redirect(
+                "logsheet:flight_split_request_detail", token=split_request.token
+            )
+        flight.save(update_fields=["split_with", "split_type"])
+        split_request.status = FlightSplitRequest.Status.ACCEPTED
+        split_request.resolved_at = timezone.now()
+        split_request.save(update_fields=["status", "resolved_at"])
+        transaction.on_commit(
+            lambda: _send_split_request_resolution_email(split_request)
+        )
+    messages.success(
+        request, "The split was approved and the flight charges were corrected."
+    )
+    return redirect("logsheet:flight_split_request_detail", token=split_request.token)
 
 
 # --- LANDING NOW AJAX ENDPOINT ---
@@ -1498,7 +1701,6 @@ def manage_logsheet(request, pk):
     # If there is a "revise", then we'll remove the finalized status
     # and the logsheet can be returned to editing status.
     elif request.method == "POST":
-
         if "revise" in request.POST:
             from billing.models import LedgerEntry
             from logsheet.utils.permissions import can_unfinalize_logsheet
@@ -3612,8 +3814,7 @@ def update_towplane_oil_deadline(request, towplane_id):
             {
                 "success": False,
                 "error": (
-                    "Value exceeds maximum supported tach value "
-                    f"({max_supported_due})."
+                    f"Value exceeds maximum supported tach value ({max_supported_due})."
                 ),
             },
             status=400,

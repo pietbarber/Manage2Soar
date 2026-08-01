@@ -1,12 +1,15 @@
-from datetime import time
+from datetime import time, timedelta
 from decimal import Decimal
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.utils import timezone
 
 from billing.models import FlightChargeSnapshot, LedgerEntry
+from billing.periods import close_period
 from billing.services import post_flight_charges
-from logsheet.models import Flight
+from logsheet.models import Flight, FlightSplitRequest
 from logsheet.utils.flight_charges import get_billing_allocations
 from siteconfig.models import (
     BillingPricingMode,
@@ -294,7 +297,7 @@ def test_clear_flight_split_ajax(client, active_member, logsheet_with_flights):
 
 
 @pytest.mark.django_db
-def test_treasurer_split_change_corrects_finalized_flight(
+def test_finalized_split_request_corrects_only_after_partner_accepts(
     client, active_member, another_member, logsheet_with_flights
 ):
     config = SiteConfiguration.objects.first() or SiteConfiguration.objects.create(
@@ -318,6 +321,7 @@ def test_treasurer_split_change_corrects_finalized_flight(
         actor=active_member,
         allocations=get_billing_allocations(flight),
     )
+    initial_entry_count = LedgerEntry.objects.filter(flight=flight).count()
 
     client.force_login(active_member)
     response = client.post(
@@ -330,14 +334,143 @@ def test_treasurer_split_change_corrects_finalized_flight(
     )
 
     assert response.status_code == 200
-    assert response.json() == {"success": True, "corrected": True}
-    assert LedgerEntry.objects.filter(flight=flight).count() == 4
+    assert response.json()["request_pending"] is True
+    assert LedgerEntry.objects.filter(flight=flight).count() == initial_entry_count
+
+    split_request = FlightSplitRequest.objects.get(flight=flight)
+    assert split_request.status == FlightSplitRequest.Status.PENDING
+    assert split_request.requested_member == another_member
+
+    client.force_login(another_member)
+    response = client.post(
+        reverse("logsheet:flight_split_request_detail", args=[split_request.token]),
+        {"decision": "accept"},
+    )
+
+    assert response.status_code == 302
+    split_request.refresh_from_db()
+    assert split_request.status == FlightSplitRequest.Status.ACCEPTED
+    assert LedgerEntry.objects.filter(flight=flight).count() == initial_entry_count + 2
     assert LedgerEntry.objects.filter(kind=LedgerEntry.Kind.REVERSAL).count() == 2
     assert set(
         FlightChargeSnapshot.objects.filter(flight=flight).values_list(
             "allocation_version", flat=True
         )
     ) == {1, 2}
+
+
+@pytest.mark.django_db
+def test_finalized_split_request_rejects_self_as_partner(
+    client, active_member, logsheet_with_flights
+):
+    config = SiteConfiguration.objects.first() or SiteConfiguration.objects.create(
+        club_name="Split Correction Test Club",
+        domain_name="split-correction.example.com",
+        club_abbreviation="SCT",
+    )
+    config.billing_app_enabled = True
+    config.save(update_fields=["billing_app_enabled"])
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    flight.tow_cost_actual = Decimal("20.00")
+    flight.save(update_fields=["tow_cost_actual"])
+    logsheet_with_flights.finalized = True
+    logsheet_with_flights.save(update_fields=["finalized"])
+    active_member.treasurer = True
+    active_member.save(update_fields=["treasurer"])
+    post_flight_charges(
+        flight=flight,
+        actor=active_member,
+        allocations=get_billing_allocations(flight),
+    )
+
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:update_flight_split", args=[flight.pk]),
+        {
+            "split_with": active_member.pk,
+            "split_type": "even",
+            "reason": "Corrected payer allocation",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "cannot request a split with yourself" in response.json()["error"]
+    assert not FlightSplitRequest.objects.filter(flight=flight).exists()
+
+
+@pytest.mark.django_db
+def test_closing_period_locks_pending_split_requests(
+    active_member, another_member, logsheet_with_flights
+):
+    active_member.treasurer = True
+    active_member.save(update_fields=["treasurer"])
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    split_request = FlightSplitRequest.objects.create(
+        flight=flight,
+        requester=active_member,
+        requested_member=another_member,
+        split_type="even",
+        allocation_version=1,
+        expires_at=timezone.now() + timedelta(days=7),
+    )
+
+    close_period(
+        year=flight.logsheet.log_date.year,
+        month=flight.logsheet.log_date.month,
+        actor=active_member,
+        reason="Month reconciled",
+    )
+
+    split_request.refresh_from_db()
+    assert split_request.status == FlightSplitRequest.Status.LOCKED
+
+
+@pytest.mark.django_db
+def test_split_request_model_rejects_self_as_partner(
+    active_member, logsheet_with_flights
+):
+    with pytest.raises(ValidationError, match="cannot request a split with themselves"):
+        FlightSplitRequest.objects.create(
+            flight=Flight.objects.filter(logsheet=logsheet_with_flights).first(),
+            requester=active_member,
+            requested_member=active_member,
+            split_type="even",
+            allocation_version=1,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+
+
+@pytest.mark.django_db
+def test_split_request_can_be_cancelled_or_expires(
+    client, active_member, another_member, logsheet_with_flights
+):
+    request = FlightSplitRequest.objects.create(
+        flight=Flight.objects.filter(logsheet=logsheet_with_flights).first(),
+        requester=active_member,
+        requested_member=another_member,
+        split_type="even",
+        allocation_version=1,
+        expires_at=timezone.now() + timedelta(days=7),
+    )
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:flight_split_request_detail", args=[request.token]),
+        {"decision": "cancel"},
+    )
+    assert response.status_code == 302
+    request.refresh_from_db()
+    assert request.status == FlightSplitRequest.Status.CANCELLED
+
+    request.status = FlightSplitRequest.Status.PENDING
+    request.expires_at = timezone.now() - timedelta(seconds=1)
+    request.save(update_fields=["status", "expires_at"])
+    client.force_login(another_member)
+    client.post(
+        reverse("logsheet:flight_split_request_detail", args=[request.token]),
+        {"decision": "accept"},
+    )
+    request.refresh_from_db()
+    assert request.status == FlightSplitRequest.Status.EXPIRED
 
 
 @pytest.mark.django_db

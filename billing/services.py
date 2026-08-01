@@ -437,3 +437,18 @@ def get_balance(ledger, as_of=None):
         entries = entries.filter(effective_date__lte=as_of)
     total = sum((entry.signed_amount for entry in entries), Decimal("0"))
     return total.quantize(MONEY_QUANTUM)
+
+
+def get_statement_rows(ledger):
+    """Return entries with the account balance after each posted entry."""
+    if ledger is None:
+        return []
+
+    balance = Decimal("0.00")
+    rows = []
+    for entry in ledger.entries.select_related("created_by").order_by(
+        "effective_date", "created_at", "id"
+    ):
+        balance += entry.signed_amount
+        rows.append({"entry": entry, "running_balance": balance})
+    return rows

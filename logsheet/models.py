@@ -1,6 +1,7 @@
 # from .models import Towplane, Airfield  # Adjust import paths as needed
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -592,6 +593,67 @@ class Flight(models.Model):
 
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"
+
+
+class FlightSplitRequest(models.Model):
+    """A member-approved proposal to change a finalized flight allocation."""
+
+    class SplitType(models.TextChoices):
+        EVEN = "even", "50/50"
+        TOW = "tow", "Tow Only"
+        RENTAL = "rental", "Rental Only"
+        FULL = "full", "Full Cost"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+        EXPIRED = "expired", "Expired"
+        STALE = "stale", "Stale"
+        LOCKED = "locked", "Locked by accounting period"
+
+    flight = models.ForeignKey(
+        Flight, on_delete=models.CASCADE, related_name="split_requests"
+    )
+    requester = models.ForeignKey(
+        Member, on_delete=models.PROTECT, related_name="made_flight_split_requests"
+    )
+    requested_member = models.ForeignKey(
+        Member, on_delete=models.PROTECT, related_name="received_flight_split_requests"
+    )
+    split_type = models.CharField(max_length=10, choices=SplitType.choices)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PENDING
+    )
+    reason = models.TextField(blank=True)
+    allocation_version = models.PositiveIntegerField()
+    token = models.UUIDField(default=uuid4, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("flight",),
+                condition=models.Q(status="pending"),
+                name="one_pending_split_request_per_flight",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(requester=models.F("requested_member")),
+                name="split_request_requester_differs_from_requested_member",
+            ),
+        ]
+
+    def clean(self):
+        if self.requester_id == self.requested_member_id:
+            raise ValidationError("A member cannot request a split with themselves.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class CommercialTicket(models.Model):
