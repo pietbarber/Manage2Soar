@@ -1,6 +1,7 @@
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta
 
+from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
@@ -106,13 +107,16 @@ def close_period(*, year, month, actor=None, reason):
         reason=reason.strip(),
     )
 
-    from logsheet.models import FlightSplitRequest
-
-    FlightSplitRequest.objects.filter(
-        flight__logsheet__log_date__year=year,
-        flight__logsheet__log_date__month=month,
-        status=FlightSplitRequest.Status.PENDING,
-    ).update(status=FlightSplitRequest.Status.LOCKED)
+    try:
+        FlightSplitRequest = apps.get_model("logsheet", "FlightSplitRequest")
+    except LookupError:
+        pass
+    else:
+        FlightSplitRequest.objects.filter(
+            flight__logsheet__log_date__year=year,
+            flight__logsheet__log_date__month=month,
+            status=FlightSplitRequest.Status.PENDING,
+        ).update(status=FlightSplitRequest.Status.LOCKED)
     return period
 
 
