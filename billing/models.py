@@ -138,6 +138,11 @@ class LedgerEntry(models.Model):
                 condition=models.Q(source_key__isnull=False),
                 name="billing_entry_source_key_unique",
             ),
+            models.UniqueConstraint(
+                fields=("ledger",),
+                condition=models.Q(kind="opening_balance"),
+                name="billing_one_opening_balance_per_ledger",
+            ),
             models.CheckConstraint(
                 condition=(
                     models.Q(

@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from billing.models import LedgerEntry
 from billing.services import (
     get_balance,
+    override_opening_balance,
     post_manual_charge,
     post_manual_credit,
     post_manual_payment,
@@ -74,8 +75,8 @@ def test_manual_entries_record_audit_fields_and_balance(member, treasurer):
     assert credit.kind == LedgerEntry.Kind.CREDIT
 
 
-def test_opening_balance_supports_both_directions(member, treasurer):
-    debit = post_opening_balance(
+def test_opening_balance_can_only_be_posted_once(member, treasurer):
+    opening_balance = post_opening_balance(
         member=member,
         actor=treasurer,
         amount="25",
@@ -84,19 +85,80 @@ def test_opening_balance_supports_both_directions(member, treasurer):
         description="Opening receivable",
         reason="Imported opening balance",
     )
-    credit = post_opening_balance(
+    assert opening_balance.kind == LedgerEntry.Kind.OPENING_BALANCE
+    assert get_balance(member.billing_ledger) == Decimal("25.00")
+
+    with pytest.raises(ValidationError, match="already been posted"):
+        post_opening_balance(
+            member=member,
+            actor=treasurer,
+            amount="5",
+            effect=LedgerEntry.Effect.CREDIT,
+            effective_date=date.today(),
+            description="Opening credit",
+            reason="Imported opening balance",
+        )
+
+
+def test_opening_balance_override_posts_an_auditable_adjustment(member, treasurer):
+    post_opening_balance(
         member=member,
         actor=treasurer,
-        amount="5",
-        effect=LedgerEntry.Effect.CREDIT,
+        amount="25",
+        effect=LedgerEntry.Effect.DEBIT,
         effective_date=date.today(),
-        description="Opening credit",
+        description="Opening receivable",
         reason="Imported opening balance",
     )
 
-    assert debit.kind == LedgerEntry.Kind.OPENING_BALANCE
-    assert credit.effect == LedgerEntry.Effect.CREDIT
-    assert get_balance(member.billing_ledger) == Decimal("20.00")
+    adjustment = override_opening_balance(
+        member=member,
+        actor=treasurer,
+        amount="10",
+        effect=LedgerEntry.Effect.CREDIT,
+        effective_date=date.today(),
+        description="Corrected source report",
+        reason="Treasurer corrected import",
+    )
+
+    assert adjustment.kind == LedgerEntry.Kind.CREDIT
+    assert adjustment.source_key.startswith("opening-override:")
+    assert get_balance(member.billing_ledger) == Decimal("-10.00")
+    assert (
+        LedgerEntry.objects.filter(kind=LedgerEntry.Kind.OPENING_BALANCE).count() == 1
+    )
+
+
+def test_opening_balance_override_accounts_for_reversed_opening_balance(
+    member, treasurer
+):
+    opening_balance = post_opening_balance(
+        member=member,
+        actor=treasurer,
+        amount="25",
+        effect=LedgerEntry.Effect.DEBIT,
+        effective_date=date.today(),
+        description="Opening receivable",
+        reason="Imported opening balance",
+    )
+    reverse_manual_entry(
+        entry=opening_balance,
+        actor=treasurer,
+        effective_date=date.today(),
+        reason="Imported in error",
+    )
+
+    override_opening_balance(
+        member=member,
+        actor=treasurer,
+        amount="10",
+        effect=LedgerEntry.Effect.DEBIT,
+        effective_date=date.today(),
+        description="Corrected source report",
+        reason="Treasurer corrected import",
+    )
+
+    assert get_balance(member.billing_ledger) == Decimal("10.00")
 
 
 def test_manual_reversal_requires_staff_and_preserves_reason(member, treasurer):

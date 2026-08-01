@@ -366,6 +366,7 @@ def post_manual_credit(
     )
 
 
+@transaction.atomic
 def post_opening_balance(
     *, member, actor, amount, effect, effective_date, description, reason
 ):
@@ -374,6 +375,15 @@ def post_opening_balance(
     reason = require_audit_text(reason, "reason")
     if effect not in LedgerEntry.Effect.values:
         raise ValidationError("Opening balance must specify a debit or credit effect.")
+    ledger = get_or_create_ledger(member)
+    if (
+        LedgerEntry.objects.select_for_update()
+        .filter(ledger=ledger, kind=LedgerEntry.Kind.OPENING_BALANCE)
+        .exists()
+    ):
+        raise ValidationError(
+            "An opening balance has already been posted for this account."
+        )
     return post_entry(
         member=member,
         actor=actor,
@@ -383,6 +393,69 @@ def post_opening_balance(
         effective_date=effective_date,
         description=description,
         internal_note=reason,
+    )
+
+
+@transaction.atomic
+def override_opening_balance(
+    *, member, actor, amount, effect, effective_date, description, reason
+):
+    """Adjust an account's opening balance without changing posted history."""
+    require_manual_transaction_access(actor)
+    description = require_audit_text(description, "member description")
+    reason = require_audit_text(reason, "reason")
+    if effect not in LedgerEntry.Effect.values:
+        raise ValidationError("Opening balance must specify a debit or credit effect.")
+
+    ledger = get_or_create_ledger(member)
+    entries = list(LedgerEntry.objects.select_for_update().filter(ledger=ledger))
+    if not any(entry.kind == LedgerEntry.Kind.OPENING_BALANCE for entry in entries):
+        raise ValidationError(
+            "An opening balance must be posted before it can be overridden."
+        )
+
+    override_prefix = f"opening-override:{ledger.pk}:"
+    opening_entry_ids = {
+        entry.pk
+        for entry in entries
+        if entry.kind == LedgerEntry.Kind.OPENING_BALANCE
+        or (entry.source_key and entry.source_key.startswith(override_prefix))
+    }
+    current_opening_balance = sum(
+        (
+            entry.signed_amount
+            for entry in entries
+            if entry.pk in opening_entry_ids
+            or (
+                entry.kind == LedgerEntry.Kind.REVERSAL
+                and entry.reverses_id in opening_entry_ids
+            )
+        ),
+        Decimal("0.00"),
+    )
+    target_balance = _money(amount)
+    if effect == LedgerEntry.Effect.CREDIT:
+        target_balance = -target_balance
+    adjustment = target_balance - current_opening_balance
+    if adjustment == 0:
+        raise ValidationError("The account already has this opening balance.")
+
+    return post_entry(
+        member=member,
+        actor=actor,
+        kind=(
+            LedgerEntry.Kind.MANUAL_CHARGE
+            if adjustment > 0
+            else LedgerEntry.Kind.CREDIT
+        ),
+        effect=(
+            LedgerEntry.Effect.DEBIT if adjustment > 0 else LedgerEntry.Effect.CREDIT
+        ),
+        amount=abs(adjustment),
+        effective_date=effective_date,
+        description=f"Opening balance override: {description}",
+        internal_note=reason,
+        source_key=f"{override_prefix}{uuid4()}",
     )
 
 
