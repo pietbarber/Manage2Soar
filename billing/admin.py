@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from billing.models import FlightChargeSnapshot, Ledger, LedgerEntry
+from billing.models import (
+    BillingPeriod,
+    BillingPeriodEvent,
+    FlightChargeSnapshot,
+    Ledger,
+    LedgerEntry,
+)
 
 
 @admin.register(Ledger)
@@ -8,6 +14,20 @@ class LedgerAdmin(admin.ModelAdmin):
     list_display = ("member", "created_at")
     search_fields = ("member__username", "member__first_name", "member__last_name")
     readonly_fields = ("member", "created_at")
+
+
+@admin.register(BillingPeriod)
+class BillingPeriodAdmin(admin.ModelAdmin):
+    list_display = ("year", "month", "is_closed")
+    list_filter = ("is_closed", "year")
+    readonly_fields = ("year", "month", "is_closed")
+
+
+@admin.register(BillingPeriodEvent)
+class BillingPeriodEventAdmin(admin.ModelAdmin):
+    list_display = ("period", "action", "actor", "created_at")
+    list_filter = ("action",)
+    readonly_fields = tuple(field.name for field in BillingPeriodEvent._meta.fields)
 
 
 @admin.register(LedgerEntry)

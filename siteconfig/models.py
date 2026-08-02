@@ -54,6 +54,22 @@ class BillingPricingMode(models.TextChoices):
     MATRIX = "matrix", "Matrix Mode"
 
 
+class BillingPeriodClosePolicy(models.TextChoices):
+    MANUAL = "manual", "Manual Close"
+    NTH_WEEKDAY = "nth_weekday", "Nth Weekday"
+    DAYS_BEFORE_MONTH_END = "days_before_month_end", "Days Before Month End"
+
+
+class Weekday(models.IntegerChoices):
+    MONDAY = 0, "Monday"
+    TUESDAY = 1, "Tuesday"
+    WEDNESDAY = 2, "Wednesday"
+    THURSDAY = 3, "Thursday"
+    FRIDAY = 4, "Friday"
+    SATURDAY = 5, "Saturday"
+    SUNDAY = 6, "Sunday"
+
+
 class MailingList(models.Model):
     """
     Configurable mailing list definitions for the club email system.
@@ -490,6 +506,38 @@ class SiteConfiguration(models.Model):
             "ledger posting for this site. Billing rule settings only apply "
             "when this master switch is enabled."
         ),
+    )
+    billing_period_close_policy = models.CharField(
+        max_length=32,
+        choices=tuple(BillingPeriodClosePolicy.choices),
+        default=BillingPeriodClosePolicy.MANUAL,
+        help_text=(
+            "Choose manual close, an Nth weekday, or a number of days before month-end. "
+            "Automatic closes occur at 11:59 PM club time."
+        ),
+    )
+    billing_period_close_month_offset = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(0), MaxValueValidator(1)],
+        help_text=(
+            "Use 0 for the billing month or 1 for the following month when calculating "
+            "an automatic close."
+        ),
+    )
+    billing_period_close_week_number = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Week occurrence (1 through 5) for the Nth-weekday close policy.",
+    )
+    billing_period_close_weekday = models.PositiveSmallIntegerField(
+        choices=Weekday.choices,
+        default=Weekday.MONDAY,
+        help_text="Weekday for the Nth-weekday close policy.",
+    )
+    billing_period_close_days_before_month_end = models.PositiveSmallIntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(27)],
+        help_text="Days before the selected month ends for that automatic close policy.",
     )
     billing_rules_enabled = models.BooleanField(
         default=False,

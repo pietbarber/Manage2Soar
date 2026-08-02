@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Billing Periods{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><p class="text-uppercase text-muted small mb-1">Treasurer workspace</p><h1 class="h3 mb-0">Billing Periods</h1></div>
+    <a class="btn btn-outline-secondary" href="{% url 'billing:ledger_list' %}">Member billing</a>
+  </div>
+  <p class="text-muted">Automatic policies close periods at 11:59 PM in the configured club timezone.</p>
+  <form method="post" action="{% url 'billing:period_close' %}" class="card card-body mb-4">
+    {% csrf_token %}
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-2"><label class="form-label" for="period-year">Year</label><input class="form-control" id="period-year" name="year" type="number" value="{{ today.year }}" required></div>
+      <div class="col-sm-2"><label class="form-label" for="period-month">Month</label><input class="form-control" id="period-month" name="month" type="number" min="1" max="12" value="{{ today.month }}" required></div>
+      <div class="col-sm"><label class="form-label" for="close-reason">Reason</label><input class="form-control" id="close-reason" name="reason" required></div>
+      <div class="col-sm-auto"><button class="btn btn-danger" type="submit">Close period</button></div>
+    </div>
+  </form>
+  <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Period</th><th>Status</th><th>History</th><th></th></tr></thead><tbody>
+    {% for period in periods %}<tr>
+      <td>{{ period.year }}-{{ period.month|stringformat:"02d" }}</td><td>{% if period.is_closed %}<span class="badge text-bg-danger">Closed</span>{% else %}<span class="badge text-bg-success">Open</span>{% endif %}</td>
+      <td>{% for event in period.events.all %}<div>{{ event.get_action_display }} {{ event.created_at }}{% if event.actor %} by {{ event.actor }}{% endif %}: {{ event.reason }}</div>{% empty %}<span class="text-muted">No events</span>{% endfor %}</td>
+      <td>{% if period.is_closed %}<form method="post" action="{% url 'billing:period_reopen' period.pk %}">{% csrf_token %}<label class="visually-hidden" for="reopen-reason-{{ period.pk }}">Reopen reason</label><input class="form-control form-control-sm d-inline-block w-auto" id="reopen-reason-{{ period.pk }}" name="reason" required placeholder="Reason"><button class="btn btn-sm btn-outline-primary" type="submit">Reopen</button></form>{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="4" class="text-muted">No periods have been closed or reopened.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+{% endblock %}

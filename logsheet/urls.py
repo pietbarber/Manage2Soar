@@ -164,11 +164,15 @@ urlpatterns = [
         views.land_flight_now,
         name="land_flight_now",
     ),
-    # AJAX endpoint for updating split fields
     path(
-        "flight/<int:flight_id>/update_split/",
-        views.update_flight_split,
-        name="update_flight_split",
+        "split-request/<uuid:token>/",
+        views.flight_split_request_detail,
+        name="flight_split_request_detail",
+    ),
+    path(
+        "split-requests/",
+        views.flight_split_request_list,
+        name="flight_split_request_list",
     ),
     # AJAX endpoint for updating split fields
     path(

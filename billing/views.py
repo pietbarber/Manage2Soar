@@ -1,3 +1,4 @@
+from datetime import date
 from functools import wraps
 
 from django.contrib import messages
@@ -11,7 +12,8 @@ from django.views.decorators.http import require_POST
 
 from billing.decorators import billing_app_required
 from billing.forms import ManualEntryForm, ReverseEntryForm
-from billing.models import Ledger, LedgerEntry
+from billing.models import BillingPeriod, Ledger, LedgerEntry
+from billing.periods import close_period, reopen_period
 from billing.services import (
     get_balance,
     post_manual_charge,
@@ -78,6 +80,56 @@ def ledger_list(request):
             }
         )
     return render(request, "billing/ledger_list.html", {"rows": rows, "query": query})
+
+
+@require_POST
+@billing_app_required
+@treasurer_required
+def close_billing_period(request):
+    try:
+        year = int(request.POST.get("year", ""))
+        month = int(request.POST.get("month", ""))
+        date(year, month, 1)
+        close_period(
+            year=year,
+            month=month,
+            actor=request.user,
+            reason=request.POST.get("reason", ""),
+        )
+    except (TypeError, ValueError, ValidationError) as exc:
+        messages.error(request, "; ".join(getattr(exc, "messages", [str(exc)])))
+    else:
+        messages.success(request, f"Closed billing period {year}-{month:02d}.")
+    return redirect("billing:period_list")
+
+
+@require_POST
+@billing_app_required
+@treasurer_required
+def reopen_billing_period(request, period_id):
+    period = get_object_or_404(BillingPeriod, pk=period_id)
+    try:
+        reopen_period(
+            period=period, actor=request.user, reason=request.POST.get("reason", "")
+        )
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+    else:
+        messages.success(
+            request, f"Reopened billing period {period.year}-{period.month:02d}."
+        )
+    return redirect("billing:period_list")
+
+
+@billing_app_required
+@treasurer_required
+def billing_period_list(request):
+    periods = BillingPeriod.objects.prefetch_related("events__actor")
+    return render(
+        request,
+        "billing/period_list.html",
+        {"periods": periods, "today": date.today()},
+    )
 
 
 @billing_app_required

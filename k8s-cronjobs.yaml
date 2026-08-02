@@ -2,6 +2,46 @@
 # These CronJobs run scheduled tasks in the Kubernetes cluster with distributed locking
 
 ---
+# Every 15 minutes: Close billing periods due under the configured billing close policy.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: close-billing-periods
+  namespace: default
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: close-billing-periods
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - close_billing_periods
+                - --verbosity=1
+              workingDir: /app
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+
+---
 # Daily: Aging Logsheet Notifications (8:00 AM UTC)
 apiVersion: batch/v1
 kind: CronJob
