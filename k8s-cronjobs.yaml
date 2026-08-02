@@ -2,7 +2,7 @@
 # These CronJobs run scheduled tasks in the Kubernetes cluster with distributed locking
 
 ---
-# Daily: Close billing periods due under the club-local first-Monday policy.
+# Every 15 minutes: Close billing periods due under the configured billing close policy.
 apiVersion: batch/v1
 kind: CronJob
 metadata:

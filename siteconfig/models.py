@@ -530,7 +530,7 @@ class SiteConfiguration(models.Model):
         help_text="Week occurrence (1 through 5) for the Nth-weekday close policy.",
     )
     billing_period_close_weekday = models.PositiveSmallIntegerField(
-        choices=Weekday,
+        choices=Weekday.choices,
         default=Weekday.MONDAY,
         help_text="Weekday for the Nth-weekday close policy.",
     )

@@ -1155,7 +1155,8 @@ def flight_split_request_detail(request, token):
         return HttpResponseForbidden("Only the requested member can decide this split.")
     decision = request.POST.get("decision")
     if decision not in {"accept", "reject"}:
-        return HttpResponseNotAllowed(["accept", "reject", "cancel"])
+        messages.error(request, "Invalid decision. Choose accept or reject.")
+        return redirect("logsheet:flight_split_request_detail", token=split_request.token)
     treasurer_reason = request.POST.get("treasurer_reason", "").strip()
     if period_closed and request.user == split_request.requested_member:
         messages.error(request, "This billing period is closed. Contact a treasurer.")
