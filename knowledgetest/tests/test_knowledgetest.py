@@ -1085,9 +1085,12 @@ class WrittenTestAssignmentDeleteTests(TestCase):
         self.instructor_user.save()
 
         self.staff_user = User.objects.create_user(
-            username="staff-test", password="pass", is_staff=True
+            username="staff-test",
+            password="pass",
+            is_staff=True,
+            is_superuser=True,
+            membership_status="Full Member",
         )
-        self.student = User.objects.create_user(
             username="student-delete", password="pass"
         )
         self.student.membership_status = "Full Member"
