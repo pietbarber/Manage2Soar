@@ -155,23 +155,6 @@ def close_due_periods(now=None, dry_run=False):
         "log_date__year", "log_date__month"
     ).distinct():
         close_at = automatic_close_at(year, month)
-        if close_at is not None and now >= close_at:
-            period = BillingPeriod.objects.filter(year=year, month=month).first()
-            reopened = (
-                period
-                and period.events.filter(
-                    action=BillingPeriodEvent.Action.REOPENED
-                ).exists()
-            )
-            if period is None or (not period.is_closed and not reopened):
-                if dry_run:
-                    closed.append((year, month))
-                else:
-                    closed.append(
-                        close_period(
-                            year=year,
-                            month=month,
-                            reason="Automatically closed by the configured billing-period policy.",
-                        )
                     )
+                )
     return closed
