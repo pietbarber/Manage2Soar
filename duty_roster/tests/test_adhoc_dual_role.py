@@ -9,7 +9,7 @@ Ensures that:
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from duty_roster.models import DutyAssignment
@@ -85,6 +85,7 @@ class TestAdHocDualRolePrevention(TestCase):
         self.adhoc_assignment.refresh_from_db()
         self.assertEqual(self.adhoc_assignment.tow_pilot, self.dual_member)
 
+    @override_settings(EMAIL_DEV_MODE=False)
     def test_dual_member_can_signup_as_instructor(self):
         """Test that a dual-qualified member can sign up as instructor."""
         self.client.login(username="dualmember", password="testpass123")
@@ -247,6 +248,7 @@ class TestAdHocRescindFunctionality(TestCase):
         self.adhoc_assignment.refresh_from_db()
         self.assertIsNone(self.adhoc_assignment.tow_pilot)
 
+    @override_settings(EMAIL_DEV_MODE=False)
     def test_instructor_can_rescind(self):
         """Test that an instructor can rescind their signup."""
         self.client.login(username="instmember", password="testpass123")
@@ -275,6 +277,7 @@ class TestAdHocRescindFunctionality(TestCase):
         self.adhoc_assignment.refresh_from_db()
         self.assertIsNone(self.adhoc_assignment.duty_officer)
 
+    @override_settings(EMAIL_DEV_MODE=False)
     def test_ado_can_rescind(self):
         """Test that an ADO can rescind their signup."""
         self.client.login(username="adomember", password="testpass123")
@@ -370,6 +373,7 @@ class TestRescindThenSwitchRoles(TestCase):
             tow_pilot=self.dual_member,
         )
 
+    @override_settings(EMAIL_DEV_MODE=False)
     def test_can_rescind_tow_then_signup_as_instructor(self):
         """Test that a member can rescind tow signup and then sign up as instructor."""
         self.client.login(username="dualmember", password="testpass123")
@@ -564,6 +568,7 @@ class TestRescindOnConfirmedAdHoc(TestCase):
         # Confirmation should be recalculated - no duty officer means not confirmed
         self.assertFalse(self.adhoc_assignment.is_confirmed)
 
+    @override_settings(EMAIL_DEV_MODE=False)
     def test_rescind_then_another_member_can_signup(self):
         """Test that after rescinding, another member can sign up for that role."""
         # Dual member rescind tow pilot

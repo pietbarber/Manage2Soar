@@ -5,7 +5,8 @@
     "docker.lsp.experimental.scout.criticalHighVulnerabilities": true,
     "python.analysis.typeCheckingMode": "basic",
     "python.analysis.diagnosticSeverityOverrides": {
-        "reportAttributeAccessIssue": "none"
+        "reportAttributeAccessIssue": "none",
+        "reportGeneralTypeIssues": "none"
     },
     "[html]": {
         "html.format.wrapLineLength": 0,
