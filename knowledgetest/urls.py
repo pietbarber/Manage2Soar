@@ -7,6 +7,7 @@ from .views import (
     InstructorRecentTestsView,
     MemberWrittenTestHistoryView,
     PendingTestsView,
+    WrittenTestAssignmentDeleteView,
     WrittenTestAttemptDeleteView,
     WrittenTestResultView,
     WrittenTestStartView,
@@ -38,5 +39,10 @@ urlpatterns = [
         "tests/<int:pk>/review/<int:student_pk>/",
         WrittenTestReviewView.as_view(),
         name="quiz-review",
+    ),
+    path(
+        "assignments/<int:pk>/delete/",
+        WrittenTestAssignmentDeleteView.as_view(),
+        name="assignment-delete",
     ),
 ]
