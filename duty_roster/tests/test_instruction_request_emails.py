@@ -12,6 +12,7 @@ from datetime import date, timedelta
 
 import pytest
 from django.core import mail
+from django.test.utils import override_settings
 from django.utils import timezone
 
 from duty_roster.models import DutyAssignment, InstructionSlot
@@ -134,6 +135,7 @@ def duty_assignment(instructor, db):
 
 
 @pytest.mark.django_db
+@override_settings(EMAIL_DEV_MODE=False)
 class TestStudentInstructionRequestEmail:
     """Tests for student instruction request emails (with progress)."""
 
@@ -218,6 +220,7 @@ class TestStudentInstructionRequestEmail:
 
 
 @pytest.mark.django_db
+@override_settings(EMAIL_DEV_MODE=False)
 class TestRatedPilotInstructionRequestEmail:
     """Tests for rated pilot instruction request emails (with currency)."""
 
@@ -398,6 +401,7 @@ class TestRatedPilotInstructionRequestEmail:
 
 
 @pytest.mark.django_db
+@override_settings(EMAIL_DEV_MODE=False)
 class TestEmailContent:
     """Tests for general email content."""
 
@@ -468,6 +472,7 @@ class TestEmailContent:
 
 
 @pytest.mark.django_db
+@override_settings(EMAIL_DEV_MODE=False)
 class TestInstructionRequestDetails:
     """Tests for instruction request type and notes fields (Issue #464)."""
 
