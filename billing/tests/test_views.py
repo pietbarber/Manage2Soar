@@ -80,8 +80,8 @@ def test_non_treasurer_cannot_access_treasurer_ledger_endpoints(client, member, 
         ).status_code
         == 403
     )
-    entry.refresh_from_db()
-    assert entry.reversal is None
+entry.refresh_from_db()
+assert not LedgerEntry.objects.filter(reverses=entry).exists()
     assert not LedgerEntry.objects.filter(
         ledger__member=member, member_description="Unauthorized charge"
     ).exists()
