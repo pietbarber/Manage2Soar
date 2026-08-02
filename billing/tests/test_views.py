@@ -6,7 +6,7 @@ from django.contrib.messages import get_messages
 from django.urls import reverse
 
 from billing.models import LedgerEntry
-from billing.services import get_balance
+from billing.services import get_balance, post_manual_charge
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
@@ -39,6 +39,52 @@ def test_ledger_list_requires_treasurer(client, member, treasurer):
     response = client.get(url)
     assert response.status_code == 200
     assert "Member Billing" in response.content.decode()
+
+
+def test_non_treasurer_cannot_access_treasurer_ledger_endpoints(client, member, treasurer):
+    other_member = Member.objects.create_user(
+        username="other-billing-member", is_active=True, membership_status="Full Member"
+    )
+    entry = post_manual_charge(
+        member=member,
+        actor=treasurer,
+        amount="10.00",
+        effective_date=date.today(),
+        description="Charge",
+        reason="Test setup",
+    )
+    client.force_login(other_member)
+
+    assert (
+        client.get(reverse("billing:ledger_detail", args=[member.pk])).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            reverse("billing:ledger_detail", args=[member.pk]),
+            {
+                "kind": "manual_charge",
+                "amount": "25.00",
+                "effective_date": date.today().isoformat(),
+                "description": "Unauthorized charge",
+                "reason": "Unauthorized",
+                "effect": "",
+            },
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            reverse("billing:entry_reverse", args=[entry.pk]),
+            {"reason": "Unauthorized"},
+        ).status_code
+        == 403
+    )
+entry.refresh_from_db()
+assert not LedgerEntry.objects.filter(reverses=entry).exists()
+    assert not LedgerEntry.objects.filter(
+        ledger__member=member, member_description="Unauthorized charge"
+    ).exists()
 
 
 def test_ledger_list_redirects_when_billing_is_disabled(client, treasurer):
