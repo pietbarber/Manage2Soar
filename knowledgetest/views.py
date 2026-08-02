@@ -219,7 +219,10 @@ class CreateWrittenTestView(FormView):
         if data["must_include"]:
             import re
 
-            must = [int(n) for n in re.findall(r"\d+", data["must_include"])]
+            raw = [int(n) for n in re.findall(r"\d+", data["must_include"])]
+            # Normalize to existing question IDs and de-dup (issue #969)
+            valid_qnums = set(Question.objects.values_list("pk", flat=True))
+            must = list(dict.fromkeys(n for n in raw if n in valid_qnums))
         weights = {
             code: data[f"weight_{code}"]
             for code in QuestionCategory.objects.values_list("code", flat=True)
@@ -240,8 +243,7 @@ class CreateWrittenTestView(FormView):
 
         # If too many, randomly select down to 50 (must-includes always included)
         if total + len(must) > MAX_QUESTIONS:
-            # Remove duplicates in must
-            must = list(dict.fromkeys(must))
+            # de-dup was already done above when normalizing to existing IDs
             if len(must) >= MAX_QUESTIONS:
                 must = must[:MAX_QUESTIONS]
                 weights = {}
@@ -701,10 +703,12 @@ class WrittenTestAssignmentDeleteView(View):
             )
             return redirect(reverse("knowledgetest:quiz-pending"))
         with transaction.atomic():
+            # Capture name before deleting the assignment
+            tmpl = asn.template
             # Delete the assignment. If this was the last assignment for the template,
             # also delete the template (which CASCADES to WrittenTestTemplateQuestion rows).
             asn.delete()
-            if not WrittenTestAssignment.objects.filter(template=tmpl).exists():
+            if not WrittenTestAssignment.objects.filter(template_id=tmpl.pk).exists():
                 # No remaining assignments for this template, delete it too
                 tmpl.delete()
         messages.success(

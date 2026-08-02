@@ -1033,6 +1033,46 @@ class ZeroQuestionTestPreventionTests(TestCase):
         # Should redirect (success)
         self.assertEqual(resp.status_code, 302)
 
+    def test_must_include_nonexistent_ids_prevented(self):
+        """Must-include with only non-existent question IDs must be rejected."""
+        code_list = list(QuestionCategory.objects.values_list("code", flat=True))
+        # Use invalid Q-numbers that don't match any existing question
+        data = {
+            "student": self.student.pk,
+            "pass_percentage": "100",
+            "description": "",
+            "must_include": "999",
+        }
+        for code in code_list:
+            data[f"weight_{code}"] = 0
+
+        url = reverse("knowledgetest:create")
+        resp = self.client.post(url, data)
+        # Should re-render the form with an error (no real questions to include)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(
+            "No questions selected",
+            str(resp.content),
+        )
+
+    def test_must_include_partial_invalid_ids_still_works(self):
+        """Must-include with some valid and some invalid IDs must still work."""
+        code_list = list(QuestionCategory.objects.values_list("code", flat=True))
+        # Mix valid (5) with invalid (999) Q-numbers
+        data = {
+            "student": self.student.pk,
+            "pass_percentage": "100",
+            "description": "",
+            "must_include": "5, 999",
+        }
+        for code in code_list:
+            data[f"weight_{code}"] = 0
+
+        url = reverse("knowledgetest:create")
+        resp = self.client.post(url, data)
+        # Should redirect (success) because at least one valid question exists
+        self.assertEqual(resp.status_code, 302)
+
 
 class WrittenTestAssignmentDeleteTests(TestCase):
     """Tests for deleting pending test assignments (issue #969)."""
