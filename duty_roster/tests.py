@@ -1,7 +1,7 @@
 from datetime import date, time, timedelta
 
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -658,6 +658,11 @@ class InstructionSlotModelTests(TestCase):
             )
 
 
+@override_settings(
+    EMAIL_DEV_MODE=False,
+    EMAIL_DEV_MODE_REDIRECT_TO="",
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
 class InstructionRequestViewTests(TestCase):
     """Tests for instruction request views."""
 

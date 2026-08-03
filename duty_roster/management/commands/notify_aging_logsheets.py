@@ -131,6 +131,9 @@ class Command(BaseCronJobCommand):
             "duty_roster/emails/aging_logsheets.txt", context
         )
 
+        email_sent = False
+        in_app_sent = False
+
         try:
             # Send email notification
             send_mail(
@@ -141,17 +144,26 @@ class Command(BaseCronJobCommand):
                 html_message=html_message,
                 fail_silently=False,
             )
+            email_sent = True
+        except Exception as e:
+            self.log_error(
+                f"Failed to send aging logsheet email to {member.full_display_name}: {str(e)}"
+            )
 
-            # Create in-app notification
+        try:
+            # Always attempt in-app notification, even if email delivery fails.
             Notification.objects.create(
                 user=member,
                 message=f"You have {len(logsheet_data)} aging logsheet(s) that need finalization",
                 url="/logsheet/",
             )
+            in_app_sent = True
+        except Exception as e:
+            self.log_error(
+                f"Failed to create aging logsheet in-app notification for {member.full_display_name}: {str(e)}"
+            )
 
+        if email_sent or in_app_sent:
             self.log_success(
                 f"Notified {member.full_display_name} about {len(logsheet_data)} aging logsheet(s)"
             )
-
-        except Exception as e:
-            self.log_error(f"Failed to notify {member.full_display_name}: {str(e)}")

@@ -38,7 +38,26 @@ class DjangoPlaywrightTestCase(StaticLiveServerTestCase):
         super().setUpClass()
         # Start Playwright once for the test class
         cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch(headless=True)
+        cls.browser = cls._launch_browser()
+
+    @classmethod
+    def _launch_browser(cls):
+        """Launch a browser for E2E tests with fallback for unsupported distros.
+
+        Playwright's bundled Chromium may be unavailable on very new Linux
+        distributions. In that case, fall back to driving system Chrome.
+        """
+        try:
+            return cls.playwright.chromium.launch(headless=True)
+        except Exception as exc:
+            message = str(exc).lower()
+            if (
+                "executable doesn't exist" in message
+                or "does not support chromium" in message
+            ):
+                channel = os.environ.get("PLAYWRIGHT_BROWSER_CHANNEL", "chrome")
+                return cls.playwright.chromium.launch(channel=channel, headless=True)
+            raise
 
     @classmethod
     def tearDownClass(cls):

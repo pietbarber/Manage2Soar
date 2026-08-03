@@ -249,6 +249,14 @@ class TestSafetyOfficerField(TestCase):
 class TestSafetyReportNotifications:
     """Tests for safety report email and in-app notifications."""
 
+    @pytest.fixture(autouse=True)
+    def _configure_email_for_tests(self, settings):
+        """Use deterministic local email behavior for notification tests."""
+        settings.EMAIL_DEV_MODE = False
+        settings.EMAIL_DEV_MODE_REDIRECT_TO = ""
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        mail.outbox.clear()
+
     def test_email_sent_to_safety_officers(self, client, active_member, safety_officer):
         """Test that email notifications are sent to all safety officers."""
         # Create a second safety officer

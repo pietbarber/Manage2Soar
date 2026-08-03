@@ -8,6 +8,17 @@ Tests the duty swap workflow including:
 - Email notifications
 """
 
+from builtins import (
+    AssertionError,
+    RuntimeError,
+    ValueError,
+    all,
+    any,
+    len,
+    list,
+    sorted,
+    str,
+)
 from datetime import date, datetime, timedelta
 from datetime import timezone as dt_timezone
 
@@ -844,6 +855,7 @@ class TestSwapRequestCreation:
 
 
 @pytest.mark.django_db
+@override_settings(EMAIL_DEV_MODE=False)
 class TestSwapOfferWorkflow:
     """Tests for swap offer workflow."""
 
@@ -876,7 +888,7 @@ class TestSwapOfferWorkflow:
             offer_type="cover",
         )
 
-        swap_request.refresh_from_db()
+        swap_request.refresh_from_db(from_queryset=None)
         assert offer.status == "accepted"
         assert swap_request.status == "fulfilled"
         assert swap_request.accepted_offer == offer
@@ -906,7 +918,7 @@ class TestSwapOfferWorkflow:
             proposed_swap_date=bob_duty_assignment.date,
         )
 
-        swap_request.refresh_from_db()
+        swap_request.refresh_from_db(from_queryset=None)
         assert offer.status == "pending"
         assert swap_request.status == "open"
         assert swap_request.accepted_offer is None
@@ -976,7 +988,7 @@ class TestSwapOfferWorkflow:
             offered_by=ado_helper_probationary,
             offer_type="cover",
         )
-        ado_swap_request.refresh_from_db()
+        ado_swap_request.refresh_from_db(from_queryset=None)
         assert offer.status == "accepted"
         assert ado_swap_request.status == "fulfilled"
 
@@ -1192,8 +1204,8 @@ class TestOfferAcceptDecline:
         resp = client.post(url)
         assert resp.status_code in [200, 302]
 
-        swap_offer.refresh_from_db()
-        swap_request.refresh_from_db()
+        swap_offer.refresh_from_db(from_queryset=None)
+        swap_request.refresh_from_db(from_queryset=None)
 
         assert swap_offer.status == "accepted"
         assert swap_request.status == "fulfilled"
@@ -1208,7 +1220,7 @@ class TestOfferAcceptDecline:
         resp = client.post(url)
         assert resp.status_code in [200, 302]
 
-        swap_offer.refresh_from_db()
+        swap_offer.refresh_from_db(from_queryset=None)
         assert swap_offer.status == "declined"
 
     def test_withdraw_offer(self, client, bob, swap_request, swap_offer, site_config):
@@ -1218,7 +1230,7 @@ class TestOfferAcceptDecline:
         resp = client.post(url)
         assert resp.status_code in [200, 302]
 
-        swap_offer.refresh_from_db()
+        swap_offer.refresh_from_db(from_queryset=None)
         assert swap_offer.status == "withdrawn"
 
     def test_accept_helper_returns_false_when_request_already_fulfilled(
@@ -1262,7 +1274,7 @@ class TestCancelAndConvert:
         resp = client.post(url)
         assert resp.status_code in [200, 302]
 
-        swap_request.refresh_from_db()
+        swap_request.refresh_from_db(from_queryset=None)
         assert swap_request.status == "cancelled"
 
     def test_convert_direct_to_general(
@@ -1397,7 +1409,7 @@ class TestCancelAndConvert:
         response = client.post(url)
 
         assert response.status_code == 302
-        direct_request.refresh_from_db()
+        direct_request.refresh_from_db(from_queryset=None)
         assert direct_request.request_type == "general"
         assert direct_request.direct_request_to is None
 
@@ -1465,8 +1477,8 @@ class TestDynamicAssignmentUpdateEdgeCases:
 
         update_duty_assignments(swap_request, offer)
 
-        original_assignment.refresh_from_db()
-        swap_assignment.refresh_from_db()
+        original_assignment.refresh_from_db(from_queryset=None)
+        swap_assignment.refresh_from_db(from_queryset=None)
 
         recreated_original_row = DutyAssignmentRole.objects.get(
             assignment=original_assignment,
@@ -1537,9 +1549,9 @@ class TestDynamicAssignmentUpdateEdgeCases:
 
         update_duty_assignments(swap_request, offer)
 
-        original_row.refresh_from_db()
-        original_assignment.refresh_from_db()
-        swap_assignment.refresh_from_db()
+        original_row.refresh_from_db(from_queryset=None)
+        original_assignment.refresh_from_db(from_queryset=None)
+        swap_assignment.refresh_from_db(from_queryset=None)
         created_swap_row = DutyAssignmentRole.objects.get(
             assignment=swap_assignment,
             role_key="launch_coord",
@@ -1613,8 +1625,8 @@ class TestDynamicAssignmentUpdateEdgeCases:
 
         update_duty_assignments(swap_request, offer)
 
-        original_assignment.refresh_from_db()
-        swap_assignment.refresh_from_db()
+        original_assignment.refresh_from_db(from_queryset=None)
+        swap_assignment.refresh_from_db(from_queryset=None)
 
         swap_row = DutyAssignmentRole.objects.get(
             assignment=swap_assignment,
@@ -1663,8 +1675,8 @@ class TestDynamicAssignmentUpdateEdgeCases:
         with pytest.raises(ValueError, match="Missing original assignment"):
             _accept_offer_and_finalize(swap_request, offer)
 
-        swap_request.refresh_from_db()
-        offer.refresh_from_db()
+        swap_request.refresh_from_db(from_queryset=None)
+        offer.refresh_from_db(from_queryset=None)
 
         assert swap_request.status == "open"
         assert swap_request.accepted_offer is None
@@ -1934,8 +1946,8 @@ class TestSwapRequestExpiryCronjob:
 
         call_command("expire_past_swap_requests", verbosity=0)
 
-        swap_request.refresh_from_db()
-        offer.refresh_from_db()
+        swap_request.refresh_from_db(from_queryset=None)
+        offer.refresh_from_db(from_queryset=None)
 
         assert swap_request.status == "expired"
         assert offer.status == "auto_declined"
@@ -1976,8 +1988,8 @@ class TestSwapRequestExpiryCronjob:
 
         call_command("expire_past_swap_requests", verbosity=0)
 
-        stale_request.refresh_from_db()
-        boundary_request.refresh_from_db()
+        stale_request.refresh_from_db(from_queryset=None)
+        boundary_request.refresh_from_db(from_queryset=None)
         assert stale_request.status == "expired"
         assert boundary_request.status == "open"
 
@@ -2007,8 +2019,8 @@ class TestSwapRequestExpiryCronjob:
 
         call_command("expire_past_swap_requests", "--dry-run", verbosity=0)
 
-        swap_request.refresh_from_db()
-        offer.refresh_from_db()
+        swap_request.refresh_from_db(from_queryset=None)
+        offer.refresh_from_db(from_queryset=None)
 
         assert swap_request.status == "open"
         assert offer.status == "pending"
@@ -2049,7 +2061,7 @@ class TestSwapRequestExpiryCronjob:
 
         call_command("expire_past_swap_requests", verbosity=0)
 
-        swap_request.refresh_from_db()
+        swap_request.refresh_from_db(from_queryset=None)
         assert swap_request.status == "expired"
         assert notified == []
         assert len(scheduled_callbacks) == 1
@@ -2105,10 +2117,10 @@ class TestSwapRequestExpiryCronjob:
 
         call_command("expire_past_swap_requests", verbosity=0)
 
-        stale_open.refresh_from_db()
-        future_open.refresh_from_db()
-        past_cancelled.refresh_from_db()
-        past_fulfilled.refresh_from_db()
+        stale_open.refresh_from_db(from_queryset=None)
+        future_open.refresh_from_db(from_queryset=None)
+        past_cancelled.refresh_from_db(from_queryset=None)
+        past_fulfilled.refresh_from_db(from_queryset=None)
 
         assert stale_open.status == "expired"
         assert future_open.status == "open"
@@ -2737,7 +2749,7 @@ class TestSwapVisibilityInCalendar:
             is_staff=True,
         )
         Member.objects.filter(pk=staff_viewer.pk).update(is_staff=True)
-        staff_viewer.refresh_from_db(fields=["is_staff"])
+        staff_viewer.refresh_from_db(fields=["is_staff"], from_queryset=None)
 
         DutySwapRequest.objects.create(
             requester=alice,
@@ -2823,7 +2835,7 @@ class TestSwapVisibilityInCalendar:
             is_staff=True,
         )
         Member.objects.filter(pk=staff_viewer.pk).update(is_staff=True)
-        staff_viewer.refresh_from_db(fields=["is_staff"])
+        staff_viewer.refresh_from_db(fields=["is_staff"], from_queryset=None)
 
         DutySwapRequest.objects.create(
             requester=alice,
@@ -2898,7 +2910,7 @@ class TestReminderRecipientFiltering:
             rostermeister=True,
         )
         Member.objects.filter(pk=inactive_rostermeister.pk).update(is_active=False)
-        inactive_rostermeister.refresh_from_db(fields=["is_active"])
+        inactive_rostermeister.refresh_from_db(fields=["is_active"], from_queryset=None)
 
         swap_request = DutySwapRequest.objects.create(
             requester=alice,
