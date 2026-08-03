@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from logsheet.models import Airfield
@@ -13,6 +13,11 @@ from members.models import Member
 User = get_user_model()
 
 
+@override_settings(
+    EMAIL_DEV_MODE=False,
+    EMAIL_DEV_MODE_REDIRECT_TO="",
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
 class TestOperationsAuthentication(TestCase):
     """Test authentication requirements for proposing operations."""
 
