@@ -9,6 +9,7 @@ Covers the full happy path:
 
 from datetime import date, timedelta
 
+from django.test import override_settings
 from django.urls import reverse
 
 from duty_roster.models import (
@@ -22,6 +23,10 @@ from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
 from siteconfig.models import SiteConfiguration
 
 
+@override_settings(
+    EMAIL_DEV_MODE=False,
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
 class TestDynamicSwapFullFlow(DjangoPlaywrightTestCase):
     def setUp(self):
         super().setUp()
