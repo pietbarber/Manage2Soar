@@ -1,6 +1,5 @@
 from decimal import ROUND_HALF_UP, Decimal
 
-
 MONEY_QUANTUM = Decimal("0.01")
 
 
@@ -55,11 +54,6 @@ def split_flight_costs(
 
     allocations = {}
     primary = pilot or partner
-
-    def split_even(value):
-        """Split cents deterministically, assigning any remainder to partner."""
-        first = quantize_currency(value / 2)
-        return first, quantize_currency(value - first)
 
     if split_type:
         if pilot and partner and split_type == "even":

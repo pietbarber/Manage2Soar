@@ -482,11 +482,13 @@ class TestFinalizationWithNonTowFlights:
         config.billing_rules_enabled = True
         config.instructor_time_charges_enabled = True
         config.billing_pricing_mode = BillingPricingMode.MATRIX
+        config.billing_app_enabled = True
         config.save(
             update_fields=[
                 "billing_rules_enabled",
                 "instructor_time_charges_enabled",
                 "billing_pricing_mode",
+                "billing_app_enabled",
             ]
         )
 
@@ -533,6 +535,14 @@ class TestFinalizationWithNonTowFlights:
         glider.rental_rate = Decimal("50.00")
         glider.max_rental_rate = Decimal("120.00")
         glider.save(update_fields=["rental_rate", "max_rental_rate"])
+
+        config = SiteConfiguration.objects.first() or SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.org",
+            club_abbreviation="TC",
+        )
+        config.billing_app_enabled = True
+        config.save(update_fields=["billing_app_enabled"])
 
         flight = Flight.objects.create(
             logsheet=logsheet,
