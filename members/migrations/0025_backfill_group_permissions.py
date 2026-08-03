@@ -36,6 +36,16 @@ def backfill_group_permissions(apps, schema_editor):
         perms_to_add = []
 
         for app_label, model_name, codename in perm_tuples:
+            # Guard: verify the target model actually exists in this migration's
+            # historical state before creating ContentType/Permission rows.  This
+            # prevents silently creating orphaned auth rows when GROUP_PERMISSIONS
+            # contains a typo or references a removed model — and avoids swallowing
+            # real migration errors behind blanket exception handling.
+            try:
+                apps.get_model(app_label, model_name)
+            except LookupError:
+                continue
+
             try:
                 ct, _ = ContentType.objects.using(db_alias).get_or_create(
                     app_label=app_label,

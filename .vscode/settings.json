@@ -6,7 +6,7 @@
     "python.analysis.typeCheckingMode": "basic",
     "python.analysis.diagnosticSeverityOverrides": {
         "reportAttributeAccessIssue": "none",
-        "reportGeneralTypeIssues": "none"
+        "reportGeneralTypeIssues": "warning"
     },
     "[html]": {
         "html.format.wrapLineLength": 0,
