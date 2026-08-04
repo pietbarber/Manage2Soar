@@ -1091,6 +1091,7 @@ class WrittenTestAssignmentDeleteTests(TestCase):
             is_superuser=True,
             membership_status="Full Member",
         )
+        self.student = User.objects.create_user(
             username="student-delete", password="pass"
         )
         self.student.membership_status = "Full Member"
@@ -1147,8 +1148,11 @@ class WrittenTestAssignmentDeleteTests(TestCase):
     def test_non_instructor_cannot_delete(self):
         """A non-instructor, non-staff user should get 403."""
         other_user = User.objects.create_user(username="other-test", password="pass")
-        self.client.login(username="other-test", password="pass")
+        # Ensure the user has an active membership so we can test _check_permission specifically
+        other_user.membership_status = "Full Member"
+        other_user.save()
 
+        self.client.login(username="other-test", password="pass")
         resp = self.client.post(self.delete_url)
         self.assertEqual(resp.status_code, 403)
 
