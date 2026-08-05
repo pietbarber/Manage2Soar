@@ -25,13 +25,22 @@ def finalize_logsheet_financials(
     # FOR UPDATE queries that lock the nullable side of an outer join.
     locked_flights = Flight.objects.select_for_update().filter(logsheet=locked_logsheet)
     for flight in locked_flights:
+        # Track which cost fields actually changed to avoid no-op saves
+        costs_to_save = []
         if flight.tow_cost_actual is None:
             flight.tow_cost_actual = flight.tow_cost_calculated
+            costs_to_save.append("tow_cost_actual")
         if flight.rental_cost_actual is None:
             flight.rental_cost_actual = flight.rental_cost
+            costs_to_save.append("rental_cost_actual")
         if flight.instruction_fee_actual is None:
             flight.instruction_fee_actual = flight.instruction_fee_calculated
-        flight.save()
+            costs_to_save.append("instruction_fee_actual")
+
+        # Only save if we actually changed something, and persist only those fields
+        # to avoid rewriting unrelated auto-calculated fields like duration
+        if costs_to_save:
+            flight.save(update_fields=costs_to_save)
 
         if billing_enabled:
             post_flight_charges(
