@@ -14,3 +14,12 @@ This repo has **git hooks and security checks** (bandit, black, isort, django-up
 - Run tests before submitting changes
 - Follow the project's existing code style (black, isort already configured)
 - Ask before modifying sensitive files (settings, config, security-related)
+
+## Command execution
+
+- Prefer Claude Code's Read, Edit, and Write tools over shell redirection.
+- Do not use `>` to create or edit project files when Write or Edit can do it.
+- Do not claim that a command ran unless an actual tool result was returned.
+- If a tool is denied, report the denial exactly.
+- Never silently remove redirection, pipelines, arguments, or command portions.
+- Verify every modification with Read or `git diff`.
