@@ -1100,7 +1100,7 @@ def assign_qualification_modal(request, member_id):
 # Also lists any pending reports in the last 30 days.
 #
 # Context:
-# - pending_reports: List of dicts with 'pilot', 'date', 'report_url'
+# - pending_reports: List of dicts with 'pilot', 'date', 'flight_count', 'report_url'
 # - students_data: List of dicts with per-student 'solo_pct', 'rating_pct', 'sessions', 'solo_url', 'checkride_url'
 # - rated_data: Same as students_data but for rated members
 ####################################################
@@ -1179,32 +1179,37 @@ def progress_dashboard(request):
         )
 
     # ————————————————————————————————
-    # 4) Pending reports (unchanged)
+    # 4) Pending reports with flight counts per pilot+date
     cutoff = date.today() - timedelta(days=30)
     flights_qs = Flight.objects.filter(
         instructor=request.user, logsheet__log_date__gte=cutoff
     ).select_related("pilot", "logsheet")
 
-    seen = set()
-    pending_reports = []
+    # Count flights and collect one entry per pilot+date
+    flight_counts: dict[tuple[int, date], int] = defaultdict(int)
+    pilot_dates: dict[tuple[int, date], Member] = {}
     for f in flights_qs:
         key = (f.pilot_id, f.logsheet.log_date)
-        if key in seen:
-            continue
-        seen.add(key)
+        flight_counts[key] += 1
+        pilot_dates.setdefault(key, f.pilot)
+
+    pending_reports = []
+    for (pilot_id, report_date), count in flight_counts.items():
+        pilot = pilot_dates[(pilot_id, report_date)]
         already = InstructionReport.objects.filter(
-            student=f.pilot, instructor=request.user, report_date=f.logsheet.log_date
+            student=pilot, instructor=request.user, report_date=report_date
         ).exists()
         if already:
             continue
 
         pending_reports.append(
             {
-                "pilot": f.pilot,
-                "date": f.logsheet.log_date,
+                "pilot": pilot,
+                "date": report_date,
+                "flight_count": count,
                 "report_url": reverse(
                     "instructors:fill_instruction_report",
-                    args=[f.pilot.pk, f.logsheet.log_date],
+                    args=[pilot_id, report_date],
                 ),
             }
         )

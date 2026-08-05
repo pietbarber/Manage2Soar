@@ -13,13 +13,14 @@
 
 {% if pending_reports %}
   <div class="alert alert-warning">
-    You have {{ pending_reports|length }} reports to file from flights in the last 30 days:
+    You have {{ pending_reports|length }} report{{ pending_reports|length|pluralize }} to file from flights in the last 30 days:
   </div>
   <table class="table table-sm table-bordered mb-4">
     <thead class="table-light">
       <tr>
         <th>Pilot</th>
         <th>Date</th>
+        <th>Flights</th>
         <th>Action</th>
       </tr>
     </thead>
@@ -28,6 +29,7 @@
       <tr>
         <td>{{ p.pilot.full_display_name }}</td>
         <td>{{ p.date|date:"Y-m-d" }}</td>
+        <td>{{ p.flight_count }} flight{{ p.flight_count|pluralize }}</td>
         <td>
           <a class="btn btn-sm btn-primary"
              href="{{ p.report_url }}">
