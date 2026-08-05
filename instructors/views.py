@@ -1191,7 +1191,8 @@ def progress_dashboard(request):
     for f in flights_qs:
         key = (f.pilot_id, f.logsheet.log_date)
         flight_counts[key] += 1
-        pilot_dates.setdefault(key, f.pilot)
+        if f.pilot is not None:
+            pilot_dates.setdefault(key, f.pilot)
 
     pending_reports = []
     for (pilot_id, report_date), count in flight_counts.items():
