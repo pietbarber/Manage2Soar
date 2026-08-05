@@ -1186,3 +1186,103 @@ def test_foreflight_aircraft_rows_sanitize_formula_cells(client):
     assert towplane_row["AircraftID"] == "'@NTOW"
     assert towplane_row["Make"] == "'=TowMake"
     assert towplane_row["Model"] == "'+TowModel"
+
+
+@pytest.mark.django_db
+def test_progress_dashboard_pending_reports_include_flight_count(client):
+    """Pending reports should show how many flights the instructor flew with each student."""
+    _ensure_full_member_status()
+    instructor = _make_member(
+        "flight_count_instructor", instructor=True, glider_rating="rated"
+    )
+    student = _make_member("flight_count_student", glider_rating="student")
+    airfield = Airfield.objects.create(name="Test Field", identifier="KTFD")
+
+    today = date.today()
+    logsheet = Logsheet.objects.create(
+        log_date=today,
+        airfield=airfield,
+        created_by=instructor,
+    )
+    glider = Glider.objects.create(
+        n_number="N123TF",
+        make="Schempp-Hirth",
+        model="Discus",
+        club_owned=True,
+        is_active=True,
+    )
+
+    # Create 3 flights on the same day with the same student
+    for i in range(3):
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=student,
+            glider=glider,
+            instructor=instructor,
+            launch_method="tow",
+            launch_time=time(9, 0 + i),
+            landing_time=time(9, 15 + i),
+        )
+
+    client.force_login(instructor)
+    response = client.get(reverse("instructors:instructors-dashboard"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    # The flight count should appear in the table
+    assert "3 flights" in content
+
+
+@pytest.mark.django_db
+def test_progress_dashboard_ignores_null_pilot_flights(client):
+    """Dashboard should ignore legacy flights with null pilot values."""
+    _ensure_full_member_status()
+    instructor = _make_member(
+        "null_pilot_instructor", instructor=True, glider_rating="rated"
+    )
+    student = _make_member("null_pilot_student", glider_rating="student")
+    airfield = Airfield.objects.create(name="Null Pilot Field", identifier="KNPF")
+
+    today = date.today()
+    logsheet = Logsheet.objects.create(
+        log_date=today,
+        airfield=airfield,
+        created_by=instructor,
+    )
+    glider = Glider.objects.create(
+        n_number="N999NP",
+        make="Schempp-Hirth",
+        model="Discus",
+        club_owned=True,
+        is_active=True,
+    )
+
+    # Valid student flight should appear as a single pending report.
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=student,
+        glider=glider,
+        instructor=instructor,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 15),
+    )
+
+    # Legacy/partial row: instructor is set but pilot is null.
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=None,
+        glider=glider,
+        instructor=instructor,
+        launch_method="tow",
+        launch_time=time(10, 20),
+        landing_time=time(10, 35),
+    )
+
+    client.force_login(instructor)
+    response = client.get(reverse("instructors:instructors-dashboard"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "1 flight" in content
+    assert "2 flights" not in content
