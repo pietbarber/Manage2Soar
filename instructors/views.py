@@ -1182,7 +1182,9 @@ def progress_dashboard(request):
     # 4) Pending reports with flight counts per pilot+date
     cutoff = date.today() - timedelta(days=30)
     flights_qs = Flight.objects.filter(
-        instructor=request.user, logsheet__log_date__gte=cutoff
+        instructor=request.user,
+        logsheet__log_date__gte=cutoff,
+        pilot__isnull=False,
     ).select_related("pilot", "logsheet")
 
     # Count flights and collect one entry per pilot+date
