@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, time
 from decimal import Decimal
 from unittest.mock import Mock
 
@@ -9,7 +9,7 @@ from django.test import TestCase
 from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.services import get_balance
 from logsheet import services as logsheet_services
-from logsheet.models import Airfield, Flight, Logsheet, RevisionLog
+from logsheet.models import Airfield, Flight, Glider, Logsheet, RevisionLog
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
@@ -29,15 +29,17 @@ def member(db):
     return Member.objects.create_user(username="finalization-member")
 
 
-def _flight(logsheet, pilot, *, with_actual=True):
-    return Flight.objects.create(
-        logsheet=logsheet,
-        pilot=pilot,
-        flight_type="solo",
-        tow_cost_actual=Decimal("20.00") if with_actual else None,
-        rental_cost_actual=Decimal("15.00") if with_actual else None,
-        instruction_fee_actual=Decimal("5.00") if with_actual else None,
-    )
+def _flight(logsheet, pilot, *, with_actual=True, **overrides):
+    flight_kwargs = {
+        "logsheet": logsheet,
+        "pilot": pilot,
+        "flight_type": "solo",
+        "tow_cost_actual": Decimal("20.00") if with_actual else None,
+        "rental_cost_actual": Decimal("15.00") if with_actual else None,
+        "instruction_fee_actual": Decimal("5.00") if with_actual else None,
+    }
+    flight_kwargs.update(overrides)
+    return Flight.objects.create(**flight_kwargs)
 
 
 def _allocation(flight, member):
@@ -130,7 +132,7 @@ def test_finalization_rolls_back_cost_freezes_and_charges(member, monkeypatch):
 
 
 @pytest.mark.django_db
-def test_finalization_skips_cost_freezes_and_ledger_when_billing_is_disabled(
+def test_finalization_freezes_costs_but_skips_ledger_when_billing_is_disabled(
     member, enable_billing_app
 ):
     enable_billing_app.billing_app_enabled = False
@@ -139,7 +141,22 @@ def test_finalization_skips_cost_freezes_and_ledger_when_billing_is_disabled(
     logsheet = Logsheet.objects.create(
         log_date=date.today(), airfield=airfield, created_by=member
     )
-    flight = _flight(logsheet, member, with_actual=False)
+    glider = Glider.objects.create(
+        make="Schleicher",
+        model="ASK-21",
+        n_number="NFINOFF",
+        rental_rate=Decimal("15.00"),
+        club_owned=True,
+        is_active=True,
+    )
+    flight = _flight(
+        logsheet,
+        member,
+        with_actual=False,
+        glider=glider,
+        launch_time=time(10, 0),
+        landing_time=time(11, 0),
+    )
     enqueue_summary = Mock()
 
     with TestCase.captureOnCommitCallbacks(execute=True):
@@ -152,9 +169,8 @@ def test_finalization_skips_cost_freezes_and_ledger_when_billing_is_disabled(
     flight.refresh_from_db()
     logsheet.refresh_from_db()
     assert logsheet.finalized
-    assert flight.tow_cost_actual is None
-    assert flight.rental_cost_actual is None
-    assert flight.instruction_fee_actual is None
+    assert flight.rental_cost_actual == Decimal("15.00")
+    assert flight.instruction_fee_actual == Decimal("0.00")
     assert not LedgerEntry.objects.filter(flight=flight).exists()
     assert not FlightChargeSnapshot.objects.filter(flight=flight).exists()
     assert RevisionLog.objects.filter(logsheet=logsheet).count() == 1
