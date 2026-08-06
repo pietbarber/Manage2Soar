@@ -2575,28 +2575,38 @@ document.addEventListener("click", async function(e) {
     const liveDurationElements = document.querySelectorAll('.live-duration');
     liveDurationElements.forEach(el => {
       const launchTimeStr = el.getAttribute('data-launch');
-      if (launchTimeStr) {
-        const launchTime = new Date(launchTimeStr);
-        const diffMs = now - launchTime;
-        const hours = Math.floor(diffMs / (1000 * 60 * 60));
-        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        const durationText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      if (!launchTimeStr) return;
 
-        const durationSpan = el.querySelector('.duration-text');
-        if (durationSpan) {
-          durationSpan.textContent = durationText;
-        } else {
-          // Handle cases where duration-text span doesn't exist yet
-          el.innerHTML = `<i class="bi bi-stopwatch text-primary me-1"></i> ${durationText}`;
-        }
+      const launchTime = new Date(launchTimeStr);
 
-        // Update sort data using total seconds (same encoding as landed flights).
-        const cell = el.closest('td');
-        if (cell) {
-          const elapsedSeconds = hours * 3600 + minutes * 60;
-          const sortValue = elapsedSeconds + 100000; // Large offset: active flights sort after all landed
-          cell.setAttribute('data-sort', sortValue.toString());
-        }
+      // Invalid date: skip this element.
+      if (Number.isNaN(launchTime.getTime())) return;
+
+      const diffMs = now - launchTime;
+      const cell = el.closest('td');
+
+      // Client clock is ahead of launch time — use the template's in-air sentinel.
+      if (diffMs < 0) {
+        if (cell) cell.setAttribute('data-sort', String(999999));
+        return;
+      }
+
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const durationText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+      const durationSpan = el.querySelector('.duration-text');
+      if (durationSpan) {
+        durationSpan.textContent = durationText;
+      } else {
+        el.innerHTML = `<i class="bi bi-stopwatch text-primary me-1"></i> ${durationText}`;
+      }
+
+      // Update sort data using total seconds (same encoding as landed flights).
+      if (cell) {
+        const elapsedSeconds = hours * 3600 + minutes * 60;
+        const sortValue = elapsedSeconds + 999999; // Use template's in-air sentinel as base offset
+        cell.setAttribute('data-sort', String(sortValue));
       }
     });
   }
