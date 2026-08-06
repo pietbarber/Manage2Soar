@@ -2590,10 +2590,11 @@ document.addEventListener("click", async function(e) {
           el.innerHTML = `<i class="bi bi-stopwatch text-primary me-1"></i> ${durationText}`;
         }
 
-        // Update sort data for live durations
+        // Update sort data using total seconds (same encoding as landed flights).
         const cell = el.closest('td');
-        if (cell && hours >= 0 && minutes >= 0) {
-          const sortValue = hours * 100 + minutes + 10000; // Add offset to put live flights at top
+        if (cell) {
+          const elapsedSeconds = hours * 3600 + minutes * 60;
+          const sortValue = elapsedSeconds + 100000; // Large offset: active flights sort after all landed
           cell.setAttribute('data-sort', sortValue.toString());
         }
       }
