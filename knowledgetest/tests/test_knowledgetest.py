@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.shortcuts import resolve_url
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -719,18 +719,19 @@ class TestPresetViewIntegrationTests(TestCase):
         if Notification is not None:
             Notification.objects.all().delete()
 
-        response = self.client.post(
-            reverse("knowledgetest:create"),
-            {
-                "student": self.other_member.pk,
-                "pass_percentage": "100",
-                "description": "Assigned integration",
-                "must_include": "",
-                "weight_GF": "1",
-                "weight_ST": "0",
-            },
-            follow=False,
-        )
+        with override_settings(EMAIL_DEV_MODE_REDIRECT_TO="dev-null@example.com"):
+            response = self.client.post(
+                reverse("knowledgetest:create"),
+                {
+                    "student": self.other_member.pk,
+                    "pass_percentage": "100",
+                    "description": "Assigned integration",
+                    "must_include": "",
+                    "weight_GF": "1",
+                    "weight_ST": "0",
+                },
+                follow=False,
+            )
 
         self.assertEqual(response.status_code, 302)
         template = WrittenTestTemplate.objects.latest("pk")

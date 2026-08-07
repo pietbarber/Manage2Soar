@@ -1,3 +1,5 @@
+"""Management command to notify duty officers about aging (unfinalized) logsheets."""
+
 from datetime import timedelta
 
 from django.template.loader import render_to_string
@@ -6,6 +8,10 @@ from django.utils.timezone import now
 from duty_roster.utils.email import get_email_config
 from logsheet.models import Logsheet
 from notifications.models import Notification
+
+# Stable fragment used to identify aging-logsheet notifications for deduplication
+_AGING_MSG_FRAGMENT = "aging logsheet"
+
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
@@ -13,11 +19,14 @@ from utils.url_helpers import build_absolute_url
 
 
 class Command(BaseCronJobCommand):
+    """Notify duty officers about logsheets that are 7+ days old and not finalized."""
+
     help = "Notify duty officers about logsheets that are 7+ days old and not finalized"
     job_name = "notify_aging_logsheets"
     max_execution_time = timedelta(minutes=15)  # Should be quick operation
 
     def add_arguments(self, parser):
+        """Add command-line arguments to the argument parser."""
         super().add_arguments(parser)
         parser.add_argument(
             "--days",
@@ -27,6 +36,7 @@ class Command(BaseCronJobCommand):
         )
 
     def execute_job(self, *args, **options):
+        """Execute the aging logsheet notification command."""
         aging_days = options.get("days", 7)
         cutoff_date = now() - timedelta(days=aging_days)
 
@@ -95,8 +105,51 @@ class Command(BaseCronJobCommand):
         else:
             self.log_info("No notifications sent (dry run mode)")
 
+    def _upsert_aging_notification(self, member, count):
+        """Maintain exactly one undismissed aging-logsheet notification per member.
+
+        If no such notification exists, creates one.  If one or more exist,
+        keeps only the latest (by ``created_at``), updates its message with the
+        current count, and deletes any extras.
+
+        Args:
+            member: The Member instance to notify.
+            count: Number of aging logsheets to display in the message.
+
+        Returns:
+            The canonical (kept or created) Notification instance.
+        """
+        candidates = Notification.objects.filter(
+            user=member,
+            dismissed=False,
+            message__icontains=_AGING_MSG_FRAGMENT,
+            url="/logsheet/",
+        )
+
+        if not candidates.exists():
+            return Notification.objects.create(
+                user=member,
+                message=f"You have {count} aging logsheet(s) that need finalization",
+                url="/logsheet/",
+            )
+
+        # Sort newest-first; the first entry is the canonical notification.
+        sorted_candidates = sorted(candidates, key=lambda n: n.created_at, reverse=True)
+        canonical = sorted_candidates[0]
+        extras = sorted_candidates[1:]
+
+        if extras:
+            extra_ids = [n.id for n in extras]
+            Notification.objects.filter(id__in=extra_ids).delete()
+
+        new_message = f"You have {count} aging logsheet(s) that need finalization"
+        if canonical.message != new_message:
+            canonical.message = new_message
+            canonical.save(update_fields=["message"])
+        return canonical
+
     def _send_notification(self, member, logsheet_data):
-        """Send email and in-app notification to a duty officer about aging logsheets"""
+        """Send email and in-app notification to a duty officer about aging logsheets."""
 
         # Build email content
         logsheet_list = []
@@ -151,12 +204,10 @@ class Command(BaseCronJobCommand):
             )
 
         try:
-            # Always attempt in-app notification, even if email delivery fails.
-            Notification.objects.create(
-                user=member,
-                message=f"You have {len(logsheet_data)} aging logsheet(s) that need finalization",
-                url="/logsheet/",
-            )
+            # Upsert a single canonical in-app notification per user.
+            # Each cron run maintains exactly one undismissed aging-logsheet
+            # notification per member, updating the count instead of stacking.
+            self._upsert_aging_notification(member, len(logsheet_data))
             in_app_sent = True
         except Exception as e:
             self.log_error(

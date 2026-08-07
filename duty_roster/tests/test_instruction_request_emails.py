@@ -12,7 +12,6 @@ from datetime import date, timedelta
 
 import pytest
 from django.core import mail
-from django.test.utils import override_settings
 from django.utils import timezone
 
 from duty_roster.models import DutyAssignment, InstructionSlot
@@ -134,8 +133,15 @@ def duty_assignment(instructor, db):
     )
 
 
+@pytest.fixture
+def email_dev_mode_disabled(settings):
+    """Disable email dev mode redirects for template/content email assertions."""
+    settings.EMAIL_DEV_MODE = False
+    settings.EMAIL_DEV_MODE_REDIRECT_TO = ""
+
+
 @pytest.mark.django_db
-@override_settings(EMAIL_DEV_MODE=False)
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestStudentInstructionRequestEmail:
     """Tests for student instruction request emails (with progress)."""
 
@@ -220,7 +226,7 @@ class TestStudentInstructionRequestEmail:
 
 
 @pytest.mark.django_db
-@override_settings(EMAIL_DEV_MODE=False)
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestRatedPilotInstructionRequestEmail:
     """Tests for rated pilot instruction request emails (with currency)."""
 
@@ -401,7 +407,7 @@ class TestRatedPilotInstructionRequestEmail:
 
 
 @pytest.mark.django_db
-@override_settings(EMAIL_DEV_MODE=False)
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestEmailContent:
     """Tests for general email content."""
 
@@ -472,7 +478,7 @@ class TestEmailContent:
 
 
 @pytest.mark.django_db
-@override_settings(EMAIL_DEV_MODE=False)
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestInstructionRequestDetails:
     """Tests for instruction request type and notes fields (Issue #464)."""
 
