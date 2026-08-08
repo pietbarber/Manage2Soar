@@ -819,10 +819,6 @@ class TestCronJobIntegration(TransactionTestCase):
 class TestNotificationDedupe(TransactionTestCase):
     """Test deduplication of aging-logsheet notifications (issue #1005)."""
 
-    def setUp(self):
-        self.airfield = Airfield.objects.create(identifier="TST", name="Test")
-        self.cutoff = timezone.now() - timedelta(days=15)
-
     def test_dedupe_ignores_non_aging_notifications(self):
         """Non-aging notifications for the same member must survive dedup."""
         member = Member.objects.create(
@@ -874,7 +870,7 @@ class TestNotificationDedupe(TransactionTestCase):
         self.assertEqual(
             result.message, "You have 1 aging logsheet(s) that need finalization"
         )
-        self.assertIn(member.notifications.count(), [0, 1])
+        self.assertEqual(member.notifications.count(), 1)
 
     def test_upsert_updates_count(self):
         """When one aging notification exists, its count is updated."""

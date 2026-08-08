@@ -8,14 +8,13 @@ from django.utils.timezone import now
 from duty_roster.utils.email import get_email_config
 from logsheet.models import Logsheet
 from notifications.models import Notification
-
-# Stable fragment used to identify aging-logsheet notifications for deduplication
-_AGING_MSG_FRAGMENT = "aging logsheet"
-
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 from utils.url_helpers import build_absolute_url
+
+# Canonical fragment used to identify aging-logsheet notifications for deduplication
+_AGING_MSG_FRAGMENT = "aging logsheet"
 
 
 class Command(BaseCronJobCommand):
@@ -124,7 +123,7 @@ class Command(BaseCronJobCommand):
             dismissed=False,
             message__icontains=_AGING_MSG_FRAGMENT,
             url="/logsheet/",
-        )
+        ).order_by("-created_at")
 
         if not candidates.exists():
             return Notification.objects.create(
@@ -133,14 +132,16 @@ class Command(BaseCronJobCommand):
                 url="/logsheet/",
             )
 
-        # Sort newest-first; the first entry is the canonical notification.
-        sorted_candidates = sorted(candidates, key=lambda n: n.created_at, reverse=True)
-        canonical = sorted_candidates[0]
-        extras = sorted_candidates[1:]
-
-        if extras:
-            extra_ids = [n.id for n in extras]
-            Notification.objects.filter(id__in=extra_ids).delete()
+        canonical = candidates.first()
+        if canonical is None:
+            return Notification.objects.create(
+                user=member,
+                message=f"You have {count} aging logsheet(s) that need finalization",
+                url="/logsheet/",
+            )
+        extras_to_remove = candidates.exclude(pk=canonical.pk)
+        if extras_to_remove.exists():
+            extras_to_remove.delete()
 
         new_message = f"You have {count} aging logsheet(s) that need finalization"
         if canonical.message != new_message:
