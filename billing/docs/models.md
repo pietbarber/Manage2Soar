@@ -7,11 +7,24 @@ The billing app uses four core models that work together to provide a complete f
 
 ```mermaid
 erDiagram
-    auth_user ||--|| Ledger : "has one"
+    auth_user ||--|| Ledger : "billing_ledger"
+    auth_user ||--o{ LedgerEntry : "created_billing_entries"
+    auth_user ||--o{ BillingPeriodEvent : "billing_period_events"
+    auth_user ||--o{ FlightChargeSnapshot : "billed_member"
+    BillingPeriod ||--o{ BillingPeriodEvent : "events"
     Ledger ||--o{ LedgerEntry : "entries"
+    logsheet_Flight ||--o{ LedgerEntry : "billing_entries"
+    logsheet_Flight ||--o{ FlightChargeSnapshot : "snapshots"
+    LedgerEntry o|--o| LedgerEntry : "reverses"
     LedgerEntry ||--o| FlightChargeSnapshot : "flight_snapshot"
-    LedgerEntry ||--o| BillingPeriodEvent : "events"
-    AuthUser : "settings.AUTH_USER_MODEL"
+
+    auth_user {
+        int id PK
+    }
+
+    logsheet_Flight {
+        int id PK
+    }
 
     Ledger {
         uuid id PK
@@ -546,25 +559,6 @@ New Charge Entry created with same amount but version 2
     ↓
 correction_group links reversal + new entry together
 ```
-
-## Model Relationships Summary
-
-```mermaid
-erDiagram
-    User ||--|| Ledger : "billing_ledger (1:1)"
-    User ||--o{ LedgerEntry : "created_billing_entries (1:N)"
-    User ||--o{ BillingPeriodEvent : "billing_period_events (1:N)"
-
-    Ledger ||--o{ LedgerEntry : "entries (1:N)"
-    Ledger ||--|| BillingPeriod : "current (1:0..1)"
-    Ledger .|-.|| FlightChargeSnapshot : "linked"
-
-    LedgerEntry ||--o{ FlightChargeSnapshot : "flight_snapshot (1:0..1)"
-    Flight }o--o{ LedgerEntry : "billing_entries (N:1)"
-
-    BillingPeriod ||--o{ BillingPeriodEvent : "events (1:N)"
-```
-
 ## Related Documentation
 
 - [Architecture Overview](architecture.md) - System design and flow
