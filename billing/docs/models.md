@@ -4,39 +4,67 @@
 
 The billing app uses four core models that work together to provide a complete financial ledger system with immutability guarantees.
 
+
 ```mermaid
 erDiagram
     auth_user ||--|| Ledger : "has one"
-    Ledger ||--o{ LedgerEntry : "contains"
-    Ledger }o--|| FlightChargeSnapshot : "linked"
-    BillingPeriod ||--o{ BillingPeriodEvent : "has"
+    Ledger ||--o{ LedgerEntry : "entries"
+    LedgerEntry ||--o| FlightChargeSnapshot : "flight_snapshot"
+    LedgerEntry ||--o| BillingPeriodEvent : "events"
+    AuthUser : "settings.AUTH_USER_MODEL"
 
     Ledger {
         uuid id PK
-        int member_id FK
+        int member_id FK "FK to auth_user"
         datetime created_at
     }
 
     LedgerEntry {
-        uuid id PK
-        int ledger_id FK
+        int id PK
+        int ledger_id FK "FK to Ledger"
         varchar kind
         varchar effect
         decimal amount
         date effective_date
-        varchar description
+        varchar member_description
         text internal_note
+        int created_by FK "FK to auth_user"
+        datetime created_at
         varchar source_key
         uuid correction_group
+        int flight_id FK "FK to logsheet.Flight"
+        int reverses FK "FK to LedgerEntry"
+    }
+
+    FlightChargeSnapshot {
+        int id PK
+        int ledger_entry_id FK "FK to LedgerEntry"
+        int flight FK "FK to logsheet.Flight"
+        int billed_member FK "FK to auth_user"
+        decimal tow_amount
+        decimal rental_amount
+        decimal instruction_amount
+        decimal total_amount
+        varchar allocation_rule
+        int allocation_version
+        json allocation_snapshot
+        datetime created_at
+    }
+
+    BillingPeriodEvent {
+        int id PK
+        int period FK "FK to BillingPeriod"
+        varchar action
+        text reason
+        int actor FK "FK to auth_user"
         datetime created_at
     }
 
     BillingPeriod {
-        uuid id PK
+        int id PK
         int year
         smallint month
-        boolean is_closed
-        unique(year, month)
+        bool is_closed
     }
 ```
 
