@@ -67,6 +67,13 @@ def site_config(db):
 
 
 @pytest.fixture
+def email_dev_mode_disabled(settings):
+    """Disable email dev mode redirects for tests that assert direct recipients."""
+    settings.EMAIL_DEV_MODE = False
+    settings.EMAIL_DEV_MODE_REDIRECT_TO = ""
+
+
+@pytest.fixture
 def alice(db):
     """Create member Alice who will request a swap."""
     return Member.objects.create(
@@ -855,7 +862,7 @@ class TestSwapRequestCreation:
 
 
 @pytest.mark.django_db
-@override_settings(EMAIL_DEV_MODE=False)
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestSwapOfferWorkflow:
     """Tests for swap offer workflow."""
 

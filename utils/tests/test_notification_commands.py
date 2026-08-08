@@ -814,3 +814,109 @@ class TestCronJobIntegration(TransactionTestCase):
 
         # High verbosity should produce more output
         assert len(high_output) >= len(low_output)
+
+
+class TestNotificationDedupe(TransactionTestCase):
+    """Test deduplication of aging-logsheet notifications (issue #1005)."""
+
+    def test_dedupe_ignores_non_aging_notifications(self):
+        """Non-aging notifications for the same member must survive dedup."""
+        member = Member.objects.create(
+            username="iso_test",
+            email="iso@test.com",
+            first_name="Iso",
+            last_name="Test",
+        )
+
+        # Create a non-aging notification that should NOT be affected
+        Notification.objects.create(
+            user=member, message="Other important notice", url="/other/"
+        )
+        count_before = Notification.objects.filter(user=member).count()
+
+        # Also create aging notifications to dedupe
+        self._create_aging_notifications(member, count=2)
+        total_before = Notification.objects.count()  # non-aging + 2 aging
+
+        command = AgingLogsheetsCommand()
+
+        # Directly test dedup behavior (dedup logic doesn't depend on log sheet data)
+        with patch("sys.stdout", new_callable=StringIO):
+            command._upsert_aging_notification(member, count=3)
+
+        # The non-aging notification must still exist
+        other = Notification.objects.filter(
+            user=member, message__icontains="Other important notice"
+        )
+        self.assertTrue(other.exists())
+
+        # Total should be: 1 non-aging + 1 deduped aging = total_before - 1
+        remaining_for_user = Notification.objects.filter(user=member)
+        self.assertEqual(remaining_for_user.count(), total_before - 1)
+
+    def test_upsert_creates_when_none_exist(self):
+        """When no aging notifications exist, a new one is created."""
+        member = Member.objects.create(
+            username="create_test", email="create@test.com", first_name="Create"
+        )
+
+        self.assertEqual(Notification.objects.filter(user=member).count(), 0)
+
+        command = AgingLogsheetsCommand()
+        with patch("sys.stdout", new_callable=StringIO):
+            result = command._upsert_aging_notification(member, count=1)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(
+            result.message, "You have 1 aging logsheet(s) that need finalization"
+        )
+        self.assertEqual(member.notifications.count(), 1)
+
+    def test_upsert_updates_count(self):
+        """When one aging notification exists, its count is updated."""
+        member = Member.objects.create(
+            username="update_test", email="update@test.com", first_name="Update"
+        )
+
+        # Create one aging notification with old count
+        self._create_aging_notifications(member, count=1)
+        old_notification = Notification.objects.get(user=member)
+        self.assertIn("1 aging logsheet", old_notification.message)
+
+        command = AgingLogsheetsCommand()
+        result = command._upsert_aging_notification(member, count=5)
+
+        # The same notification should be updated (not a new one created)
+        self.assertEqual(result.id, old_notification.id)
+        self.assertIn("5 aging logsheet", result.message)
+
+    def test_upsert_removes_extras(self):
+        """When multiple aging notifications exist, extras are deleted."""
+        member = Member.objects.create(
+            username="remove_test", email="remove@test.com", first_name="Remove"
+        )
+
+        self._create_aging_notifications(member, count=5)
+        self.assertEqual(Notification.objects.filter(user=member).count(), 5)
+
+        command = AgingLogsheetsCommand()
+        result = command._upsert_aging_notification(member, count=3)
+
+        # Only one notification should remain
+        remaining = Notification.objects.filter(user=member)
+        self.assertEqual(remaining.count(), 1)
+        last_remaining = remaining.first()
+        assert last_remaining is not None
+        self.assertIsNotNone(result)
+        self.assertEqual(result.id, last_remaining.id)
+
+    def _create_aging_notifications(self, member, count=3):
+        """Create *count* aging-logsheet in-app notifications for a member."""
+        base = timezone.now() - timedelta(hours=count)
+        for i in range(count):
+            Notification.objects.create(
+                user=member,
+                message=f"You have {i + 1} aging logsheet(s) that need finalization",
+                url="/logsheet/",
+                created_at=base + timedelta(hours=i),
+            )
