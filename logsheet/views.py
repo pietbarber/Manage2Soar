@@ -1156,7 +1156,9 @@ def flight_split_request_detail(request, token):
     decision = request.POST.get("decision")
     if decision not in {"accept", "reject"}:
         messages.error(request, "Invalid decision. Choose accept or reject.")
-        return redirect("logsheet:flight_split_request_detail", token=split_request.token)
+        return redirect(
+            "logsheet:flight_split_request_detail", token=split_request.token
+        )
     treasurer_reason = request.POST.get("treasurer_reason", "").strip()
     if period_closed and request.user == split_request.requested_member:
         messages.error(request, "This billing period is closed. Contact a treasurer.")
@@ -1216,6 +1218,14 @@ def flight_split_request_detail(request, token):
             .values_list("allocation_version", flat=True)
             .first()
         )
+        if current_version is None:
+            messages.error(
+                request,
+                "The flight has no posted billing allocation; submit a new split request.",
+            )
+            return redirect(
+                "logsheet:flight_split_request_detail", token=split_request.token
+            )
         if current_version != split_request.allocation_version:
             split_request.status = FlightSplitRequest.Status.STALE
             split_request.resolved_at = timezone.now()
