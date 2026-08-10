@@ -179,7 +179,7 @@ class Flight(models.Model):
     )
 
     def clean(self):
-        """Normalize client_token across all write paths for consistent uniqueness."""
+        """Normalize client_token for validation paths that call model clean()."""
         val = getattr(self, "client_token", None)
         if isinstance(val, str):
             # Strip outer whitespace and treat empty/whitespace-only as None

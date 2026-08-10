@@ -372,9 +372,6 @@ def _render_flight_form(
         "inactive_gliders": inactive_gliders,
         "commercial_rides_enabled": commercial_rides_enabled,
     }
-    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
-    if is_ajax:
-        return render(request, "logsheet/edit_flight_form.html", ctx, status=400)
     return render(request, "logsheet/edit_flight_form.html", ctx)
 
 

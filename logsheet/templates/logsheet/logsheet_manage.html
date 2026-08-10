@@ -1194,11 +1194,6 @@ document.addEventListener("click", async function(e) {
         modal.show();
       }
 
-      // Helper: Return the "no cached data" modal message text for conditionals
-      function getOfflineNoCacheMessage() {
-        return 'No cached data available for offline entry. Please connect to the internet at least once to cache flight data.';
-      }
-
     // Check if offline - use offline form with pre-filled data
     if (!navigator.onLine && window.M2SOffline) {
       (async () => {
@@ -2006,6 +2001,11 @@ document.addEventListener("click", async function(e) {
   const LOGSHEET_CONTAINER = document.getElementById("logsheetContainer");
   const COMMERCIAL_RIDES_ENABLED = LOGSHEET_CONTAINER?.dataset.commercialRidesEnabled === 'true';
 
+  // Shared message for offline add/edit fallback UI.
+  function getOfflineNoCacheMessage() {
+    return 'No cached data available for offline entry. Please connect to the internet at least once to cache flight data.';
+  }
+
   // Helper function to extract pre-fill data from Edit button's data attributes (DRY)
   function extractPrefillDataFromButton(button, flightId) {
     if (!button || !flightId) return null;
@@ -2080,6 +2080,20 @@ document.addEventListener("click", async function(e) {
 
       const formUrl = form.action || window.location.href;
       const data = new FormData(form);
+
+      // Ensure idempotent add-flight submissions include a stable client token.
+      if (formUrl.includes('/add-flight/')) {
+        let clientToken = data.get('client_token');
+        if (typeof clientToken === 'string') {
+          clientToken = clientToken.trim();
+        }
+        if (!clientToken) {
+          clientToken = (window.crypto && typeof window.crypto.randomUUID === 'function')
+            ? window.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+          data.set('client_token', clientToken);
+        }
+      }
 
       // Extract flight ID from URL if this is an edit (not add)
       const editMatch = formUrl.match(/\/edit-flight\/(\d+)\//);
