@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.paginator import Paginator
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Count, F, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDate
 from django.http import (
@@ -347,66 +347,6 @@ def _csv_customer_name(member):
     if first:
         return first
     return (member.username or "Unknown").strip()
-
-
-def _render_flight_form(
-    request,
-    form,
-    logsheet,
-    *,
-    mode=None,
-    flight=None,
-    club_gliders=None,
-    club_private=None,
-    inactive_gliders=None,
-    commercial_rides_enabled=None,
-):
-    """Render the edit_flight_form.html for AJAX or non-AJAX requests."""
-    ctx = {
-        "form": form,
-        "flight": flight,
-        "logsheet": logsheet,
-        "mode": mode,
-        "club_gliders": club_gliders,
-        "club_private": club_private,
-        "inactive_gliders": inactive_gliders,
-        "commercial_rides_enabled": commercial_rides_enabled,
-    }
-    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
-    if is_ajax:
-        return render(request, "logsheet/edit_flight_form.html", ctx, status=400)
-    return render(request, "logsheet/edit_flight_form.html", ctx)
-
-
-def _render_flight_form_error(
-    request,
-    form,
-    logsheet,
-    *,
-    mode=None,
-    flight=None,
-    club_gliders=None,
-    club_private=None,
-    inactive_gliders=None,
-    commercial_rides_enabled=None,
-):
-    """Render the edit_flight_form.html with status=400 for AJAX or non-AJAX."""
-    ctx = {
-        "form": form,
-        "flight": flight,
-        "logsheet": logsheet,
-        "mode": mode,
-        "club_gliders": club_gliders,
-        "club_private": club_private,
-        "inactive_gliders": inactive_gliders,
-        "commercial_rides_enabled": commercial_rides_enabled,
-    }
-    return render(
-        request,
-        "logsheet/edit_flight_form.html",
-        ctx,
-        status=400,
-    )
 
 
 def _csv_glider_product_name(glider):
@@ -1216,9 +1156,7 @@ def flight_split_request_detail(request, token):
     decision = request.POST.get("decision")
     if decision not in {"accept", "reject"}:
         messages.error(request, "Invalid decision. Choose accept or reject.")
-        return redirect(
-            "logsheet:flight_split_request_detail", token=split_request.token
-        )
+        return redirect("logsheet:flight_split_request_detail", token=split_request.token)
     treasurer_reason = request.POST.get("treasurer_reason", "").strip()
     if period_closed and request.user == split_request.requested_member:
         messages.error(request, "This billing period is closed. Contact a treasurer.")
@@ -1296,7 +1234,7 @@ def flight_split_request_detail(request, token):
         flight.split_with = split_request.requested_member
         flight.split_type = split_request.split_type
         allocations = get_billing_allocations(
-            flight, allocation_version=split_request.allocation_version + 1
+            flight, allocation_version=current_version + 1
         )
         try:
             correct_flight_charges(
@@ -2157,31 +2095,55 @@ def edit_flight(request, logsheet_pk, flight_pk):
                     existing_ride.delete()
             if ticket_link_error:
                 form.add_error("ticket_number", ticket_link_error)
-                return _render_flight_form_error(
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return render(
+                        request,
+                        "logsheet/edit_flight_form.html",
+                        {
+                            "form": form,
+                            "flight": flight,
+                            "logsheet": logsheet,
+                            "club_gliders": club_gliders,
+                            "club_private": club_private,
+                            "inactive_gliders": inactive_gliders,
+                            "commercial_rides_enabled": commercial_rides_enabled,
+                        },
+                        status=400,
+                    )
+                return render(
                     request,
-                    form,
-                    logsheet,
-                    flight=flight,
-                    club_gliders=club_gliders,
-                    club_private=club_private,
-                    inactive_gliders=inactive_gliders,
-                    commercial_rides_enabled=commercial_rides_enabled,
+                    "logsheet/edit_flight_form.html",
+                    {
+                        "form": form,
+                        "flight": flight,
+                        "logsheet": logsheet,
+                        "club_gliders": club_gliders,
+                        "club_private": club_private,
+                        "inactive_gliders": inactive_gliders,
+                        "commercial_rides_enabled": commercial_rides_enabled,
+                    },
+                    status=400,
                 )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"success": True})
             messages.success(request, "Flight updated.")
             return redirect("logsheet:manage", pk=logsheet.pk)
-        # Return form HTML with errors (AJAX or non-AJAX)
-        return _render_flight_form_error(
-            request,
-            form,
-            logsheet,
-            flight=flight,
-            club_gliders=club_gliders,
-            club_private=club_private,
-            inactive_gliders=inactive_gliders,
-            commercial_rides_enabled=commercial_rides_enabled,
-        )
+        # AJAX: return form HTML with errors for modal
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return render(
+                request,
+                "logsheet/edit_flight_form.html",
+                {
+                    "form": form,
+                    "flight": flight,
+                    "logsheet": logsheet,
+                    "club_gliders": club_gliders,
+                    "club_private": club_private,
+                    "inactive_gliders": inactive_gliders,
+                    "commercial_rides_enabled": commercial_rides_enabled,
+                },
+                status=400,
+            )
     else:
         try:
             form = FlightForm(instance=flight, logsheet=logsheet)
@@ -2190,15 +2152,18 @@ def edit_flight(request, logsheet_pk, flight_pk):
         except Exception as exc:
             return _setup_error_response(exc, unexpected=True)
 
-    return _render_flight_form(
+    return render(
         request,
-        form,
-        logsheet,
-        flight=flight,
-        club_gliders=club_gliders,
-        club_private=club_private,
-        inactive_gliders=inactive_gliders,
-        commercial_rides_enabled=commercial_rides_enabled,
+        "logsheet/edit_flight_form.html",
+        {
+            "form": form,
+            "flight": flight,
+            "logsheet": logsheet,
+            "club_gliders": club_gliders,
+            "club_private": club_private,
+            "inactive_gliders": inactive_gliders,
+            "commercial_rides_enabled": commercial_rides_enabled,
+        },
     )
 
 
@@ -2220,32 +2185,8 @@ def edit_flight(request, logsheet_pk, flight_pk):
 #    HttpResponseRedirect: Redirects to the logsheet management page upon successful addition of the flight.
 
 
-def _find_existing_flight_by_client_token(logsheet, raw_client_token):
-    """Lookup an existing flight by normalizing client_token consistently."""
-    # Use the centralized normalize helper (matches Flight.clean() and add_flight)
-    token = _normalize_client_token(raw_client_token)
-    if not token:
-        return None
-    return Flight.objects.filter(
-        logsheet=logsheet,
-        client_token=token,
-    ).first()
-
-
-def _normalize_client_token(raw):
-    """Normalize client_token: strip whitespace, convert empty/whitespace to None."""
-    if isinstance(raw, str) and raw.strip():
-        return raw.strip()
-    return None
-
-
 @active_member_required
 def add_flight(request, logsheet_pk):
-    def _success_response():
-        if request.headers.get("x-requested-with") == "XMLHttpRequest":
-            return JsonResponse({"success": True})
-        return redirect("logsheet:manage", pk=logsheet.pk)
-
     logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
 
     from logsheet.models import Glider
@@ -2308,51 +2249,18 @@ def add_flight(request, logsheet_pk):
             return _setup_error_response(exc)
         except Exception as exc:
             return _setup_error_response(exc, unexpected=True)
-        raw_client_token = request.POST.get("client_token", "")
-        client_token = _normalize_client_token(raw_client_token)
-        client_token_max_length = Flight._meta.get_field("client_token").max_length
-        if client_token and len(client_token) > client_token_max_length:
-            form.add_error(
-                None,
-                (
-                    "Invalid submission token. Please retry from the form "
-                    f"(maximum {client_token_max_length} characters)."
-                ),
-            )
-            return _render_flight_form_error(
-                request,
-                form,
-                logsheet,
-                mode="add",
-                club_gliders=club_gliders,
-                club_private=club_private,
-                inactive_gliders=inactive_gliders,
-                commercial_rides_enabled=commercial_rides_enabled,
-            )
-        if client_token and _find_existing_flight_by_client_token(
-            logsheet, client_token
-        ):
-            return _success_response()
         if form.is_valid():
             ticket_link_error = None
             with transaction.atomic():
                 flight = form.save(commit=False)
                 flight.logsheet = logsheet
-                flight.client_token = client_token or None
                 flight.commercial_ride = form.cleaned_data.get("commercial_ride", False)
                 if not flight.airfield_id:
                     flight.airfield_id = logsheet.airfield_id
                 if flight.commercial_ride:
                     flight.passenger = None
                     flight.passenger_name = ""
-                try:
-                    flight.save()
-                except IntegrityError:
-                    if client_token and _find_existing_flight_by_client_token(
-                        logsheet, client_token
-                    ):
-                        return _success_response()
-                    raise
+                flight.save()
 
                 if flight.commercial_ride:
                     ticket_number = form.cleaned_data.get("ticket_number")
@@ -2366,28 +2274,54 @@ def add_flight(request, logsheet_pk):
                         transaction.set_rollback(True)
             if ticket_link_error:
                 form.add_error("ticket_number", ticket_link_error)
-                return _render_flight_form_error(
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return render(
+                        request,
+                        "logsheet/edit_flight_form.html",
+                        {
+                            "form": form,
+                            "logsheet": logsheet,
+                            "mode": "add",
+                            "club_gliders": club_gliders,
+                            "club_private": club_private,
+                            "inactive_gliders": inactive_gliders,
+                            "commercial_rides_enabled": commercial_rides_enabled,
+                        },
+                        status=400,
+                    )
+                return render(
                     request,
-                    form,
-                    logsheet,
-                    mode="add",
-                    club_gliders=club_gliders,
-                    club_private=club_private,
-                    inactive_gliders=inactive_gliders,
-                    commercial_rides_enabled=commercial_rides_enabled,
+                    "logsheet/edit_flight_form.html",
+                    {
+                        "form": form,
+                        "logsheet": logsheet,
+                        "mode": "add",
+                        "club_gliders": club_gliders,
+                        "club_private": club_private,
+                        "inactive_gliders": inactive_gliders,
+                        "commercial_rides_enabled": commercial_rides_enabled,
+                    },
+                    status=400,
                 )
-            return _success_response()
-        # Return form HTML with errors (AJAX or non-AJAX)
-        return _render_flight_form_error(
-            request,
-            form,
-            logsheet,
-            mode="add",
-            club_gliders=club_gliders,
-            club_private=club_private,
-            inactive_gliders=inactive_gliders,
-            commercial_rides_enabled=commercial_rides_enabled,
-        )
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"success": True})
+            return redirect("logsheet:manage", pk=logsheet.pk)
+        # AJAX: return form HTML with errors for modal
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return render(
+                request,
+                "logsheet/edit_flight_form.html",
+                {
+                    "form": form,
+                    "logsheet": logsheet,
+                    "mode": "add",
+                    "club_gliders": club_gliders,
+                    "club_private": club_private,
+                    "inactive_gliders": inactive_gliders,
+                    "commercial_rides_enabled": commercial_rides_enabled,
+                },
+                status=400,
+            )
     else:
         initial = {}
         if logsheet.tow_pilot_id:
@@ -2401,15 +2335,18 @@ def add_flight(request, logsheet_pk):
         except Exception as exc:
             return _setup_error_response(exc, unexpected=True)
 
-    return _render_flight_form(
+    return render(
         request,
-        form,
-        logsheet,
-        mode="add",
-        club_gliders=club_gliders,
-        club_private=club_private,
-        inactive_gliders=inactive_gliders,
-        commercial_rides_enabled=commercial_rides_enabled,
+        "logsheet/edit_flight_form.html",
+        {
+            "form": form,
+            "logsheet": logsheet,
+            "mode": "add",
+            "club_gliders": club_gliders,
+            "club_private": club_private,
+            "inactive_gliders": inactive_gliders,
+            "commercial_rides_enabled": commercial_rides_enabled,
+        },
     )
 
 
