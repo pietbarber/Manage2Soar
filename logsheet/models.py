@@ -60,14 +60,6 @@ class Flight(models.Model):
             models.Index(fields=["towplane", "logsheet"]),
             models.Index(fields=["tow_pilot", "logsheet"]),
         ]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["logsheet", "client_token"],
-                condition=models.Q(client_token__isnull=False)
-                & ~models.Q(client_token=""),
-                name="flight_unique_client_token_per_logsheet",
-            )
-        ]
 
     logsheet = models.ForeignKey(
         "Logsheet", on_delete=models.CASCADE, related_name="flights"
@@ -157,7 +149,6 @@ class Flight(models.Model):
         help_text="Marks this flight as a commercial ride tracked by ticket.",
     )
     notes = models.TextField(blank=True)
-    client_token = models.CharField(max_length=64, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     RELEASE_ALTITUDE_CHOICES = [(i, f"{i} ft") for i in range(0, 7100, 100)]
@@ -177,14 +168,6 @@ class Flight(models.Model):
     instruction_fee_actual = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True
     )
-
-    def clean(self):
-        """Normalize client_token across all write paths for consistent uniqueness."""
-        val = getattr(self, "client_token", None)
-        if isinstance(val, str):
-            # Strip outer whitespace and treat empty/whitespace-only as None
-            stripped = val.strip()
-            self.client_token = stripped if stripped else None
 
     def is_incomplete(self):
         if self.landing_time is None:
@@ -2123,9 +2106,9 @@ class MaintenanceDeadline(models.Model):
     def description_label(self) -> str:
         # Pylance-friendly label without relying on Django’s dynamic get_*_display
         try:
-            return str(DeadlineType(self.description).label)
+            return DeadlineType(self.description).label
         except ValueError:
-            return str(self.description)  # fallback if legacy/unknown value sneaks in
+            return self.description  # fallback if legacy/unknown value sneaks in
 
     def __str__(self):
         aircraft = self.glider or self.towplane
