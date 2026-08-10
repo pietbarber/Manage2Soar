@@ -1275,6 +1275,14 @@ def flight_split_request_detail(request, token):
             .values_list("allocation_version", flat=True)
             .first()
         )
+        if current_version is None:
+            messages.error(
+                request,
+                "The flight has no posted billing allocation; submit a new split request.",
+            )
+            return redirect(
+                "logsheet:flight_split_request_detail", token=split_request.token
+            )
         if current_version != split_request.allocation_version:
             split_request.status = FlightSplitRequest.Status.STALE
             split_request.resolved_at = timezone.now()
