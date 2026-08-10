@@ -105,14 +105,8 @@ def treasurer_required(view_func):
 
 **Member Profile Integration**:
 
-The `treasurer` flag lives on the `Member` model (extended from Django's `User` via ForeignKey):
-
-```python
-# members/models.py
-class Member(models.Model):
-    user = models.OneToOneField(User, ...)
-    treasurer = models.BooleanField(default=False)  # Treasurer permission flag
-```
+This project uses `members.Member` as `AUTH_USER_MODEL` (subclassing `AbstractUser`).
+The `treasurer` flag is defined directly on that user model and accessed as `request.user.treasurer`.
 
 ---
 
@@ -175,7 +169,7 @@ If authorized → view executes
 
 ```bash
 # Test billing decorators via integration tests
-pytest billing/tests/test_decorators.py -v
+pytest billing/tests/test_billing_disabled.py billing/tests/test_views.py -v
 ```
 
 ### Example Test Patterns
@@ -190,7 +184,7 @@ class BillingAppRequiredTest(TestCase):
         SiteConfiguration.objects.update(billing_app_enabled=False)
         response = self.client.get("/billing/ledgers/")
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/accounts/login/", response.url)
+        self.assertEqual(response.url, "/")
 
     @override_settings(BILLING_ENABLED=True)
     def test_enabled_billing_proceeds(self):
@@ -208,3 +202,4 @@ class BillingAppRequiredTest(TestCase):
 - [Data Models](models.md) - Detailed field specifications
 - [API Reference](api.md) - Service layer API
 - [Development Guide](development.md) - Contributing to billing app
+- [Testing Guide](testing.md) - Billing test suite organization

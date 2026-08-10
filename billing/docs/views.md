@@ -19,17 +19,17 @@ urlpatterns = [
     path("ledgers/", views.ledger_list, name="ledger_list"),
 
     # View individual member ledger
-    path("ledger/<int:member_id>/", views.ledger_detail, name="ledger_detail"),
+    path("ledgers/<int:member_id>/", views.ledger_detail, name="ledger_detail"),
 
     # Reverse a specific ledger entry
-    path("entry/<int:entry_id>/reverse/", views.reverse_entry, name="reverse_entry"),
+    path("entries/<int:entry_id>/reverse/", views.reverse_entry, name="entry_reverse"),
 
     # List all billing periods
     path("periods/", views.billing_period_list, name="period_list"),
 
     # Close/open billing periods (POST-only)
-    path("period/close/", views.close_billing_period, name="period_close"),
-    path("period/<int:period_id>/reopen/", views.reopen_billing_period, name="period_reopen"),
+    path("periods/close/", views.close_billing_period, name="period_close"),
+    path("periods/<int:period_id>/reopen/", views.reopen_billing_period, name="period_reopen"),
 ]
 ```
 
@@ -83,7 +83,7 @@ Ledger.objects.filter(member__in=members).annotate(
 
 ### `ledger_detail` — Individual Ledger View
 
-**URL**: `/billing/ledger/<member_id>/`  
+**URL**: `/billing/ledgers/<member_id>/`  
 **Method**: GET, POST  
 **Decorators**: `@billing_app_required`, `@treasurer_required`
 
@@ -128,7 +128,7 @@ Displays a single member's full ledger with a form for posting manual charges/pa
 
 ### `reverse_entry` — Reverse a Ledger Entry
 
-**URL**: `/billing/entry/<entry_id>/reverse/`  
+**URL**: `/billing/entries/<entry_id>/reverse/`  
 **Method**: POST only (`@require_POST`)  
 **Decorators**: `@billing_app_required`, `@treasurer_required`
 
@@ -153,7 +153,7 @@ Creates a reversal entry for a given ledger entry using the `ReverseEntryForm`.
 
 ### `close_billing_period` — Close a Billing Period
 
-**URL**: `/billing/period/close/`  
+**URL**: `/billing/periods/close/`  
 **Method**: POST only (`@require_POST`)  
 **Decorators**: `@billing_app_required`, `@treasurer_required`
 
@@ -174,7 +174,7 @@ Closes a billing period by year/month. Creates a `BillingPeriodEvent` audit reco
 
 ### `reopen_billing_period` — Reopen a Billing Period
 
-**URL**: `/billing/period/<period_id>/reopen/`  
+**URL**: `/billing/periods/<period_id>/reopen/`  
 **Method**: POST only (`@require_POST`)  
 **Decorators**: `@billing_app_required`, `@treasurer_required`
 
@@ -243,17 +243,17 @@ Form for reversing a ledger entry from `reverse_entry` view.
 flowchart LR
     User[Authorized User] --> LedgerList["GET /billing/ledgers/\nledger_list()"]
     LedgerList --> MemberClick["Click member row"]
-    MemberClick --> LedgerDetail["GET /billing/ledger/<id>/\nledger_detail()"]
+    MemberClick --> LedgerDetail["GET /billing/ledgers/<id>/\nledger_detail()"]
 
     LedgerDetail --> FormSubmit["POST with ManualEntryForm"]
     FormSubmit --> ServicePost["services.py post_*()"]
     ServicePost --> LedgerEntry["LedgerEntry created\nFlightChargeSnapshot frozen"]
 
     LedgerDetail --> ReverseClick["Click reverse action"]
-    ReverseClick --> ReverseView["POST /billing/entry/<id>/reverse/\nreverse_entry()"]
+    ReverseClick --> ReverseView["POST /billing/entries/<id>/reverse/\nreverse_entry()"]
     ReverseView --> Reversal["Reversal entry created\nreverses=original"]
 
-    LedgerList --> PeriodClose["POST /billing/period/close/\nclose_billing_period()"]
+    LedgerList --> PeriodClose["POST /billing/periods/close/\nclose_billing_period()"]
     PeriodClose --> BillingPeriod["BillingPeriod.is_closed=True\nBillingPeriodEvent created"]
 ```
 
@@ -279,7 +279,7 @@ All views use Django's messages framework for feedback:
 | Not treasurer | `403 Forbidden` | "Treasurer access is required." |
 | Not authenticated | `redirect_to_login` | Redirect to login with return URL |
 | Invalid form data | `form.add_error()` | Re-render with errors on form |
-| Period close/validation error | `messages.error()` | Stay on current page |
+| Period close/validation error | `messages.error()` | Redirect to period list |
 | Success | `messages.success()` | Redirect after POST |
 
 ---
@@ -290,3 +290,4 @@ All views use Django's messages framework for feedback:
 - [Data Models](models.md) - Detailed model relationships and constraints  
 - [Decorators](decorators.md) - Authentication and authorization decorators
 - [Development Guide](development.md) - Contributing to billing app
+- [Testing Guide](testing.md) - Billing test modules and execution

@@ -160,11 +160,11 @@ billing_period_close_time_hour = 23   # Hour (23 = 11 PM)
 billing_period_close_time_minute = 59 # Minutes
 ```
 
-### 4. Permission System (`billing/permissions.py`)
+### 4. Permission System
 
-- **`require_manual_transaction_access(actor)`**: Requires actor to have billing permissions
-- **`treasurer_required(view_func)`**: Django decorator for view-level permission checking
-- **`billing_app_required(view_func)`**: Checks if billing app is enabled
+- **`require_manual_transaction_access(actor)`**: Service-layer guard in `billing/permissions.py`
+- **`treasurer_required(view_func)`**: View decorator defined in `billing/views.py`
+- **`billing_app_required(view_func)`**: App-enabled decorator defined in `billing/decorators.py`
 
 ### 5. URL Routes (`billing/urls.py`)
 
@@ -172,16 +172,11 @@ billing_period_close_time_minute = 59 # Minutes
 urlpatterns = [
     # List member ledgers (requires treasurer access)
     path("ledgers/", views.ledger_list, name="ledger_list"),
-
-    # Manual charge creation
-    path("charge/create/", views.manual_charge_create, name="manual_charge_create"),
-
-    # Payment posting
-    path("payment/post/", views.payment_post, name="payment_post"),
-
-    # Period management
-    path("periods/close/", views.period_close, name="period_close"),
-    path("periods/reopen/", views.period_reopen, name="period_reopen"),
+    path("periods/", views.billing_period_list, name="period_list"),
+    path("periods/close/", views.close_billing_period, name="period_close"),
+    path("periods/<int:period_id>/reopen/", views.reopen_billing_period, name="period_reopen"),
+    path("ledgers/<int:member_id>/", views.ledger_detail, name="ledger_detail"),
+    path("entries/<int:entry_id>/reverse/", views.reverse_entry, name="entry_reverse"),
 ]
 ```
 

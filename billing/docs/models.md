@@ -7,10 +7,10 @@ The billing app uses four core models that work together to provide a complete f
 
 ```mermaid
 erDiagram
-    auth_user ||--|| Ledger : "billing_ledger"
-    auth_user ||--o{ LedgerEntry : "created_billing_entries"
-    auth_user ||--o{ BillingPeriodEvent : "billing_period_events"
-    auth_user ||--o{ FlightChargeSnapshot : "billed_member"
+    members_Member ||--|| Ledger : "billing_ledger"
+    members_Member ||--o{ LedgerEntry : "created_billing_entries"
+    members_Member ||--o{ BillingPeriodEvent : "billing_period_events"
+    members_Member ||--o{ FlightChargeSnapshot : "billed_member"
     BillingPeriod ||--o{ BillingPeriodEvent : "events"
     Ledger ||--o{ LedgerEntry : "entries"
     logsheet_Flight ||--o{ LedgerEntry : "billing_entries"
@@ -18,7 +18,7 @@ erDiagram
     LedgerEntry o|--o| LedgerEntry : "reverses"
     LedgerEntry ||--o| FlightChargeSnapshot : "flight_snapshot"
 
-    auth_user {
+    members_Member {
         int id PK
     }
 
@@ -27,8 +27,8 @@ erDiagram
     }
 
     Ledger {
-        uuid id PK
-        int member_id FK "FK to auth_user"
+        int id PK
+        int member_id FK "FK to members_Member"
         datetime created_at
     }
 
@@ -41,7 +41,7 @@ erDiagram
         date effective_date
         varchar member_description
         text internal_note
-        int created_by FK "FK to auth_user"
+        int created_by FK "FK to members_Member"
         datetime created_at
         varchar source_key
         uuid correction_group
@@ -53,7 +53,7 @@ erDiagram
         int id PK
         int ledger_entry_id FK "FK to LedgerEntry"
         int flight FK "FK to logsheet.Flight"
-        int billed_member FK "FK to auth_user"
+        int billed_member FK "FK to members_Member"
         decimal tow_amount
         decimal rental_amount
         decimal instruction_amount
@@ -69,7 +69,7 @@ erDiagram
         int period FK "FK to BillingPeriod"
         varchar action
         text reason
-        int actor FK "FK to auth_user"
+        int actor FK "FK to members_Member"
         datetime created_at
     }
 
@@ -91,7 +91,7 @@ erDiagram
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | UUID (auto) | Primary key |
+| `id` | AutoField (integer, auto) | Primary key |
 | `member` | OneToOneField → User | Link to Django auth user |
 | `created_at` | DateTimeField | When ledger was created (auto_now_add) |
 
@@ -136,7 +136,7 @@ user.billing_ledger.balance  # Returns current balance
 
 | Field | Type | Constraints | Description |
 |-------|------|-------------|-------------|
-| `id` | UUID (auto) | PK | Primary key |
+| `id` | AutoField (integer, auto) | PK | Primary key |
 | `ledger` | ForeignKey → Ledger | PROTECT, related_name="entries" | Parent ledger |
 | `kind` | CharField | max_length=32, Kind.choices | Entry type |
 | `effect` | CharField | Effect.choices | Debit or credit |
@@ -449,21 +449,25 @@ CONSTRAINT billing_snapshot_components_equal_total
 def clean(self):
     super().clean()
 
-    # Total must match ledger entry amount
-    if self.ledger_entry.total_amount != self.total_amount:
-        raise ValidationError("Total must match entry")
-
     # Must link to a valid entry
     if not self.ledger_entry_id:
         raise ValidationError("Must identify a ledger entry")
 
+    entry = self.ledger_entry
+
+    # Total must match ledger entry amount
+    if self.total_amount != entry.amount:
+        raise ValidationError("Total must match entry")
+
     # Entry must be a flight charge
-    if self.ledger_entry.kind != 'flight_charge':
+    if entry.kind != 'flight_charge':
         raise ValidationError("Requires flight charge entry")
 
-    # Member must match
-    if self.ledger_entry.member != self.billed_member:
+    # Member and flight must match linked ledger entry
+    if entry.ledger.member_id != self.billed_member_id:
         raise ValidationError("Member must match ledger")
+    if entry.flight_id != self.flight_id:
+        raise ValidationError("Flight must match entry")
 ```
 
 #### Usage Example
@@ -540,24 +544,16 @@ def get_balance(ledger):
 
 ## Correction Workflow Diagram
 
-```
-Flight Charge Posted (Version 1)
-    ↓
-LedgerEntry(created_by=admin, kind='flight_charge')
-    ↓
-FlightChargeSnapshot(allocation_version=1)
-
-[Later: Correction Needed]
-    ↓
-correct_flight_charges() called
-    ↓
-Reversal Entry created (kind='reversal', reverses=original)
-    ↓
-Reversal FlightChargeSnapshot(allocation_version=2)
-    ↓
-New Charge Entry created with same amount but version 2
-    ↓
-correction_group links reversal + new entry together
+```mermaid
+flowchart TD
+    A["Flight charge posted<br/>allocation version 1"] --> B["LedgerEntry kind flight_charge"]
+    B --> C["FlightChargeSnapshot version 1"]
+    C --> D["Later correction required"]
+    D --> E["correct_flight_charges invoked"]
+    E --> F["Reversal LedgerEntry created<br/>kind reversal reverses original"]
+    F --> G["Replacement LedgerEntry created<br/>allocation version +1"]
+    G --> H["Replacement FlightChargeSnapshot created"]
+    H --> I["Both entries grouped by correction_group"]
 ```
 ## Related Documentation
 

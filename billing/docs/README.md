@@ -9,6 +9,8 @@ This directory contains comprehensive documentation for the **billing** Django a
 - [View Functions](views.md) - View functions, forms, and URL routes
 - [Decorators](decorators.md) - Authentication and authorization decorators
 - [Development Guide](development.md) - How to work with the billing app
+- [API Reference](api.md) - Service-layer entry points and usage patterns
+- [Testing Guide](testing.md) - Test layout, fixtures, and validation commands
 
 ## Quick Start
 

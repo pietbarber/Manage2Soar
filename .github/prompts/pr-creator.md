@@ -24,7 +24,6 @@ Then run the needed git/gh commands to open the PR.
   - “What changed” section grouped by area
   - “Validation” section with command results
   - “Risk / rollout notes” section
-- Mention that most fixes are test/environment hardening and deterministic behavior improvements, plus one additive data migration.
 
 ## Final action
 After drafting, open PR with GitHub CLI (`gh pr create`) and return:
