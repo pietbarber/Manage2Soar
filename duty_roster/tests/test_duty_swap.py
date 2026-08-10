@@ -1199,6 +1199,7 @@ class TestSwapOfferWorkflow:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestOfferAcceptDecline:
     """Tests for accepting and declining offers."""
 
@@ -1271,6 +1272,7 @@ class TestOfferAcceptDecline:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestCancelAndConvert:
     """Tests for cancelling and converting requests."""
 
@@ -1748,6 +1750,7 @@ class TestSwapEmailNotifications:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestSwapIntegration:
     """Integration tests for complete swap workflows."""
 
@@ -1917,6 +1920,7 @@ class TestVolunteerOpportunities:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestSwapRequestExpiryCronjob:
     """Tests for nightly expiry of stale duty swap requests."""
 
@@ -2170,6 +2174,7 @@ class TestSwapRequestExpiryCronjob:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("email_dev_mode_disabled")
 class TestOpenSwapPeriodicReminders:
     """Tests for periodic open swap reminder cadence and delivery."""
 
