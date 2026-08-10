@@ -100,7 +100,7 @@ def test_add_commercial_flight_requires_enabled_feature(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 400
     assert not Flight.objects.filter(logsheet=logsheet).exists()
     assert "commercial_ride" in response.context["form"].errors
 
@@ -150,7 +150,7 @@ def test_add_commercial_flight_rolls_back_when_ticket_link_fails(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 400
     assert "ticket_number" in response.context["form"].errors
     assert not Flight.objects.filter(logsheet=logsheet).exists()
 
@@ -209,7 +209,7 @@ def test_edit_commercial_flight_rolls_back_when_ticket_link_fails(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 400
     assert "ticket_number" in response.context["form"].errors
     flight.refresh_from_db(from_queryset=None)
     assert flight.commercial_ride is False
