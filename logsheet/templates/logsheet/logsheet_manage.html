@@ -1083,6 +1083,19 @@ document.addEventListener("click", async function(e) {
     e.preventDefault();
     const btn = e.target.classList.contains("copy-flight-btn") ? e.target : e.target.closest(".copy-flight-btn");
 
+    // Cooldown guard: ignore rapid repeated clicks while copy form is loading
+    if (btn.dataset.copying === "1") {
+      return;
+    }
+
+    function resetCopyButtonState() {
+      btn.dataset.copying = "0";
+      btn.disabled = false;
+    }
+
+    btn.dataset.copying = "1";
+    btn.disabled = true;
+
     // Extract flight data from data attributes
     const flightData = {
       pilot: btn.getAttribute("data-pilot"),
@@ -1158,6 +1171,29 @@ document.addEventListener("click", async function(e) {
       }
     }
 
+      // Helper: Show "no cached data" offline modal without duplicating HTML
+      function showOfflineNoCacheModal() {
+        const container = document.getElementById('flightModalContent');
+        if (!container) return;
+        container.innerHTML = `
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-wifi-off me-2"></i>You're Offline</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              No cached data available for offline entry. Please connect to the internet at least once to cache flight data.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        `;
+        const modal = new bootstrap.Modal(document.getElementById('flightModal'));
+        modal.show();
+      }
+
     // Check if offline - use offline form with pre-filled data
     if (!navigator.onLine && window.M2SOffline) {
       (async () => {
@@ -1192,28 +1228,15 @@ document.addEventListener("click", async function(e) {
               return;
             }
           }
+
+            // Fall through to show error if offline form is unavailable
+            showOfflineNoCacheModal();
         } catch (err) {
           console.error('[Offline] Error loading offline copy form:', err);
+            showOfflineNoCacheModal();
+        } finally {
+          resetCopyButtonState();
         }
-
-        // Fall through to show error if offline form failed
-        document.getElementById('flightModalContent').innerHTML = `
-          <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-wifi-off me-2"></i>You're Offline</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-warning">
-              <i class="bi bi-exclamation-triangle me-2"></i>
-              No cached data available for offline entry. Please connect to the internet at least once to cache flight data.
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          </div>
-        `;
-        const modal = new bootstrap.Modal(document.getElementById('flightModal'));
-        modal.show();
       })();
       return;
     }
@@ -1238,6 +1261,10 @@ document.addEventListener("click", async function(e) {
           // Attach NOW and 2K/3K button handlers
           if (window.attachModalButtonHandlers) {
             window.attachModalButtonHandlers();
+          }
+          // Wire up the form's AJAX submit handler to prevent duplicate POSTs
+          if (window.attachFlightFormHandler) {
+            window.attachFlightFormHandler();
           }
         }, 100);
 
@@ -1272,6 +1299,9 @@ document.addEventListener("click", async function(e) {
         `;
         const modal = new bootstrap.Modal(document.getElementById('flightModal'));
         modal.show();
+      })
+      .finally(() => {
+        resetCopyButtonState();
       });
   }
 });
@@ -1971,6 +2001,11 @@ document.addEventListener("click", async function(e) {
   const LOGSHEET_CONTAINER = document.getElementById("logsheetContainer");
   const COMMERCIAL_RIDES_ENABLED = LOGSHEET_CONTAINER?.dataset.commercialRidesEnabled === 'true';
 
+  // Shared message for offline add/edit fallback UI.
+  function getOfflineNoCacheMessage() {
+    return 'No cached data available for offline entry. Please connect to the internet at least once to cache flight data.';
+  }
+
   // Helper function to extract pre-fill data from Edit button's data attributes (DRY)
   function extractPrefillDataFromButton(button, flightId) {
     if (!button || !flightId) return null;
@@ -1998,6 +2033,225 @@ document.addEventListener("click", async function(e) {
       notes: button.getAttribute('data-notes')
     };
   }
+
+  // Global function to wire up the flight form's AJAX submit handler (shared between add and edit flows)
+  window.attachFlightFormHandler = function(modalContentEl) {
+    const el = modalContentEl || document.getElementById('flightModalContent');
+    if (!el) return;
+    const form = el.querySelector('#edit-flight-form') || el.querySelector('form[method="post"]');
+    if (!form) return;
+
+    // Remove existing handler to prevent duplicates on re-attach
+    form.removeEventListener('submit', window._flightFormSubmitHandler);
+
+    window._flightSubmitButton = null;
+
+    window._flightFormSubmitHandler = function(e) {
+      if (form.dataset.submitting === "1") {
+        e.preventDefault();
+        return;
+      }
+
+      e.preventDefault();
+      form.dataset.submitting = "1";
+
+      // Disable submit button immediately to prevent duplicate POSTs
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        window._flightSubmitButton = submitBtn;
+        submitBtn.disabled = true;
+        const originalLabel = submitBtn.getAttribute('data-original-label') || submitBtn.textContent;
+        if (!submitBtn.getAttribute('data-original-label')) {
+          submitBtn.setAttribute('data-original-label', originalLabel);
+        }
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Saving...';
+      }
+
+      function resetSubmitState() {
+        form.dataset.submitting = "0";
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          const originalLabel = submitBtn.getAttribute('data-original-label');
+          if (originalLabel) {
+            submitBtn.textContent = originalLabel;
+          }
+        }
+      }
+
+      const formUrl = form.action || window.location.href;
+      const data = new FormData(form);
+
+      // Ensure idempotent add-flight submissions include a stable client token.
+      if (formUrl.includes('/add-flight/')) {
+        let clientToken = data.get('client_token');
+        if (typeof clientToken === 'string') {
+          clientToken = clientToken.trim();
+        }
+        if (!clientToken) {
+          clientToken = (window.crypto && typeof window.crypto.randomUUID === 'function')
+            ? window.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+          data.set('client_token', clientToken);
+        }
+      }
+
+      // Extract flight ID from URL if this is an edit (not add)
+      const editMatch = formUrl.match(/\/edit-flight\/(\d+)\//);
+      const flightId = editMatch ? parseInt(editMatch[1], 10) : null;
+      const isEdit = flightId !== null;
+
+      fetch(formUrl, {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: data
+      })
+      .then(async response => {
+        const contentType = response.headers.get("content-type") || "";
+        if (response.ok) {
+          // Success: expect JSON
+          const jsonData = await response.json();
+          if (jsonData.success) {
+            location.reload();
+          }
+        } else if (contentType.includes("text/html")) {
+          // Validation error: got HTML form, replace modal content and re-attach handler
+          const html = await response.text();
+          resetSubmitState();
+          if (el) {
+            el.innerHTML = html;
+            // Remove the old submit handler before re-attaching
+            form.removeEventListener('submit', window._flightFormSubmitHandler);
+            window.attachFlightFormHandler(el);
+          } else {
+            document.body.innerHTML = html;
+          }
+        } else {
+          // Non-OK, non-HTML response — try to extract a structured JSON error message.
+          let serverMessage = "";
+          if (contentType.includes("application/json")) {
+            try {
+              const payload = await response.json();
+              serverMessage = payload.error || payload.message || "";
+            } catch (e) {
+              console.warn("Unable to parse JSON error payload from submit response", e);
+            }
+          }
+          const submitError = new Error(serverMessage || "server_error");
+          submitError.httpStatus = response.status;
+          throw submitError;
+        }
+      })
+      .catch(async error => {
+        // Check if we're offline and can save locally
+        if (!navigator.onLine && window.M2SIndexedDB) {
+          console.log('[Offline] Saving flight edit locally...');
+          try {
+            // Convert FormData to object
+            const flightData = {};
+            for (const [key, value] of data.entries()) {
+              // Skip CSRF token
+              if (key === 'csrfmiddlewaretoken') continue;
+              // Convert empty strings to null for optional fields
+              flightData[key] = value === '' ? null : value;
+            }
+
+            // Convert IDs to integers
+            ['pilot', 'instructor', 'glider', 'towplane', 'tow_pilot', 'passenger', 'release_altitude'].forEach(field => {
+              if (flightData[field]) {
+                flightData[field] = parseInt(flightData[field], 10) || null;
+              }
+            });
+
+            const db = window.M2SIndexedDB;
+            let localId;
+
+            if (isEdit && flightId) {
+              // This is an edit to an existing flight
+              localId = await db.createPendingEdit(flightId, flightData, LOGSHEET_ID);
+            } else {
+              // This is a new flight
+              localId = await db.createPendingFlight(flightData, LOGSHEET_ID);
+            }
+
+            console.log('[Offline] Flight saved with local ID:', localId);
+
+            // Close the modal
+            const modalEl = document.getElementById('flightModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) {
+              modal.hide();
+            }
+
+            // Show success toast
+            showOfflineSaveToast(isEdit ? 'edit' : 'add');
+
+            // Update pending indicator
+            if (window.M2SOffline) {
+              window.M2SOffline.updatePendingIndicator();
+            }
+
+            // Register for background sync
+            if ('serviceWorker' in navigator && 'SyncManager' in window) {
+              const registration = await navigator.serviceWorker.ready;
+              await registration.sync.register('sync-flights');
+            }
+
+          } catch (dbError) {
+            console.error('[Offline] Failed to save locally:', dbError);
+            alert("Could not save the flight offline. Please try again when online.");
+            resetSubmitState();
+          }
+
+          // Allow retry after offline fallback flow completes.
+          resetSubmitState();
+        } else {
+          // alert() displays plain text — do NOT pass HTML-escaped content or
+          // characters like '>' will show as '&gt;'. escapeHtml is only for innerHTML.
+          const serverMessage = error.message && error.message !== 'server_error'
+            ? error.message
+            : "Could not save the flight. Please check your connection and try again.";
+          alert(serverMessage);
+
+          resetSubmitState();
+        }
+      });
+    };
+
+    form.addEventListener('submit', window._flightFormSubmitHandler);
+  };
+
+  // Helper to show offline save toast
+  function showOfflineSaveToast(action) {
+    let toastContainer = document.getElementById('offline-toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'offline-toast-container';
+      toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3 mt-5';
+      toastContainer.style.zIndex = '1100';
+      document.body.appendChild(toastContainer);
+    }
+
+    const toastId = 'offline-saved-toast-' + Date.now();
+    const message = action === 'edit' ? 'Flight edit saved offline!' : 'New flight saved offline!';
+    const toastHtml = `
+      <div id="${toastId}" class="toast align-items-center text-white bg-warning border-0" role="alert">
+        <div class="d-flex">
+          <div class="toast-body">
+            <i class="bi bi-download me-2"></i>
+            <strong>${message}</strong>
+            Will sync when online.
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+      </div>
+    `;
+
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    const toastEl = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastEl, { delay: 5000 });
+    toast.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+  };
 
   flightModal.addEventListener("show.bs.modal", async function (event) {
     // Get the button that triggered the modal - may be an icon inside the button
@@ -2090,166 +2344,12 @@ document.addEventListener("click", async function(e) {
     .then(html => {
       document.getElementById("flightModalContent").innerHTML = html;
 
-      // Attach robust form submit handler for modal
-      function attachFlightFormHandler() {
-        const form = document.getElementById("edit-flight-form");
-        if (!form) return;
-        form.addEventListener("submit", function (e) {
-          e.preventDefault();
-          const formUrl = form.action || window.location.href;
-          const data = new FormData(form);
-
-          // Extract flight ID from URL if this is an edit (not add)
-          const editMatch = formUrl.match(/\/edit-flight\/(\d+)\//);
-          const flightId = editMatch ? parseInt(editMatch[1], 10) : null;
-          const isEdit = flightId !== null;
-
-          fetch(formUrl, {
-            method: "POST",
-            headers: { "X-Requested-With": "XMLHttpRequest" },
-            body: data
-          })
-          .then(async response => {
-            const contentType = response.headers.get("content-type") || "";
-            if (response.ok) {
-              // Success: expect JSON
-              const jsonData = await response.json();
-              if (jsonData.success) {
-                location.reload();
-              }
-            } else if (contentType.includes("text/html")) {
-              // Validation error: got HTML form, replace modal content and re-attach handler
-              const html = await response.text();
-              const modalContent = document.getElementById("flightModalContent");
-              if (modalContent) {
-                modalContent.innerHTML = html;
-                attachFlightFormHandler();
-              } else {
-                document.body.innerHTML = html;
-              }
-            } else {
-              // Non-OK, non-HTML response — try to extract a structured JSON error message.
-              let serverMessage = "";
-              if (contentType.includes("application/json")) {
-                try {
-                  const payload = await response.json();
-                  serverMessage = payload.error || payload.message || "";
-                } catch (e) {
-                  console.warn("Unable to parse JSON error payload from submit response", e);
-                }
-              }
-              const submitError = new Error(serverMessage || "server_error");
-              submitError.httpStatus = response.status;
-              throw submitError;
-            }
-          })
-          .catch(async error => {
-            // Check if we're offline and can save locally
-            if (!navigator.onLine && window.M2SIndexedDB) {
-              console.log('[Offline] Saving flight edit locally...');
-              try {
-                // Convert FormData to object
-                const flightData = {};
-                for (const [key, value] of data.entries()) {
-                  // Skip CSRF token
-                  if (key === 'csrfmiddlewaretoken') continue;
-                  // Convert empty strings to null for optional fields
-                  flightData[key] = value === '' ? null : value;
-                }
-
-                // Convert IDs to integers
-                ['pilot', 'instructor', 'glider', 'towplane', 'tow_pilot', 'passenger', 'release_altitude'].forEach(field => {
-                  if (flightData[field]) {
-                    flightData[field] = parseInt(flightData[field], 10) || null;
-                  }
-                });
-
-                const db = window.M2SIndexedDB;
-                let localId;
-
-                if (isEdit && flightId) {
-                  // This is an edit to an existing flight
-                  localId = await db.createPendingEdit(flightId, flightData, LOGSHEET_ID);
-                } else {
-                  // This is a new flight
-                  localId = await db.createPendingFlight(flightData, LOGSHEET_ID);
-                }
-
-                console.log('[Offline] Flight saved with local ID:', localId);
-
-                // Close the modal
-                const modalEl = document.getElementById('flightModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) {
-                  modal.hide();
-                }
-
-                // Show success toast
-                showOfflineSaveToast(isEdit ? 'edit' : 'add');
-
-                // Update pending indicator
-                if (window.M2SOffline) {
-                  window.M2SOffline.updatePendingIndicator();
-                }
-
-                // Register for background sync
-                if ('serviceWorker' in navigator && 'SyncManager' in window) {
-                  const registration = await navigator.serviceWorker.ready;
-                  await registration.sync.register('sync-flights');
-                }
-
-              } catch (dbError) {
-                console.error('[Offline] Failed to save locally:', dbError);
-                alert("Could not save the flight offline. Please try again when online.");
-              }
-            } else {
-              // alert() displays plain text — do NOT pass HTML-escaped content or
-              // characters like '>' will show as '&gt;'. escapeHtml is only for innerHTML.
-              const serverMessage = error.message && error.message !== 'server_error'
-                ? error.message
-                : "Could not save the flight. Please check your connection and try again.";
-              alert(serverMessage);
-            }
-          });
-        });
+      // Attach NOW and 2K/3K button handlers via existing shared function
+      if (window.attachFlightFormHandler) {
+        window.attachFlightFormHandler(document.getElementById("flightModalContent"));
       }
 
-      // Helper to show offline save toast
-      function showOfflineSaveToast(action) {
-        let toastContainer = document.getElementById('offline-toast-container');
-        if (!toastContainer) {
-          toastContainer = document.createElement('div');
-          toastContainer.id = 'offline-toast-container';
-          toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3 mt-5';
-          toastContainer.style.zIndex = '1100';
-          document.body.appendChild(toastContainer);
-        }
-
-        const toastId = 'offline-saved-toast-' + Date.now();
-        const message = action === 'edit' ? 'Flight edit saved offline!' : 'New flight saved offline!';
-        const toastHtml = `
-          <div id="${toastId}" class="toast align-items-center text-white bg-warning border-0" role="alert">
-            <div class="d-flex">
-              <div class="toast-body">
-                <i class="bi bi-download me-2"></i>
-                <strong>${message}</strong>
-                Will sync when online.
-              </div>
-              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-          </div>
-        `;
-
-        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-        const toastEl = document.getElementById(toastId);
-        const toast = new bootstrap.Toast(toastEl, { delay: 5000 });
-        toast.show();
-        toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
-      }
-
-      attachFlightFormHandler();
-
-      // 🚨 DOM inside modal is now ready, attach glider/instructor logic here
+      // Attach glider/instructor/passenger visibility logic after modal content loads
       const gliderField = flightModal.querySelector("#id_glider");
       const instructorField = flightModal.querySelector("#id_instructor");
       const passengerField = flightModal.querySelector("#id_passenger");
@@ -2437,7 +2537,7 @@ document.addEventListener("click", async function(e) {
             <strong>${isOffline ? "No internet connection." : "Could not load the form."}</strong>
             <p class="mb-0 mt-2">
               ${isOffline && (isAddFlight || isEditFlight)
-                ? "No cached data available for offline entry. Please connect to the internet at least once to cache flight data."
+                ? getOfflineNoCacheMessage()
                 : isOffline
                   ? "This action requires an internet connection."
                   : escapeHtml(serverMessage)}
