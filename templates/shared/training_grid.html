@@ -169,6 +169,9 @@
             {% elif row.max_score == "4" %}
               <img src="{% static 'images/blob4.png' %}" alt="Max score 4">
               <span class="print-score-text">4</span>
+            {% elif row.max_score == "!" %}
+              <img src="{% static 'images/blob5.png' %}" alt="Needs attention">
+              <span class="print-score-text">!</span>
             {% else %}
               &mdash;
             {% endif %}
