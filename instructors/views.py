@@ -678,17 +678,20 @@ def member_training_grid(request, member_id):
     # Add non-flight ground-only instructor/date pairs as first-class columns.
     # If a report or pending column already exists for the same pair, reuse it
     # and let ground scores populate lesson cells for that column.
+    # Precompute pending keys once (avoid O(n*m) recomputation per ground session).
+    pending_key_set = {
+        (entry["date"], entry["instructor_id"])
+        for entries in pending_entries_by_date.values()
+        for entry in entries
+    }
+
     ground_entries_by_date = defaultdict(list)
     ground_column_keys = set()
     for session in ground_sessions:
         column_key = (session.date, session.instructor_id)
         if column_key in existing_report_keys:
             continue
-        if column_key in {
-            (entry["date"], entry["instructor_id"])
-            for entries in pending_entries_by_date.values()
-            for entry in entries
-        }:
+        if column_key in pending_key_set:
             continue
         if column_key in ground_column_keys:
             continue
@@ -788,7 +791,10 @@ def member_training_grid(request, member_id):
             score = ""
             if column_entry["report_id"] is not None:
                 score = scores_lookup.get((lesson.id, column_entry["report_id"]), "")
-            else:
+            # Fall back to ground scores for report/pending columns that
+            # share the same (date, instructor) as a ground session but have
+            # no matching report lesson-score key.
+            if not score:
                 score = ground_scores_lookup.get(
                     (lesson.id, column_entry["date"], column_entry["instructor_id"]),
                     "",
