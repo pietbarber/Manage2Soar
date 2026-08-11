@@ -583,12 +583,40 @@ def member_training_grid(request, member_id):
     report_entries = list(reports)
     lessons = TrainingLesson.objects.all().order_by("sort_key")
 
-    # Build lookup for scores by (lesson_id, report_id)
+    def score_rank(score):
+        if score and score.isdigit():
+            return (2, int(score))
+        if score == "!":
+            return (1, 0)
+        return (0, 0)
+
+    def pick_best_score(current_score, candidate_score):
+        if score_rank(candidate_score) > score_rank(current_score):
+            return candidate_score
+        return current_score
+
+    # Build lookup for report scores by (lesson_id, report_id)
     scores_lookup = {
         (sc.lesson_id, rep.id): sc.score
         for rep in report_entries
         for sc in rep.lesson_scores.all()
     }
+
+    # Build lookup for ground scores by (lesson_id, date, instructor_id),
+    # keeping best score when multiple ground sessions exist on the same day.
+    ground_scores_lookup = defaultdict(str)
+    ground_sessions = (
+        GroundInstruction.objects.filter(student=member)
+        .select_related("instructor")
+        .prefetch_related("lesson_scores")
+        .order_by("date", "id")
+    )
+    for session in ground_sessions:
+        for score in session.lesson_scores.all():
+            key = (score.lesson_id, session.date, session.instructor_id)
+            ground_scores_lookup[key] = pick_best_score(
+                ground_scores_lookup[key], score.score
+            )
 
     today = now().date()
     pending_cutoff = today - timedelta(days=30)
@@ -647,9 +675,41 @@ def member_training_grid(request, member_id):
             )
         pending_entries_by_date[report_date] = resolved_entries
 
+    # Add non-flight ground-only instructor/date pairs as first-class columns.
+    # If a report or pending column already exists for the same pair, reuse it
+    # and let ground scores populate lesson cells for that column.
+    ground_entries_by_date = defaultdict(list)
+    ground_column_keys = set()
+    for session in ground_sessions:
+        column_key = (session.date, session.instructor_id)
+        if column_key in existing_report_keys:
+            continue
+        if column_key in {
+            (entry["date"], entry["instructor_id"])
+            for entries in pending_entries_by_date.values()
+            for entry in entries
+        }:
+            continue
+        if column_key in ground_column_keys:
+            continue
+
+        ground_entries_by_date[session.date].append(
+            {
+                "date": session.date,
+                "instructor": session.instructor,
+                "instructor_id": session.instructor_id,
+                "is_pending": False,
+                "report_id": None,
+                "is_ground_only": True,
+            }
+        )
+        ground_column_keys.add(column_key)
+
     column_entries = []
     all_column_dates = sorted(
-        set(report_entries_by_date) | set(pending_entries_by_date)
+        set(report_entries_by_date)
+        | set(pending_entries_by_date)
+        | set(ground_entries_by_date)
     )
     for report_date in all_column_dates:
         for report in report_entries_by_date.get(report_date, []):
@@ -671,6 +731,15 @@ def member_training_grid(request, member_id):
             ),
         )
         column_entries.extend(pending_columns)
+
+        ground_columns = sorted(
+            ground_entries_by_date.get(report_date, []),
+            key=lambda entry: (
+                str(entry["instructor"].full_display_name or ""),
+                entry["instructor_id"],
+            ),
+        )
+        column_entries.extend(ground_columns)
 
     report_dates = [entry["date"] for entry in column_entries]
 
@@ -714,13 +783,18 @@ def member_training_grid(request, member_id):
             "lesson_id": lesson.id,
             "code": lesson.code,
         }
-        max_scores = []
+        max_score_value = ""
         for column_entry in column_entries:
             score = ""
             if column_entry["report_id"] is not None:
                 score = scores_lookup.get((lesson.id, column_entry["report_id"]), "")
-            if score.isdigit():
-                max_scores.append(int(score))
+            else:
+                score = ground_scores_lookup.get(
+                    (lesson.id, column_entry["date"], column_entry["instructor_id"]),
+                    "",
+                )
+
+            max_score_value = pick_best_score(max_score_value, score)
             info = get_column_meta(column_entry)
             tooltip = f"{info['full_name']} – {info['days_ago']} days ago"
             if info["is_pending"]:
@@ -732,7 +806,7 @@ def member_training_grid(request, member_id):
                     "is_pending": info["is_pending"],
                 }
             )
-        row["max_score"] = str(max(max_scores)) if max_scores else ""
+        row["max_score"] = max_score_value
         lesson_data.append(row)
 
     # Build column metadata for template headers using unified column metadata.

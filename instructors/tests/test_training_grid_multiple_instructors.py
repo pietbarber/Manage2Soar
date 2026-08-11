@@ -13,7 +13,13 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from instructors.models import InstructionReport, LessonScore, TrainingLesson
+from instructors.models import (
+    GroundInstruction,
+    GroundLessonScore,
+    InstructionReport,
+    LessonScore,
+    TrainingLesson,
+)
 from logsheet.models import Airfield, Flight, Glider, Logsheet, Towplane
 from members.models import Member
 
@@ -323,3 +329,144 @@ class TestTrainingGridMultipleInstructors(TestCase):
         assert pending_cell["score"] == ""
         assert pending_cell["is_pending"] is True
         assert "Pending report" in pending_cell["tooltip"]
+
+    def test_training_grid_includes_ground_only_column_and_score(self):
+        """Ground-only sessions should appear as columns and populate lesson scores."""
+        ground_date = self.log_date - timedelta(days=3)
+        session = GroundInstruction.objects.create(
+            student=self.student,
+            instructor=self.instructor2,
+            date=ground_date,
+            location="Classroom",
+        )
+        GroundLessonScore.objects.create(session=session, lesson=self.lesson, score="3")
+
+        self.client.force_login(self.student)
+        url = reverse("instructors:member_training_grid", args=[self.student.id])
+        response = self.client.get(url)
+
+        assert response.status_code == 200
+
+        ground_columns = [
+            m for m in response.context["column_metadata"] if m["date"] == ground_date
+        ]
+        assert len(ground_columns) == 1
+
+        ground_column = ground_columns[0]
+        assert ground_column["instructor_name"] == "Rufus Decker"
+        assert ground_column["is_pending"] is False
+        assert ground_column["num_flights"] == 0
+
+        lesson_row = next(
+            (
+                row
+                for row in response.context["lesson_data"]
+                if row["lesson_id"] == self.lesson.id
+            ),
+            None,
+        )
+        assert lesson_row is not None
+
+        column_index = response.context["column_metadata"].index(ground_column)
+        ground_cell = lesson_row["scores"][column_index]
+        assert ground_cell["score"] == "3"
+        assert ground_cell["is_pending"] is False
+        assert lesson_row["max_score"] == "3"
+
+    def test_training_grid_max_uses_higher_of_flight_and_ground(self):
+        """Max should use the highest numeric score from either source."""
+        report = InstructionReport.objects.get(
+            student=self.student,
+            instructor=self.instructor1,
+            report_date=self.log_date,
+        )
+        LessonScore.objects.create(report=report, lesson=self.lesson, score="2")
+
+        ground_date = self.log_date - timedelta(days=4)
+        session = GroundInstruction.objects.create(
+            student=self.student,
+            instructor=self.instructor2,
+            date=ground_date,
+            location="Simulator",
+        )
+        GroundLessonScore.objects.create(session=session, lesson=self.lesson, score="4")
+
+        self.client.force_login(self.student)
+        url = reverse("instructors:member_training_grid", args=[self.student.id])
+        response = self.client.get(url)
+
+        lesson_row = next(
+            (
+                row
+                for row in response.context["lesson_data"]
+                if row["lesson_id"] == self.lesson.id
+            ),
+            None,
+        )
+        assert lesson_row is not None
+        assert lesson_row["max_score"] == "4"
+
+    def test_training_grid_max_uses_attention_when_only_attention_scores_exist(self):
+        """Max should show attention marker when no numeric score exists."""
+        ground_date = self.log_date - timedelta(days=5)
+        session = GroundInstruction.objects.create(
+            student=self.student,
+            instructor=self.instructor2,
+            date=ground_date,
+            location="Classroom",
+        )
+        GroundLessonScore.objects.create(session=session, lesson=self.lesson, score="!")
+
+        self.client.force_login(self.student)
+        url = reverse("instructors:member_training_grid", args=[self.student.id])
+        response = self.client.get(url)
+
+        lesson_row = next(
+            (
+                row
+                for row in response.context["lesson_data"]
+                if row["lesson_id"] == self.lesson.id
+            ),
+            None,
+        )
+        assert lesson_row is not None
+        assert lesson_row["max_score"] == "!"
+
+    def test_training_grid_max_persists_when_later_pending_cells_are_blank(self):
+        """A later blank pending column must not clear an existing max score."""
+        report = InstructionReport.objects.get(
+            student=self.student,
+            instructor=self.instructor1,
+            report_date=self.log_date,
+        )
+        LessonScore.objects.create(report=report, lesson=self.lesson, score="3")
+
+        pending_date = self.log_date + timedelta(days=1)
+        pending_logsheet = Logsheet.objects.create(
+            log_date=pending_date,
+            airfield=self.airfield,
+            created_by=self.student,
+            finalized=False,
+        )
+        Flight.objects.create(
+            logsheet=pending_logsheet,
+            pilot=self.student,
+            glider=self.glider,
+            towplane=self.towplane,
+            instructor=self.instructor2,
+        )
+
+        self.client.force_login(self.student)
+        url = reverse("instructors:member_training_grid", args=[self.student.id])
+        response = self.client.get(url)
+
+        lesson_row = next(
+            (
+                row
+                for row in response.context["lesson_data"]
+                if row["lesson_id"] == self.lesson.id
+            ),
+            None,
+        )
+        assert lesson_row is not None
+        assert lesson_row["max_score"] == "3"
