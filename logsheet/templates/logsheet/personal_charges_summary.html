@@ -7,6 +7,7 @@
     <a href="{% url 'logsheet:personal_charges_csv' %}" class="btn btn-outline-primary btn-sm">Export CSV</a>
   </div>
 
+  {% if billing_active %}
   <div class="card border-0 bg-body-tertiary mb-4">
     <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div>
@@ -61,5 +62,83 @@
   <div class="alert alert-light border mt-4 mb-0 small" role="note">
     Questions about balances from before the ledger was introduced? Contact the treasurer.
   </div>
+  {% else %}
+  <div class="card border-0 bg-body-tertiary mb-4">
+    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div>
+        <div class="text-uppercase text-muted small">Total charges accrued</div>
+      </div>
+      <div class="h3 mb-0 text-danger">${{ total_owed|floatformat:2 }}</div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-light-subtle">
+      <h2 class="h5 mb-0">Flight charges</h2>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Glider</th>
+            <th class="text-end">Tow</th>
+            <th class="text-end">Rental</th>
+            <th class="text-end">Instruction</th>
+            <th class="text-end">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in flight_rows %}
+          <tr>
+            <td class="text-nowrap">{{ row.flight_date }}</td>
+            <td>{{ row.glider }}</td>
+            <td class="text-end">${{ row.tow_cost|floatformat:2 }}</td>
+            <td class="text-end">${{ row.rental_cost|floatformat:2 }}</td>
+            <td class="text-end">${{ row.instruction_cost|floatformat:2 }}</td>
+            <td class="text-end fw-semibold">${{ row.total_cost|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-muted text-center py-4">No operational flight charges recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if misc_charges %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-light-subtle">
+      <h2 class="h5 mb-0">Miscellaneous charges</h2>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Item</th>
+            <th>Description</th>
+            <th class="text-end">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for charge in misc_charges %}
+          <tr>
+            <td class="text-nowrap">{{ charge.date }}</td>
+            <td>{{ charge.chargeable_item.name }}</td>
+            <td>{{ charge.notes|default:charge.chargeable_item.name }}</td>
+            <td class="text-end fw-semibold">${{ charge.total_price|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="alert alert-light border mt-4 mb-0 small" role="note">
+    Billing is not active for this site. These are the charges you've accrued through flight operations; contact the treasurer or duty officer regarding payment.
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

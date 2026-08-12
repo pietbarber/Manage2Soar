@@ -108,7 +108,7 @@ def test_billing_navigation_is_hidden_when_disabled(client, treasurer):
     response = client.get("/")
 
     assert reverse("billing:ledger_list") not in response.content.decode()
-    assert reverse("logsheet:personal_charges") not in response.content.decode()
+    assert reverse("logsheet:personal_charges") in response.content.decode()
 
 
 def test_ledger_detail_posts_manual_charge_and_shows_audit(client, member, treasurer):
