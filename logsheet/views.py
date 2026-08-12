@@ -835,7 +835,7 @@ def personal_charges_summary_csv(request):
     )
 
     writer = csv.writer(response)
-    writer.writerow(["Date", "Type", "Description", "Amount"])
+    writer.writerow(["Date", "Type", "Description", "Debit", "Credit", "Balance"])
     for row in combined_rows:
         writer.writerow(
             [
@@ -843,6 +843,8 @@ def personal_charges_summary_csv(request):
                 row["type"],
                 row["description"],
                 f"{row['amount']:.2f}",
+                "",
+                "",
             ]
         )
 

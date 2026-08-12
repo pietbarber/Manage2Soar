@@ -155,14 +155,6 @@ class TestPersonalChargesView:
             rental_cost_actual="30.00",
             instruction_fee_actual="10.00",
         )
-        flight.is_chargeable = True
-        flight.save(
-            update_fields=[
-                "tow_cost_actual",
-                "rental_cost_actual",
-                "instruction_fee_actual",
-            ]
-        )
 
         client.force_login(self.member)
         response = client.get(reverse("logsheet:personal_charges"))
@@ -172,3 +164,12 @@ class TestPersonalChargesView:
         assert response.context["total_owed"] == Decimal("65.00")
         assert "Total charges accrued" in response.content.decode()
         assert "No ledger entries posted." not in response.content.decode()
+
+        csv_response = client.get(reverse("logsheet:personal_charges_csv"))
+        assert csv_response.status_code == 200
+        rows = list(csv.reader(StringIO(csv_response.content.decode())))
+        assert rows[0] == ["Date", "Type", "Description", "Debit", "Credit", "Balance"]
+        assert rows[1][1] == "Flight"
+        assert rows[1][3] == "65.00"
+        assert rows[1][4] == ""
+        assert rows[1][5] == ""
