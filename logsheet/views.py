@@ -726,7 +726,7 @@ def stats_dump_export_download(request, pk):
 
 @active_member_required
 def personal_charges_summary(request):
-    """Show the authenticated member's ledger statement or live operational charges."""
+    """Show the authenticated member's ledger statement or recent operational charges."""
     site_config = SiteConfiguration.objects.first()
     billing_app_enabled = bool(site_config and site_config.billing_app_enabled)
 
@@ -746,9 +746,15 @@ def personal_charges_summary(request):
             },
         )
 
-    flight_rows, misc_charges = _get_personal_charge_data(
-        request.user, date(1900, 1, 1)
-    )
+    days = request.GET.get("days")
+    try:
+        days = int(days) if days is not None else 365
+    except ValueError:
+        days = 365
+    days = max(1, min(days, 3650))
+    start_date = timezone.localdate() - timedelta(days=days)
+
+    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
     total_owed = sum(
         (row["total_cost"] for row in flight_rows),
         Decimal("0.00"),
@@ -759,6 +765,8 @@ def personal_charges_summary(request):
         "logsheet/personal_charges_summary.html",
         {
             "billing_active": False,
+            "days": days,
+            "start_date": start_date,
             "flight_rows": flight_rows,
             "misc_charges": misc_charges,
             "total_owed": total_owed,
@@ -768,7 +776,7 @@ def personal_charges_summary(request):
 
 @active_member_required
 def personal_charges_summary_csv(request):
-    """Export the authenticated member's charges as ledger or live operational data."""
+    """Export the authenticated member's charges as ledger or recent operational data."""
     site_config = SiteConfiguration.objects.first()
     billing_app_enabled = bool(site_config and site_config.billing_app_enabled)
 
@@ -800,9 +808,15 @@ def personal_charges_summary_csv(request):
 
         return response
 
-    flight_rows, misc_charges = _get_personal_charge_data(
-        request.user, date(1900, 1, 1)
-    )
+    days = request.GET.get("days")
+    try:
+        days = int(days) if days is not None else 365
+    except ValueError:
+        days = 365
+    days = max(1, min(days, 3650))
+    start_date = timezone.localdate() - timedelta(days=days)
+
+    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
     combined_rows = []
     for row in flight_rows:
         flight = row["flight"]
