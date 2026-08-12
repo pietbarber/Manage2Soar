@@ -7,6 +7,7 @@ import pytest
 from django.urls import reverse
 
 from billing.services import post_manual_charge, post_manual_payment
+from logsheet.models import Airfield, Flight, Glider, Logsheet, Towplane
 from members.models import Member
 from siteconfig.models import MembershipStatus, SiteConfiguration
 
@@ -116,3 +117,59 @@ class TestPersonalChargesView:
         client.force_login(self.member)
         assert client.get(reverse("logsheet:personal_charges")).status_code == 200
         assert client.get(reverse("logsheet:personal_charges_csv")).status_code == 200
+
+    def test_member_statement_uses_live_operational_charges_when_billing_is_disabled(
+        self, client
+    ):
+        self.config.billing_app_enabled = False
+        self.config.save(update_fields=["billing_app_enabled"])
+
+        airfield = Airfield.objects.create(name="Test Airfield", identifier="KTEST")
+        glider = Glider.objects.create(
+            n_number="N11111",
+            make="Test",
+            model="Glider",
+            club_owned=True,
+            is_active=True,
+        )
+        towplane = Towplane.objects.create(
+            n_number="N22222",
+            make="Tow",
+            model="Plane",
+            club_owned=True,
+            is_active=True,
+        )
+        logsheet = Logsheet.objects.create(
+            log_date=date(2026, 7, 15),
+            airfield=airfield,
+            created_by=self.member,
+            finalized=True,
+        )
+        flight = Flight.objects.create(
+            logsheet=logsheet,
+            pilot=self.member,
+            glider=glider,
+            towplane=towplane,
+            launch_time="10:00:00",
+            tow_cost_actual="25.00",
+            rental_cost_actual="30.00",
+            instruction_fee_actual="10.00",
+        )
+
+        client.force_login(self.member)
+        response = client.get(reverse("logsheet:personal_charges"))
+
+        assert response.status_code == 200
+        assert response.context["billing_active"] is False
+        assert response.context["total_owed"] == Decimal("65.00")
+        assert "Total charges accrued" in response.content.decode()
+        assert "No ledger entries posted." not in response.content.decode()
+
+        csv_response = client.get(reverse("logsheet:personal_charges_csv"))
+        assert csv_response.status_code == 200
+        rows = list(csv.reader(StringIO(csv_response.content.decode())))
+        assert rows[0] == ["Date", "Type", "Description", "Debit", "Credit", "Balance"]
+        assert rows[1][1] == "Flight"
+        assert rows[1][3] == "65.00"
+        assert rows[1][4] == ""
+        assert rows[1][5] == ""

@@ -336,11 +336,9 @@
               {% if user.towpilot %}
               <li><a class="dropdown-item" href="{% url 'logsheet:tow_pilot_logbook' %}">🛩️ My Tow Logbook</a></li>
               {% endif %}
-              {% if siteconfig and siteconfig.billing_app_enabled %}
               <li><a class="dropdown-item" href="{% url 'logsheet:personal_charges' %}">
                 <i class="fas fa-dollar-sign me-1"></i> My Flight Charges
               </a></li>
-              {% endif %}
               <li><a class="dropdown-item" href="{% url 'knowledgetest:quiz-pending' %}">📝 My Pending Tests</a></li>
               <li><a class="dropdown-item" href="{% url 'knowledgetest:member-test-history' %}">📊 My Test History</a></li>
               {% if not kiosk_mode %}

@@ -726,29 +726,122 @@ def stats_dump_export_download(request, pk):
 
 @active_member_required
 def personal_charges_summary(request):
-    """Show the authenticated member's immutable billing statement."""
-    from billing.models import Ledger
-    from billing.services import get_balance, get_statement_rows
+    """Show the authenticated member's ledger statement or recent operational charges."""
+    site_config = SiteConfiguration.objects.first()
+    billing_app_enabled = bool(site_config and site_config.billing_app_enabled)
 
-    ledger = Ledger.objects.filter(member=request.user).first()
+    if billing_app_enabled:
+        from billing.models import Ledger
+        from billing.services import get_balance, get_statement_rows
+
+        ledger = Ledger.objects.filter(member=request.user).first()
+
+        return render(
+            request,
+            "logsheet/personal_charges_summary.html",
+            {
+                "billing_active": True,
+                "statement_rows": list(reversed(get_statement_rows(ledger))),
+                "ledger_balance": get_balance(ledger) if ledger else Decimal("0.00"),
+            },
+        )
+
+    days = request.GET.get("days")
+    try:
+        days = int(days) if days is not None else 365
+    except ValueError:
+        days = 365
+    days = max(1, min(days, 3650))
+    start_date = timezone.localdate() - timedelta(days=days)
+
+    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+    total_owed = sum(
+        (row["total_cost"] for row in flight_rows),
+        Decimal("0.00"),
+    ) + sum((charge.total_price for charge in misc_charges), Decimal("0.00"))
 
     return render(
         request,
         "logsheet/personal_charges_summary.html",
         {
-            "statement_rows": list(reversed(get_statement_rows(ledger))),
-            "ledger_balance": get_balance(ledger) if ledger else Decimal("0.00"),
+            "billing_active": False,
+            "days": days,
+            "start_date": start_date,
+            "flight_rows": flight_rows,
+            "misc_charges": misc_charges,
+            "total_owed": total_owed,
         },
     )
 
 
 @active_member_required
 def personal_charges_summary_csv(request):
-    """Export the authenticated member's ledger statement as CSV."""
-    from billing.models import Ledger
-    from billing.services import get_statement_rows
+    """Export the authenticated member's charges as ledger or recent operational data."""
+    site_config = SiteConfiguration.objects.first()
+    billing_app_enabled = bool(site_config and site_config.billing_app_enabled)
 
-    ledger = Ledger.objects.filter(member=request.user).first()
+    if billing_app_enabled:
+        from billing.models import Ledger
+        from billing.services import get_statement_rows
+
+        ledger = Ledger.objects.filter(member=request.user).first()
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = (
+            f'attachment; filename="personal_charges_{timezone.localdate().isoformat()}.csv"'
+        )
+
+        writer = csv.writer(response)
+        writer.writerow(["Date", "Type", "Description", "Debit", "Credit", "Balance"])
+        for row in get_statement_rows(ledger):
+            entry = row["entry"]
+            writer.writerow(
+                [
+                    entry.effective_date.isoformat(),
+                    _sanitize_csv_cell(entry.get_kind_display()),
+                    _sanitize_csv_cell(entry.member_description),
+                    f"{entry.amount:.2f}" if entry.effect == "debit" else "",
+                    f"{entry.amount:.2f}" if entry.effect == "credit" else "",
+                    f"{row['running_balance']:.2f}",
+                ]
+            )
+
+        return response
+
+    days = request.GET.get("days")
+    try:
+        days = int(days) if days is not None else 365
+    except ValueError:
+        days = 365
+    days = max(1, min(days, 3650))
+    start_date = timezone.localdate() - timedelta(days=days)
+
+    flight_rows, misc_charges = _get_personal_charge_data(request.user, start_date)
+    combined_rows = []
+    for row in flight_rows:
+        flight = row["flight"]
+        combined_rows.append(
+            {
+                "date": row["flight_date"],
+                "type": "Flight",
+                "description": _sanitize_csv_cell(
+                    f"{flight.glider} — tow/rental/instruction"
+                ),
+                "amount": row["total_cost"],
+            }
+        )
+    for charge in misc_charges:
+        combined_rows.append(
+            {
+                "date": charge.date,
+                "type": _sanitize_csv_cell(charge.chargeable_item.name),
+                "description": _sanitize_csv_cell(
+                    charge.notes or charge.chargeable_item.name
+                ),
+                "amount": charge.total_price,
+            }
+        )
+    combined_rows.sort(key=lambda row: row["date"], reverse=True)
 
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = (
@@ -757,16 +850,15 @@ def personal_charges_summary_csv(request):
 
     writer = csv.writer(response)
     writer.writerow(["Date", "Type", "Description", "Debit", "Credit", "Balance"])
-    for row in get_statement_rows(ledger):
-        entry = row["entry"]
+    for row in combined_rows:
         writer.writerow(
             [
-                entry.effective_date.isoformat(),
-                _sanitize_csv_cell(entry.get_kind_display()),
-                _sanitize_csv_cell(entry.member_description),
-                f"{entry.amount:.2f}" if entry.effect == "debit" else "",
-                f"{entry.amount:.2f}" if entry.effect == "credit" else "",
-                f"{row['running_balance']:.2f}",
+                row["date"].isoformat(),
+                row["type"],
+                row["description"],
+                f"{row['amount']:.2f}",
+                "",
+                "",
             ]
         )
 
