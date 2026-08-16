@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from typing import Any, cast
 
 from django.conf import settings
@@ -778,6 +779,39 @@ class SafetyReport(models.Model):
         if self.reporter:
             return self.reporter.get_full_name() or self.reporter.username
         return "Unknown"
+
+
+class VisitingPilotVisit(models.Model):
+    """Log of each visiting-pilot check-in, used to enforce a per-year visit cap (Issue #1017)."""
+
+    member = models.ForeignKey(
+        "Member",
+        on_delete=models.CASCADE,
+        related_name="visiting_pilot_visits",
+    )
+    visit_date = models.DateField(default=date.today)
+    logsheet = models.ForeignKey(
+        "logsheet.Logsheet",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="visiting_pilot_visits",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Visiting Pilot Visit"
+        verbose_name_plural = "Visiting Pilot Visits"
+        ordering = ["-visit_date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.member} - {self.visit_date}"
+
+    @classmethod
+    def visits_this_year(cls, member, year=None):
+        """Count visiting-pilot check-ins for `member` in the given (or current) calendar year."""
+        year = year or date.today().year
+        return cls.objects.filter(member=member, visit_date__year=year).count()
 
 
 # Import MembershipApplication model from separate file to keep models.py manageable

@@ -44,10 +44,23 @@ urlpatterns = [
         name="kiosk_verify_device",
     ),
     # Visiting pilot URLs
+    # Literal paths (signup/, returning/, qr/, qr-display/) must be listed
+    # before the generic <str:token> landing route below, otherwise Django
+    # would match e.g. "qr/" as a token value for the landing view.
     path(
         "visiting-pilot/signup/<str:token>/",
         views.visiting_pilot_signup,
         name="visiting_pilot_signup",
+    ),
+    path(
+        "visiting-pilot/returning/<str:token>/confirm/",
+        views.visiting_pilot_returning_confirm,
+        name="visiting_pilot_returning_confirm",
+    ),
+    path(
+        "visiting-pilot/returning/<str:token>/",
+        views.visiting_pilot_returning_lookup,
+        name="visiting_pilot_returning_lookup",
     ),
     path(
         "visiting-pilot/qr/",
@@ -58,6 +71,11 @@ urlpatterns = [
         "visiting-pilot/qr-display/",
         views.visiting_pilot_qr_display,
         name="visiting_pilot_qr_display",
+    ),
+    path(
+        "visiting-pilot/<str:token>/",
+        views.visiting_pilot_landing,
+        name="visiting_pilot_landing",
     ),
     # Membership Application URLs
     path(

@@ -26,7 +26,11 @@ from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
 from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
-from siteconfig.forms import VisitingPilotSignupForm
+from siteconfig.forms import (
+    VisitingPilotLookupForm,
+    VisitingPilotReturningUpdateForm,
+    VisitingPilotSignupForm,
+)
 from siteconfig.models import SiteConfiguration
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
@@ -38,7 +42,7 @@ from .forms import (
     SafetyReportForm,
     SetPasswordForm,
 )
-from .models import Badge, Biography, Member, MemberBadge
+from .models import Badge, Biography, Member, MemberBadge, VisitingPilotVisit
 from .utils.avatar_generator import generate_identicon
 from .utils.badge_utils import suppress_badge_board_legs, suppress_member_badge_legs
 from .utils.vcard_tools import generate_vcard_qr
@@ -652,26 +656,330 @@ def pydenticon_view(request, username):
 # Visiting Pilot Views
 
 
+def _validate_visiting_pilot_token(request, token):
+    """
+    Shared token/config validation for the visiting-pilot QR flow.
+
+    Returns a (config, error_response) tuple. If error_response is not None,
+    the calling view should return it immediately.
+    """
+    config = SiteConfiguration.objects.first()
+    if not config:
+        logger.warning(
+            "SiteConfiguration row is missing. Visiting pilot flow is unavailable."
+        )
+        return None, render(request, "members/visiting_pilot_disabled.html")
+    if not config.visiting_pilot_enabled:
+        return None, render(request, "members/visiting_pilot_disabled.html")
+
+    # Validate token to prevent unauthorized access/spam
+    if not config.visiting_pilot_token or token != config.visiting_pilot_token:
+        logger.warning(f"Invalid or expired visiting pilot token: {token}")
+        raise Http404("Invalid or expired signup link")
+
+    return config, None
+
+
+def visiting_pilot_landing(request, token):
+    """
+    Entry point reached by scanning the visiting-pilot QR code.
+
+    Lets the visitor choose between "first time here" (goes to the existing
+    signup form) and "I've flown here before" (returning-pilot lookup).
+    """
+    config, error = _validate_visiting_pilot_token(request, token)
+    if error:
+        return error
+    if config is None:
+        return render(request, "members/visiting_pilot_disabled.html")
+
+    # Redirect logged-in users - they don't need to sign up as visiting pilots
+    if request.user.is_authenticated:
+        return render(
+            request,
+            "members/visiting_pilot_member_redirect.html",
+            {"config": config},
+        )
+
+    return render(
+        request,
+        "members/visiting_pilot_landing.html",
+        {"config": config, "token": token},
+    )
+
+
+def visiting_pilot_returning_lookup(request, token):
+    """
+    "Have you flown with us before?" lookup step.
+
+    Looks up an existing Member by exact email match only (never by name) so
+    that the shared daily QR token can't be used to browse for or impersonate
+    an existing member's record.
+    """
+    config, error = _validate_visiting_pilot_token(request, token)
+    if error:
+        return error
+    if config is None:
+        return render(request, "members/visiting_pilot_disabled.html")
+
+    if request.user.is_authenticated:
+        return render(
+            request,
+            "members/visiting_pilot_member_redirect.html",
+            {"config": config},
+        )
+
+    # Clear any stale candidate from a previous user/session flow so the
+    # confirm step is only reachable after a fresh lookup in this request path.
+    request.session.pop("visiting_pilot_candidate_id", None)
+    request.session.pop("visiting_pilot_candidate_token", None)
+
+    if request.method == "POST":
+        form = VisitingPilotLookupForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"]
+            matches = list(Member.objects.filter(email__iexact=email))
+            if len(matches) == 1:
+                member = matches[0]
+                if member.membership_status in get_active_membership_statuses():
+                    # Never let an anonymous visitor edit an already-active
+                    # member's record just because they know their email address.
+                    messages.warning(
+                        request,
+                        "That email belongs to an existing active club member. "
+                        "For security, please log in to update your own "
+                        "information, or check in with the duty officer.",
+                    )
+                    return render(
+                        request,
+                        "members/visiting_pilot_returning_lookup.html",
+                        {"form": form, "config": config, "token": token},
+                    )
+                # Store the match server-side (never in the URL) so the confirm
+                # step can't be reached by guessing a member id.
+                request.session["visiting_pilot_candidate_id"] = member.pk
+                request.session["visiting_pilot_candidate_token"] = token
+                return redirect("members:visiting_pilot_returning_confirm", token=token)
+            elif not matches:
+                messages.info(
+                    request,
+                    "We couldn't find a record with that email address. Please "
+                    "register as a first-time visitor instead.",
+                )
+                return redirect("members:visiting_pilot_signup", token=token)
+            else:
+                messages.warning(
+                    request,
+                    "We found more than one record with that email address. "
+                    "Please check in with the duty officer for assistance.",
+                )
+    else:
+        form = VisitingPilotLookupForm()
+
+    return render(
+        request,
+        "members/visiting_pilot_returning_lookup.html",
+        {"form": form, "config": config, "token": token},
+    )
+
+
+def visiting_pilot_returning_confirm(request, token):
+    """
+    Confirm/update contact info and check in again for a returning visiting pilot.
+
+    Only reachable after a successful lookup in the same session (see
+    `visiting_pilot_returning_lookup`), never via a guessable URL.
+    """
+    config, error = _validate_visiting_pilot_token(request, token)
+    if error:
+        return error
+    if config is None:
+        return render(request, "members/visiting_pilot_disabled.html")
+
+    if request.user.is_authenticated:
+        return render(
+            request,
+            "members/visiting_pilot_member_redirect.html",
+            {"config": config},
+        )
+
+    candidate_id = request.session.get("visiting_pilot_candidate_id")
+    candidate_token = request.session.get("visiting_pilot_candidate_token")
+    if not candidate_id or candidate_token != token:
+        messages.warning(request, "Please look up your record again to continue.")
+        return redirect("members:visiting_pilot_returning_lookup", token=token)
+
+    member = get_object_or_404(Member, pk=candidate_id)
+
+    # Defense in depth: never let this page edit an already-active member's
+    # record, even if their status changed after the lookup step ran.
+    if member.membership_status in get_active_membership_statuses():
+        del request.session["visiting_pilot_candidate_id"]
+        del request.session["visiting_pilot_candidate_token"]
+        messages.warning(
+            request,
+            "That email belongs to an existing active club member. For "
+            "security, please log in to update your own information, or "
+            "check in with the duty officer.",
+        )
+        return redirect("members:visiting_pilot_returning_lookup", token=token)
+
+    if request.method == "POST":
+        form = VisitingPilotReturningUpdateForm(request.POST, member=member)
+        if form.is_valid():
+            if config.visiting_pilot_visit_limit_reached(member):
+                cap_reached_message = (
+                    "You've reached the maximum of "
+                    f"{config.visiting_pilot_max_visits_per_year} visiting-pilot "
+                    "check-ins allowed this year. Please check in with the duty "
+                    "officer for assistance."
+                )
+                return render(
+                    request,
+                    "members/visiting_pilot_returning_confirm.html",
+                    {
+                        "form": form,
+                        "config": config,
+                        "member": member,
+                        "token": token,
+                        "cap_reached_message": cap_reached_message,
+                    },
+                )
+
+            member.phone = form.cleaned_data.get("phone", "")
+            member.mobile_phone = form.cleaned_data.get("mobile_phone", "")
+            member.address = form.cleaned_data.get("address", "")
+            member.city = form.cleaned_data.get("city", "")
+            member.state_code = form.cleaned_data.get("state_code") or None
+            member.zip_code = form.cleaned_data.get("zip_code", "")
+            member.home_club = form.cleaned_data.get("home_club", "")
+            if form.cleaned_data.get("ssa_member_number"):
+                member.SSA_member_number = form.cleaned_data["ssa_member_number"]
+            if form.cleaned_data.get("glider_rating"):
+                member.glider_rating = form.cleaned_data["glider_rating"]
+
+            # Never downgrade/clobber an already-active membership - only apply
+            # the temporary visiting-pilot status when the member is currently
+            # inactive (e.g. lapsed or never-active).
+            status_upgraded = False
+            if (
+                member.membership_status not in get_active_membership_statuses()
+                and config.visiting_pilot_status
+            ):
+                member.membership_status = config.visiting_pilot_status
+                member.is_active = config.visiting_pilot_auto_approve
+                status_upgraded = True
+
+            member.save()
+
+            glider_created = False
+            glider = None
+            if all(
+                form.cleaned_data.get(field)
+                for field in ["glider_n_number", "glider_make", "glider_model"]
+            ):
+                from logsheet.models import Glider
+
+                try:
+                    # N-number is already normalized to uppercase in form validation.
+                    # get_or_create (not create) since a returning pilot's glider
+                    # may already be registered from a previous visit.
+                    glider, created = Glider.objects.get_or_create(
+                        n_number=form.cleaned_data["glider_n_number"],
+                        defaults={
+                            "make": form.cleaned_data["glider_make"],
+                            "model": form.cleaned_data["glider_model"],
+                            "club_owned": False,
+                            "is_active": True,
+                            "seats": 1,
+                        },
+                    )
+                    if created:
+                        glider_created = True
+                        glider.owners.add(member)
+                    elif glider.owners.exists() and member not in glider.owners.all():
+                        messages.warning(
+                            request,
+                            f"A glider with N-number {glider.n_number} is already "
+                            "registered to a different owner. Your check-in was "
+                            "still updated, but the glider was not linked to you.",
+                        )
+                    elif member not in glider.owners.all():
+                        glider.owners.add(member)
+                except Exception as e:
+                    logger.error(
+                        f"Error linking glider for returning visiting pilot {member.email}: "
+                        f"{type(e).__name__}: {e}",
+                        exc_info=True,
+                    )
+                    messages.warning(
+                        request,
+                        "An error occurred while adding your glider. Your check-in "
+                        "was still updated, but the glider was not added.",
+                    )
+                    glider = None
+
+            VisitingPilotVisit.objects.create(member=member)
+
+            del request.session["visiting_pilot_candidate_id"]
+            del request.session["visiting_pilot_candidate_token"]
+
+            if status_upgraded:
+                from .signals import _notify_member_managers_of_visiting_pilot
+
+                _notify_member_managers_of_visiting_pilot(member, returning=True)
+
+            messages.success(
+                request,
+                f"Welcome back, {member.first_name}! Your information has been "
+                "updated. Please check in with the duty officer.",
+            )
+
+            return render(
+                request,
+                "members/visiting_pilot_success.html",
+                {
+                    "member": member,
+                    "config": config,
+                    "auto_approved": member.is_active,
+                    "glider": glider if glider_created else None,
+                    "returning": True,
+                },
+            )
+    else:
+        form = VisitingPilotReturningUpdateForm(
+            member=member,
+            initial={
+                "phone": member.phone,
+                "mobile_phone": member.mobile_phone,
+                "address": member.address,
+                "city": member.city,
+                "state_code": member.state_code,
+                "zip_code": member.zip_code,
+                "ssa_member_number": member.SSA_member_number,
+                "glider_rating": member.glider_rating,
+                "home_club": member.home_club,
+            },
+        )
+
+    return render(
+        request,
+        "members/visiting_pilot_returning_confirm.html",
+        {"form": form, "config": config, "member": member, "token": token},
+    )
+
+
 def visiting_pilot_signup(request, token):
     """
     Handle visiting pilot quick signup.
     Public view accessible via QR code with security token.
     Redirects logged-in users away since they're already members.
     """
-    # Check if visiting pilot signup is enabled and token is valid
-    config = SiteConfiguration.objects.first()
-    if not config:
-        logger.warning(
-            "SiteConfiguration row is missing. Visiting pilot signup is unavailable."
-        )
+    config, error = _validate_visiting_pilot_token(request, token)
+    if error:
+        return error
+    if config is None:
         return render(request, "members/visiting_pilot_disabled.html")
-    if not config.visiting_pilot_enabled:
-        return render(request, "members/visiting_pilot_disabled.html")
-
-    # Validate token to prevent unauthorized access/spam
-    if not config.visiting_pilot_token or token != config.visiting_pilot_token:
-        logger.warning(f"Invalid or expired visiting pilot signup token: {token}")
-        raise Http404("Invalid or expired signup link")
 
     # Redirect logged-in users - they don't need to sign up as visiting pilots
     if request.user.is_authenticated:
@@ -743,6 +1051,8 @@ def visiting_pilot_signup(request, token):
                 # Set additional fields
                 member.is_active = config.visiting_pilot_auto_approve
                 member.save()
+
+                VisitingPilotVisit.objects.create(member=member)
 
                 # Create glider if glider information was provided
                 glider_created = False
@@ -881,7 +1191,7 @@ def visiting_pilot_qr_code(request):
         # Reuse config.canonical_url to avoid redundant DB query
         canonical_base = config.canonical_url if config.canonical_url else None
         signup_url = build_absolute_url(
-            reverse("members:visiting_pilot_signup", args=[token]),
+            reverse("members:visiting_pilot_landing", args=[token]),
             canonical=canonical_base,
         )
 
@@ -943,7 +1253,7 @@ def visiting_pilot_qr_display(request):
     # Reuse config.canonical_url to avoid redundant DB query
     canonical_base = config.canonical_url if config.canonical_url else None
     signup_url = build_absolute_url(
-        reverse("members:visiting_pilot_signup", args=[token]),
+        reverse("members:visiting_pilot_landing", args=[token]),
         canonical=canonical_base,
     )
 

@@ -8,7 +8,7 @@ from django.urls import reverse
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
 from members.views import visiting_pilot_signup
-from siteconfig.forms import VisitingPilotSignupForm
+from siteconfig.forms import VisitingPilotReturningUpdateForm, VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
 
 User = get_user_model()
@@ -359,7 +359,7 @@ def test_visiting_pilot_form_warns_about_same_name_no_ssa(visiting_pilot_config)
     form = VisitingPilotSignupForm(form_data)
     assert not form.is_valid()
     assert "Bob Johnson is already registered" in str(form.errors)
-    assert "provide your SSA member number" in str(form.errors)
+    assert "flown here before" in str(form.errors)
 
 
 @pytest.mark.django_db
@@ -552,6 +552,41 @@ def test_visiting_pilot_form_glider_n_number_case_insensitive(visiting_pilot_con
     assert any(
         "already registered" in error for error in form.non_field_errors()
     ), "Should detect duplicate regardless of case"
+
+
+@pytest.mark.django_db
+def test_returning_form_allows_owned_glider_when_member_has_multiple_gliders(
+    visiting_pilot_config,
+):
+    """A returning pilot can submit any N-number they already own without duplicate errors."""
+    from logsheet.models import Glider
+
+    member = Member.objects.create_user(
+        username="returning@example.com",
+        email="returning@example.com",
+        first_name="Returning",
+        last_name="Pilot",
+    )
+
+    glider_one = Glider.objects.create(
+        n_number="N10001", make="Schempp-Hirth", model="Discus", club_owned=False
+    )
+    glider_two = Glider.objects.create(
+        n_number="N20002", make="Schleicher", model="ASK-21", club_owned=False
+    )
+    glider_one.owners.add(member)
+    glider_two.owners.add(member)
+
+    form = VisitingPilotReturningUpdateForm(
+        data={
+            "glider_n_number": "n20002",
+            "glider_make": "Schleicher",
+            "glider_model": "ASK-21",
+        },
+        member=member,
+    )
+
+    assert form.is_valid(), form.errors
 
 
 @pytest.mark.django_db

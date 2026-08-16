@@ -530,7 +530,7 @@ class SiteConfiguration(models.Model):
         help_text="Week occurrence (1 through 5) for the Nth-weekday close policy.",
     )
     billing_period_close_weekday = models.PositiveSmallIntegerField(
-        choices=Weekday.choices,
+        choices=Weekday,
         default=Weekday.MONDAY,
         help_text="Weekday for the Nth-weekday close policy.",
     )
@@ -654,6 +654,13 @@ class SiteConfiguration(models.Model):
         default=True,
         help_text="Automatically approve visiting pilots (they can fly immediately after signup)",
     )
+    visiting_pilot_max_visits_per_year = models.PositiveIntegerField(
+        default=0,
+        help_text=(
+            "Maximum number of times a person may check in as a visiting pilot per "
+            "calendar year. Set to 0 for unlimited."
+        ),
+    )
     visiting_pilot_token = models.CharField(
         max_length=20,
         blank=True,
@@ -760,6 +767,18 @@ class SiteConfiguration(models.Model):
         self.visiting_pilot_token_created = None
         self.save(
             update_fields=["visiting_pilot_token", "visiting_pilot_token_created"]
+        )
+
+    def visiting_pilot_visit_limit_reached(self, member):
+        """Return True if `member` has already used up this year's visiting-pilot visit cap."""
+        if not self.visiting_pilot_max_visits_per_year:
+            return False
+
+        from members.models import VisitingPilotVisit
+
+        return (
+            VisitingPilotVisit.visits_this_year(member)
+            >= self.visiting_pilot_max_visits_per_year
         )
 
     def get_quick_altitude_list(self):
