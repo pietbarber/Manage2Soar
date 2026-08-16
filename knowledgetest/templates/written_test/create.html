@@ -114,7 +114,7 @@
 
 <script>
 (function() {
-  var weightFields = document.querySelectorAll('input[name^="weight_"]');
+  var weightFields = document.querySelectorAll('input[name^="weight_"], select[name^="weight_"]');
   var mustInclude = document.getElementById('id_must_include');
   var countEl = document.getElementById('question-count');
   var warningEl = document.getElementById('question-warning');
@@ -149,6 +149,7 @@
 
   weightFields.forEach(function(input) {
     input.addEventListener('input', updateCount);
+    input.addEventListener('change', updateCount);
   });
   if (mustInclude) {
     mustInclude.addEventListener('input', updateCount);
