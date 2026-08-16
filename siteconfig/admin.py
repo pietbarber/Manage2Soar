@@ -102,6 +102,29 @@ class SiteConfigurationAdminForm(forms.ModelForm):
                 ),
             )
 
+        visiting_pilot_status_field = self.fields.get("visiting_pilot_status")
+        if visiting_pilot_status_field:
+            from siteconfig.models import MembershipStatus
+
+            status_choices = MembershipStatus.get_all_status_choices()
+            current_status = (
+                self.initial.get("visiting_pilot_status")
+                or getattr(self.instance, "visiting_pilot_status", None)
+                or ""
+            )
+            if current_status and current_status not in dict(status_choices):
+                status_choices = [(current_status, current_status)] + list(
+                    status_choices
+                )
+
+            self.fields["visiting_pilot_status"] = forms.ChoiceField(
+                choices=status_choices,
+                required=True,
+                initial=current_status,
+                label=visiting_pilot_status_field.label,
+                help_text=visiting_pilot_status_field.help_text,
+            )
+
 
 class DutyRoleDefinitionInline(admin.TabularInline):
     model = DutyRoleDefinition
@@ -348,6 +371,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "visiting_pilot_require_ssa",
                     "visiting_pilot_require_rating",
                     "visiting_pilot_auto_approve",
+                    "visiting_pilot_max_visits_per_year",
                     "visiting_pilot_token",
                     "visiting_pilot_token_created",
                 ),

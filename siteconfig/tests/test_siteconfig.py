@@ -19,6 +19,7 @@ from utils.favicon import PWA_CLUB_ICON_NAME
 User = get_user_model()
 
 
+@pytest.mark.django_db
 def test_siteconfiguration_admin_form_timezone_is_dropdown_with_iana_help():
     from siteconfig.admin import SiteConfigurationAdminForm
 
@@ -29,6 +30,26 @@ def test_siteconfiguration_admin_form_timezone_is_dropdown_with_iana_help():
     assert "UTC" in timezone_values
     assert "America/New_York" in timezone_values
     assert "iana.org/time-zones" in timezone_field.help_text
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_admin_form_visiting_pilot_status_is_dropdown():
+    """visiting_pilot_status should render as a dropdown of MembershipStatus names (Issue #1017)."""
+    from siteconfig.admin import SiteConfigurationAdminForm
+
+    MembershipStatus.objects.get_or_create(
+        name="Affiliate Member", defaults={"is_active": True, "sort_order": 90}
+    )
+    MembershipStatus.objects.get_or_create(
+        name="Full Member", defaults={"is_active": True, "sort_order": 10}
+    )
+
+    form = SiteConfigurationAdminForm()
+    status_field = form.fields["visiting_pilot_status"]
+    status_values = {value for value, _ in status_field.choices}
+
+    assert "Affiliate Member" in status_values
+    assert "Full Member" in status_values
 
 
 @pytest.mark.django_db

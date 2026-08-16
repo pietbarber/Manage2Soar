@@ -58,9 +58,9 @@ def _create_notification_if_not_exists(user, message, url=None):
         return None
 
 
-def _notify_member_managers_of_visiting_pilot(member):
+def _notify_member_managers_of_visiting_pilot(member, returning=False):
     """
-    Send notifications to member managers about new visiting pilot registration.
+    Send notifications to member managers about a visiting pilot registration or check-in.
     Based on the membership manager workflow requirements.
     """
     try:
@@ -106,7 +106,10 @@ def _notify_member_managers_of_visiting_pilot(member):
                     .replace("\n", " ")
                 )
 
-                subject = f"New Visiting Pilot Registration: {safe_name[:50]}"
+                if returning:
+                    subject = f"Visiting Pilot Check-In: {safe_name[:50]}"
+                else:
+                    subject = f"New Visiting Pilot Registration: {safe_name[:50]}"
 
                 # Prepare context for email templates - compute canonical once to avoid redundant DB queries
                 site_url = get_canonical_url()
@@ -160,8 +163,9 @@ def _notify_member_managers_of_visiting_pilot(member):
 
         # In-app notifications
         try:
+            action_text = "checked in again" if returning else "registered"
             notification_message = (
-                f"New visiting pilot registered: {member.first_name} {member.last_name} "
+                f"Visiting pilot {action_text}: {member.first_name} {member.last_name} "
                 f"({member.home_club or 'Unknown Club'}) - {status_text}"
             )
 

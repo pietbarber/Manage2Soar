@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Visiting Pilot - {{ config.club_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-plane"></i>
+                        Welcome to {{ config.club_name }}
+                    </h4>
+                </div>
+                <div class="card-body text-center">
+                    {% if config.visiting_pilot_welcome_text %}
+                        <div class="alert alert-info text-start">
+                            {{ config.visiting_pilot_welcome_text|linebreaks }}
+                        </div>
+                    {% endif %}
+
+                    <p class="text-muted">Have you flown with us before?</p>
+
+                    <div class="d-grid gap-3">
+                        <a href="{% url 'members:visiting_pilot_returning_lookup' token %}"
+                           class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-check"></i>
+                            Yes, I've flown here before
+                        </a>
+                        <a href="{% url 'members:visiting_pilot_signup' token %}"
+                           class="btn btn-outline-primary btn-lg">
+                            <i class="fas fa-user-plus"></i>
+                            No, this is my first time
+                        </a>
+                    </div>
+
+                    <div class="mt-4">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            Questions? Please speak with the duty officer.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

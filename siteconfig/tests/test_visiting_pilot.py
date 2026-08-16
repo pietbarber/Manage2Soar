@@ -359,7 +359,7 @@ def test_visiting_pilot_form_warns_about_same_name_no_ssa(visiting_pilot_config)
     form = VisitingPilotSignupForm(form_data)
     assert not form.is_valid()
     assert "Bob Johnson is already registered" in str(form.errors)
-    assert "provide your SSA member number" in str(form.errors)
+    assert "flown here before" in str(form.errors)
 
 
 @pytest.mark.django_db

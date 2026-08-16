@@ -42,15 +42,18 @@ graph TD
     B --> C[System Generates Daily Security Token]
     C --> D[QR Modal Shows Code + URL]
     D --> E[Visiting Pilot Scans QR Code]
-    E --> F[Mobile Browser Opens Signup Form]
-    F --> G{Valid Token?}
+    E --> F[Landing Page: 'Have you flown with us before?']
+    F -->|First time| G{Valid Token?}
+    F -->|Returning| RL[Email Lookup]
+
     G -->|No| H[Security Error Page]
     G -->|Yes| I[Signup Form with Validation]
     I --> J{Form Valid?}
     J -->|No| K[Show Validation Errors]
     K --> I
     J -->|Yes| L{Duplicate Detection}
-    L -->|Duplicate Found| M[Show Duplicate Warning]
+    L -->|Duplicate Found| M[Point to 'I've flown here before']
+    M --> RL
     L -->|No Duplicate| N{Auto-Approval Enabled?}
     N -->|Yes| O[Create Active Member]
     N -->|No| P[Create Pending Member]
@@ -60,6 +63,18 @@ graph TD
     R --> T[Admin Reviews and Approves]
     T --> S
     S --> U[Normal Flight Logging Process]
+
+    RL -->|No match| I
+    RL -->|Ambiguous| RA[Warn - Contact Duty Officer]
+    RL -->|Exact email match| RC{Yearly Visit Cap Reached?}
+    RC -->|Yes| RB[Blocked - Contact Duty Officer]
+    RC -->|No| RD[Confirm/Update Contact Info]
+    RD --> RE{Already an Active Member?}
+    RE -->|Yes| RF[Keep Existing Status]
+    RE -->|No| RG[Apply Configured Temp Status]
+    RF --> RH[Log Visit + Success Page]
+    RG --> RH
+    RH --> S
 
     V[End of Day] --> W[Logsheet Finalization]
     W --> X[Security Token Automatically Retired]
@@ -88,14 +103,29 @@ graph TD
 ```python
 # Visiting Pilot Configuration
 visiting_pilot_enabled = models.BooleanField(default=False)
-visiting_pilot_status = models.CharField(max_length=50, blank=True)
+visiting_pilot_status = models.CharField(max_length=50, blank=True)  # rendered as a MembershipStatus dropdown in admin
 visiting_pilot_auto_approve = models.BooleanField(default=False)
 visiting_pilot_require_ssa = models.BooleanField(default=True)
 visiting_pilot_require_rating = models.BooleanField(default=False)
+visiting_pilot_max_visits_per_year = models.PositiveIntegerField(default=0)  # 0 = unlimited
 
 # Security Token Management  
 visiting_pilot_token = models.CharField(max_length=20, blank=True)
 visiting_pilot_token_created = models.DateTimeField(null=True, blank=True)
+```
+
+### VisitingPilotVisit Model (`members.models`)
+
+Logs each visiting-pilot check-in (first-time registration or returning
+confirm) so `visiting_pilot_max_visits_per_year` can be enforced per calendar
+year:
+
+```python
+class VisitingPilotVisit(models.Model):
+    member = models.ForeignKey("Member", on_delete=models.CASCADE)
+    visit_date = models.DateField(default=date.today)
+    logsheet = models.ForeignKey("logsheet.Logsheet", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 ```
 
 ### Member Model Extensions
@@ -164,6 +194,34 @@ The system performs comprehensive duplicate detection:
 2. **SSA Number**: Exact match when provided
 3. **Name Similarity**: Smart detection of similar names with same SSA number
 4. **Name Warning**: Alert for identical names without SSA numbers
+
+When a duplicate is detected, the error message now points the visitor at the
+"I've flown here before" returning-pilot flow (see below) instead of a dead end.
+
+## Returning Pilot Flow (Issue #1017)
+
+A pilot who has flown with the club before is no longer forced through the
+first-time signup form (which rejects them once their email is already in the
+system). From the QR landing page they can instead choose **"I've flown here
+before"**:
+
+1. **Lookup**: The visitor enters their email address. Lookup is **email-exact-match
+   only** (never by name) - the daily QR token is shared with everyone at the
+   field, so a name-based search would let anyone browse for or impersonate an
+   existing member's record.
+   - No match -> redirected to the first-time signup form.
+   - Multiple matches -> asked to contact the duty officer (ambiguous, not shown to the visitor).
+   - Exactly one match -> the member id is stored **server-side in the session**
+     (never in the URL) and the visitor is sent to the confirm step.
+2. **Confirm/Update**: The visitor can update contact info (phone, address,
+   SSA number, glider rating, home club) and optionally add/update their glider.
+   - The visit is blocked if `visiting_pilot_max_visits_per_year` has already
+     been reached for that member this calendar year (0 = unlimited).
+   - `membership_status` is **only** upgraded to `visiting_pilot_status` if the
+     member's *current* status is not already active - an existing real
+     membership is never downgraded or clobbered.
+   - A `VisitingPilotVisit` row is logged for the yearly cap, for both
+     first-time registrations and returning check-ins.
 
 ## Error Handling
 

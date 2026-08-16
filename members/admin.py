@@ -25,6 +25,7 @@ from .models import (
     Member,
     MemberBadge,
     SafetyReport,
+    VisitingPilotVisit,
 )
 from .models_applications import MembershipApplication
 from .resources import MEMBER_CSV_FIELDS, MemberResource
@@ -960,6 +961,21 @@ class KioskAccessLogAdmin(admin.ModelAdmin):
         if obj.device_fingerprint:
             return obj.device_fingerprint[:12] + "..."
         return "-"
+
+
+@admin.register(VisitingPilotVisit)
+class VisitingPilotVisitAdmin(admin.ModelAdmin):
+    """Admin interface for the visiting-pilot visit log used to enforce the yearly visit cap."""
+
+    list_display = ("member", "visit_date", "logsheet", "created_at")
+    list_filter = ("visit_date",)
+    search_fields = ("member__first_name", "member__last_name", "member__email")
+    date_hierarchy = "visit_date"
+    ordering = ("-visit_date",)
+
+    def has_add_permission(self, request):
+        """Visits are logged automatically by the visiting-pilot signup flow."""
+        return False
 
 
 @admin.register(SafetyReport)
