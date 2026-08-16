@@ -415,11 +415,16 @@ class VisitingPilotReturningUpdateForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         errors = []
-        exclude_n_number = (
-            self.member.gliders_owned.values_list("n_number", flat=True).first()
-            if self.member
-            else None
-        )
+        exclude_n_number = None
+        submitted_n_number = (cleaned_data.get("glider_n_number") or "").strip().upper()
+        if (
+            self.member
+            and submitted_n_number
+            and self.member.gliders_owned.filter(
+                n_number__iexact=submitted_n_number
+            ).exists()
+        ):
+            exclude_n_number = submitted_n_number
         cleaned_data = _clean_glider_fields(
             cleaned_data, errors, exclude_n_number=exclude_n_number
         )

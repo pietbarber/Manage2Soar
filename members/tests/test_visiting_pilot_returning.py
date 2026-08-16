@@ -73,6 +73,34 @@ class VisitingPilotReturningFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("visiting_pilot_candidate_id", self.client.session)
 
+    def test_lookup_clears_stale_candidate_session_on_ambiguous_match(self):
+        Member.objects.create_user(
+            username="dup1", email="dup@example.com", first_name="A", last_name="One"
+        )
+        Member.objects.create_user(
+            username="dup2", email="dup@example.com", first_name="B", last_name="Two"
+        )
+        session = self.client.session
+        session["visiting_pilot_candidate_id"] = 999999
+        session["visiting_pilot_candidate_token"] = self.TOKEN
+        session.save()
+
+        response = self._lookup("dup@example.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("visiting_pilot_candidate_id", self.client.session)
+        self.assertNotIn("visiting_pilot_candidate_token", self.client.session)
+
+    def test_lookup_clears_stale_candidate_session_on_invalid_form(self):
+        session = self.client.session
+        session["visiting_pilot_candidate_id"] = 999999
+        session["visiting_pilot_candidate_token"] = self.TOKEN
+        session.save()
+
+        response = self.client.post(self.lookup_url, {"email": ""})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("visiting_pilot_candidate_id", self.client.session)
+        self.assertNotIn("visiting_pilot_candidate_token", self.client.session)
+
     def test_lookup_single_match_stores_session_and_redirects_to_confirm(self):
         Member.objects.create_user(
             username="paul", email="paul@example.com", first_name="Paul", last_name="P"

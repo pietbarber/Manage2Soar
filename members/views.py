@@ -726,6 +726,8 @@ def visiting_pilot_returning_lookup(request, token):
         )
 
     if request.method == "POST":
+        request.session.pop("visiting_pilot_candidate_id", None)
+        request.session.pop("visiting_pilot_candidate_token", None)
         form = VisitingPilotLookupForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data["email"]
