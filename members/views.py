@@ -690,6 +690,8 @@ def visiting_pilot_landing(request, token):
     config, error = _validate_visiting_pilot_token(request, token)
     if error:
         return error
+    if config is None:
+        return render(request, "members/visiting_pilot_disabled.html")
 
     # Redirect logged-in users - they don't need to sign up as visiting pilots
     if request.user.is_authenticated:
@@ -717,6 +719,8 @@ def visiting_pilot_returning_lookup(request, token):
     config, error = _validate_visiting_pilot_token(request, token)
     if error:
         return error
+    if config is None:
+        return render(request, "members/visiting_pilot_disabled.html")
 
     if request.user.is_authenticated:
         return render(
@@ -725,9 +729,12 @@ def visiting_pilot_returning_lookup(request, token):
             {"config": config},
         )
 
+    # Clear any stale candidate from a previous user/session flow so the
+    # confirm step is only reachable after a fresh lookup in this request path.
+    request.session.pop("visiting_pilot_candidate_id", None)
+    request.session.pop("visiting_pilot_candidate_token", None)
+
     if request.method == "POST":
-        request.session.pop("visiting_pilot_candidate_id", None)
-        request.session.pop("visiting_pilot_candidate_token", None)
         form = VisitingPilotLookupForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data["email"]
@@ -786,6 +793,8 @@ def visiting_pilot_returning_confirm(request, token):
     config, error = _validate_visiting_pilot_token(request, token)
     if error:
         return error
+    if config is None:
+        return render(request, "members/visiting_pilot_disabled.html")
 
     if request.user.is_authenticated:
         return render(
@@ -969,6 +978,8 @@ def visiting_pilot_signup(request, token):
     config, error = _validate_visiting_pilot_token(request, token)
     if error:
         return error
+    if config is None:
+        return render(request, "members/visiting_pilot_disabled.html")
 
     # Redirect logged-in users - they don't need to sign up as visiting pilots
     if request.user.is_authenticated:
