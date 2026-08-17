@@ -983,7 +983,7 @@
     "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will land a glider and get it stopped using as little runway as possible after clearing an obstacle in the flight path.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(16)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(16)</a><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----> <em data-path-to-node=\"8,0,0\" data-index-in-node=\"76\">(Landings, including normal and crosswind)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(iv)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(iv)</a><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----> <em data-path-to-node=\"8,1,1,0,0\" data-index-in-node=\"24\">(Launches and landings)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Half-airbrakes</li>\r\n<li>aim-point</li>\r\n<li>full-airbrakes</li>\r\n<li>flare and touchdown&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The lesson is complete when the learner can consistently perform a landing and get the glider stopped within a designated distance after clearing a simulated obstacle on final, while maintaining the specified airspeed within +10/-5 knots.&nbsp;</p>",
     "sort_key": "00006.00004",
     "far_requirement": "14 CFR 61.87(i)(16)",
-    "pts_reference": "14 CFR 61.107(b)(6)(iv) (Launc",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
     "phase": 6,
     "created_at": "2026-01-26T17:59:06.614Z",
     "updated_at": "2026-06-11T02:25:04.296Z"
@@ -1314,7 +1314,7 @@
     "sort_key": "00008.00006",
     "far_requirement": "",
     "pts_reference": "14 CFR 61.107(b)(6)(x)",
-    "phase": null,
+    "phase": 8,
     "created_at": "2026-08-17T00:52:43.387Z",
     "updated_at": "2026-08-17T00:57:34.030Z"
   }

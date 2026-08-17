@@ -110,11 +110,28 @@ done
 
 echo
 echo "==> Verifying loaded counts"
-python manage.py shell -c '
+
+LOADED_COUNTS="$(
+    python manage.py shell -c '
 from instructors.models import TrainingPhase, TrainingLesson, SyllabusDocument
 print(TrainingPhase.objects.count(), TrainingLesson.objects.count(), SyllabusDocument.objects.count())
-' 2>/dev/null | grep -EoE '^[0-9]+ [0-9]+ [0-9]+$' | \
-    awk '{printf "    TrainingPhase:     %s\n    TrainingLesson:    %s\n    SyllabusDocument:  %s\n", $1, $2, $3}' || true
+' 2>/dev/null | grep -Eo '^[0-9]+ [0-9]+ [0-9]+$' | head -n1 || true
+)"
+
+if [[ -z "$LOADED_COUNTS" ]]; then
+    echo "    ERROR: could not read post-load row counts from Django shell (unexpected output)." >&2
+    exit 5
+fi
+
+read -r PHASES LESSONS DOCS <<<"$LOADED_COUNTS"
+echo "    TrainingPhase:     $PHASES"
+echo "    TrainingLesson:    $LESSONS"
+echo "    SyllabusDocument:  $DOCS"
+
+if [[ "$PHASES" -ne 9 || "$LESSONS" -ne 88 || "$DOCS" -ne 1 ]]; then
+    echo "    ERROR: unexpected counts after import (expected: 9 88 1)." >&2
+    exit 6
+fi
 
 echo
 echo "==> Done. Training syllabus import complete."

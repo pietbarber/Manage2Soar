@@ -219,7 +219,7 @@ kubectl exec -n "$NS" -c django "$POD" -- \
 
 1. Open the tenant's site (e.g. `https://masa.manage2soar.com/`).
 2. As an instructor, navigate to **Training → Syllabus**.
-   - Confirm the header document renders (`/TRAINING/syllabus/`).
+   - Confirm the header document renders (`/instructors/syllabus/`).
    - Confirm all phases and lessons appear and sort correctly (natural
      ordering via `sort_key`).
 3. Spot-check a lesson's FAR/PTS references and HTML content.
