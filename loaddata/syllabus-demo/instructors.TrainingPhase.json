@@ -1,0 +1,74 @@
+[
+{
+  "model": "instructors.trainingphase",
+  "pk": 1,
+  "fields": {
+    "number": 1,
+    "name": "Orientation, Pre-Flight, Post-Flight"
+  }
+},
+{
+  "model": "instructors.trainingphase",
+  "pk": 2,
+  "fields": {
+    "number": 2,
+    "name": "Takeoffs"
+  }
+},
+{
+  "model": "instructors.trainingphase",
+  "pk": 3,
+  "fields": {
+    "number": 3,
+    "name": "Aerotow"
+  }
+},
+{
+  "model": "instructors.trainingphase",
+  "pk": 4,
+  "fields": {
+    "number": 4,
+    "name": "In-Flight Maneuvers"
+  }
+},
+{
+  "model": "instructors.trainingphase",
+  "pk": 5,
+  "fields": {
+    "number": 5,
+    "name": "Landing Patterns"
+  }
+},
+{
+  "model": "instructors.trainingphase",
+  "pk": 6,
+  "fields": {
+    "number": 6,
+    "name": "Landings"
+  }
+},
+{
+  "model": "instructors.trainingphase",
+  "pk": 7,
+  "fields": {
+    "number": 7,
+    "name": "Flying in Lift"
+  }
+},
+{
+  "model": "instructors.trainingphase",
+  "pk": 8,
+  "fields": {
+    "number": 8,
+    "name": "Emergency Procedures"
+  }
+},
+{
+  "model": "instructors.trainingphase",
+  "pk": 9,
+  "fields": {
+    "number": 9,
+    "name": "Aeronautical Decision Making"
+  }
+}
+]
