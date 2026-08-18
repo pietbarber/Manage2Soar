@@ -12,7 +12,8 @@ depend on copying files around by hand.
 
 | Operation | Command |
 |-----------|---------|
-| Dump the syllabus from a source tenant | See [Step 1](#step-1--dump-the-syllabus-from-the-source-tenant) |
+| **Refresh the repo seed from a source tenant** | `bash loaddata/syllabus-demo/refresh_seed_from_tenant.sh` |
+| Dump the syllabus from a source tenant (raw) | See [Step 1](#step-1--dump-the-syllabus-from-the-source-tenant) |
 | Import into an empty tenant (safe, recommended) | `bash loaddata/syllabus-demo/import_syllabus_demo.sh` |
 | Inspect what a target tenant already has | See [Preflight](#step-2--import-into-the-target-tenant) |
 | Force-load (upsert, **no delete**) | `bash loaddata/syllabus-demo/import_syllabus_demo.sh --force` |
@@ -27,7 +28,7 @@ between tenants:
 |-------|---------|------------------------|
 | `instructors.TrainingPhase` | Phases that group lessons (e.g. "Before We Fly") | 9 |
 | `instructors.TrainingLesson` | Individual lessons (code, title, HTML, FAR/PTS refs) | 88 |
-| `instructors.SyllabusDocument` | Header / supplemental documents keyed by slug | 1 |
+| `instructors.SyllabusDocument` | Header / supplemental documents keyed by slug | 2 |
 
 > ⚠️ The **other** models in `instructors` (`InstructionReport`, `LessonScore`,
 > `GroundInstruction`, `GroundLessonScore`, `MemberQualification`,
@@ -40,9 +41,10 @@ between tenants:
 ```
 loaddata/syllabus-demo/
 ├── import_syllabus_demo.sh          # safe import script (preflight + load + verify)
+├── refresh_seed_from_tenant.sh      # refresh repo fixtures from a source tenant
 ├── instructors.TrainingPhase.json   # 9 phases
 ├── instructors.TrainingLesson.json  # 88 lessons
-└── instructors.SyllabusDocument.json# 1 document (slug "header")
+└── instructors.SyllabusDocument.json# 2 documents (slugs "header", "materials")
 ```
 
 This is a **separate, named seed set** alongside the existing canonical seed in
@@ -91,7 +93,7 @@ DB credentials in its environment) and copy the JSON out:
 ```bash
 SRC_NS=tenant-demo
 SRC_POD=$(kubectl get pods -n "$SRC_NS" -o name | grep -E 'django-app' \
-  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed 's#pods/##')
+  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed -E 's#^pods?/##')
 
 for M in TrainingPhase TrainingLesson SyllabusDocument; do
   kubectl exec -n "$SRC_NS" -c django "$SRC_POD" -- \
@@ -117,6 +119,19 @@ directly to `main`.
 > three syllabus models are loaded with plain integer PKs; `loaddata` handles
 > the cross-refs between them automatically because it is given all three files.
 
+### The refresh script (preferred)
+
+For the common case of "I fixed HTML / added lessons on `tenant-demo`, now
+update the repo seed", use the dedicated script. It wraps the dump + copy +
+verify steps and prints a before/after count comparison:
+
+```bash
+bash loaddata/syllabus-demo/refresh_seed_from_tenant.sh            # from tenant-demo (default)
+bash loaddata/syllabus-demo/refresh_seed_from_tenant.sh tenant-foo # from another source tenant
+```
+
+Review the diff, then commit via feature branch + PR.
+
 ---
 
 ## Step 2 — Import into the target tenant
@@ -135,7 +150,7 @@ The import script is **safe-by-default**. It:
 ```bash
 NS=tenant-masa   # <-- target tenant
 POD=$(kubectl get pods -n "$NS" -o name | grep -E 'django-app' \
-  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed 's#pods/##')
+  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed -E 's#^pods?/##')
 
 kubectl exec -n "$NS" -c django "$POD" -- \
   bash /app/loaddata/syllabus-demo/import_syllabus_demo.sh
@@ -155,7 +170,7 @@ Expected output on a clean (empty) target:
 ==> Verifying loaded counts
     TrainingPhase:      9
     TrainingLesson:     88
-    SyllabusDocument:   1
+    SyllabusDocument:   2
 
 ==> Done. Training syllabus import complete.
 ```
@@ -180,7 +195,7 @@ Some images may not ship the repo's `loaddata/` tree at runtime. In that case,
 ```bash
 NS=tenant-masa
 POD=$(kubectl get pods -n "$NS" -o name | grep -E 'django-app' \
-  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed 's#pods/##')
+  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed -E 's#^pods?/##')
 
 kubectl cp "loaddata/syllabus-demo" "$NS/$POD:/tmp/syllabus-demo" -c django
 kubectl exec -n "$NS" -c django "$POD" -- \
@@ -194,7 +209,7 @@ Only do this if you cannot use the script. The preflight check is on **you**:
 ```bash
 NS=tenant-masa
 POD=$(kubectl get pods -n "$NS" -o name | grep -E 'django-app' \
-  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed 's#pods/##')
+  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed -E 's#^pods?/##')
 
 # 1) Verify the target is empty (all three MUST be 0)
 kubectl exec -n "$NS" -c django "$POD" -- python manage.py shell -c \
@@ -224,12 +239,14 @@ kubectl exec -n "$NS" -c django "$POD" -- \
      ordering via `sort_key`).
 3. Spot-check a lesson's FAR/PTS references and HTML content.
 
-> 🖊️ **Per-club branding**: the `header` SyllabusDocument is club-branded
-> (title + HTML). The version in this seed was authored on `tenant-demo` and
-> currently reads **"Demo Soaring Club"** with a sample checklist row. After
-> import, the receiving club should edit this document via the admin
-> (`instructors → syllabus document`) or `edit_syllabus_document` view to
-> reflect their own club name and any club-specific front matter.
+> 🖊️ **Per-club branding**: the `SyllabusDocument` rows (`header`, and
+> optionally `materials`) are club-branded (title + HTML). The version in this
+> seed was authored on `tenant-demo` — the `header` doc currently reads
+> **"Demo Soaring Club"** with a sample checklist row, and `materials` is a
+> starter "Training Materials" page. After import, the receiving club should
+> edit both via the admin (`instructors → syllabus document`) or the
+> `edit_syllabus_document` view to reflect their own club name, logo, and any
+> club-specific front matter.
 >
 > The `TrainingPhase` and `TrainingLesson` rows are curriculum content (FAR/PTS
 > references, lesson objectives, etc.) and should generally be left as-is.
@@ -245,7 +262,7 @@ tenant is the right one first.
 ```bash
 NS=tenant-masa
 POD=$(kubectl get pods -n "$NS" -o name | grep -E 'django-app' \
-  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed 's#pods/##')
+  | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 | sed -E 's#^pods?/##')
 
 kubectl exec -n "$NS" -c django "$POD" -- python manage.py shell -c '
 from instructors.models import TrainingPhase, TrainingLesson, SyllabusDocument
