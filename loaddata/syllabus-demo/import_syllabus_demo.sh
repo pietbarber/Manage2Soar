@@ -128,8 +128,28 @@ echo "    TrainingPhase:     $PHASES"
 echo "    TrainingLesson:    $LESSONS"
 echo "    SyllabusDocument:  $DOCS"
 
-if [[ "$PHASES" -ne 9 || "$LESSONS" -ne 88 || "$DOCS" -ne 1 ]]; then
-    echo "    ERROR: unexpected counts after import (expected: 9 88 1)." >&2
+# Expected counts are derived from the fixture files themselves (not
+# hardcoded), so the check stays correct across seed refreshes.
+EXPECT="$(
+    python3 - "$FIXTURE_DIR" <<'PY'
+import json, sys
+d = sys.argv[1]
+counts = []
+for m in ("TrainingPhase", "TrainingLesson", "SyllabusDocument"):
+    with open(f"{d}/instructors.{m}.json") as fh:
+        counts.append(str(len(json.load(fh))))
+print(" ".join(counts))
+PY
+)"
+
+if [[ -z "$EXPECT" ]]; then
+    echo "    ERROR: could not compute expected counts from fixtures." >&2
+    exit 6
+fi
+
+read -r EXP_PHASES EXP_LESSONS EXP_DOCS <<<"$EXPECT"
+if [[ "$PHASES" -ne "$EXP_PHASES" || "$LESSONS" -ne "$EXP_LESSONS" || "$DOCS" -ne "$EXP_DOCS" ]]; then
+    echo "    ERROR: unexpected counts after import (expected: $EXP_PHASES $EXP_LESSONS $EXP_DOCS)." >&2
     exit 6
 fi
 
