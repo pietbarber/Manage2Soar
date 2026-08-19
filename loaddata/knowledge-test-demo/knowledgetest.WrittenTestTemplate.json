@@ -3,7 +3,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 1,
     "fields": {
-      "name": "Test by Piet Barber on 2026-02-15",
+      "name": "Written test 1",
       "description": "DO logsheet test. See email about this.",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -15,7 +15,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 2,
     "fields": {
-      "name": "Test by Piet Barber on 2026-02-22",
+      "name": "Written test 2",
       "description": "Duty Officer Written Test Bank questions",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -27,7 +27,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 3,
     "fields": {
-      "name": "Test by Piet Barber on 2026-02-22",
+      "name": "Written test 3",
       "description": "Duty Officer Written Test Bank questions.",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -39,7 +39,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 4,
     "fields": {
-      "name": "Test by Piet Barber on 2026-02-22",
+      "name": "Written test 4",
       "description": "Duty Officer Written Test Bank questions",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -51,7 +51,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 5,
     "fields": {
-      "name": "Test by Piet Barber on 2026-02-26",
+      "name": "Written test 5",
       "description": "ADO Written test",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -63,7 +63,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 6,
     "fields": {
-      "name": "Test by Piet Barber on 2026-02-28",
+      "name": "Written test 6",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -75,7 +75,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 7,
     "fields": {
-      "name": "Test by Piet Barber on 2026-03-08",
+      "name": "Written test 7",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -87,7 +87,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 8,
     "fields": {
-      "name": "Test by Rufus G Decker on 2026-03-13",
+      "name": "Written test 8",
       "description": "ASK 21 test",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -99,7 +99,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 9,
     "fields": {
-      "name": "Test by John Noss on 2026-03-15",
+      "name": "Written test 9",
       "description": "PW5 Only",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -111,7 +111,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 10,
     "fields": {
-      "name": "Test by Piet Barber on 2026-03-17",
+      "name": "Written test 10",
       "description": "ADO Written Test.  Good Luck!",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -123,7 +123,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 11,
     "fields": {
-      "name": "Test by Piet Barber on 2026-03-22",
+      "name": "Written test 11",
       "description": "Pw5 written test",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -135,7 +135,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 12,
     "fields": {
-      "name": "Test by Ron Wagner on 2026-03-23",
+      "name": "Written test 12",
       "description": "ADO Qualification",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -147,7 +147,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 13,
     "fields": {
-      "name": "Test by Robb Hohmann on 2026-04-02",
+      "name": "Written test 13",
       "description": "",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -159,7 +159,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 14,
     "fields": {
-      "name": "Test by Piet Barber on 2026-04-11",
+      "name": "Written test 14",
       "description": "ADO written test",
       "pass_percentage": "70.00",
       "time_limit": null,
@@ -171,7 +171,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 15,
     "fields": {
-      "name": "Test by Rufus G Decker on 2026-04-17",
+      "name": "Written test 15",
       "description": "ASK 21 pre solo test",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -183,7 +183,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 16,
     "fields": {
-      "name": "Test by John Noss on 2026-07-04",
+      "name": "Written test 16",
       "description": "PW5-specific questions",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -195,7 +195,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 17,
     "fields": {
-      "name": "Test by Piet Barber on 2026-07-06",
+      "name": "Written test 17",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -207,7 +207,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 18,
     "fields": {
-      "name": "Test by Ron Wagner on 2026-07-06",
+      "name": "Written test 18",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -219,7 +219,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 19,
     "fields": {
-      "name": "Test by Uwe Jettmar on 2026-07-07",
+      "name": "Written test 19",
       "description": "ASK-21",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -231,7 +231,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 20,
     "fields": {
-      "name": "Test by Ron Wagner on 2026-07-07",
+      "name": "Written test 20",
       "description": "ASK-21",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -243,7 +243,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 21,
     "fields": {
-      "name": "Test by Ron Wagner on 2026-07-07",
+      "name": "Written test 21",
       "description": "ASK-21",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -255,7 +255,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 22,
     "fields": {
-      "name": "Test by Chris Norris on 2026-07-07",
+      "name": "Written test 22",
       "description": "ASK-21 presolo written exam.",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -267,7 +267,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 23,
     "fields": {
-      "name": "Test by Uwe Jettmar on 2026-07-07",
+      "name": "Written test 23",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -279,7 +279,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 24,
     "fields": {
-      "name": "Test by Uwe Jettmar on 2026-07-07",
+      "name": "Written test 24",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -291,7 +291,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 25,
     "fields": {
-      "name": "Test by Uwe Jettmar on 2026-07-07",
+      "name": "Written test 25",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -303,7 +303,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 26,
     "fields": {
-      "name": "Test by Uwe Jettmar on 2026-07-08",
+      "name": "Written test 26",
       "description": "PW5 Test",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -315,7 +315,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 27,
     "fields": {
-      "name": "Test by Uwe Jettmar on 2026-07-08",
+      "name": "Written test 27",
       "description": "AKS-21 pre-solo written test",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -327,7 +327,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 28,
     "fields": {
-      "name": "Test by Chris Norris on 2026-07-08",
+      "name": "Written test 28",
       "description": "PW5 presolo written exam.",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -339,7 +339,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 29,
     "fields": {
-      "name": "Test by Piet Barber on 2026-07-09",
+      "name": "Written test 29",
       "description": "ASK-21 Pre-Solo written test",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -351,7 +351,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 30,
     "fields": {
-      "name": "Test by Piet Barber on 2026-07-09",
+      "name": "Written test 30",
       "description": "ASK-21 Pre-Solo written test",
       "pass_percentage": "70.00",
       "time_limit": null,
@@ -363,7 +363,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 31,
     "fields": {
-      "name": "Test by Piet Barber on 2026-07-09",
+      "name": "Written test 31",
       "description": "PW-5 Written test",
       "pass_percentage": "70.00",
       "time_limit": null,
@@ -375,7 +375,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 32,
     "fields": {
-      "name": "Test by Piet Barber on 2026-07-09",
+      "name": "Written test 32",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -387,7 +387,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 33,
     "fields": {
-      "name": "Test by Chris Norris on 2026-07-09",
+      "name": "Written test 33",
       "description": "PW5 retest",
       "pass_percentage": "70.00",
       "time_limit": null,
@@ -399,7 +399,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 34,
     "fields": {
-      "name": "Test by Chris Norris on 2026-07-09",
+      "name": "Written test 34",
       "description": "PW5",
       "pass_percentage": "70.00",
       "time_limit": null,
@@ -411,7 +411,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 35,
     "fields": {
-      "name": "Test by Uwe Jettmar on 2026-07-09",
+      "name": "Written test 35",
       "description": "PWTest",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -423,7 +423,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 36,
     "fields": {
-      "name": "Test by Piet Barber on 2026-07-10",
+      "name": "Written test 36",
       "description": "",
       "pass_percentage": "70.00",
       "time_limit": null,
@@ -435,7 +435,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 37,
     "fields": {
-      "name": "Test by Uwe Jettmar on 2026-07-11",
+      "name": "Written test 37",
       "description": "ASK-21 pre-solo test",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -447,7 +447,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 38,
     "fields": {
-      "name": "Test by Robb Hohmann on 2026-07-25",
+      "name": "Written test 38",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -459,7 +459,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 39,
     "fields": {
-      "name": "Test by David Wacker on 2026-08-15",
+      "name": "Written test 39",
       "description": "",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -471,7 +471,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 40,
     "fields": {
-      "name": "Test by John Noss on 2026-08-16",
+      "name": "Written test 40",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -483,7 +483,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 41,
     "fields": {
-      "name": "Test by John Noss on 2026-08-16",
+      "name": "Written test 41",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -495,7 +495,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 42,
     "fields": {
-      "name": "Test by John Noss on 2026-08-16",
+      "name": "Written test 42",
       "description": "",
       "pass_percentage": "80.00",
       "time_limit": null,
@@ -507,7 +507,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 43,
     "fields": {
-      "name": "Test by John Noss on 2026-08-16",
+      "name": "Written test 43",
       "description": "",
       "pass_percentage": "100.00",
       "time_limit": null,
@@ -519,7 +519,7 @@
     "model": "knowledgetest.writtentesttemplate",
     "pk": 44,
     "fields": {
-      "name": "Test by John Noss on 2026-08-16",
+      "name": "Written test 44",
       "description": "",
       "pass_percentage": "100.00",
       "time_limit": null,

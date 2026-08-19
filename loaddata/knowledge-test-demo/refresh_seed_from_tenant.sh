@@ -61,7 +61,7 @@ echo "==> Source namespace: $NS"
 POD="$(kubectl get pods -n "$NS" -o name \
         | grep -E 'django-app' \
         | grep -vE 'clearsessions|expire|notify|process|send|cron' \
-        | head -1 | sed -E 's#^pods?/##')"
+        | head -1 | sed -E 's#^pods?/##' || true)"
 
 if [[ -z "$POD" ]]; then
     echo "ERROR: no long-running app pod found in namespace $NS" >&2
@@ -103,13 +103,21 @@ import json, sys
 d = sys.argv[1]
 
 # Per-model field sanitization: field -> rule.
-#   "null"  -> set the FK field to None (member/user only exists in source)
-#   "strip" -> set the media FileField to None (per-tenant GCS path)
+#   "null"          -> set the FK field to None (member/user only exists in source)
+#   "strip"         -> set the media FileField to "" (per-tenant GCS path not in target)
+#   "generic_title" -> replace a personal-name-laden template name (e.g. "Test by
+#                      Piet Barber on 2026-02-15") with a stable, leakage-free
+#                      generic title ("Written test <pk>") so a receiving club
+#                      sees no source-club instructor names. The meaningful test
+#                      type is retained in the (preserved) description field.
 RULES = {
     "knowledgetest.question": {"updated_by": "null", "media": "strip"},
-    "knowledgetest.writtentesttemplate": {"created_by": "null"},
+    "knowledgetest.writtentesttemplate": {
+        "created_by": "null",
+        "name": "generic_title",
+    },
     # QuestionCategory, WrittenTestTemplateQuestion, TestPreset have no
-    # member/user/media references, so they are exported verbatim.
+    # member/user/media/name references, so they are exported verbatim.
 }
 
 summary = {}
@@ -123,7 +131,7 @@ for fn in (
     path = f"{d}/{fn}"
     with open(path) as fh:
         data = json.load(fh)
-    nulls = strips = 0
+    nulls = strips = generalized = 0
     for obj in data:
         model = obj.get("model")
         fields = obj.get("fields", {})
@@ -133,18 +141,24 @@ for fn in (
                 fields[fname] = None
             elif rule == "strip" and fields.get(fname) not in (None, ""):
                 strips += 1
-                fields[fname] = None
+                fields[fname] = ""
+            elif rule == "generic_title":
+                if fields.get("name") is not None:
+                    fields["name"] = f"Written test {obj['pk']}"
+                    generalized += 1
     with open(path, "w") as fh:
         json.dump(data, fh, indent=2)
         fh.write("\n")
-    summary[fn] = (len(data), nulls, strips)
+    summary[fn] = (len(data), nulls, strips, generalized)
 
-for fn, (n, nulls, strips) in summary.items():
+for fn, (n, nulls, strips, generalized) in summary.items():
     extras = []
     if nulls:
         extras.append(f"{nulls} member/user FK(s) nulled")
     if strips:
         extras.append(f"{strips} media path(s) stripped")
+    if generalized:
+        extras.append(f"{generalized} template name(s) generalized")
     suffix = (" (" + ", ".join(extras) + ")") if extras else " (no member/media refs)"
     print(f"    {fn}: {n} objects{suffix}")
 PY

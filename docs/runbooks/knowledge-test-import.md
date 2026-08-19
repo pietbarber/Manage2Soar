@@ -52,9 +52,10 @@ unresolvable FK. The **refresh script sanitizes them at capture time**:
 | `Question.updated_by` (FK→`Member`) | Question | Member PK only valid in source tenant | set to `null` |
 | `WrittenTestTemplate.created_by` (FK→`User`) | WrittenTestTemplate | User PK only valid in source tenant | set to `null` |
 | `Question.media` (FileField) | Question | per-tenant GCS path (`{CLUB_PREFIX}/media/...`) | set to empty |
+| `WrittenTestTemplate.name` (display title) | WrittenTestTemplate | source names embed instructor names (e.g. "Test by <name> on <date>") | generalized to `Written test <pk>`; the meaningful test type is retained in the preserved `description` |
 
 Because of this, the seed loads cleanly into **any** tenant with no dangling
-`Member`/`User`/file references. **Trade-off:** the target tenant loses the
+`Member`/`User`/file references and no leaked source-club instructor names. **Trade-off:** the target tenant loses the
 "last updated by" attribution and any question images/files — a club that needs
 question media must upload it locally after import (there is no way to copy a
 per-tenant GCS object into another tenant's GCS layout from this seed).

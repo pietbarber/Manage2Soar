@@ -24,8 +24,15 @@
 #     target (holds whether the target started empty or with overlapping pks).
 #
 # Intended use (production / per-tenant):
-#   kubectl exec -n <tenant-ns> <app-pod> -- \
-#       bash /app/loaddata/knowledge-test-demo/import_knowledge_test_demo.sh
+#   The deployed image may not ship this repo's loaddata/ tree, so copy the
+#   seed into the pod first, then run it from the copied location:
+#     NS=<tenant-ns>
+#     POD=$(kubectl get pods -n "$NS" -o name | grep -E 'django-app' \
+#           | grep -vE 'clearsessions|expire|notify|process|send|cron' | head -1 \
+#           | sed -E 's#^pods?/##')
+#     kubectl cp "loaddata/knowledge-test-demo" "$NS/$POD:/tmp/kseed" -c django
+#     kubectl exec -n "$NS" -c django "$POD" -- bash /tmp/kseed/import_knowledge_test_demo.sh
+#   (See docs/runbooks/knowledge-test-import.md for the full walkthrough.)
 #
 # Local / dev use (with your Django env already active):
 #   bash loaddata/knowledge-test-demo/import_knowledge_test_demo.sh
@@ -171,11 +178,14 @@ for fname, model in MODELS:
 if failures:
     raise SystemExit(1)
 ' 2>&1
-)"
+)" || true
 
 echo "$VERIFY" | sed 's/^/    /'
 
-# The inner python exits non-zero on any missing pk; capture that.
+# The inner python exits non-zero on any missing pk, but the `|| true` above
+# keeps that status from tripping `set -e` (so the "MISSING pks" diagnostic
+# above is still captured into $VERIFY and printed). The all_present=True
+# checks below therefore drive the script's exit code.
 if [[ -z "$VERIFY" ]] || ! echo "$VERIFY" | grep -q "all_present=True"; then
     echo "    ERROR: at least one fixture primary key is missing from the target." >&2
     exit 5
