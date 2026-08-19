@@ -1,0 +1,114 @@
+[
+  {
+    "model": "knowledgetest.testpreset",
+    "pk": 1,
+    "fields": {
+      "name": "ASK21",
+      "description": "ASK-21 glider type rating test - includes aircraft-specific questions plus fundamentals",
+      "category_weights": {
+        "DO": 0,
+        "GF": 10,
+        "ST": 5,
+        "WX": 4,
+        "AIM": 5,
+        "AMF": 0,
+        "FAR": 5,
+        "GFH": 10,
+        "PW5": 0,
+        "SSC": 5,
+        "ACRO": 0,
+        "ASK21": 19,
+        "Discus": 0,
+        "GNDOPS": 5
+      },
+      "is_active": true,
+      "sort_order": 10,
+      "created_at": "2026-01-05T03:02:01.885Z",
+      "updated_at": "2026-01-05T03:02:01.885Z"
+    }
+  },
+  {
+    "model": "knowledgetest.testpreset",
+    "pk": 2,
+    "fields": {
+      "name": "PW5",
+      "description": "PW-5 glider type rating test - includes aircraft-specific questions plus fundamentals",
+      "category_weights": {
+        "DO": 0,
+        "GF": 10,
+        "ST": 5,
+        "WX": 4,
+        "AIM": 5,
+        "AMF": 5,
+        "FAR": 5,
+        "GFH": 10,
+        "PW5": 24,
+        "SSC": 5,
+        "ACRO": 0,
+        "ASK21": 0,
+        "Discus": 0,
+        "GNDOPS": 5
+      },
+      "is_active": true,
+      "sort_order": 20,
+      "created_at": "2026-01-05T03:02:01.969Z",
+      "updated_at": "2026-01-05T03:02:01.969Z"
+    }
+  },
+  {
+    "model": "knowledgetest.testpreset",
+    "pk": 3,
+    "fields": {
+      "name": "DISCUS",
+      "description": "Discus glider type rating test - includes aircraft-specific questions",
+      "category_weights": {
+        "DO": 0,
+        "GF": 10,
+        "ST": 5,
+        "WX": 0,
+        "AIM": 0,
+        "AMF": 0,
+        "FAR": 5,
+        "GFH": 0,
+        "PW5": 0,
+        "SSC": 0,
+        "ACRO": 0,
+        "ASK21": 0,
+        "Discus": 22,
+        "GNDOPS": 5
+      },
+      "is_active": true,
+      "sort_order": 30,
+      "created_at": "2026-01-05T03:02:01.971Z",
+      "updated_at": "2026-01-05T03:02:01.971Z"
+    }
+  },
+  {
+    "model": "knowledgetest.testpreset",
+    "pk": 4,
+    "fields": {
+      "name": "ACRO",
+      "description": "Aerobatics test - focused on aerobatic maneuvers and safety",
+      "category_weights": {
+        "ACRO": 30
+      },
+      "is_active": true,
+      "sort_order": 40,
+      "created_at": "2026-01-05T03:02:01.972Z",
+      "updated_at": "2026-01-05T03:02:01.972Z"
+    }
+  },
+  {
+    "model": "knowledgetest.testpreset",
+    "pk": 5,
+    "fields": {
+      "name": "EMPTY",
+      "description": "Empty template - no questions pre-selected, allows manual question selection",
+      "category_weights": {},
+      "is_active": true,
+      "sort_order": 100,
+      "created_at": "2026-01-05T03:02:01.973Z",
+      "updated_at": "2026-01-05T03:02:01.973Z"
+    }
+  }
+]
