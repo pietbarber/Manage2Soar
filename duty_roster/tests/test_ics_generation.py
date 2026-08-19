@@ -22,10 +22,11 @@ from siteconfig.models import SiteConfiguration
 def _parse_ical(raw: bytes):
     """Parse the ``bytes`` ICS output from the generators into an ical component.
 
-    ``icalendar``'s type stubs declare ``Calendar.from_ical`` as taking a
-    ``str``, but these generators return UTF-8 ``bytes`` (asserted elsewhere
-    in this module).  Decode at this single boundary so the call type-checks
-    while remaining byte-for-byte equivalent at runtime.
+    These generators return UTF-8 ``bytes`` (asserted elsewhere in this
+    module), but the type checker resolves ``Calendar.from_ical`` to a
+    ``str``-typed signature, so passing ``bytes`` directly raises a
+    ``reportArgumentType`` diagnostic.  Decode at this single boundary so the
+    call type-checks while remaining byte-for-byte equivalent at runtime.
     """
     return Calendar.from_ical(raw.decode("utf-8"))
 
