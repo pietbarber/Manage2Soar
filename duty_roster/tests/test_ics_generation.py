@@ -19,6 +19,18 @@ from duty_roster.utils.ics import (
 from siteconfig.models import SiteConfiguration
 
 
+def _parse_ical(raw: bytes):
+    """Parse the ``bytes`` ICS output from the generators into an ical component.
+
+    These generators return UTF-8 ``bytes`` (asserted elsewhere in this
+    module), but the type checker resolves ``Calendar.from_ical`` to a
+    ``str``-typed signature, so passing ``bytes`` directly raises a
+    ``reportArgumentType`` diagnostic.  Decode at this single boundary so the
+    call type-checks while remaining byte-for-byte equivalent at runtime.
+    """
+    return Calendar.from_ical(raw.decode("utf-8"))
+
+
 @pytest.fixture
 def site_config(db):
     """Create a site configuration for testing."""
@@ -46,7 +58,7 @@ class TestGenerateDutyIcs:
         assert isinstance(ics_content, bytes)
 
         # Should be valid iCalendar
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         assert cal is not None
 
         # Check calendar properties
@@ -64,7 +76,7 @@ class TestGenerateDutyIcs:
             member_name="Jane Smith",
         )
 
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         assert len(events) == 1
 
@@ -82,7 +94,7 @@ class TestGenerateDutyIcs:
             member_name="Bob Wilson",
         )
 
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         event = events[0]
 
@@ -98,7 +110,7 @@ class TestGenerateDutyIcs:
             member_name="Test User",
         )
 
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         event = events[0]
 
@@ -121,7 +133,7 @@ class TestGenerateDutyIcs:
             notes="Please arrive early.",
         )
 
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         event = events[0]
 
@@ -145,8 +157,8 @@ class TestGenerateDutyIcs:
             member_name="User 2",
         )
 
-        cal1 = Calendar.from_ical(ics1)
-        cal2 = Calendar.from_ical(ics2)
+        cal1 = _parse_ical(ics1)
+        cal2 = _parse_ical(ics2)
 
         uid1 = str(list(c for c in cal1.walk() if c.name == "VEVENT")[0].get("uid"))
         uid2 = str(list(c for c in cal2.walk() if c.name == "VEVENT")[0].get("uid"))
@@ -170,7 +182,7 @@ class TestGenerateDutyIcs:
             location="Front Royal Airport",
         )
 
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         event = events[0]
 
@@ -222,7 +234,7 @@ class TestGeneratePreopIcs:
         )
 
         assert isinstance(ics_content, bytes)
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         assert len(events) == 1
 
@@ -316,7 +328,7 @@ class TestGenerateSwapIcs:
         )
 
         assert isinstance(ics_content, bytes)
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         assert len(events) == 1
 
@@ -352,7 +364,7 @@ class TestGenerateSwapIcs:
         )
 
         assert isinstance(ics_content, bytes)
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         assert len(events) == 1
 
@@ -372,7 +384,7 @@ class TestGenerateSwapIcs:
         )
 
         assert isinstance(ics_content, bytes)
-        cal = Calendar.from_ical(ics_content)
+        cal = _parse_ical(ics_content)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         assert len(events) == 1
 
@@ -442,7 +454,7 @@ class TestGenerateOpsDayIcs:
         ics_bytes = generate_ops_day_ics(duty_date)
 
         assert isinstance(ics_bytes, bytes)
-        cal = Calendar.from_ical(ics_bytes)
+        cal = _parse_ical(ics_bytes)
         assert cal is not None
         assert b"BEGIN:VCALENDAR" in ics_bytes
         assert b"BEGIN:VEVENT" in ics_bytes
@@ -452,7 +464,7 @@ class TestGenerateOpsDayIcs:
         duty_date = date(2026, 7, 4)
         ics_bytes = generate_ops_day_ics(duty_date)
 
-        cal = Calendar.from_ical(ics_bytes)
+        cal = _parse_ical(ics_bytes)
         events = [c for c in cal.walk() if c.name == "VEVENT"]
         assert len(events) == 1
         summary = str(events[0].get("summary"))
@@ -467,8 +479,8 @@ class TestGenerateOpsDayIcs:
         ics_bytes_1 = generate_ops_day_ics(duty_date)
         ics_bytes_2 = generate_ops_day_ics(duty_date)
 
-        cal1 = Calendar.from_ical(ics_bytes_1)
-        cal2 = Calendar.from_ical(ics_bytes_2)
+        cal1 = _parse_ical(ics_bytes_1)
+        cal2 = _parse_ical(ics_bytes_2)
 
         uid1 = str(next(c for c in cal1.walk() if c.name == "VEVENT").get("uid"))
         uid2 = str(next(c for c in cal2.walk() if c.name == "VEVENT").get("uid"))
@@ -519,7 +531,7 @@ class TestGenerateOpsDayIcs:
         duty_date = date(2026, 9, 21)
         ics_bytes = generate_ops_day_ics(duty_date)
 
-        cal = Calendar.from_ical(ics_bytes)
+        cal = _parse_ical(ics_bytes)
         event = next(c for c in cal.walk() if c.name == "VEVENT")
 
         dtstart = event.get("dtstart").dt
