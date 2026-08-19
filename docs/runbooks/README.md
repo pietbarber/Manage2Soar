@@ -10,6 +10,7 @@ This directory contains operational runbooks for system administrators managing 
 |---------|-------------|-------------|
 | [Deployment & Updates](deployment-updates.md) | Deploy new versions, rollbacks, zero-downtime updates | Weekly deployments, hotfixes |
 | [Troubleshooting Guide](troubleshooting.md) | Common issues and solutions | Production incidents |
+| [Training Syllabus Import](syllabus-import.md) | Copy a known-good syllabus from one tenant to an empty tenant | Onboarding a new club's curriculum |
 | [Ansible Playbook Guide](ansible-playbook-guide.md) | Complete reference for all Ansible playbooks | Reference |
 | [Database Operations](database-operations.md) | PostgreSQL backups, restoration, troubleshooting | Database changes, disaster recovery |
 | Security Operations *(coming soon)* | Secret rotation, vulnerability patching | Security incidents, monthly maintenance |

@@ -1,0 +1,1322 @@
+[
+{
+  "model": "instructors.traininglesson",
+  "pk": 1,
+  "fields": {
+    "code": "1.1",
+    "title": "Primary Flight Controls",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will become familiar with the primary flight controls and their functions -- their names, locations and effects.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"http://www.ecfr.gov/cgi-bin/text-idx?c=ecfr&amp;sid=80cb350ebfe5217be4fc51b8be4ae09f&amp;rgn=div8&amp;view=text&amp;node=14:2.0.1.1.2.3.1.4&amp;idno=14\" target=\"_blank\" rel=\"noopener\">&sect;61.87(i)(1)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Pitch&nbsp;</li>\r\n<li>Roll</li>\r\n<li>Yaw</li>\r\n<li>Elevators</li>\r\n<li>Ailerons</li>\r\n<li>Rudders</li>\r\n</ul>",
+    "sort_key": "00001.00001",
+    "far_requirement": "14 CFR 61.87(i)(1)",
+    "pts_reference": "",
+    "phase": 1,
+    "created_at": "2026-01-26T17:45:07.639Z",
+    "updated_at": "2026-05-24T15:24:49.885Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 2,
+  "fields": {
+    "code": "1.2",
+    "title": "Secondary Flight Controls",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will become familiar with the secondary flight controls and their functions -- their names, locations and effects.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(1)\">14 CFR 61.87(i)(1)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Towrope release</li>\r\n<li>Airbrakes</li>\r\n<li>Elevator Trim</li>\r\n<li>Flaps</li>\r\n<li>Undercarriage</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to locate and describe the use of the items listed in Content</p>",
+    "sort_key": "00001.00002",
+    "far_requirement": "14 CFR 61.87(i)(1)",
+    "pts_reference": "",
+    "phase": 1,
+    "created_at": "2026-01-26T17:45:20.108Z",
+    "updated_at": "2026-05-24T15:35:50.154Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 3,
+  "fields": {
+    "code": "1.3",
+    "title": "Using the Flight Instruments",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will become familiar with the flight instruments commonly used in a glider.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(1)\">14 CFR 61.87(i)(1)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Altimeter</li>\r\n<li>Airspeed Indicator</li>\r\n<li>Variometer</li>\r\n<li>Yaw String</li>\r\n<li>Compass</li>\r\n<li>Radio</li>\r\n<li>Transponder</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to locate and describe the use of the items listed in Content</p>",
+    "sort_key": "00001.00003",
+    "far_requirement": "14 CFR 61.87(i)(1)",
+    "pts_reference": "",
+    "phase": 1,
+    "created_at": "2026-01-26T17:45:33.282Z",
+    "updated_at": "2026-05-24T15:35:25.082Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 4,
+  "fields": {
+    "code": "1.4",
+    "title": "Ground Handling",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to safely move the glider around the gliderport.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(2)\">14 CFR 61.87(i)(2)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Walking the wingtip</li>\r\n<li>Towing with a vehicle</li>\r\n<li>Protecting the canopy from the wind</li>\r\n<li>Avoid pushing by the wingtips</li>\r\n<li>Tail dolly installation and removal</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to safely move the glider with a helper without instructor supervision</p>",
+    "sort_key": "00001.00004",
+    "far_requirement": "14 CFR 61.87(i)(2)",
+    "pts_reference": "",
+    "phase": 1,
+    "created_at": "2026-01-26T17:45:44.978Z",
+    "updated_at": "2026-05-24T15:34:44.156Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 5,
+  "fields": {
+    "code": "1.5",
+    "title": "Preflight Inspection",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to determine if the aircraft is airworthy by means of a proper pre-flight inspection.&nbsp;&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(1)\">14 CFR 61.87(i)(1)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ii)\">14 CFR 61.107(b)(6)(ii)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Checklist usage</li>\r\n<li>Avoiding distractions, handling spectators</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to explain the significance of each item on the preflight checklist, and perform the preflight inspection unassisted.&nbsp;</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Failure to use a checklist&nbsp;</li>\r\n<li>Skipping items on the checklist</li>\r\n</ul>",
+    "sort_key": "00001.00005",
+    "far_requirement": "14 CFR 61.87(i)(1)",
+    "pts_reference": "14 CFR 61.107(b)(6)(ii)",
+    "phase": 1,
+    "created_at": "2026-01-26T17:45:55.945Z",
+    "updated_at": "2026-05-24T15:41:57.480Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 6,
+  "fields": {
+    "code": "1.6",
+    "title": "Positive Control Check",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to perform a positive control check, especially after a glider has been assembled.&nbsp;&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(1)\">14 CFR 61.87(i)(1)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ii)\">14 CFR 61.107(b)(6)(ii)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Checklist usage</li>\r\n<li>Avoiding distractions, handling spectators</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to explain the importance of a positive control check and can perform one with the aid of a helper.&nbsp;</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Failure to perform a positive control check after assembling the glider</li>\r\n<li>Not moving the control surface through its full range of motion</li>\r\n</ul>\r\n<h2>Additional Resources</h2>\r\n<p>Soaring Safety Foundation video on aircraft mis-assembly. [<a href=\"https://youtu.be/8qqNLz6wBf0?si=zzRd2sHmu62lmIAq&amp;t=380\">YouTube</a>] (9:04)</p>",
+    "sort_key": "00001.00006",
+    "far_requirement": "14 CFR 61.87(i)(1)",
+    "pts_reference": "14 CFR 61.107(b)(6)(ii)",
+    "phase": 1,
+    "created_at": "2026-01-26T17:46:05.102Z",
+    "updated_at": "2026-05-24T15:49:42.894Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 7,
+  "fields": {
+    "code": "1.7",
+    "title": "Tow Rope Inspection",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to inspect the tow-line.&nbsp;&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(11)\">14 CFR 61.87(i)(11)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ii)\">14 CFR 61.107(b)(6)(ii)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Knots</li>\r\n<li>Tost release and Schweizer release</li>\r\n<li>Fraying, wear, and rope replacement criteria</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to determine whether a towrope is in usuable condition.&nbsp;</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Failure to inspect the towrope</li>\r\n<li>Just glancing at the rope without actually examining it</li>\r\n</ul>",
+    "sort_key": "00001.00007",
+    "far_requirement": "14 CFR 61.87(i)(11)",
+    "pts_reference": "",
+    "phase": 1,
+    "created_at": "2026-01-26T17:46:37.776Z",
+    "updated_at": "2026-05-24T16:12:59.790Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 8,
+  "fields": {
+    "code": "1.8",
+    "title": "Securing the Glider",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will&nbsp; learn how to properly secure the glider after landing</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots):&nbsp;<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(xi)\">14 CFR 61.107(b)(6)(xi)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Getting the glider into the hangar without damage</li>\r\n<li>Securing flight controls</li>\r\n<li>Using proper tie-down ropes</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to explain and follow the proper procedures for securing the glider after flight.</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Failure to&nbsp; properly tie down the glider after flight</li>\r\n<li>Failure to properly secure the glider after flight</li>\r\n</ul>\r\n<p>&nbsp;</p>",
+    "sort_key": "00001.00008",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.107(b)(6)(xi)",
+    "phase": 1,
+    "created_at": "2026-01-26T17:46:49.096Z",
+    "updated_at": "2026-05-24T16:28:24.665Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 9,
+  "fields": {
+    "code": "1.9",
+    "title": "Area Familiarization",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the names and locations of landmarks, and their position with respect to the home airport.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots):&nbsp;<br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li><span style=\"background-color: rgb(241, 196, 15);\">Local landmark #1</span></li>\r\n<li><span style=\"background-color: rgb(241, 196, 15);\">Local landmark #2</span></li>\r\n<li><span style=\"background-color: rgb(241, 196, 15);\">Local landmark #3</span></li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to name and locate area landmarks, and are always aware of the gliders position relative to the airport.</p>\r\n<p>&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00001.00009",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 1,
+    "created_at": "2026-01-26T17:46:59.049Z",
+    "updated_at": "2026-05-24T16:32:52.707Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 10,
+  "fields": {
+    "code": "2.1",
+    "title": "Takeoff Checklist",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to use the pre-takeoff checklist</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(1)\">14 CFR 61.87(i)(1)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ii)\">14 CFR 61.107(b)(6)(ii)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li><span style=\"background-color: rgb(241, 196, 15);\">Club-standard pre-takeoff checklist</span></li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently perform the pre-takeoff checklist before each flight without prompting from the instructor</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Failure to begin the checklist</li>\r\n<li>Failure to complete the checklist</li>\r\n<li>Skipping items on the checklist</li>\r\n<li>Failure to resume the checklist at the proper point after an interruption or distraction</li>\r\n</ul>\r\n<p>&nbsp;</p>",
+    "sort_key": "00002.00001",
+    "far_requirement": "14 CFR 61.87(i)(1)",
+    "pts_reference": "14 CFR 61.107(b)(6)(ii)",
+    "phase": 2,
+    "created_at": "2026-01-26T17:47:09.319Z",
+    "updated_at": "2026-05-27T00:43:47.700Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 11,
+  "fields": {
+    "code": "2.2",
+    "title": "Takeoff Procedures and Signals",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will become familiar with takeoff procedures and the signals used for takeoff</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(11)\">14 CFR 61.87(i)(11)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Inspecting and connecting the tow rope</li>\r\n<li>Open Tow Hook</li>\r\n<li>Close Tow Hook</li>\r\n<li>Take Up Slack signal</li>\r\n<li>Ready for Takeoff signal</li>\r\n<li>Hold Signal</li>\r\n<li>Start Takeoff</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to explain and perform the launch procedures and signals.&nbsp;</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Thumbs-up before airbrakes are closed and locked</li>\r\n<li>Wing runner holding the wings level before receiving a thumbs-up</li>\r\n<li>Wing runner giving the takeoff signal before the glider pilot gives the rudder waggle</li>\r\n<li>Wing runner pushing or pulling on the wing tip during the takeoff roll.&nbsp;</li>\r\n</ul>\r\n<p>&nbsp;</p>",
+    "sort_key": "00002.00002",
+    "far_requirement": "14 CFR 61.87(i)(11)",
+    "pts_reference": "",
+    "phase": 2,
+    "created_at": "2026-01-26T17:47:23.043Z",
+    "updated_at": "2026-05-24T16:41:20.304Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 12,
+  "fields": {
+    "code": "2.3",
+    "title": "Takeoff",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to perform a normal takeoff in the glider.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(3)\">14 CFR 61.87(i)(3)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Initial ground roll</li>\r\n<li>glider airborne, but towplane still on ground</li>\r\n<li>climb-out when both towplane and glider are airborne</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently perform the takeoff without instructor input</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Failure to raise the nose wheel soon enough</li>\r\n<li>Raising the nose too high and dragging the ail wheel</li>\r\n<li>Failure to maintain the proper ground track</li>\r\n<li>Failure to keep the wings level</li>\r\n<li>Failure to maintain the proper altitude before the tow plane becomes airborne</li>\r\n<li>Pitch oscillations after liftoff due to over-controlling the elevator</li>\r\n</ul>\r\n<p>&nbsp;</p>",
+    "sort_key": "00002.00003",
+    "far_requirement": "14 CFR 61.87(i)(3)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 2,
+    "created_at": "2026-01-26T17:47:31.599Z",
+    "updated_at": "2026-05-24T16:46:52.381Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 13,
+  "fields": {
+    "code": "2.4",
+    "title": "Crosswind Takeoff",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to accomplish a takeoff with a crosswind</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(3)\">14 CFR 61.87(i)(3)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Staying behind the towplane before the glider is airborne</li>\r\n<li>Staying behind the towplane before the towplane is airborne</li>\r\n<li>Correct position behind the towplane after both aircraft are airborne</li>\r\n<li>Proper position of controls on takeoff</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to:</p>\r\n<ul>\r\n<li>recognize and compensate for a crosswind on takeoff</li>\r\n</ul>",
+    "sort_key": "00002.00004",
+    "far_requirement": "14 CFR 61.87(i)(3)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 2,
+    "created_at": "2026-01-26T17:47:40.333Z",
+    "updated_at": "2026-05-24T22:53:35.193Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 14,
+  "fields": {
+    "code": "2.5",
+    "title": "Takeoff Without a Wing Runner",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to take off when nobody is available to run the wing during a takeoff.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content&nbsp;</h2>\r\n<ul>\r\n<li>Which wing to leave on the ground</li>\r\n<li>Positioning on the runway when it's narrow</li>\r\n<li>Handling which direction the glider veers on takeoff</li>\r\n<li>Hazards of a no-wing-runner takeoff with a CG-hook equipped glider</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently take off without a wing runner</p>",
+    "sort_key": "00002.00005",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 2,
+    "created_at": "2026-01-26T17:48:06.765Z",
+    "updated_at": "2026-05-24T22:57:34.179Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 15,
+  "fields": {
+    "code": "2.6",
+    "title": "Downwind Takeoff",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the procedures and hazards of a downwind takeoff</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None&nbsp;<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Hazards of a tailwind (downwind) takeoff</li>\r\n<li>Effectiveness of flight controls at low speeds</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to explain the factors involved in a downwind takeoff, and be able to consistently perform a downwind takeoff.</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00002.00006",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 2,
+    "created_at": "2026-01-26T17:48:16.644Z",
+    "updated_at": "2026-05-24T23:02:32.610Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 16,
+  "fields": {
+    "code": "2.7",
+    "title": "High Density Altitude Takeoff",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn about the performance loss of high altitude or high density altitude takeoffs.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Difference between density altitude and field elevation</li>\r\n<li>Tow plane climb performance with high density altitude</li>\r\n<li>Ground speed versus indicated airspeed in high density altitude situations</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to understand and explain how high altitude affects the glier and tow plane on takeoff</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00002.00007",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 2,
+    "created_at": "2026-01-26T17:48:28.279Z",
+    "updated_at": "2026-05-24T23:05:53.198Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 17,
+  "fields": {
+    "code": "3.1",
+    "title": "Introduction to Flying the Aerotow",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will be introduced to the aerotow.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(12)\">14 CFR 61.87(i)(12)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>The physics of aerotow</li>\r\n<li>Flying the aerotow</li>\r\n<li>Bank angles during the aerotow</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently maintain position on tow using the stick, while the instructor controls the rudder.&nbsp;</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Failing to notice when the glider is getting out of position</li>\r\n<li>Using too much bank angle / control movement</li>\r\n<li>NOt removing bank angle correction early enough</li>\r\n<li>Failure to maintain a constant pitch and bank angle when in the proper position on tow</li>\r\n</ul>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00001",
+    "far_requirement": "14 CFR 61.87(i)(12)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 3,
+    "created_at": "2026-01-26T17:48:42.991Z",
+    "updated_at": "2026-05-24T23:09:18.489Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 18,
+  "fields": {
+    "code": "3.2",
+    "title": "Flying Aerotow with Stick and Rudder",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to use the rudder to counteract adverse yaw while on tow.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(12)\">14 CFR 61.87(i)(12)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Using all of the flight controls (ailerons, elevator, rudder) while on aerotow</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to maintain position on tow using both the stick and rudder.&nbsp;</p>",
+    "sort_key": "00003.00002",
+    "far_requirement": "14 CFR 61.87(i)(12)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 3,
+    "created_at": "2026-01-26T17:48:56.376Z",
+    "updated_at": "2026-05-24T23:11:28.756Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 19,
+  "fields": {
+    "code": "3.3",
+    "title": "Release from Tow",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the proper procedures for releasing from the tow plane.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(12)\">14 CFR 61.87(i)(12)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Stabilize</li>\r\n<li>Check for Traffic</li>\r\n<li>Release</li>\r\n<li>Turn Right</li>\r\n<li>Set the Airspeed</li>\r\n<li>Locate the Airport</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently perform the proper tow release sequence.&nbsp;</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Failure to stabilize</li>\r\n<li>Failure to check for traffic</li>\r\n<li>Failure to verify that the rope has released</li>\r\n<li>Letting the nose pitch up after release</li>\r\n</ul>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00003",
+    "far_requirement": "14 CFR 61.87(i)(12)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 3,
+    "created_at": "2026-01-26T17:49:08.932Z",
+    "updated_at": "2026-05-25T01:06:55.620Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 20,
+  "fields": {
+    "code": "3.4",
+    "title": "Soft Release",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to reduce wear and tear on the glider's tow hook. This is sometimes the procedure at fields that use Schweizer gliders. Its adoption and use is not universal.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots):&nbsp;<br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>When to use the soft release</li>\r\n<li>Soft release procedure</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently perform a soft release.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00004",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 3,
+    "created_at": "2026-01-26T17:49:20.102Z",
+    "updated_at": "2026-05-25T01:08:52.980Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 21,
+  "fields": {
+    "code": "3.5",
+    "title": "Shifting Through the Wake",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will perform the high-low maneuver while on aerotow</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(12)\">14 CFR 61.87(i)(12)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Transition down through the towplane's wake</li>\r\n<li>Transition from low tow to high tow position, through the towplane's wake.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to transition smoothly between high and low tow positions.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00005",
+    "far_requirement": "14 CFR 61.87(i)(12)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 3,
+    "created_at": "2026-01-26T17:49:30.622Z",
+    "updated_at": "2026-05-27T18:11:49.655Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 22,
+  "fields": {
+    "code": "3.6",
+    "title": "Steering Turns",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will direct the towplane to turn left and right by maintaing specific aerotow positions.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(11)\">14 CFR 61.87(i)(11)</a><br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Steering Turn Signals</li>\r\n<li>Use of Radio</li>\r\n<li>Performing a Steering Turn</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to turn the towplane to a desired heading while mantaining the correct vertical and horizontal position relative to the tow plane.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00006",
+    "far_requirement": "14 CFR 61.87(i)(11)",
+    "pts_reference": "",
+    "phase": 3,
+    "created_at": "2026-01-26T17:49:40.376Z",
+    "updated_at": "2026-05-25T01:14:04.157Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 23,
+  "fields": {
+    "code": "3.7",
+    "title": "Aerotow Signals",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the various signals used to communicate with the towpilot in-flight.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(11)\">14 CFR 61.87(i)(11)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Increase airspeed</li>\r\n<li>Decrease airspeed</li>\r\n<li>Glider release failure</li>\r\n<li>Release immediately</li>\r\n<li>Check airbrakes</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to perform all of the signals above.&nbsp;&nbsp;</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>Confusing the rudder waggle with the rock off signals</li>\r\n</ul>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00007",
+    "far_requirement": "14 CFR 61.87(i)(11)",
+    "pts_reference": "",
+    "phase": 3,
+    "created_at": "2026-01-26T17:49:53.560Z",
+    "updated_at": "2026-05-25T01:16:26.603Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 24,
+  "fields": {
+    "code": "3.8",
+    "title": "Boxing the Wake",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to move around the towplane's wake</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Maneuvering around the towplane's wake</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently box the wake, maintaining proper vertical and horizontal alignment during each part of the maneuver.</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00008",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 3,
+    "created_at": "2026-01-26T17:50:02.718Z",
+    "updated_at": "2026-05-25T01:18:56.353Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 25,
+  "fields": {
+    "code": "3.9",
+    "title": "Slack Rope on Tow",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will recognize and resolve slack line while on aerotow.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(19)\">14 CFR 61.87(i)(19)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Avoid the rope</li>\r\n<li>Stabilize / slow down</li>\r\n<li>Absorb Shock</li>\r\n<li>Practice Slack Rope Recovery</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to recover from a slack line condition in straight flight with minimal stress on the rope, while at all times remaining above the tow plane.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00009",
+    "far_requirement": "14 CFR 61.87(i)(19)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 3,
+    "created_at": "2026-01-26T17:50:12.811Z",
+    "updated_at": "2026-05-25T01:21:37.321Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 26,
+  "fields": {
+    "code": "3.10",
+    "title": "Slack Rope in a Turn",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will practice and recover from slack during a turn while on aerotow</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(19)\">14 CFR 61.87(i)(19)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Importance of maintaining position in order to avoid the \"Crack the whip\" effect.</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to remove slack from the rope that develops in a turn without undue stress to the rope, towplane, or glider.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00003.00010",
+    "far_requirement": "14 CFR 61.87(i)(19)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 3,
+    "created_at": "2026-01-26T17:50:21.650Z",
+    "updated_at": "2026-05-25T01:23:56.655Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 27,
+  "fields": {
+    "code": "4.1",
+    "title": "Transferring Control of the Glider",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the appropriate way to hand over controls to the instructor, and vice-versa.&nbsp;&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate:</p>\r\n<ul>\r\n<li>&nbsp;<a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ii)\">14 CFR 61.107(b)(6)(ii)</a> (specifically covered under the \"Passenger Briefing\" task in the PTS, which mandates defining the positive exchange of flight controls</li>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(7)\">14 CFR 61.105(b)(7)</a> <em data-path-to-node=\"11,2,0\" data-index-in-node=\"56\">(positive exchange of flight controls is an FAA-wide safety directive under general operating rules)</em>.</li>\r\n</ul>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Three-stage control hand-off</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently verify each transfer of the controls between the learner and the instructor</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00004.00001",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.105(b)(7)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:50:30.990Z",
+    "updated_at": "2026-05-27T18:15:25.801Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 28,
+  "fields": {
+    "code": "4.2",
+    "title": "Scanning for Traffic",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will develop the habit of constantly and effectively scanning for traffic.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(6)\">14 CFR 61.87(i)(6)</a>&nbsp;<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(7)\">14 CFR 61.105(b)(7)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>scanning technique during straight flight</li>\r\n<li>scanning technique during turns</li>\r\n<li>meteorological visibility considerations (smoke, haze, low visibility)</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to continuously scan for traffic while turning, whiout being prompted or reminded by the instructor</p>",
+    "sort_key": "00004.00002",
+    "far_requirement": "14 CFR 61.87(i)(6)",
+    "pts_reference": "14 CFR 61.105(b)(7)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:50:44.784Z",
+    "updated_at": "2026-05-25T22:03:06.773Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 29,
+  "fields": {
+    "code": "4.3",
+    "title": "Pitch / Speed Control",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to maintain a desired airspeed by controlling the pitch attitude of the glider using the elevator.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(8)\">14 CFR 61.87(i)(8)</a><br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Relationship of pitch attitude to airspeed</li>\r\n<li>Chasing the airspeed indicator</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to maintain a specified airspeed within &plusmn;10 knots.</p>",
+    "sort_key": "00004.00003",
+    "far_requirement": "14 CFR 61.87(i)(8)",
+    "pts_reference": "",
+    "phase": 4,
+    "created_at": "2026-01-26T17:50:55.595Z",
+    "updated_at": "2026-05-25T22:12:54.964Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 30,
+  "fields": {
+    "code": "4.4",
+    "title": "Using the Trim Control",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to trim the glider at different airspeeds using the elevator trim control.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(8)\">14 CFR 61.87(i)(8)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>How to change the trim adjustment</li>\r\n<li>Set pitch, check airspeed</li>\r\n<li>At the target airspeed, use trim to negate stick forces</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to achieve the desired airspeed, and can quickly trim the glider for \"hands-off\" flight within &plusmn;5 knots of the desired airspeed.</p>",
+    "sort_key": "00004.00004",
+    "far_requirement": "14 CFR 61.87(i)(8)",
+    "pts_reference": "",
+    "phase": 4,
+    "created_at": "2026-01-26T17:51:05.264Z",
+    "updated_at": "2026-05-26T00:41:21.487Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 31,
+  "fields": {
+    "code": "4.5",
+    "title": "Shallow / Medium Bank Turns",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to turn the glider using coordinated application of the ailerons and rudder.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(4)\">14 CFR 61.87(i)(4)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>aileron and rudder usage</li>\r\n<li>increased back-stick to mtaintain attitude in a turn</li>\r\n<li>use of yaw string to maintain coordination</li>\r\n<li>rolling into and out of a turn</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to initiate a turn to a specified bank angle, maintain the ank angle within &plusmn;5 degrees, maintain the airspeed within &plusmn;10 knots, and recover to straight and level flight with smooth and coordinated application of the controls</p>",
+    "sort_key": "00004.00005",
+    "far_requirement": "14 CFR 61.87(i)(4)",
+    "pts_reference": "",
+    "phase": 4,
+    "created_at": "2026-01-26T17:51:38.442Z",
+    "updated_at": "2026-05-26T00:47:51.182Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 32,
+  "fields": {
+    "code": "4.6",
+    "title": "Precision Turns",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to turn to a precise heading.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(4)\">14 CFR 61.87(i)(4)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>small bank angles for small heading changes</li>\r\n<li>larger heading changes require more bank</li>\r\n<li>Rolling out to a specific cardinal direction or compass heading</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to maintain an appropriate rate of turn to a specified heading within 10 degrees, using smooth and coordinated control movements, while maintaining a desired airspeed within 10 knots.&nbsp;</p>",
+    "sort_key": "00004.00006",
+    "far_requirement": "14 CFR 61.87(i)(4)",
+    "pts_reference": "",
+    "phase": 4,
+    "created_at": "2026-01-26T17:51:47.869Z",
+    "updated_at": "2026-05-26T00:50:51.480Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 33,
+  "fields": {
+    "code": "4.7",
+    "title": "Airbrakes in Flight",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will operate the airbrakes, and to demonstrate the effect that the airbrakes have on attitude.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(7)\">14 CFR 61.87(i)(7)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Pitch changes when airbrakes are opened and closed&nbsp;</li>\r\n<li>airspeed must remain constant when opening and closing the airbrakes</li>\r\n</ul>\r\n<h2>Note</h2>\r\n<ul>\r\n<li>The term airbrakes and spoilers are used interchangeably, depending on the resource.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to maintain the specified airspeed within +10/-5 knots while transitioning between different airbrake settings.</p>",
+    "sort_key": "00004.00007",
+    "far_requirement": "14 CFR 61.87(i)(7)",
+    "pts_reference": "",
+    "phase": 4,
+    "created_at": "2026-01-26T17:51:55.929Z",
+    "updated_at": "2026-05-26T00:54:00.178Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 34,
+  "fields": {
+    "code": "4.8",
+    "title": "Steep Turns",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to control the glider at bank angles between 30 and 60 degrees.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(4)\">14 CFR 61.87(i)(4)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>The physics of a steep turn</li>\r\n<li>Determining the bank angle</li>\r\n<li>Relationship between bank angle and load factor</li>\r\n<li>Performing a steep turn</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to consistently perform steep turns, maintaining the specified bank angle within 10 degrees, and the specified airspeed within 10 knots throughout the turn.&nbsp;</p>",
+    "sort_key": "00004.00008",
+    "far_requirement": "14 CFR 61.87(i)(4)",
+    "pts_reference": "",
+    "phase": 4,
+    "created_at": "2026-01-26T17:52:17.320Z",
+    "updated_at": "2026-05-26T00:57:20.192Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 35,
+  "fields": {
+    "code": "4.9",
+    "title": "Circling Flight",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will maintain a constant airspeed and bank angle while continuously turning. The learner will perform multiple 360 degree turns at moderate bank angles.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(4)\">14 CFR 61.87(i)(4)</a><br>Private Pilot Test Candidate:&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Keeping the bank and pitch angles constant</li>\r\n<li>Handling uncoordinated flight during the turn</li>\r\n<li>Using the yaw string to handle coordination</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to indefinitely maintain a turn at a specified bank angle within 5 degrees and a specified airspeed within 10 knots with smooth and coordinated application of the controls</p>",
+    "sort_key": "00004.00009",
+    "far_requirement": "14 CFR 61.87(i)(4)",
+    "pts_reference": "",
+    "phase": 4,
+    "created_at": "2026-01-26T17:52:41.013Z",
+    "updated_at": "2026-05-26T00:59:44.706Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 36,
+  "fields": {
+    "code": "4.11",
+    "title": "Stall Recognition and Recovery (Level)",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to recognize the warning signs of a stall and to recover from a stall during straight and level flight.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(14)\">14 CFR 61.87(i)(14)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ix)\">14 CFR 61.107(b)(6)(ix)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Stick back</li>\r\n<li>Nose High</li>\r\n<li>Decreasing airspeed</li>\r\n<li>Decreasing wind noise</li>\r\n<li>Mushy controls</li>\r\n<li>Buffeting</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to list and recognize the warning signs of a stall, and recover from a stall in level flight with minimal loss of altitude.&nbsp;</p>",
+    "sort_key": "00004.00011",
+    "far_requirement": "14 CFR 61.87(i)(14)",
+    "pts_reference": "14 CFR 61.107(b)(6)(ix)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:52:55.731Z",
+    "updated_at": "2026-05-26T02:47:25.298Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 37,
+  "fields": {
+    "code": "4.12",
+    "title": "Stall Recognition and Recovery (Turn)",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to recognize and recover from a stall that occurs during a turn.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(14)\">14 CFR 61.87(i)(14)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ix)\">14 CFR 61.107(b)(6)(ix)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Stick back</li>\r\n<li>Nose rising</li>\r\n<li>Decreasing airspeed</li>\r\n<li>Decreasing wind noise</li>\r\n<li>Mushy controls</li>\r\n<li>Buffeting</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to list and recognize the warning signs of a stall, and can recover from a stall in a turn with minimal loss of altitude. Leading up to the stall, maintain bank within 10 degrees.&nbsp;&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00004.00012",
+    "far_requirement": "14 CFR 61.87(i)(14)",
+    "pts_reference": "14 CFR 61.107(b)(6)(ix)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:53:10.536Z",
+    "updated_at": "2026-05-26T02:54:54.965Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 38,
+  "fields": {
+    "code": "4.13",
+    "title": "Slow Flight",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will become familiar with minimum controllable airspeed (MCA)</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(8)\">14 CFR 61.87(i)(8)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ix)\">14 CFR 61.107(b)(6)(ix)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Clear the area,&nbsp;</li>\r\n<li>trim to fly just above the stall speed</li>\r\n<li>lower the nose if any buffeting or if the controls lose effectiveness</li>\r\n<li>use small bank angles</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to fly at the minimum controllable airspeed appropriate to the specified bank angle, adjusting the pitch attitude as necessary to prevent a stall.&nbsp; Hold heading of 10 degrees and maintain bank angle within 10 degrees when in turning flight.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00004.00013",
+    "far_requirement": "14 CFR 61.87(i)(8)",
+    "pts_reference": "14 CFR 61.107(b)(6)(ix)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:53:18.947Z",
+    "updated_at": "2026-05-26T23:40:35.495Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 39,
+  "fields": {
+    "code": "4.14",
+    "title": "Stall Recognition and Recovery (Brakes)",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to recognize and recover from a stall that occurs while the airbrakes are deployed.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(14)\">14 CFR 61.87(i)(14)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ix)\">14 CFR 61.107(b)(6)(ix)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Stick back</li>\r\n<li>Nose rising</li>\r\n<li>decreasing airspeed</li>\r\n<li>Decreasing wind noise</li>\r\n<li>Mushy controls</li>\r\n<li>Buffeting</li>\r\n<li>Closing the airbrakes to recover from the stall</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to list and recognize the warning signs of a stall, and can recover from a stall that occurs while the airbrakes are open with minimal loss of altitude.&nbsp;</p>",
+    "sort_key": "00004.00014",
+    "far_requirement": "14 CFR 61.87(i)(14)",
+    "pts_reference": "14 CFR 61.107(b)(6)(ix)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:53:44.290Z",
+    "updated_at": "2026-05-26T23:44:06.709Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 41,
+  "fields": {
+    "code": "4.15",
+    "title": "Side Slip - Correcting for Alignment Errors",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will practice the sideslip for alignment correction, while at altitude. This is normally used to correct alignment errors when on final approach.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(17)\">14 CFR 61.87(i)(17)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>use of a side slip to correct for an alignment error on final.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to enter and recover from a side slip, while maintaining the desired airspeed within +1/-5 knots and maintainng the desired heading within 10 degrees.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00004.00015",
+    "far_requirement": "14 CFR 61.87(i)(17)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:54:17.379Z",
+    "updated_at": "2026-05-26T23:47:42.755Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 42,
+  "fields": {
+    "code": "4.16",
+    "title": "Side Slip - Compensating for a Crosswind",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how compensate for a crosswind with a side slip, especially on touchdown, in order to prevent side-loads on the landing wheel.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(17)\">14 CFR 61.87(i)(17)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>slipping with adequate bank angle to overcome a crosswind</li>\r\n<li>maintaining the nose direction with the end of the runway</li>\r\n<li>keeping the glider over the centerline of the runway</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to compensate for a crosswind using a slip, maintaining specified heading within 10 degrees, and maintaining a specified airspeed with +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00004.00016",
+    "far_requirement": "14 CFR 61.87(i)(17)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:54:30.909Z",
+    "updated_at": "2026-05-26T23:51:10.212Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 43,
+  "fields": {
+    "code": "4.17",
+    "title": "Forward Slip",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to steepen the glider slope without increasing the airspeed.&nbsp; A forward slip can also be used in the unlikely event that the airbrakes fil to operate. This lesson practices entering and recovering from a forward slip at altitude.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(17)\">14 CFR 61.87(i)(17)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Entering the forward slip with ailerons and opposite rudder</li>\r\n<li>Recovery from the forward slip by neutralizing the controls</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to use a forward slip to adjust the glide slope, while maintaining a specified heading of +/- 10 degrees, and maintaining a specified airspeed of +10/-5 knots.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00004.00017",
+    "far_requirement": "14 CFR 61.87(i)(17)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:54:41.165Z",
+    "updated_at": "2026-05-26T23:54:47.867Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 44,
+  "fields": {
+    "code": "4.19",
+    "title": "Selecting a Cruise Speed",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to select the proper speed to fly for the conditions of lift, sink, headwind or tailwind.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(8)\">14 CFR 61.87(i)(8)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(v)\">14 CFR 61.107(b)(6)(v)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Rules of thumb for speeds to fly in a tailwind or headwind</li>\r\n<li>Rules of thumb for speeds to fly in lift or sink&nbsp;</li>\r\n<li>Correcting for lift / sink&nbsp;</li>\r\n<li>Using a Speed Ring</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to select the optimum airspeed for the conditions, and can maintain that airspeed within +/- 5 knots.&nbsp;</p>",
+    "sort_key": "00004.00019",
+    "far_requirement": "14 CFR 61.87(i)(8)",
+    "pts_reference": "14 CFR 61.107(b)(6)(v)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:54:52.515Z",
+    "updated_at": "2026-05-27T00:00:30.154Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 46,
+  "fields": {
+    "code": "4.21",
+    "title": "Chandelle",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to perform the chandelle, a steep climbing turn.&nbsp; it is used by glider pilots to transition betwee cruising and thermalling flight. Note: this procedure is not requred by any FAA regulations for glider training.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None&nbsp;<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Check for traffic</li>\r\n<li>pull-up from high-speed cruise into a steep-climbing turn</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to quickly transition between high-speed cruising flight and low-speed circling at the desired airspeed within 10 knots and the desired bank angle with 10 degrees.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00004.00021",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 4,
+    "created_at": "2026-01-26T17:55:19.680Z",
+    "updated_at": "2026-05-27T17:52:19.922Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 47,
+  "fields": {
+    "code": "4.18",
+    "title": "Low-G Maneuvers",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to distinguish between the falling sensation of a stall and the low-G sensations resulting from normal maneuvering.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None.&nbsp;<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(vii)\">14 CFR 61.107(b)(6)(vii)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Reduced G-forces from maneuvering should not be confused with the falling sensation</li>\r\n<li>Do not exceed the maneuvering speed of the glider&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to distinguish between a stall and normal low-G maneuvers</p>\r\n<h2>Common Errors</h2>\r\n<ul>\r\n<li>&nbsp;</li>\r\n</ul>\r\n<p>&nbsp;</p>",
+    "sort_key": "00004.00018",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.107(b)(6)(vii)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:55:30.441Z",
+    "updated_at": "2026-05-26T23:57:00.587Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 48,
+  "fields": {
+    "code": "4.22",
+    "title": "Incipient Spin Recognition and Recovery",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to quickly react to recover from an unintentional spin. The learner will learn to recognize the events leading to a spin, and to recognize and recover from an incipient spin. <em>Practicing</em> spin training is not required for solo, private, commercial glider ratings.&nbsp; However, it is required for the instructor rating. <em>Knowledge </em>of spins and spin recovery techniques are required by <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(11)\">14 CFR 61.105(b)(11)</a>&nbsp;for private pilot and above.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots):&nbsp;<br>Private Pilot Test Candidate: &nbsp;<a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(11)\">14 CFR 61.105(b)(11)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Some gliders are easier to spin than others.&nbsp; Some gliders may not spin easily with a student and instructor on-board, but behave differently when the same glider is flown solo.&nbsp;</li>\r\n<li>Importance of Weight and Balance relative to spin susceptability.&nbsp;</li>\r\n<li>skidding versus slipping turns and spin susceptability</li>\r\n<li>Some gliders have a different recovery technique.&nbsp; Be familiar with your glider's spin recovery technique!&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to explain the events leading to a spin, and can consistently recognize and recover from an incipient spin.&nbsp;</p>",
+    "sort_key": "00004.00022",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.105(b)(11)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:55:43.841Z",
+    "updated_at": "2026-05-27T17:58:26.282Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 49,
+  "fields": {
+    "code": "4.23",
+    "title": "Spin Recognition and Recovery",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner learn what it feels like to ve in a fully-developed spin and how to recover from the spin.&nbsp; The previous lesson only showed the situations that develop into a spin; this lesson actually has a fully-developed spin.&nbsp;</p>\r\n<p><em><strong>Note: </strong>Practicing</em> spin training is not required for solo, private, commercial glider ratings.&nbsp; However, it is required for the instructor rating. <em>Knowledge </em>of spins and spin recovery techniques are required by <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(11)\">14 CFR 61.105(b)(11)</a>&nbsp;for private pilot and above.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots):&nbsp;<br>Private Pilot Test Candidate: &nbsp;<a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(11)\">14 CFR 61.105(b)(11)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Some gliders are easier to spin than others.&nbsp; Some gliders may not spin easily with a student and instructor on-board, but behave differently when the same glider is flown solo.&nbsp;</li>\r\n<li>Importance of Weight and Balance relative to spin susceptability.&nbsp;</li>\r\n<li>skidding versus slipping turns and spin susceptability</li>\r\n<li>Some gliders have a different recovery technique.&nbsp; Be familiar with your glider's spin recovery technique!&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to explain the events leading to a spin, and can consistently recognize and recover from an incipient spin.&nbsp;</p>",
+    "sort_key": "00004.00023",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.105(b)(11)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:55:53.370Z",
+    "updated_at": "2026-05-27T18:03:22.577Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 50,
+  "fields": {
+    "code": "4.24",
+    "title": "Rapid Speed Changes",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will practice quickly and efficiently changing the airspeed and trimming the glider.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(8)\">14 CFR 61.87(i)(8)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(v)\">14 CFR 61.107(b)(6)(v)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Instructor selects an airspeed for you to fly, quickly adjust the pitch attitude to achieve the airspeed and trim the glider so that it will fly hands-off.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to quickly adjust the pitch and trim to achieve a target airspeed of +/- 5 knots.&nbsp;</p>",
+    "sort_key": "00004.00024",
+    "far_requirement": "14 CFR 61.87(i)(8)",
+    "pts_reference": "14 CFR 61.107(b)(6)(v)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:56:03.472Z",
+    "updated_at": "2026-05-27T18:06:22.132Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 51,
+  "fields": {
+    "code": "4.25",
+    "title": "High-Speed Flight",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will fly the glider between maneuvering speed and the never-exceed speed (redline) to learn how the glider behaves differently&nbsp;&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(8)\">14 CFR 61.87(i)(8)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(v)\">14 CFR 61.107(b)(6)(v)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>one-third control deflection above maneuvering speed!</li>\r\n<li>do not get closer than 10 knots from never-exceed speed</li>\r\n<li>do not practice this maneuver in turbulent air</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to use smooth and coordinated control movements to maneuver the glider at airspeeds between the maneuvering speed and the never-exceed speed.&nbsp;</p>",
+    "sort_key": "00004.00025",
+    "far_requirement": "14 CFR 61.87(i)(8)",
+    "pts_reference": "14 CFR 61.107(b)(6)(v)",
+    "phase": 4,
+    "created_at": "2026-01-26T17:56:12.209Z",
+    "updated_at": "2026-05-27T18:09:42.090Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 52,
+  "fields": {
+    "code": "5.1",
+    "title": "Landing Checklist",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will memorize the pre-landing checklist and practice performing it before each landing.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots):</p>\r\n<ul>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(1)\">14 CFR 61.87(i)(1)</a> <code data-path-to-node=\"4,0,0\" data-index-in-node=\"10\">Proper flight preparation procedures</code><em data-path-to-node=\"4,0,0\" data-index-in-node=\"51\">(includes cockpit management and utilizing proper mnemonics like FUSTALL before entering the pattern)</em>.</li>\r\n</ul>\r\n<p>Private Pilot Test Candidate:&nbsp;</p>\r\n<ul>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(7)\">14 CFR 61.105(b)(7)</a> <code data-path-to-node=\"4,2,0\" data-index-in-node=\"11\">Safe and efficient operation of aircraft</code> <em data-path-to-node=\"4,2,0\" data-index-in-node=\"56\">(standardized use of checklists)</em>.</li>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a> <code data-path-to-node=\"4,1,0\" data-index-in-node=\"14\">Launches and landings</code> <em data-path-to-node=\"4,1,0\" data-index-in-node=\"41\">(specifically evaluated as part of the traffic pattern entry duties)</em>.</li>\r\n</ul>\r\n<h2>Content</h2>\r\n<ul>\r\n<li><span style=\"background-color: rgb(241, 196, 15);\">Use your club-standard landing checklist</span>:&nbsp;</li>\r\n<li>FUSTALL</li>\r\n<li>RUFSTALL</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will have memorized the standard checklist and use it before every landing, making sure to start it early enough in the pattern as to not become a distraction during the pattern.&nbsp;</p>",
+    "sort_key": "00005.00001",
+    "far_requirement": "14 CFR 61.87(i)(1)",
+    "pts_reference": "14 CFR 61.105(b)(7)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:56:20.025Z",
+    "updated_at": "2026-05-27T19:04:01.893Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 53,
+  "fields": {
+    "code": "5.2",
+    "title": "Introduction to the Landing Pattern",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots):&nbsp;</p>\r\n<ul>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(13)\">14 CFR 61.87(i)(13)</a> <code data-path-to-node=\"14,0,0\" data-index-in-node=\"10\">Flight at traffic pattern altitudes and entry procedures</code>.</li>\r\n</ul>\r\n<p>Private Pilot Test Candidate:&nbsp;</p>\r\n<ul>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a> <code data-path-to-node=\"14,1,0\" data-index-in-node=\"14\">Launches and landings</code> <em data-path-to-node=\"14,1,0\" data-index-in-node=\"41\">(specifically the Traffic Pattern task)</em>.</li>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(7)\">14 CFR 61.105(b)(7)</a> <code data-path-to-node=\"14,2,0\" data-index-in-node=\"11\">Safe and efficient operation of aircraft...</code> <em data-path-to-node=\"14,2,0\" data-index-in-node=\"59\">(understanding standard traffic pattern geometry and right-of-way rules)</em>.</li>\r\n</ul>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>The \"Pattern\"</li>\r\n<li>The downwind leg</li>\r\n<li>The stop, touchdown, and aim points</li>\r\n<li>The base leg</li>\r\n<li>Turning final</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will identify each part of the pattern, explain the benefits of flying a pattern, and can enter and fly the pattern maintaining a specified airspeed within +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00005.00002",
+    "far_requirement": "14 CFR 61.87(i)(13)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:56:29.855Z",
+    "updated_at": "2026-05-27T20:51:50.902Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 54,
+  "fields": {
+    "code": "5.3",
+    "title": "Glide Slope Control Using Airbrakes",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to use the airbrakes to regulate the descent rate so that they will arrive at the aim point at the correct altitude and airspeed.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots):&nbsp;</p>\r\n<ul>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(16)\">14 CFR 61.87(i)(16)</a> <code data-path-to-node=\"14,0,0\" data-index-in-node=\"10\">Flight at traffic pattern altitudes and entry procedures</code>.</li>\r\n</ul>\r\n<p>Private Pilot Test Candidate:&nbsp;</p>\r\n<ul>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a> <code data-path-to-node=\"14,1,0\" data-index-in-node=\"14\">Launches and landings</code> <em data-path-to-node=\"14,1,0\" data-index-in-node=\"41\">(specifically the Traffic Pattern task)</em>.</li>\r\n<li><a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(10)\">14 CFR 61.105(b)(10)</a> <code data-path-to-node=\"14,2,0\" data-index-in-node=\"11\">Safe and efficient operation of aircraft...</code> <em data-path-to-node=\"14,2,0\" data-index-in-node=\"59\">(understanding standard traffic pattern geometry and right-of-way rules)</em>.</li>\r\n</ul>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Use the airbrakes to intercept the half-airbrake gilde slope.</li>\r\n<li>Open and close the airbrakes smoothly.&nbsp;</li>\r\n<li>Use caution in making adjustments to the airbrakes when close to the ground</li>\r\n<li>Wind gradient</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will use the airbrakes to arrive at the aim point with the airbrakes halfway deployed, while maintaining the specified airspeed with +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00005.00003",
+    "far_requirement": "14 CFR 61.87(i)(16)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:56:44.405Z",
+    "updated_at": "2026-05-27T20:59:06.069Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 55,
+  "fields": {
+    "code": "5.4",
+    "title": "Radio Use",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will practice and master proper use of the radio.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None</p>\r\n<p>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(5)\">14 CFR 61.105(b)(5)</a> <code data-path-to-node=\"18,2,0\" data-index-in-node=\"11\">Radio communication procedures</code>&nbsp;</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>The only way to become proficient is to practice.&nbsp;</li>\r\n<li>Practice saying the radio calls on the ground until you can repeat them</li>\r\n<li>think through the transmission before pressing the PTT button.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will monitor and use the radio, and be aware of the position of other aircraft based on the radio calls.&nbsp;</p>",
+    "sort_key": "00005.00004",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.105(b)(5)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:56:51.784Z",
+    "updated_at": "2026-05-27T21:04:35.516Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 56,
+  "fields": {
+    "code": "5.5",
+    "title": "Crosswind Patterns",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to fly the pattern to compensate for a crosswind</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(16)\">14 CFR 61.87(i)(16)</a> <code data-path-to-node=\"20,0,0\" data-index-in-node=\"10\">Flight at traffic pattern altitudes...</code> and <code data-path-to-node=\"20,0,0\" data-index-in-node=\"58\">(16) Landings, including normal and crosswind</code>.<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a>&nbsp;<code data-path-to-node=\"20,1,0\" data-index-in-node=\"14\">Launches and landings</code>.</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Determine the different types of crosswind: quartering headwind, crosswind, quartering tailwind.&nbsp;</li>\r\n<li>Modification of pattern due to crosswind</li>\r\n<li>Choosing the proper runway at multiple-runway airports</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will recognize and compensate for a crosswind in the pattern, maintaining the desired airspeed within +10/-5 knots.</p>",
+    "sort_key": "00005.00005",
+    "far_requirement": "14 CFR 61.87(i)(16)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:57:01.325Z",
+    "updated_at": "2026-05-27T23:22:48.085Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 57,
+  "fields": {
+    "code": "5.6",
+    "title": "Unusual Patterns",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to perform unusual paterns, and learn when it is appropriate to execute one.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(19)\">14 CFR 61.87(i)(19)</a> &nbsp;<code data-path-to-node=\"23,0,0\" data-index-in-node=\"10\">Emergency procedures, including equipment malfunctions</code> <em data-path-to-node=\"23,0,0\" data-index-in-node=\"70\">(or premature termination of launch protocols)</em>.<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a> <code data-path-to-node=\"23,1,0\" data-index-in-node=\"14\">Emergency operations</code> <em data-path-to-node=\"23,1,0\" data-index-in-node=\"39\">(specifically the \"Aborted Launch\" or \"Off-Field Landing\" concepts in the PTS)</em>.</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>when to use an unusual pattern</li>\r\n<li>being too close to the runway on downwind</li>\r\n<li>adjusting the pattern (or discarding portions of it!) to maintain safety</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will select and fly the pattern appropriate to the situation, maintaining the desired airspeed with +10/-5 knots.</p>",
+    "sort_key": "00005.00006",
+    "far_requirement": "14 CFR 61.87(i)(19)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:57:13.300Z",
+    "updated_at": "2026-05-27T23:27:19.871Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 58,
+  "fields": {
+    "code": "5.7",
+    "title": "Forward Slip with Airbrakes",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to use a forward slip in addition to airbrakes to increase your descent rate in the pattern.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(17)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(17)</a><em data-path-to-node=\"12,0,0\" data-index-in-node=\"74\">(Slips to a landing)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(iv)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(iv)</a><em data-path-to-node=\"12,1,0\" data-index-in-node=\"54\">(Launches and landings)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Use of airbrakes in addition to the slip for glideslope control</li>\r\n<li>Maintaining constant pitch attitude</li>\r\n<li>Removing the slip and closing the airbrakes halfway when intercepting the half-airbrake glide slope</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will recover from being too high on final by using a slip with the airbrakes, while maintaining the desired airspeed within +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00005.00007",
+    "far_requirement": "14 CFR 61.87(i)(17)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:57:24.474Z",
+    "updated_at": "2026-08-18T23:14:50.592Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 59,
+  "fields": {
+    "code": "5.8",
+    "title": "Turning Slips",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will perform a turning slip during the turn from base to final</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): &nbsp;<a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(17)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(17)</a><em data-path-to-node=\"12,0,0\" data-index-in-node=\"74\">(Slips to a landing)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(iv)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(iv)</a> <em data-path-to-node=\"12,1,0\" data-index-in-node=\"54\">(Launches and landings)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Staying in the slip by holding outside rudder while performing the turn.&nbsp;</li>\r\n<li>Remove slip after intercepting the half-airbrake glide slope.&nbsp;</li>\r\n<li>Make sure to use slips and not skids in the pattern!</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will slip the glider in the turn from base to final while maintaining the desired airspeed within +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00005.00008",
+    "far_requirement": "14 CFR 61.87(i)(17)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:57:32.921Z",
+    "updated_at": "2026-08-18T23:16:30.313Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 60,
+  "fields": {
+    "code": "5.9",
+    "title": "Side Slip in the Pattern",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will use a side slip to correct for an alignment ereror that the instructor will intentionally create on final.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(17)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(17)</a><em data-path-to-node=\"16,0,0\" data-index-in-node=\"74\">(Slips to a landing)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(iv)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(iv)</a><em data-path-to-node=\"16,1,0\" data-index-in-node=\"54\">(Launches and landings &mdash; specifically to address crosswind correction components)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>The instructor will fly your final off to one side of the runway.&nbsp; You will use the sideslip to correct the alignment error.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will correctly use a side slip to align the glider with the runway while maintaining the desired airspeed within +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00005.00009",
+    "far_requirement": "14 CFR 61.87(i)(17)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:57:41.927Z",
+    "updated_at": "2026-08-18T23:16:58.881Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 61,
+  "fields": {
+    "code": "5.10",
+    "title": "No Altimeter Pattern",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to fly a normal pattern without reference to the altimeter.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(9)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(9)</a><em data-path-to-node=\"4,0,0\" data-index-in-node=\"73\">(Emergency procedures and equipment malfunctions)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(x)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(x)</a><em data-path-to-node=\"4,1,0\" data-index-in-node=\"53\">(Emergency operations)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Learning how to adjust the altimeter based on the AWOS altimter setting</li>\r\n<li>Using angles to judge altitude in the pattern</li>\r\n<li>Covered altimeter in the pattern</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will accurately fly a pattern without reference to the altimeter while maintaining the desired airspeed within+10/-5 knots and can land the glider within a designated area, and get the glider stopped within 200 feet but short of a designated point.&nbsp;</p>",
+    "sort_key": "00005.00010",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:57:50.494Z",
+    "updated_at": "2026-08-18T23:17:35.630Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 62,
+  "fields": {
+    "code": "5.11",
+    "title": "No Altimeter / Airspeed Pattern",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will simulate a static source failure, causing the airspeed indicator and altimeter instruments to fail.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(9)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(9)</a><em data-path-to-node=\"4,0,0\" data-index-in-node=\"73\">(Emergency procedures and equipment malfunctions)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(x)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(x)</a><em data-path-to-node=\"4,1,0\" data-index-in-node=\"53\">(Emergency operations)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>The instructor will cover both instruments before or during the flight.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will perform a pattern and landing without reference to the airspeed indicator or altimeter and can land the glider within a designated area, stopped within 200 feet but short of a designated point.&nbsp;</p>",
+    "sort_key": "00005.00011",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:58:01.533Z",
+    "updated_at": "2026-08-18T23:18:02.720Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 63,
+  "fields": {
+    "code": "5.12",
+    "title": "No Airbrake Pattern",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will use a forward slip to control the glide slope on base and final.&nbsp; The learner will use a forward slip instead of airbrakes to regulate the descent rate in the pattern.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(9)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(9)</a> <em data-path-to-node=\"8,0,1,0,0\" data-index-in-node=\"19\">(Emergency procedures and equipment malfunctions)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(x)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(x)</a><em data-path-to-node=\"8,1,0\" data-index-in-node=\"53\">(Emergency operations)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Instructor demonstrates a no-airbrake pattern and landing&nbsp;</li>\r\n<li>Make sure the pattern is not so low that you won't make it to the runway.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will land the glider using only a slip to control your descent rate while maintaining the desired airspeed within +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00005.00012",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:58:09.440Z",
+    "updated_at": "2026-08-18T23:18:28.318Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 64,
+  "fields": {
+    "code": "5.13",
+    "title": "Full Airbrake Pattern",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will fly a modified pattern to compensate for the extra sink rate caused by fully open airbrakes.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(9)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(9)</a><em data-path-to-node=\"8,0,1,0,0\" data-index-in-node=\"19\">(Emergency procedures and equipment malfunctions)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(x)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(x)</a><em data-path-to-node=\"8,1,0\" data-index-in-node=\"53\">(Emergency operations)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Tighten the pattern, using higher angles relative to the ground.&nbsp;</li>\r\n<li>Don't touch down with full airbrakes if the wheel brake is connected to the full spoilers.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will fly a pattern and landon the runway with the airbrakes fully open while maintaining the desired airspeed within +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00005.00013",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 5,
+    "created_at": "2026-01-26T17:58:17.621Z",
+    "updated_at": "2026-08-18T23:19:03.195Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 65,
+  "fields": {
+    "code": "6.1",
+    "title": "Introduction to the Landing",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to land the glider.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(16)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(16)</a><em data-path-to-node=\"4,0,0\" data-index-in-node=\"74\">(Landings, including normal and crosswind)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(iv)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(iv)</a><em data-path-to-node=\"4,1,1,0,0\" data-index-in-node=\"24\">(Launches and landings)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Approach</li>\r\n<li>Flare</li>\r\n<li>Hold Off</li>\r\n<li>Roll-out</li>\r\n<li>Landing attitude&nbsp;</li>\r\n<li>Ground Effect</li>\r\n<li>Pilot-Induced Oscillations (PIOs)</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will consistently perform a two-point or tail wheel first landing and control the glider during the rollout, keeping it within 15 feet of centerline.&nbsp;</p>",
+    "sort_key": "00006.00001",
+    "far_requirement": "14 CFR 61.87(i)(16)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 6,
+    "created_at": "2026-01-26T17:58:33.549Z",
+    "updated_at": "2026-08-18T23:19:27.563Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 66,
+  "fields": {
+    "code": "6.2",
+    "title": "Precision Landings",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will make small adjustments to the airbrakes during the hold off to fine-tune the touchdown and stop points.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(16)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(16)</a><em data-path-to-node=\"6,0,0\" data-index-in-node=\"74\">(Landings, including normal and crosswind)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(iv)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(iv)</a><em data-path-to-node=\"6,1,1,0,0\" data-index-in-node=\"24\">(Launches and landings)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Pay attention to flying a precise pattern.&nbsp;</li>\r\n<li>Approach the aim point with small adjustments to the airbrake setting as necessary</li>\r\n<li>After touchdown, use airbrakes and wheel brakes as necessary to stop the glider ant the designated stop point.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The lesson is complete when the learner can consistently perform a smooth landing touching down within a designated landing area within 5 feet of the centerline, and stopping within 200 feet but short of a designated point.&nbsp;</p>",
+    "sort_key": "00006.00002",
+    "far_requirement": "14 CFR 61.87(i)(16)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 6,
+    "created_at": "2026-01-26T17:58:44.985Z",
+    "updated_at": "2026-08-18T23:19:54.944Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 67,
+  "fields": {
+    "code": "6.3",
+    "title": "Crosswind Landings",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will compensate for a crosswind while landing by using a side slip.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(16)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(16)</a><em data-path-to-node=\"8,0,0\" data-index-in-node=\"76\">(Landings, including normal and crosswind)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(iv)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(iv)</a>&lt;<em data-path-to-node=\"8,1,1,0,0\" data-index-in-node=\"24\">(Launches and landings)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Pointing the nose straight down the runway, using ailerons and rudder to compensate for the crosswind&nbsp;</li>\r\n<li>Using crab to get into position&nbsp;</li>\r\n<li>Not landing when the glider is in a crab.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The lesson is complete when the learner consistently performs a smooth landing in a crosswind, touching down within a designated landing area, and stopping within 200 feet but short of a designated point.&nbsp;</p>\r\n<p>&nbsp;</p>",
+    "sort_key": "00006.00003",
+    "far_requirement": "14 CFR 61.87(i)(16)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 6,
+    "created_at": "2026-01-26T17:58:55.138Z",
+    "updated_at": "2026-08-18T23:20:18.028Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 68,
+  "fields": {
+    "code": "6.4",
+    "title": "Landing Over an Obstacle",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will land a glider and get it stopped using as little runway as possible after clearing an obstacle in the flight path.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(16)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(16)</a><em data-path-to-node=\"8,0,0\" data-index-in-node=\"76\">(Landings, including normal and crosswind)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(iv)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(iv)</a> <em data-path-to-node=\"8,1,1,0,0\" data-index-in-node=\"24\">(Launches and landings)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Half-airbrakes</li>\r\n<li>aim-point</li>\r\n<li>full-airbrakes</li>\r\n<li>flare and touchdown&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The lesson is complete when the learner can consistently perform a landing and get the glider stopped within a designated distance after clearing a simulated obstacle on final, while maintaining the specified airspeed within +10/-5 knots.&nbsp;</p>",
+    "sort_key": "00006.00004",
+    "far_requirement": "14 CFR 61.87(i)(16)",
+    "pts_reference": "14 CFR 61.107(b)(6)(iv)",
+    "phase": 6,
+    "created_at": "2026-01-26T17:59:06.614Z",
+    "updated_at": "2026-08-18T23:20:37.657Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 69,
+  "fields": {
+    "code": "6.5",
+    "title": "Simulated Off-Field Landing",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will practice landing the glider with minimum energy (i.e., speed) and getting it stopped as quickly as possible.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(9)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(9)</a><em data-path-to-node=\"12,0,0\" data-index-in-node=\"73\">(Emergency procedures and equipment malfunctions)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(x)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(x)</a><em data-path-to-node=\"12,1,1,1,0\" data-index-in-node=\"23\">(Emergency operations)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Keep the glider in the air as long as possible, just above the ground</li>\r\n<li>Open airbrakes immeidately after touchdown</li>\r\n<li>Use wheel brake without locking up the wheel&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>This lesson is complete when the learner can consistently perform minimum-energy landings.&nbsp;</p>",
+    "sort_key": "00006.00005",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 6,
+    "created_at": "2026-01-26T17:59:22.390Z",
+    "updated_at": "2026-08-18T23:20:55.506Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 70,
+  "fields": {
+    "code": "6.6",
+    "title": "Downwind Landing",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to perform downwind landings.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-C/section-61.87#p-61.87(i)(9)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.87(i)(9)</a><em data-path-to-node=\"14,0,0\" data-index-in-node=\"73\">(Emergency procedures and equipment malfunctions)</em><br>Private Pilot Test Candidate: <a class=\"ng-star-inserted\" href=\"https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-E/section-61.107#p-61.107(b)(6)(x)\" target=\"_blank\" rel=\"noopener\">14 CFR 61.107(b)(6)(x)</a><em data-path-to-node=\"14,1,1,0,0\" data-index-in-node=\"23\">(Emergency operations)</em></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>in moderate wind, the instructor will have you land with a tailwind.&nbsp;</li>\r\n<li>Ground speed is much higher than normal.&nbsp;</li>\r\n<li>Ensure you don't flare higher than normal.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>This lesson is complete when you can consistently perform a smooth landing with a tailwind while maintaining the specified airspeed within +10/-5 knots, up to the flare.&nbsp;</p>",
+    "sort_key": "00006.00006",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 6,
+    "created_at": "2026-01-26T22:05:14.070Z",
+    "updated_at": "2026-08-18T23:40:29.448Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 71,
+  "fields": {
+    "code": "7.1",
+    "title": "Thermaling",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<ul>\r\n<li>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(18)\">14 CFR 61.87(i)(18)</a></li>\r\n<li>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(vi)\">14 CFR 61.107(b)(6)(vi)</a></li>\r\n</ul>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Identifying thermal generators and markers</li>\r\n<li>selecting clouds</li>\r\n<li>flying in a gaggle</li>\r\n<li>maximizing climb rate</li>\r\n<li>centering the thermal</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will understand and explain how to find thermals, how to fly in a gaggle of gliders, and how to maximize the climb rate</p>",
+    "sort_key": "00007.00001",
+    "far_requirement": "14 CFR 61.87(i)(18)",
+    "pts_reference": "14 CFR 61.107(b)(6)(vi)",
+    "phase": 7,
+    "created_at": "2026-01-26T22:06:47.093Z",
+    "updated_at": "2026-07-19T01:33:27.506Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 72,
+  "fields": {
+    "code": "7.2",
+    "title": "Mountain Wave",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the procedure and hazards of wave flying.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(vi)\">14 CFR 61.107(b)(6)(vi)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>How wave is formed</li>\r\n<li>Hazards of wave flying\r\n<ul>\r\n<li>Getting caught with undercast</li>\r\n<li>Hypothermia</li>\r\n<li>Hypoxia</li>\r\n<li>Rotor</li>\r\n<li>High speed jet traffic</li>\r\n<li>Class A airspace</li>\r\n<li>Getting blown downwind</li>\r\n</ul>\r\n</li>\r\n<li>Location of wave lift</li>\r\n<li>Working wave / rotor lift</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will explain the conditions that cause mountain wave, the hazards associated with wave flying, the location of lthe lift and sink associated with wave, and the method of working wave lift.&nbsp;</p>",
+    "sort_key": "00007.00002",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.107(b)(6)(vi)",
+    "phase": 7,
+    "created_at": "2026-01-26T22:06:57.835Z",
+    "updated_at": "2026-08-04T01:30:53.220Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 73,
+  "fields": {
+    "code": "7.3",
+    "title": "Ridge",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the techniques and risks of ridge soaring</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(vi)\">14 CFR 61.107(b)(6)(vi)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Procedure</li>\r\n<li>Approaching the ridge at the correct angle</li>\r\n<li>Right-of-Way rules on the ridge</li>\r\n<li>Hazards:\r\n<ul>\r\n<li>Getting caught on the lee side</li>\r\n<li>Insufficient wind to maintain ridge lift</li>\r\n<li>Extreme turbulence</li>\r\n</ul>\r\n</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will understand and explain how ridge lift is created, how to climb in ridge lift, and how to apply the right-of-way rules of ridge flying.</p>",
+    "sort_key": "00007.00003",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.107(b)(6)(vi)",
+    "phase": 7,
+    "created_at": "2026-01-26T22:07:07.261Z",
+    "updated_at": "2026-08-04T01:33:18.900Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 74,
+  "fields": {
+    "code": "7.4",
+    "title": "Convergence / Shear",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to use the lift from a convergence or shear line. This type of lift is highly dependent on location.</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(vi)\">14 CFR 61.107(b)(6)(vi)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Recognizeing convergence lift</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will explain the conditions leading to convergence lift and the methods for working it.</p>",
+    "sort_key": "00007.00004",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.107(b)(6)(vi)",
+    "phase": 7,
+    "created_at": "2026-01-26T22:07:23.473Z",
+    "updated_at": "2026-08-04T01:36:37.139Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 75,
+  "fields": {
+    "code": "8.1",
+    "title": "Introduction to Premature Aerotow Release",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn to use the rope-break plan, and learn how to make a pre-take-off briefing with low-altitude rope breaks as the focus.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(19)\">14 CFR 61.87(i)(19)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Pre-take off safety brief (Emergency Plan)\r\n<ul>\r\n<li>On Runway</li>\r\n<li>Straight ahead landing</li>\r\n<li>180 degree return to downwind landing</li>\r\n<li>perform abbreviated pattern</li>\r\n<li>normal pattern&nbsp;</li>\r\n</ul>\r\n</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to review rope break procedures as an emergency plan for every take-off. The learner will call out the transition points in the plan while climbing on tow.&nbsp;</p>",
+    "sort_key": "00008.00001",
+    "far_requirement": "14 CFR 61.87(i)(19)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 8,
+    "created_at": "2026-01-26T22:07:46.167Z",
+    "updated_at": "2026-08-17T00:41:00.080Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 76,
+  "fields": {
+    "code": "8.2",
+    "title": "Simulated Rope Breaks",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will execute the rope breaks in the event of a tow that was terminated prematurely.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(19)\">14 CFR 61.87(i)(19)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Generally, the instructor demonstrates the different rope break procedures, and will warn you before pulling the rope break the first time.&nbsp;</li>\r\n<li>Make a radio call if time permits</li>\r\n<li>Do not open airbrakes until you are absolutely sure you will make it back to the runway</li>\r\n<li>Landing Straight Ahead</li>\r\n<li>180 degree return to a downwind landing</li>\r\n<li>Abbreviated Pattern</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will execute a safe landing after a simulated rope break from any altitude while maintaining the appropriate airspeed.&nbsp;</p>",
+    "sort_key": "00008.00002",
+    "far_requirement": "14 CFR 61.87(i)(19)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 8,
+    "created_at": "2026-01-26T22:07:55.428Z",
+    "updated_at": "2026-08-17T00:44:31.090Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 79,
+  "fields": {
+    "code": "8.3",
+    "title": "Rock Off",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn what to do when the tow plane malfunctions while on aero tow.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(9)\">14 CFR 61.87(i)(9)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>It's Simple: If the tow plane rocks wings, you pull the release.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner is expected to react properly to the rock-off signal by immediately releasing the towrope and executing the following rope break plan.&nbsp;</p>",
+    "sort_key": "00008.00003",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 8,
+    "created_at": "2026-01-26T22:09:15.929Z",
+    "updated_at": "2026-08-17T00:46:24.138Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 80,
+  "fields": {
+    "code": "8.4",
+    "title": "Tow Plane Power Loss During Takeoff",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to abort a takeoff due to loss of power whilst on the runway.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(9)\">14 CFR 61.87(i)(9)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>open airbrakes and get the glider stopped as soon as possible.&nbsp;</li>\r\n<li>The towplane will move left to give you room in case you have to pass the tow plane.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will explain the symptoms of a tow plane power loss on takeoff and can execute or describe the proper reaction.&nbsp;</p>",
+    "sort_key": "00008.00004",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 8,
+    "created_at": "2026-01-26T22:09:32.809Z",
+    "updated_at": "2026-08-17T00:48:44.565Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 81,
+  "fields": {
+    "code": "8.5",
+    "title": "Tow Plane Power Loss at Altitude",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the signs of tow plane power loss at altitude. The learner will also learn how to react to avoid a collision with the tow plane.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(9)\">14 CFR 61.87(i)(9)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>The Tow plane will start to descend</li>\r\n<li>Maintaining proper tow position will cause the glider to overake the towplane.</li>\r\n<li>Release and quickly turn right!</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will quickly recognize when the tow plane has lost power and take immediate action to avoid overtaking it.</p>",
+    "sort_key": "00008.00005",
+    "far_requirement": "14 CFR 61.87(i)(9)",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 8,
+    "created_at": "2026-01-26T22:09:44.941Z",
+    "updated_at": "2026-08-17T00:50:41.348Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 82,
+  "fields": {
+    "code": "8.7",
+    "title": "Spiral Dive Recovery",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will recognize and safely recover from a spiral dive. The learner will distinguish between a spiral dive and a spin.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(15)\">14 CFR 61.87(i)(15)</a><br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Steep-banked descending turn, allow the airspeed to increase</li>\r\n<li>As the airspeed approaches maneuvering speed, recover by relaxing back pressure on the stick, and reducing bank angle.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will recognize and recover from a spiral dive and distinguish between a spin and a spiral dive.</p>",
+    "sort_key": "00008.00007",
+    "far_requirement": "14 CFR 61.87(i)(15)",
+    "pts_reference": "",
+    "phase": 8,
+    "created_at": "2026-01-26T22:09:57.929Z",
+    "updated_at": "2026-08-17T01:06:30.335Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 83,
+  "fields": {
+    "code": "8.8",
+    "title": "Unusual Attitude Recovery",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the concepts of recovering from an unusual attitude upset without overstressing the glider.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>If the nose is up, get it down, then level the wings.&nbsp;</li>\r\n<li>If the nose is down, level the wings first, then raise the nose.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will recognize and recover from any unusual attitude using smooth and coordinated control inputs, without losing excessive altitude or exceeding the flight limitations of the glider.&nbsp;</p>",
+    "sort_key": "00008.00008",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 8,
+    "created_at": "2026-01-26T22:10:12.676Z",
+    "updated_at": "2026-08-17T01:08:23.914Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 84,
+  "fields": {
+    "code": "8.9",
+    "title": "Intercept Procedures",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to respond to an intercepting aircraft.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>If you are ever intercepted, the intercepting aircraft will fly along side you and rock its wings.&nbsp;&nbsp;</li>\r\n<li>Acknowledge by rocking your wings.&nbsp;</li>\r\n<li>If a military aircraft does not rock its wings, you are not being intercepted.</li>\r\n<li>Contact ATC on 121.5 and give aircraft type, registration number, position.&nbsp;</li>\r\n<li>If the intercepting aircraft overflies an airport and lowers its landing gear, you should land at the airport.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will explain intercept signals and procedures.&nbsp;</p>",
+    "sort_key": "00008.00009",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 8,
+    "created_at": "2026-01-26T22:10:26.906Z",
+    "updated_at": "2026-08-17T01:10:50.965Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 85,
+  "fields": {
+    "code": "9.1",
+    "title": "Situational Awareness",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will be taught how to evaluate and improve your situational awareness.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>As you progress in your flying skills increase, you will be able to develop increasing awareness of your environment.&nbsp;</li>\r\n<li>Before first solo, you must have developed enough situational awareness to keep from getting into situations where you do not have enough skill to cope with the situation.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will develop and consistently maintain sufficient situational awareness to simultaneously control the glider, monitor traffic, communicate, and evaluate the weather.&nbsp;</p>",
+    "sort_key": "00009.00001",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 9,
+    "created_at": "2026-01-26T22:10:41.419Z",
+    "updated_at": "2026-08-17T01:16:01.478Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 86,
+  "fields": {
+    "code": "9.2",
+    "title": "Judgment",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will be evaluated for making good and bad decisions.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None&nbsp;<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Overly inflating the benefit of a decision</li>\r\n<li>lack of knowledge of hazards associated with a decision</li>\r\n<li>underestimating the risks involved with a decision</li>\r\n<li>failure to use a systematic decision making process</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will use a systematic decision making process to reach appropriate decisions based on personal values.&nbsp;</p>",
+    "sort_key": "00009.00002",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 9,
+    "created_at": "2026-01-26T22:10:55.618Z",
+    "updated_at": "2026-08-17T01:18:23.103Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 87,
+  "fields": {
+    "code": "9.3",
+    "title": "Self-Discipline",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will be evaluated on the ability to follow through on the decisions covered in the last lesson <em><span style=\"text-decoration: underline;\"><strong>9.2 Judgment</strong></span></em></p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>See Lesson 9.3 of the <strong>Flight Training Manual for Gliders</strong> book.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will have the self-discipline to consistently respect personal limits.&nbsp;</p>",
+    "sort_key": "00009.00003",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 9,
+    "created_at": "2026-01-26T22:11:09.553Z",
+    "updated_at": "2026-08-17T01:21:00.505Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 88,
+  "fields": {
+    "code": "4.10",
+    "title": "Crabbing During Cruising Flight",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn how to adjust a glider's flight path to adjust for crosswind</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(15)\">14 CFR 61.87(i)(15)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(viii)\">14 CFR 61.107(b)(6)(viii)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>difference between heading and ground track</li>\r\n<li>use of coordinated inputs</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will adjust the crab angle to maintain a specified ground track within 10 degrees using smooth and coordinated control inputs.&nbsp;</p>",
+    "sort_key": "00004.00010",
+    "far_requirement": "14 CFR 61.87(i)(15)",
+    "pts_reference": "14 CFR 61.107(b)(6)(viii)",
+    "phase": 4,
+    "created_at": "2026-05-26T01:00:51.468Z",
+    "updated_at": "2026-07-18T16:46:07.470Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 89,
+  "fields": {
+    "code": "4.20",
+    "title": "Deep Stall Recognition and Recovery",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn trecognize and recover from a deep stall.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.87#p-61.87(i)(14)\">14 CFR 61.87(i)(14)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(ix)\">14 CFR 61.107(b)(6)(ix)</a>, <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(11)\">14 CFR 61.105(b)(11)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Clear the area</li>\r\n<li>Lower the nose to attain sufficient airspeed</li>\r\n<li>initiate the deep stall by raising the nose about 45 degrees above the horizon</li>\r\n<li>the nose will pitch down severely. Recover.&nbsp;</li>\r\n<li>be aware of the secondary stall</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will learn to recover from a deep stall with a minimal loss of altitude.</p>",
+    "sort_key": "00004.00020",
+    "far_requirement": "14 CFR 61.87(i)(14)",
+    "pts_reference": "14 CFR 61.107(b)(6)(ix)",
+    "phase": 4,
+    "created_at": "2026-05-26T02:49:55.900Z",
+    "updated_at": "2026-07-18T16:46:25.157Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 90,
+  "fields": {
+    "code": "6.7",
+    "title": "High Wind Landings",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will handle the special challenges during landing in high winds.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(iv)\">14 CFR 61.107(b)(6)(iv)</a><br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.105#p-61.105(b)(6)\">14 CFR 61.105(b)(6)</a></p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Selecting appropriate approach speed</li>\r\n<li>Note that downwind leg the ground speed is higher</li>\r\n<li>Note that on final the ground speed will be very low</li>\r\n<li>Knowledge of wind gradient on short final</li>\r\n<li>Getting out of the glider in high winds</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will fly the pattern in a high wind maintaining the specified airspeed and perform a smooth landing touching down within a deisgnated landing area.&nbsp;</p>",
+    "sort_key": "00006.00007",
+    "far_requirement": "14 CFR 61.87(i)(16)",
+    "pts_reference": "14 CFR 61.105(b)(6)",
+    "phase": 6,
+    "created_at": "2026-07-12T02:09:15.270Z",
+    "updated_at": "2026-07-18T22:14:24.850Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 91,
+  "fields": {
+    "code": "6.8",
+    "title": "High Density Altitude Landings",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn the significance of high density altitude, and how it affects landings</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: None</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Refer to Chapter 5 in the Glider Pilot's Handbook of Aeronautical Knowledge.&nbsp;</li>\r\n<li>Low Pressure, high temperature, high altitude will increase the density altitude.&nbsp;</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will understand and explain how high density altitude affects the glider during a landing.&nbsp;</p>",
+    "sort_key": "00006.00008",
+    "far_requirement": "",
+    "pts_reference": "",
+    "phase": 6,
+    "created_at": "2026-07-18T23:54:32.165Z",
+    "updated_at": "2026-07-19T01:26:01.457Z"
+  }
+},
+{
+  "model": "instructors.traininglesson",
+  "pk": 92,
+  "fields": {
+    "code": "8.6",
+    "title": "Simultaneous Release Failure",
+    "description": "<h2>Lesson Objective</h2>\r\n<p>During this lesson, the learner will learn two different ways to deal with simultaneous failure of both the glider and tow plane's release mechanisms.&nbsp;</p>\r\n<h2>Regulatory Requirement</h2>\r\n<p>Pre-Solo pilot (Student Pilot and Transition Pilots): None<br>Private Pilot Test Candidate: <a href=\"https://www.ecfr.gov/current/title-14/part-61/section-61.107#p-61.107(b)(6)(x)\">14 CFR 61.107(b)(6)(x)</a> This subject is mentioned in the Practical Test Standards</p>\r\n<h2>Content</h2>\r\n<ul>\r\n<li>Break the rope</li>\r\n<li>Landing on Tow</li>\r\n</ul>\r\n<h2>Completion Standard</h2>\r\n<p>The learner will be able to describe the procedures to break the rope and how to land on tow.&nbsp; There are no test standards in the United States that require this ability to be demonstrated. There are also no documented cases of this type of emergency in the last 50 years.&nbsp;</p>",
+    "sort_key": "00008.00006",
+    "far_requirement": "",
+    "pts_reference": "14 CFR 61.107(b)(6)(x)",
+    "phase": 8,
+    "created_at": "2026-08-17T00:52:43.387Z",
+    "updated_at": "2026-08-17T04:01:51.531Z"
+  }
+}
+]
