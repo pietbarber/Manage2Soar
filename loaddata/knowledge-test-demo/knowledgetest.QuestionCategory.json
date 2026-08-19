@@ -1,0 +1,107 @@
+[
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "ACRO",
+    "fields": {
+      "description": "Aerobatics"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "ADO",
+    "fields": {
+      "description": "Assistant Duty Officer"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "AIM",
+    "fields": {
+      "description": "Aeronautical Information Manual"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "AMF",
+    "fields": {
+      "description": "Aeromedical Factors"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "ASK21",
+    "fields": {
+      "description": "ASK-21 specific questions"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "Discus",
+    "fields": {
+      "description": "Discus CS Questions"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "DO",
+    "fields": {
+      "description": "Duty Officer Operations"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "FAR",
+    "fields": {
+      "description": "Federal Regulations"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "GF",
+    "fields": {
+      "description": "Glider Flying Technique"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "GFH",
+    "fields": {
+      "description": "Glider Flying General Knowledge"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "GNDOPS",
+    "fields": {
+      "description": "SSC Ground Operations"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "PW5",
+    "fields": {
+      "description": "PW-5 Presolo Questions"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "SSC",
+    "fields": {
+      "description": "Skyline Soaring Club questions"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "ST",
+    "fields": {
+      "description": "Soaring Technique"
+    }
+  },
+  {
+    "model": "knowledgetest.questioncategory",
+    "pk": "WX",
+    "fields": {
+      "description": "Weather"
+    }
+  }
+]

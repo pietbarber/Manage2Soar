@@ -1,0 +1,530 @@
+[
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 1,
+    "fields": {
+      "name": "Written test 1",
+      "description": "DO logsheet test. See email about this.",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-02-15T17:17:03.469Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 2,
+    "fields": {
+      "name": "Written test 2",
+      "description": "Duty Officer Written Test Bank questions",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-02-22T20:22:08.196Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 3,
+    "fields": {
+      "name": "Written test 3",
+      "description": "Duty Officer Written Test Bank questions.",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-02-22T20:22:35.929Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 4,
+    "fields": {
+      "name": "Written test 4",
+      "description": "Duty Officer Written Test Bank questions",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-02-22T20:22:57.436Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 5,
+    "fields": {
+      "name": "Written test 5",
+      "description": "ADO Written test",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-02-26T02:50:10.160Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 6,
+    "fields": {
+      "name": "Written test 6",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-02-28T14:28:47.800Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 7,
+    "fields": {
+      "name": "Written test 7",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-03-08T04:46:51.421Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 8,
+    "fields": {
+      "name": "Written test 8",
+      "description": "ASK 21 test",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-03-13T19:54:19.320Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 9,
+    "fields": {
+      "name": "Written test 9",
+      "description": "PW5 Only",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-03-15T02:16:32.574Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 10,
+    "fields": {
+      "name": "Written test 10",
+      "description": "ADO Written Test.  Good Luck!",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-03-17T23:36:51.812Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 11,
+    "fields": {
+      "name": "Written test 11",
+      "description": "Pw5 written test",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-03-22T14:43:12.258Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 12,
+    "fields": {
+      "name": "Written test 12",
+      "description": "ADO Qualification",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-03-23T14:13:30.157Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 13,
+    "fields": {
+      "name": "Written test 13",
+      "description": "",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-04-02T01:18:15.580Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 14,
+    "fields": {
+      "name": "Written test 14",
+      "description": "ADO written test",
+      "pass_percentage": "70.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-04-11T17:56:45.142Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 15,
+    "fields": {
+      "name": "Written test 15",
+      "description": "ASK 21 pre solo test",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-04-17T14:48:33.874Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 16,
+    "fields": {
+      "name": "Written test 16",
+      "description": "PW5-specific questions",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-04T00:02:33.615Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 17,
+    "fields": {
+      "name": "Written test 17",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-06T14:19:11.665Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 18,
+    "fields": {
+      "name": "Written test 18",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-06T14:20:39.468Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 19,
+    "fields": {
+      "name": "Written test 19",
+      "description": "ASK-21",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-07T12:22:39.702Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 20,
+    "fields": {
+      "name": "Written test 20",
+      "description": "ASK-21",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-07T12:24:41.813Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 21,
+    "fields": {
+      "name": "Written test 21",
+      "description": "ASK-21",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-07T12:28:43.915Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 22,
+    "fields": {
+      "name": "Written test 22",
+      "description": "ASK-21 presolo written exam.",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-07T14:12:25.753Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 23,
+    "fields": {
+      "name": "Written test 23",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-07T14:59:19.153Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 24,
+    "fields": {
+      "name": "Written test 24",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-07T15:04:24.469Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 25,
+    "fields": {
+      "name": "Written test 25",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-07T17:10:43.090Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 26,
+    "fields": {
+      "name": "Written test 26",
+      "description": "PW5 Test",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-08T16:47:17.060Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 27,
+    "fields": {
+      "name": "Written test 27",
+      "description": "AKS-21 pre-solo written test",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-08T17:36:49.446Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 28,
+    "fields": {
+      "name": "Written test 28",
+      "description": "PW5 presolo written exam.",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-08T19:45:28.728Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 29,
+    "fields": {
+      "name": "Written test 29",
+      "description": "ASK-21 Pre-Solo written test",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-09T13:57:45.558Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 30,
+    "fields": {
+      "name": "Written test 30",
+      "description": "ASK-21 Pre-Solo written test",
+      "pass_percentage": "70.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-09T13:59:45.796Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 31,
+    "fields": {
+      "name": "Written test 31",
+      "description": "PW-5 Written test",
+      "pass_percentage": "70.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-09T14:00:13.071Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 32,
+    "fields": {
+      "name": "Written test 32",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-09T14:01:44.787Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 33,
+    "fields": {
+      "name": "Written test 33",
+      "description": "PW5 retest",
+      "pass_percentage": "70.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-09T14:09:26.154Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 34,
+    "fields": {
+      "name": "Written test 34",
+      "description": "PW5",
+      "pass_percentage": "70.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-09T14:12:58.019Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 35,
+    "fields": {
+      "name": "Written test 35",
+      "description": "PWTest",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-09T14:56:47.437Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 36,
+    "fields": {
+      "name": "Written test 36",
+      "description": "",
+      "pass_percentage": "70.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-10T00:46:05.205Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 37,
+    "fields": {
+      "name": "Written test 37",
+      "description": "ASK-21 pre-solo test",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-11T03:49:36.717Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 38,
+    "fields": {
+      "name": "Written test 38",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-07-25T17:20:45.513Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 39,
+    "fields": {
+      "name": "Written test 39",
+      "description": "",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-08-15T17:40:03.284Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 40,
+    "fields": {
+      "name": "Written test 40",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-08-16T16:29:46.631Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 41,
+    "fields": {
+      "name": "Written test 41",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-08-16T16:33:12.239Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 42,
+    "fields": {
+      "name": "Written test 42",
+      "description": "",
+      "pass_percentage": "80.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-08-16T16:35:46.841Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 43,
+    "fields": {
+      "name": "Written test 43",
+      "description": "",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-08-16T16:36:34.994Z"
+    }
+  },
+  {
+    "model": "knowledgetest.writtentesttemplate",
+    "pk": 44,
+    "fields": {
+      "name": "Written test 44",
+      "description": "",
+      "pass_percentage": "100.00",
+      "time_limit": null,
+      "created_by": null,
+      "created_at": "2026-08-16T16:53:28.662Z"
+    }
+  }
+]
