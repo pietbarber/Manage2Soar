@@ -27,6 +27,8 @@ explicitly changes them.
 
 ## Guest Settlement
 
+- Commercial rides are treated as prepaid and do not create a member or guest
+  settlement obligation; the commercial-ride flag is the explicit charge type.
 - Every guest flight must have a payment method before the logsheet can close.
 - Supported guest methods are cash, check, and Zelle.
 - Guest cash, check, and Zelle use the remittance workflow.
