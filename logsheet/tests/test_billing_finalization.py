@@ -131,6 +131,39 @@ def test_guest_finalization_posts_pending_payment_to_responsible_member(member):
 
 
 @pytest.mark.django_db
+def test_guest_finalization_requires_explicit_payment_method(member):
+    airfield = Airfield.objects.create(identifier="KGM1", name="Guest Method")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    flight = _flight(
+        logsheet,
+        member,
+        guest_pilot_name="Guest Pilot",
+        commercial_ride=False,
+    )
+    guest_payment = LogsheetGuestPayment.objects.create(
+        logsheet=logsheet,
+        flight=flight,
+        responsible_member=member,
+        guest_name="Guest Pilot",
+        amount=Decimal("40.00"),
+    )
+
+    with pytest.raises(ValidationError, match="payment method"):
+        logsheet_services.finalize_logsheet_financials(
+            logsheet_id=logsheet.pk,
+            actor=member,
+            enqueue_summary=Mock(),
+        )
+
+    assert not Logsheet.objects.get(pk=logsheet.pk).finalized
+    assert not LedgerEntry.objects.filter(
+        source_key=f"guest-payment:{guest_payment.pk}"
+    ).exists()
+
+
+@pytest.mark.django_db
 def test_finalization_rolls_back_cost_freezes_and_charges(member, monkeypatch):
     other_member = Member.objects.create_user(username="finalization-other")
     airfield = Airfield.objects.create(identifier="KROLL", name="Rollback")
