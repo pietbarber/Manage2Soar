@@ -94,6 +94,7 @@ def test_member_cannot_access_or_modify_another_members_ledger(
     assert not LedgerEntry.objects.filter(
         ledger__member=member, member_description="Unauthorized charge"
     ).exists()
+    assert LedgerEntry.objects.filter(ledger__member=member).count() == 1
 
 
 def test_treasurer_can_confirm_full_guest_remittance(client, member, treasurer):
