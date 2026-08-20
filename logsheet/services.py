@@ -24,7 +24,9 @@ def finalize_logsheet_financials(
 
     # Keep nullable relationships out of the locking query. PostgreSQL rejects
     # FOR UPDATE queries that lock the nullable side of an outer join.
-    locked_flights = Flight.objects.select_for_update().filter(logsheet=locked_logsheet)
+    locked_flights = list(
+        Flight.objects.select_for_update().filter(logsheet=locked_logsheet)
+    )
     for flight in locked_flights:
         # Track which cost fields actually changed to avoid no-op saves
         costs_to_save = []
@@ -54,6 +56,20 @@ def finalize_logsheet_financials(
         guest_payments = locked_logsheet.guest_payments.select_related(
             "flight", "responsible_member"
         )
+        guest_flight_ids = {
+            flight.pk
+            for flight in locked_flights
+            if (flight.guest_pilot_name or "").strip()
+        }
+        recorded_guest_flight_ids = {payment.flight_id for payment in guest_payments}
+        missing_guest_payments = guest_flight_ids - recorded_guest_flight_ids
+        if missing_guest_payments:
+            raise ValidationError(
+                "Complete guest payment details before finalizing flights: "
+                + ", ".join(
+                    f"#{flight_id}" for flight_id in sorted(missing_guest_payments)
+                )
+            )
         for guest_payment in guest_payments:
             if not guest_payment.responsible_member_id:
                 raise ValidationError(
