@@ -9,7 +9,14 @@ from django.test import TestCase
 from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.services import get_balance
 from logsheet import services as logsheet_services
-from logsheet.models import Airfield, Flight, Glider, Logsheet, RevisionLog
+from logsheet.models import (
+    Airfield,
+    Flight,
+    Glider,
+    Logsheet,
+    LogsheetGuestPayment,
+    RevisionLog,
+)
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
@@ -87,6 +94,40 @@ def test_finalization_posts_frozen_charge_once(member, monkeypatch):
     assert get_balance(member.billing_ledger) == Decimal("40.00")
     assert RevisionLog.objects.filter(logsheet=logsheet).count() == 1
     enqueue_summary.assert_called_once_with(logsheet.pk)
+
+
+@pytest.mark.django_db
+def test_guest_finalization_posts_pending_payment_to_responsible_member(member):
+    airfield = Airfield.objects.create(identifier="KGST", name="Guest Flight")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    flight = _flight(
+        logsheet,
+        member,
+        guest_pilot_name="Guest Pilot",
+        commercial_ride=False,
+    )
+    guest_payment = LogsheetGuestPayment.objects.create(
+        logsheet=logsheet,
+        flight=flight,
+        responsible_member=member,
+        guest_name="Guest Pilot",
+        amount=Decimal("40.00"),
+        payment_method="zelle",
+    )
+
+    assert logsheet_services.finalize_logsheet_financials(
+        logsheet_id=logsheet.pk,
+        actor=member,
+        enqueue_summary=Mock(),
+    )
+
+    entry = LedgerEntry.objects.get(source_key=f"guest-payment:{guest_payment.pk}")
+    assert entry.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING
+    assert entry.flight_id == flight.pk
+    assert entry.guest_name == "Guest Pilot"
+    assert get_balance(member.billing_ledger) == Decimal("40.00")
 
 
 @pytest.mark.django_db

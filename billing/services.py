@@ -13,6 +13,7 @@ CHARGE_KINDS = {
     LedgerEntry.Kind.FLIGHT_CHARGE,
     LedgerEntry.Kind.MISC_CHARGE,
     LedgerEntry.Kind.MANUAL_CHARGE,
+    LedgerEntry.Kind.GUEST_PAYMENT_PENDING,
 }
 REVERSIBLE_KINDS = set(LedgerEntry.Kind.values) - {LedgerEntry.Kind.REVERSAL}
 
@@ -89,6 +90,9 @@ def post_entry(
     source_key=None,
     flight=None,
     correction_group=None,
+    guest_name="",
+    payment_method="",
+    remits=None,
 ):
     """Post one immutable entry, returning an existing identical source entry."""
     _require_billing_enabled()
@@ -131,6 +135,9 @@ def post_entry(
         source_key=source_key,
         flight=flight,
         correction_group=correction_group,
+        guest_name=guest_name,
+        payment_method=payment_method,
+        remits=remits,
     )
     try:
         with transaction.atomic():
@@ -331,6 +338,65 @@ def post_manual_charge(
     )
 
 
+def post_guest_payment_pending(
+    *,
+    member,
+    actor,
+    amount,
+    effective_date,
+    guest_name,
+    payment_method,
+    description,
+    flight=None,
+    source_key=None,
+):
+    """Record a guest liability held by the responsible member."""
+    description = require_audit_text(description, "member description")
+    guest_name = require_audit_text(guest_name, "guest name")
+    if payment_method not in {"cash", "check", "zelle"}:
+        raise ValidationError("Choose cash, check, or Zelle for guest payments.")
+    return post_entry(
+        member=member,
+        actor=actor,
+        kind=LedgerEntry.Kind.GUEST_PAYMENT_PENDING,
+        effect=LedgerEntry.Effect.DEBIT,
+        amount=amount,
+        effective_date=effective_date,
+        description=description,
+        source_key=source_key,
+        flight=flight,
+        guest_name=guest_name,
+        payment_method=payment_method,
+    )
+
+
+@transaction.atomic
+def remit_guest_payment(*, entry, actor, effective_date, reference=""):
+    """Clear a guest payment in full after treasurer confirmation."""
+    require_manual_transaction_access(actor)
+    original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
+    if original.kind != LedgerEntry.Kind.GUEST_PAYMENT_PENDING:
+        raise ValidationError("Only pending guest payments can be remitted.")
+    if hasattr(original, "remittance"):
+        raise ValidationError("This guest payment has already been remitted.")
+    reference = reference.strip() if isinstance(reference, str) else ""
+    return post_entry(
+        member=original.ledger.member,
+        actor=actor,
+        kind=LedgerEntry.Kind.GUEST_REMITTANCE,
+        effect=LedgerEntry.Effect.CREDIT,
+        amount=original.amount,
+        effective_date=effective_date,
+        description=f"Guest remittance: {original.guest_name}",
+        internal_note=reference,
+        source_key=f"guest-remittance:{original.pk}",
+        flight=original.flight,
+        guest_name=original.guest_name,
+        payment_method=original.payment_method,
+        remits=original,
+    )
+
+
 def post_manual_payment(
     *, member, actor, amount, effective_date, description, reason, source_key=None
 ):
@@ -481,6 +547,12 @@ def reverse_entry(*, entry, actor, effective_date, reason, correction_group=None
     original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
     if original.kind not in REVERSIBLE_KINDS:
         raise ValidationError("A reversal cannot itself be reversed.")
+    if original.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING and hasattr(
+        original, "remittance"
+    ):
+        raise ValidationError(
+            "Reverse the guest remittance before reversing its collection."
+        )
     if hasattr(original, "reversal"):
         raise ValidationError("This entry has already been reversed.")
     reversal = LedgerEntry(

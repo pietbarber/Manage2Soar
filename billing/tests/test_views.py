@@ -8,7 +8,12 @@ from django.contrib.messages import get_messages
 from django.urls import reverse
 
 from billing.models import LedgerEntry
-from billing.services import get_balance, post_manual_charge, post_opening_balance
+from billing.services import (
+    get_balance,
+    post_guest_payment_pending,
+    post_manual_charge,
+    post_opening_balance,
+)
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
@@ -91,6 +96,29 @@ def test_member_cannot_access_or_modify_another_members_ledger(
     ).exists()
 
 
+def test_treasurer_can_confirm_full_guest_remittance(client, member, treasurer):
+    pending = post_guest_payment_pending(
+        member=member,
+        actor=member,
+        amount="75.00",
+        effective_date=date.today(),
+        guest_name="Guest Pilot",
+        payment_method="zelle",
+        description="Guest payment pending",
+    )
+    client.force_login(treasurer)
+
+    response = client.post(
+        reverse("billing:guest_payment_remit", args=[pending.pk]),
+        {"reference": "ZELLE-75"},
+    )
+
+    assert response.status_code == 302
+    pending.refresh_from_db()
+    assert pending.remittance.amount == Decimal("75.00")
+    assert get_balance(member.billing_ledger) == Decimal("0.00")
+
+
 def test_ledger_list_redirects_when_billing_is_disabled(client, treasurer):
     SiteConfiguration.objects.update(billing_app_enabled=False)
     client.force_login(treasurer)
@@ -110,7 +138,7 @@ def test_billing_navigation_is_hidden_when_disabled(client, treasurer):
     response = client.get("/")
 
     assert reverse("billing:ledger_list") not in response.content.decode()
-    assert reverse("logsheet:personal_charges") not in response.content.decode()
+    assert reverse("logsheet:personal_charges") in response.content.decode()
 
 
 def test_ledger_detail_posts_manual_charge_and_shows_audit(client, member, treasurer):

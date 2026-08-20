@@ -8,10 +8,12 @@ from billing.models import LedgerEntry
 from billing.services import (
     get_balance,
     override_opening_balance,
+    post_guest_payment_pending,
     post_manual_charge,
     post_manual_credit,
     post_manual_payment,
     post_opening_balance,
+    remit_guest_payment,
     reverse_manual_entry,
 )
 from members.models import Member
@@ -73,6 +75,77 @@ def test_manual_entries_record_audit_fields_and_balance(member, treasurer):
     assert charge.internal_note == "Member purchase"
     assert payment.kind == LedgerEntry.Kind.PAYMENT
     assert credit.kind == LedgerEntry.Kind.CREDIT
+
+
+def test_guest_payment_remains_member_liability_until_full_remittance(
+    member, treasurer
+):
+    pending = post_guest_payment_pending(
+        member=member,
+        actor=member,
+        amount="100",
+        effective_date=date.today(),
+        guest_name="Guest Pilot",
+        payment_method="zelle",
+        description="Guest flight payment pending",
+    )
+
+    assert pending.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING
+    assert get_balance(member.billing_ledger) == Decimal("100.00")
+
+    with pytest.raises(ValidationError, match="full amount"):
+        LedgerEntry.objects.create(
+            ledger=member.billing_ledger,
+            kind=LedgerEntry.Kind.GUEST_REMITTANCE,
+            effect=LedgerEntry.Effect.CREDIT,
+            amount="99.99",
+            effective_date=date.today(),
+            member_description="Partial remittance",
+            created_by=treasurer,
+            remits=pending,
+        )
+
+    remittance = remit_guest_payment(
+        entry=pending,
+        actor=treasurer,
+        effective_date=date.today(),
+        reference="Zelle confirmation 123",
+    )
+
+    assert remittance.kind == LedgerEntry.Kind.GUEST_REMITTANCE
+    assert get_balance(member.billing_ledger) == Decimal("0.00")
+    with pytest.raises(ValidationError, match="already been remitted"):
+        remit_guest_payment(
+            entry=pending,
+            actor=treasurer,
+            effective_date=date.today(),
+        )
+    with pytest.raises(ValidationError, match="Reverse the guest remittance"):
+        reverse_manual_entry(
+            entry=pending,
+            actor=treasurer,
+            effective_date=date.today(),
+            reason="Attempted collection reversal",
+        )
+
+
+def test_guest_payment_remittance_is_treasurer_only(member, treasurer):
+    pending = post_guest_payment_pending(
+        member=member,
+        actor=member,
+        amount="25",
+        effective_date=date.today(),
+        guest_name="Guest Pilot",
+        payment_method="cash",
+        description="Guest cash pending",
+    )
+
+    with pytest.raises(ValidationError, match="Only treasurers"):
+        remit_guest_payment(
+            entry=pending,
+            actor=member,
+            effective_date=date.today(),
+        )
 
 
 def test_opening_balance_can_only_be_posted_once(member, treasurer):

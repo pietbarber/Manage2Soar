@@ -25,4 +25,9 @@ urlpatterns = [
         name="opening_balance_override",
     ),
     path("entries/<int:entry_id>/reverse/", views.reverse_entry, name="entry_reverse"),
+    path(
+        "entries/<int:entry_id>/remit/",
+        views.remit_guest_payment_entry,
+        name="guest_payment_remit",
+    ),
 ]

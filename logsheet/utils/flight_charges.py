@@ -123,7 +123,7 @@ def quantize_currency(value):
 
 def get_billing_allocations(flight, allocation_version=1):
     """Return the frozen member allocation input consumed by Billing."""
-    if flight.commercial_ride:
+    if flight.commercial_ride or (flight.guest_pilot_name or "").strip():
         return []
     allocations = split_flight_costs(
         flight.pilot,

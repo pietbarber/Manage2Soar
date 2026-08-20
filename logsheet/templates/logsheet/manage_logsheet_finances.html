@@ -281,6 +281,68 @@
 
 <!-- end form -->
 
+{% if guest_payment_data_sorted %}
+<h4 class="mb-3 mt-5">
+  <i class="bi bi-person-vcard text-danger me-2"></i>
+  Guest Flight Payments
+</h4>
+<p class="text-muted small">
+  Guest payments remain the responsibility of the selected member until a treasurer
+  confirms full remittance. Guest Zelle follows the same process.
+</p>
+<div class="finance-table-container">
+  <table class="table finance-table align-middle">
+    <thead>
+      <tr>
+        <th>Guest</th>
+        <th>Flight</th>
+        <th>Amount</th>
+        <th>Responsible member</th>
+        <th>Payment method</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for payment in guest_payment_data_sorted %}
+      <tr>
+        <td>{{ payment.guest_name }}</td>
+        <td>#{{ payment.flight_id }}</td>
+        <td>${{ payment.amount|floatformat:2 }}</td>
+        <td>
+          <select name="guest_responsible_member_{{ payment.pk }}"
+                  form="finance-form" class="form-select form-select-sm"
+                  {% if logsheet.finalized %}disabled{% endif %}>
+            <option value="">Select member</option>
+            {% for member in responsible_member_choices %}
+            <option value="{{ member.pk }}" {% if payment.responsible_member_id == member.pk %}selected{% endif %}>
+              {{ member }}
+            </option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <select name="guest_payment_method_{{ payment.pk }}"
+                  form="finance-form" class="form-select form-select-sm"
+                  {% if logsheet.finalized %}disabled{% endif %}>
+            <option value="">Select method</option>
+            <option value="cash" {% if payment.payment_method == "cash" %}selected{% endif %}>Cash</option>
+            <option value="check" {% if payment.payment_method == "check" %}selected{% endif %}>Check</option>
+            <option value="zelle" {% if payment.payment_method == "zelle" %}selected{% endif %}>Zelle</option>
+          </select>
+        </td>
+        <td>
+          <input type="text" name="guest_payment_note_{{ payment.pk }}"
+                 form="finance-form" value="{{ payment.note }}"
+                 class="form-control form-control-sm"
+                 {% if logsheet.finalized %}disabled{% endif %}>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 <h4 class="mb-3 mt-5">
   <i class="bi bi-airplane text-info me-2"></i>
   Summary by Flight

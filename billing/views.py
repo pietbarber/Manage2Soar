@@ -1,5 +1,5 @@
-from datetime import date
 import csv
+from datetime import date
 from functools import wraps
 
 from django.contrib import messages
@@ -12,7 +12,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from billing.decorators import billing_app_required
-from billing.forms import ManualEntryForm, OpeningBalanceOverrideForm, ReverseEntryForm
+from billing.forms import (
+    GuestRemittanceForm,
+    ManualEntryForm,
+    OpeningBalanceOverrideForm,
+    ReverseEntryForm,
+)
 from billing.models import BillingPeriod, Ledger, LedgerEntry
 from billing.periods import close_period, reopen_period
 from billing.services import (
@@ -23,6 +28,7 @@ from billing.services import (
     post_manual_credit,
     post_manual_payment,
     post_opening_balance,
+    remit_guest_payment,
     reverse_manual_entry,
 )
 from members.models import Member
@@ -292,4 +298,31 @@ def reverse_entry(request, entry_id):
             messages.success(request, "Ledger entry reversed.")
     else:
         messages.error(request, "A reversal reason is required.")
+    return redirect("billing:ledger_detail", member_id=entry.ledger.member_id)
+
+
+@require_POST
+@billing_app_required
+@treasurer_required
+def remit_guest_payment_entry(request, entry_id):
+    entry = get_object_or_404(
+        LedgerEntry,
+        pk=entry_id,
+        kind=LedgerEntry.Kind.GUEST_PAYMENT_PENDING,
+    )
+    form = GuestRemittanceForm(request.POST)
+    if form.is_valid():
+        try:
+            remit_guest_payment(
+                entry=entry,
+                actor=request.user,
+                effective_date=date.today(),
+                reference=form.cleaned_data["reference"],
+            )
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        else:
+            messages.success(request, "Guest payment remitted in full.")
+    else:
+        messages.error(request, "A valid remittance confirmation is required.")
     return redirect("billing:ledger_detail", member_id=entry.ledger.member_id)

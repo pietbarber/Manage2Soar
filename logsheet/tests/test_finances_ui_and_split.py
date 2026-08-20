@@ -9,7 +9,7 @@ from django.utils import timezone
 from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.periods import close_period
 from billing.services import post_flight_charges
-from logsheet.models import Flight, FlightSplitRequest
+from logsheet.models import Flight, FlightSplitRequest, LogsheetPayment
 from logsheet.utils.flight_charges import get_billing_allocations
 from siteconfig.models import (
     BillingPricingMode,
@@ -43,6 +43,29 @@ def test_payment_method_tracker_has_splits_column(
     assert response.status_code == 200
     assert b"Edit Split" in response.content
     assert b"Payment Method Tracker" in response.content
+
+
+@pytest.mark.django_db
+def test_member_payment_defaults_to_on_account(
+    client, active_member, logsheet_with_flights
+):
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+
+    response = client.get(url)
+
+    assert response.status_code == 200
+    payment = LogsheetPayment.objects.get(
+        logsheet=logsheet_with_flights,
+        member=active_member,
+    )
+    assert payment.payment_method == "account"
+    row = next(
+        row
+        for row in response.context["member_payment_data_sorted"]
+        if row["member"].pk == active_member.pk
+    )
+    assert row["payment_method"] == "account"
 
 
 @pytest.mark.django_db

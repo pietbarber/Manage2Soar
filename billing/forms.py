@@ -59,3 +59,11 @@ class OpeningBalanceOverrideForm(forms.Form):
 
 class ReverseEntryForm(forms.Form):
     reason = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}))
+
+
+class GuestRemittanceForm(forms.Form):
+    reference = forms.CharField(
+        required=False,
+        max_length=100,
+        help_text="Optional deposit, check, or Zelle confirmation reference.",
+    )

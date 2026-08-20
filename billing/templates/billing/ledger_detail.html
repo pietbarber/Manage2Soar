@@ -121,8 +121,15 @@
                   {{ entry.internal_note }}
                 </td>
                 <td class="text-end">
-                  {% if not entry.reversal and entry.kind != 'reversal' and entry.kind != 'flight_charge' %}
-                  <form method="post" action="{% url 'billing:entry_reverse' entry.pk %}" class="d-inline">
+                   {% if not entry.reversal and entry.kind != 'reversal' and entry.kind != 'flight_charge' %}
+                   {% if entry.kind == 'guest_payment_pending' and not entry.remittance %}
+                   <form method="post" action="{% url 'billing:guest_payment_remit' entry.pk %}" class="d-inline">
+                     {% csrf_token %}
+                     <input type="text" name="reference" maxlength="100" class="form-control form-control-sm d-inline-block me-2" style="width: 14rem;" placeholder="Confirmation reference">
+                     <button class="btn btn-sm btn-outline-success" type="submit">Confirm full remittance</button>
+                   </form>
+                   {% else %}
+                   <form method="post" action="{% url 'billing:entry_reverse' entry.pk %}" class="d-inline">
                     {% csrf_token %}
                     <label class="visually-hidden" for="reverse-reason-{{ entry.pk }}">Reversal reason</label>
                     <input
@@ -136,8 +143,9 @@
                       placeholder="Reversal reason"
                     >
                     <button class="btn btn-sm btn-outline-danger" type="submit">Reverse</button>
-                  </form>
-                  {% else %}
+                   </form>
+                   {% endif %}
+                   {% else %}
                   <span class="badge text-bg-secondary">Reversed</span>
                   {% endif %}
                 </td>

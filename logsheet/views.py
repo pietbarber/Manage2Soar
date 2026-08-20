@@ -60,6 +60,7 @@ from .models import (
     Glider,
     Logsheet,
     LogsheetCloseout,
+    LogsheetGuestPayment,
     LogsheetPayment,
     MaintenanceDeadline,
     MaintenanceIssue,
@@ -2684,7 +2685,13 @@ def manage_logsheet_finances(request, pk):
     # OPTIMIZATION: Use select_related to avoid N+1 queries for pilot, glider, towplane
     flights = logsheet.flights.select_related(
         "pilot", "instructor", "glider", "towplane", "split_with"
-    ).exclude(commercial_ride=True)
+    ).exclude(
+        Q(commercial_ride=True)
+        | (Q(guest_pilot_name__isnull=False) & ~Q(guest_pilot_name=""))
+    )
+    guest_flights = logsheet.flights.select_related("pilot").filter(
+        Q(guest_pilot_name__isnull=False) & ~Q(guest_pilot_name="")
+    )
 
     # Get towplane rental costs for this logsheet
     # OPTIMIZATION: Already optimized with select_related
@@ -2739,6 +2746,22 @@ def manage_logsheet_finances(request, pk):
         total_rental += costs["rental"] or 0
         total_instruction += costs["instruction"] or 0
         total_sum += costs["total"] or 0
+
+    guest_payment_data = []
+    for guest_flight in guest_flights:
+        guest_payment, created = LogsheetGuestPayment.objects.get_or_create(
+            logsheet=logsheet,
+            flight=guest_flight,
+            defaults={
+                "guest_name": guest_flight.guest_pilot_name.strip(),
+                "amount": quantize_currency(flight_costs(guest_flight)["total"]),
+                "responsible_member": guest_flight.pilot,
+            },
+        )
+        if created and guest_payment.amount <= 0:
+            guest_payment.delete()
+            continue
+        guest_payment_data.append(guest_payment)
 
     # Add towplane rental costs
     towplane_data = []
@@ -2868,6 +2891,22 @@ def manage_logsheet_finances(request, pk):
             }
         )
     if request.method == "POST":
+        for guest_payment in guest_payment_data:
+            responsible_member_id = request.POST.get(
+                f"guest_responsible_member_{guest_payment.pk}"
+            )
+            if responsible_member_id:
+                guest_payment.responsible_member_id = responsible_member_id
+            guest_payment.payment_method = (
+                request.POST.get(f"guest_payment_method_{guest_payment.pk}") or None
+            )
+            guest_payment.note = request.POST.get(
+                f"guest_payment_note_{guest_payment.pk}", ""
+            ).strip()
+            guest_payment.save(
+                update_fields=["responsible_member", "payment_method", "note"]
+            )
+
         if "finalize" in request.POST:
             if logsheet.finalized:
                 messages.info(request, "This logsheet has already been finalized.")
@@ -2915,6 +2954,19 @@ def manage_logsheet_finances(request, pk):
                     request,
                     "Cannot finalize. Missing payment method for: "
                     + ", ".join(missing),
+                )
+                return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
+
+            guest_missing = [
+                payment
+                for payment in guest_payment_data
+                if not payment.responsible_member_id or not payment.payment_method
+            ]
+            if guest_missing:
+                messages.error(
+                    request,
+                    "Cannot finalize. Every guest flight needs a responsible member "
+                    "and payment method.",
                 )
                 return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
@@ -3002,6 +3054,14 @@ def manage_logsheet_finances(request, pk):
         "pilot_summary_sorted": pilot_summary_sorted,
         "member_charges_sorted": member_charges_sorted,
         "member_payment_data_sorted": member_payment_data_sorted,
+        "guest_payment_data_sorted": sorted(
+            guest_payment_data,
+            key=lambda payment: (
+                payment.guest_name.lower(),
+                payment.flight_id,
+            ),
+        ),
+        "responsible_member_choices": list(active_members) + list(inactive_members),
         "misc_charges_data": misc_charges_data,
         "active_members": active_members,
         "inactive_members": inactive_members,

@@ -1,6 +1,7 @@
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from billing.services import post_flight_charges
+from billing.services import post_flight_charges, post_guest_payment_pending
 from siteconfig.models import SiteConfiguration
 
 from .models import Flight, Logsheet, RevisionLog
@@ -47,6 +48,33 @@ def finalize_logsheet_financials(
                 flight=flight,
                 actor=actor,
                 allocations=get_billing_allocations(flight),
+            )
+
+    if billing_enabled:
+        guest_payments = locked_logsheet.guest_payments.select_related(
+            "flight", "responsible_member"
+        )
+        for guest_payment in guest_payments:
+            if not guest_payment.responsible_member_id:
+                raise ValidationError(
+                    "Every guest payment must identify a responsible member."
+                )
+            if not guest_payment.payment_method:
+                raise ValidationError(
+                    "Every guest payment must identify a payment method."
+                )
+            post_guest_payment_pending(
+                member=guest_payment.responsible_member,
+                actor=actor,
+                amount=guest_payment.amount,
+                effective_date=locked_logsheet.log_date,
+                guest_name=guest_payment.guest_name,
+                payment_method=guest_payment.payment_method,
+                description=(
+                    f"Guest payment pending for flight #{guest_payment.flight_id}"
+                ),
+                flight=guest_payment.flight,
+                source_key=f"guest-payment:{guest_payment.pk}",
             )
 
     locked_logsheet.finalized = True

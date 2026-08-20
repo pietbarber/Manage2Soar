@@ -1840,6 +1840,7 @@ class LogsheetPayment(models.Model):
             ("zelle", "Zelle"),
             ("cash", "Cash"),
         ],
+        default="account",
         null=True,
         blank=True,
     )
@@ -1850,6 +1851,49 @@ class LogsheetPayment(models.Model):
 
     def __str__(self):
         return f"{self.member} - {self.logsheet.log_date} ({self.payment_method or 'Unpaid'})"
+
+
+class LogsheetGuestPayment(models.Model):
+    """Settlement choice and responsible member for a guest flight."""
+
+    PAYMENT_METHOD_CHOICES = [
+        ("cash", "Cash"),
+        ("check", "Check"),
+        ("zelle", "Zelle"),
+    ]
+
+    logsheet = models.ForeignKey(
+        Logsheet, on_delete=models.CASCADE, related_name="guest_payments"
+    )
+    flight = models.OneToOneField(
+        "Flight", on_delete=models.CASCADE, related_name="guest_payment"
+    )
+    responsible_member = models.ForeignKey(
+        Member,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="guest_flight_payment_responsibilities",
+    )
+    guest_name = models.CharField(max_length=150)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PAYMENT_METHOD_CHOICES,
+        null=True,
+        blank=True,
+    )
+    note = models.CharField(max_length=200, blank=True)
+
+    def clean(self):
+        super().clean()
+        if self.flight_id and self.flight.logsheet_id != self.logsheet_id:
+            raise ValidationError("Guest payment flight must belong to its logsheet.")
+        if self.amount <= 0:
+            raise ValidationError("Guest payment amount must be greater than zero.")
+
+    def __str__(self):
+        return f"{self.guest_name} - {self.logsheet.log_date}"
 
 
 ####################################################
