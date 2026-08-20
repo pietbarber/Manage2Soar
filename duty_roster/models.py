@@ -1510,9 +1510,9 @@ class GliderReservation(models.Model):
                         # if self is specific and conflict is preset range
                         elif (
                             self.time_preference == "specific"
-                            and c.time_preference in cls.TIME_RANGE_PREFERENCES
+                            and c.time_preference in self.TIME_RANGE_PREFERENCES
                         ):
-                            pref_range = cls.get_configured_time_preference_range(
+                            pref_range = self.get_configured_time_preference_range(
                                 c.time_preference
                             )
                             if pref_range:
@@ -1526,9 +1526,9 @@ class GliderReservation(models.Model):
                         # if self is preset and conflict is specific
                         elif (
                             c.time_preference == "specific"
-                            and self.time_preference in cls.TIME_RANGE_PREFERENCES
+                            and self.time_preference in self.TIME_RANGE_PREFERENCES
                         ):
-                            pref_range = cls.get_configured_time_preference_range(
+                            pref_range = self.get_configured_time_preference_range(
                                 self.time_preference
                             )
                             if pref_range:

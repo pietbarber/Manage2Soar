@@ -861,13 +861,12 @@ class GliderReservationForm(forms.ModelForm):
             and self.instance.time_preference
             not in {value for value, _label in time_preference_choices}
         ):
-            legacy_choices = dict(GliderReservation.TIME_PREFERENCE_CHOICES)
             time_preference_choices.append(
                 (
                     self.instance.time_preference,
-                    legacy_choices.get(
+                    GliderReservation.get_configured_time_preference_label(
                         self.instance.time_preference,
-                        self.instance.time_preference,
+                        config=config,
                     ),
                 )
             )

@@ -10,7 +10,7 @@ Tests cover:
 - Views and URLs
 """
 
-from datetime import timedelta
+from datetime import time, timedelta
 
 import pytest
 from django.core.exceptions import ValidationError
