@@ -195,7 +195,9 @@ for p in paths:
     if bucket.get_blob(dst) is not None and not overwrite:
         skipped += 1
         continue
-    bucket.copy_blob(bucket.blob(src), bucket_name, dst)
+    # Same shared bucket for source and target; copy_blob expects a Bucket
+    # object (not a string) as the destination bucket.
+    bucket.copy_blob(bucket.blob(src), bucket, dst)
     copied += 1
 print(f"icons: copied={copied} skipped_existing={skipped}")
 ' 2>&1

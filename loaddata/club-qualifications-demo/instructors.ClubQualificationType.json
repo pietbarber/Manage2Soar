@@ -316,7 +316,7 @@
   "pk": 27,
   "fields": {
     "code": "TowPilot",
-    "name": "Tow PIlot",
+    "name": "Tow Pilot",
     "icon": "quals/icons/Towpilot-qual.jpg",
     "applies_to": "both",
     "is_obsolete": false,
