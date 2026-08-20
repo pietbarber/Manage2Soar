@@ -67,6 +67,7 @@ def test_siteconfiguration_admin_form_timezone_is_dropdown_with_iana_help():
     assert "iana.org/time-zones" in timezone_field.help_text
 
 
+@pytest.mark.django_db
 def test_siteconfiguration_admin_form_reservation_time_periods_are_checkboxes():
     from siteconfig.admin import SiteConfigurationAdminForm
 
