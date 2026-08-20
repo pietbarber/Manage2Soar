@@ -12,6 +12,7 @@ This directory contains operational runbooks for system administrators managing 
 | [Troubleshooting Guide](troubleshooting.md) | Common issues and solutions | Production incidents |
 | [Training Syllabus Import](syllabus-import.md) | Copy a known-good syllabus from one tenant to an empty tenant | Onboarding a new club's curriculum |
 | [Knowledge Test Bank Import](knowledge-test-import.md) | Copy the written-test question bank (questions, templates, presets) from one tenant to another | Onboarding a new club's test bank |
+| [Club Qualifications Import](club-qualifications-import.md) | Copy the club's qualification catalog (types, scope, tooltip) from one tenant to an empty tenant; includes a GCS copy of the icon objects so they render out of the box | Onboarding a new club's qualification catalog |
 | [Ansible Playbook Guide](ansible-playbook-guide.md) | Complete reference for all Ansible playbooks | Reference |
 | [Database Operations](database-operations.md) | PostgreSQL backups, restoration, troubleshooting | Database changes, disaster recovery |
 | Security Operations *(coming soon)* | Secret rotation, vulnerability patching | Security incidents, monthly maintenance |
