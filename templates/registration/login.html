@@ -16,6 +16,9 @@
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ next }}">
             <div class="mx-auto login-width" style="max-width: 320px; width: 100%;">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">{{ form.non_field_errors|striptags }}</div>
+                {% endif %}
                 {% for field in form %}
                 <div class="mb-3">
                     {{ field.label_tag }}
