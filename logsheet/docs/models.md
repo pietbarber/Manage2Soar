@@ -115,9 +115,19 @@ erDiagram
         int id PK
         int logsheet_id FK
         int paid_by_id FK
-        decimal amount
-        string payment_method
+        string payment_method "default=account; cash/check/zelle"
         text notes
+    }
+
+    LogsheetGuestPayment {
+        int id PK
+        int logsheet_id FK
+        int flight_id FK "OneToOne to Flight"
+        int responsible_member_id FK "nullable"
+        string guest_name
+        decimal amount
+        string payment_method "cash/check/zelle; nullable"
+        text note
     }
 
     LogsheetCloseout {
@@ -193,6 +203,9 @@ erDiagram
 
     Logsheet ||--o{ Flight : contains
     Logsheet ||--o{ LogsheetPayment : payments
+    Logsheet ||--o{ LogsheetGuestPayment : guest_payments
+    Flight ||--o| LogsheetGuestPayment : guest_payment
+    Member ||--o{ LogsheetGuestPayment : guest_flight_payment_responsibilities
     Logsheet ||--o{ LogsheetCloseout : closeout
     Logsheet ||--o{ TowplaneCloseout : towplane_closeouts
     Logsheet ||--|| FinalizationEmailOutbox : finalization_email_outbox
@@ -284,8 +297,15 @@ This document describes all models in `logsheet/models.py`.
 - **Flexible Pricing**: Supports complex pricing models like "$25 base + $1 per 100ft above 1000ft".
 
 ## LogsheetPayment
-- Tracks payments for logsheet entries.
+- Tracks payments for logsheet entries (one per `logsheet`+`member`, enforced by `unique_together`).
 - **Performance Optimization (Issue #285)**: Added composite database index on `(logsheet_id, member_id)` for faster payment lookups in finances view.
+- **Issue #981 (billing ledger MVP)**: `payment_method` now defaults to `"account"` (On Account) and gains that choice alongside `check`/`zelle`/`cash`; existing null rows were backfilled to `"account"` (migration `0031`). A `"account"` payment is billed to the member's `billing.Ledger`.
+
+## LogsheetGuestPayment
+- **New in Issue #981 (migration `0032`)**: Records the settlement choice and responsible member for a **guest** flight.
+- One-to-one with `Flight` (`related_name="guest_payment"`); the guest is identified by `guest_name` (guests have no `Member`).
+- `responsible_member` (nullable, `PROTECT`) is the member whose account the `guest_payment_pending` ledger entry is charged to.
+- `amount` and `payment_method` (`cash`/`check`/`zelle`) capture how the guest's share is to be collected; the billing service mirrors this into `billing.LedgerEntry` as a `guest_payment_pending` debit.
 
 ## LogsheetCloseout
 - Records the closeout summary for a logsheet.

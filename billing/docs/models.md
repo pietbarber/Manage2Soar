@@ -16,6 +16,7 @@ erDiagram
     logsheet_Flight ||--o{ LedgerEntry : "billing_entries"
     logsheet_Flight ||--o{ FlightChargeSnapshot : "snapshots"
     LedgerEntry o|--o| LedgerEntry : "reverses"
+    LedgerEntry o|--o| LedgerEntry : "remits"
     LedgerEntry ||--o| FlightChargeSnapshot : "flight_snapshot"
 
     members_Member {
@@ -47,6 +48,9 @@ erDiagram
         uuid correction_group
         int flight_id FK "FK to logsheet.Flight"
         int reverses FK "FK to LedgerEntry"
+        int remits FK "FK to LedgerEntry (guest collection)"
+        varchar guest_name
+        varchar payment_method
     }
 
     FlightChargeSnapshot {
@@ -150,6 +154,9 @@ user.billing_ledger.balance  # Returns current balance
 | `correction_group` | UUIDField | blank/null, db_index=True | Links correction to originals |
 | `flight` | ForeignKey → Flight | PROTECT, blank/null, related_name="billing_entries" | Linked flight (if applicable) |
 | `reverses` | OneToOneField → self | PROTECT, blank/null, related_name="reversal" | Reversed entry reference |
+| `remits` | OneToOneField → self | PROTECT, blank/null, related_name="remittance" | Guest-remittance entry that clears a `guest_payment_pending` collection entry |
+| `guest_name` | CharField | max_length=150, blank | Name of the guest being charged/reimbursed (guest entries only) |
+| `payment_method` | CharField | max_length=10, blank, choices `cash`/`check`/`zelle` | Payment method for guest entries |
 
 #### Kind Choices
 
@@ -161,6 +168,8 @@ user.billing_ledger.balance  # Returns current balance
 | `payment` | Payment | Money received from member | CREDIT only |
 | `credit` | Credit | Applied credit/cancellation | CREDIT only |
 | `opening_balance` | Opening balance | Initial balance for new members | Either |
+| `guest_payment_pending` | Guest payment pending | Charge to a guest (on a member's ledger); requires `guest_name` + `payment_method` | DEBIT only |
+| `guest_remittance` | Guest payment remittance | Member reimbursement clearing a `guest_payment_pending`; must `remits` a same-ledger, same-amount collection | CREDIT only |
 | `reversal` | Reversal | Correction of previous entry | Must have reverses reference |
 
 #### Effect Choices
@@ -206,6 +215,18 @@ user.billing_ledger.balance  # Returns current balance
    ```sql
    CHECK (flight IS NOT NULL IF kind='flight_charge')
    CONSTRAINT billing_flight_charge_has_flight
+   ```
+
+6. **One opening balance per ledger**:
+   ```sql
+   UNIQUE (ledger) WHERE kind='opening_balance'
+   CONSTRAINT billing_one_opening_balance_per_ledger
+   ```
+
+7. **Guest remittance must clear a collection**:
+   ```sql
+   CHECK (remits IS NOT NULL IF kind='guest_remittance')
+   CONSTRAINT billing_guest_remittance_has_collection
    ```
 
 #### Indexes
