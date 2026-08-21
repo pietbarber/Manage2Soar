@@ -125,7 +125,8 @@
                    {% if entry.kind == 'guest_payment_pending' and not entry.remittance %}
                    <form method="post" action="{% url 'billing:guest_payment_remit' entry.pk %}" class="d-inline">
                      {% csrf_token %}
-                     <input type="text" name="reference" maxlength="100" class="form-control form-control-sm d-inline-block me-2" style="width: 14rem;" placeholder="Confirmation reference">
+                     <label class="visually-hidden" for="guest-remit-reference-{{ entry.pk }}">Remittance confirmation reference</label>
+                     <input id="guest-remit-reference-{{ entry.pk }}" type="text" name="reference" maxlength="100" class="form-control form-control-sm d-inline-block me-2" style="width: 14rem;" placeholder="Confirmation reference">
                      <button class="btn btn-sm btn-outline-success" type="submit">Confirm full remittance</button>
                    </form>
                    {% else %}
