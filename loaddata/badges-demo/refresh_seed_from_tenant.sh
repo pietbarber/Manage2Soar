@@ -92,8 +92,17 @@ for entry in "${MODELS[@]}"; do
     echo "    dumpdata $MODEL"
     kubectl exec -n "$NS" -c django "$POD" -- \
         python manage.py dumpdata "$MODEL" --indent 2 -o "/tmp/badge_$LABEL.json" 2>/dev/null
-    kubectl cp "$NS/$POD:/tmp/badge_$LABEL.json" "$FIXTURE_DIR/members.$LABEL.json" -c django 2>&1 \
-        | grep -viE 'tar: Removing|exiting' || true
+    # Capture kubectl cp's output/exit status WITHOUT letting a non-zero exit
+    # trip `set -euo pipefail` (which would abort here, before we can report
+    # which model failed and that the fixture is stale). `|| true` neutralizes
+    # the status while still preserving stdout/stderr.
+    CP_OUT="$(kubectl cp "$NS/$POD:/tmp/badge_$LABEL.json" "$FIXTURE_DIR/members.$LABEL.json" -c django 2>&1)" || true
+    echo "$CP_OUT" | grep -viE 'tar: Removing|exiting' || true
+    if [[ ! -s "$FIXTURE_DIR/members.$LABEL.json" ]]; then
+        echo "ERROR: kubectl cp for $LABEL did not produce a non-empty fixture" >&2
+        echo "       (the previous fixture, if any, may be stale). See kubectl cp output above." >&2
+        exit 1
+    fi
 done
 kubectl exec -n "$NS" -c django "$POD" -- bash -c 'rm -f /tmp/badge_*.json'
 

@@ -150,8 +150,12 @@ POD=$(kubectl get pods -n "$NS" -o name | grep -E 'django-app' \
 
 kubectl cp "loaddata/badges-demo" "$NS/$POD:/tmp/bseed" -c django
 kubectl exec -n "$NS" -c django "$POD" -- bash /tmp/bseed/import_badges_demo.sh
-kubectl exec -n "$NS" -c django "$POD" -- rm -rf /tmp/bseed
 ```
+
+> **Keep `/tmp/bseed` for now.** The [Rollback](#rollback) section reads the
+> fixture from `/tmp/bseed/members.Badge.json`. Once you are confident the
+> import is correct and you won't need to roll back, remove it with
+> `kubectl exec -n "$NS" -c django "$POD" -- rm -rf /tmp/bseed`.
 
 Expected output (abridged):
 
@@ -186,17 +190,28 @@ Installed 15 object(s) from 1 fixture(s)
 ## Rollback
 
 `loaddata` upserts by `(model, pk)` and does **not** delete rows it did not
-see, so "rollback" is a matter of deleting the rows the import created:
+see, so "rollback" is a matter of deleting the rows the import created. The
+rollback reads the fixture from `/tmp/bseed` — if you already removed it
+(see Step 2), copy the seed back into the pod first.
 
 ```bash
-# from the target tenant pod
-python manage.py shell -c '
+NS=tenant-<newclub>
+POD=<app-pod>
+
+# 1) Make sure the seed fixture is present in the pod (no-op if already there).
+kubectl cp "loaddata/badges-demo" "$NS/$POD:/tmp/bseed" -c django
+
+# 2) Delete the badge rows (and any member->badge links) the import created.
+kubectl exec -n "$NS" -c django "$POD" -- python manage.py shell -c '
 from members.models import Badge, MemberBadge
 import json
 pks = [o["pk"] for o in json.load(open("/tmp/bseed/members.Badge.json"))]
 print("deleting", MemberBadge.objects.filter(badge_id__in=pks).delete())
 print("deleting", Badge.objects.filter(pk__in=pks).delete())
 '
+
+# 3) Now safe to clean up the copied seed.
+kubectl exec -n "$NS" -c django "$POD" -- rm -rf /tmp/bseed
 ```
 
 If you also copied badge images, delete the objects in GCS:

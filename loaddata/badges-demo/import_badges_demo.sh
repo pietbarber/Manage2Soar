@@ -209,13 +209,27 @@ copied = skipped = 0
 for p in paths:
     src = f"{src_prefix}/media/{p}"
     dst = f"{dst_prefix}/media/{p}"
-    if bucket.get_blob(dst) is not None and not overwrite:
-        skipped += 1
-        continue
-    # Same shared bucket for source and target; copy_blob expects a Bucket
-    # object (not a string) as the destination bucket.
-    bucket.copy_blob(bucket.blob(src), bucket, dst)
-    copied += 1
+    # Same shared bucket for source and target; copy_blob destination
+    # argument must be a Bucket object (not a string).
+    if overwrite:
+        # Overwrite: unconditional copy, replacing any existing destination.
+        bucket.copy_blob(bucket.blob(src), bucket, dst)
+        copied += 1
+    else:
+        # No-clobber, made ATOMIC by a GCS precondition instead of a
+        # check-then-copy (which had a TOCTOU race: the destination could be
+        # created between get_blob() and the copy, and the copy would then
+        # overwrite it). if_generation_match=0 tells GCS to copy ONLY if the
+        # destination does not exist (generation 0); if it does, GCS rejects
+        # with 412 Precondition Failed and nothing is written.
+        try:
+            bucket.copy_blob(bucket.blob(src), bucket, dst, if_generation_match=0)
+            copied += 1
+        except Exception as e:  # noqa: BLE001 - distinguish no-clobber skip vs real failure
+            if getattr(e, "response", None) is not None and e.response.status_code == 412:
+                skipped += 1
+                continue
+            raise
 print(f"images: copied={copied} skipped_existing={skipped}")
 ' 2>&1
         )" || true
