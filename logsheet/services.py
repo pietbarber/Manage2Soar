@@ -4,7 +4,7 @@ from django.db import transaction
 from billing.services import post_flight_charges, post_guest_payment_pending
 from siteconfig.models import SiteConfiguration
 
-from .models import Flight, Logsheet, RevisionLog
+from .models import Flight, Logsheet, LogsheetGuestPayment, RevisionLog
 from .utils.finalization_email import enqueue_finalization_summary_email_job
 from .utils.flight_charges import get_billing_allocations
 
@@ -53,13 +53,27 @@ def finalize_logsheet_financials(
             )
 
     if billing_enabled:
-        guest_payments = locked_logsheet.guest_payments.select_related(
-            "flight", "responsible_member"
+        # Lock the guest-payment rows alongside the logsheet/flights so their
+        # details cannot change mid-transaction. Lock the base table only (no
+        # joins): PostgreSQL rejects FOR UPDATE on the nullable side of an outer
+        # join, and responsible_member is nullable. Then re-fetch the related
+        # fields for the posting loop below (materialized to a list once).
+        locked_guest_pks = list(
+            locked_logsheet.guest_payments.select_for_update().values_list(
+                "pk", flat=True
+            )
         )
+        guest_payments = list(
+            LogsheetGuestPayment.objects.select_related("flight", "responsible_member")
+            .filter(logsheet=locked_logsheet, pk__in=locked_guest_pks)
+            .order_by("pk")
+        )
+        # Guest settlement excludes commercial rides (prepaid; handled via the
+        # commercial-ride ticket flow), so they do not require a pending entry.
         guest_flight_ids = {
             flight.pk
             for flight in locked_flights
-            if (flight.guest_pilot_name or "").strip()
+            if (flight.guest_pilot_name or "").strip() and not flight.commercial_ride
         }
         recorded_guest_flight_ids = {payment.flight_id for payment in guest_payments}
         missing_guest_payments = guest_flight_ids - recorded_guest_flight_ids
@@ -71,6 +85,9 @@ def finalize_logsheet_financials(
                 )
             )
         for guest_payment in guest_payments:
+            # Commercial rides are prepaid; do not post a pending guest entry.
+            if guest_payment.flight.commercial_ride:
+                continue
             if not guest_payment.responsible_member_id:
                 raise ValidationError(
                     "Every guest payment must identify a responsible member."

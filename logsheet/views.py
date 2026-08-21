@@ -2689,8 +2689,12 @@ def manage_logsheet_finances(request, pk):
         Q(commercial_ride=True)
         | (Q(guest_pilot_name__isnull=False) & ~Q(guest_pilot_name=""))
     )
+    # Guest settlement excludes commercial rides: they are prepaid and handled
+    # through the commercial-ride ticket flow, not member/guest settlement.
     guest_flights = logsheet.flights.select_related("pilot").filter(
-        Q(guest_pilot_name__isnull=False) & ~Q(guest_pilot_name="")
+        ~Q(commercial_ride=True)
+        & Q(guest_pilot_name__isnull=False)
+        & ~Q(guest_pilot_name="")
     )
 
     # Get towplane rental costs for this logsheet
@@ -2749,16 +2753,26 @@ def manage_logsheet_finances(request, pk):
 
     guest_payment_data = []
     for guest_flight in guest_flights:
+        computed_total = quantize_currency(flight_costs(guest_flight)["total"])
         guest_payment, created = LogsheetGuestPayment.objects.get_or_create(
             logsheet=logsheet,
             flight=guest_flight,
             defaults={
                 "guest_name": guest_flight.guest_pilot_name.strip(),
-                "amount": quantize_currency(flight_costs(guest_flight)["total"]),
+                "amount": computed_total,
                 "responsible_member": guest_flight.pilot,
             },
         )
-        if created and guest_payment.amount <= 0:
+        if not created:
+            # Keep user-edited responsible_member/payment_method/note intact, but
+            # re-sync the derived fields (amount, guest_name) with the current
+            # flight costs so a stale amount is never carried into finalization.
+            guest_payment.guest_name = guest_flight.guest_pilot_name.strip()
+            guest_payment.amount = computed_total
+            guest_payment.save(update_fields=["guest_name", "amount"])
+        # A non-positive total (fresh or pre-existing) cannot be posted to the
+        # ledger (LedgerEntry enforces amount > 0), so drop it.
+        if guest_payment.amount <= 0:
             guest_payment.delete()
             continue
         guest_payment_data.append(guest_payment)
