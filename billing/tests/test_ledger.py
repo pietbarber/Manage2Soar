@@ -13,7 +13,9 @@ from billing.services import (
     get_or_create_ledger,
     post_charge,
     post_credit,
+    post_entry,
     post_flight_charges,
+    post_guest_payment_pending,
     reverse_entry,
 )
 from logsheet.models import Airfield, Flight, Logsheet
@@ -118,6 +120,82 @@ def test_source_semantic_conflict_is_rejected(member, actor):
             effective_date=date.today(),
             description="Different flight amount",
             source_key="flight:conflict",
+        )
+
+
+def test_source_semantic_conflict_includes_guest_metadata(member, actor):
+    post_guest_payment_pending(
+        member=member,
+        actor=actor,
+        amount="25",
+        effective_date=date.today(),
+        guest_name="Guest One",
+        payment_method="cash",
+        description="Guest payment pending",
+        source_key="guest:conflict",
+    )
+
+    with pytest.raises(ValidationError):
+        post_guest_payment_pending(
+            member=member,
+            actor=actor,
+            amount="25",
+            effective_date=date.today(),
+            guest_name="Guest One",
+            payment_method="zelle",
+            description="Guest payment pending",
+            source_key="guest:conflict",
+        )
+
+
+def test_source_semantic_conflict_includes_remits_reference(member, actor):
+    pending_one = post_guest_payment_pending(
+        member=member,
+        actor=actor,
+        amount="25",
+        effective_date=date.today(),
+        guest_name="Guest One",
+        payment_method="cash",
+        description="Guest payment pending",
+        source_key="guest:pending:1",
+    )
+    pending_two = post_guest_payment_pending(
+        member=member,
+        actor=actor,
+        amount="25",
+        effective_date=date.today(),
+        guest_name="Guest Two",
+        payment_method="zelle",
+        description="Guest payment pending",
+        source_key="guest:pending:2",
+    )
+    post_entry(
+        member=member,
+        actor=actor,
+        kind=LedgerEntry.Kind.GUEST_REMITTANCE,
+        effect=LedgerEntry.Effect.CREDIT,
+        amount="25",
+        effective_date=date.today(),
+        description="Guest remittance",
+        source_key="guest:remit:conflict",
+        guest_name="Guest One",
+        payment_method="cash",
+        remits=pending_one,
+    )
+
+    with pytest.raises(ValidationError):
+        post_entry(
+            member=member,
+            actor=actor,
+            kind=LedgerEntry.Kind.GUEST_REMITTANCE,
+            effect=LedgerEntry.Effect.CREDIT,
+            amount="25",
+            effective_date=date.today(),
+            description="Guest remittance",
+            source_key="guest:remit:conflict",
+            guest_name="Guest One",
+            payment_method="cash",
+            remits=pending_two,
         )
 
 

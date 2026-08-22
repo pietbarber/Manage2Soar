@@ -333,7 +333,7 @@
         <td>
           <input type="text" name="guest_payment_note_{{ payment.pk }}"
                  form="finance-form" value="{{ payment.note }}"
-                 class="form-control form-control-sm"
+               class="form-control form-control-sm" maxlength="200"
                  {% if logsheet.finalized %}disabled{% endif %}>
         </td>
       </tr>

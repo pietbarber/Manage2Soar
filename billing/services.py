@@ -49,6 +49,34 @@ def get_or_create_ledger(member):
         return Ledger.objects.get(member=member)
 
 
+def _entry_matches_source_payload(
+    entry,
+    *,
+    ledger,
+    kind,
+    effect,
+    amount,
+    effective_date,
+    flight=None,
+    correction_group=None,
+    guest_name="",
+    payment_method="",
+    remits=None,
+):
+    return (
+        entry.ledger_id == ledger.id
+        and entry.kind == kind
+        and entry.effect == effect
+        and entry.amount == amount
+        and entry.effective_date == effective_date
+        and entry.flight_id == getattr(flight, "pk", None)
+        and entry.correction_group == correction_group
+        and entry.guest_name == guest_name
+        and entry.payment_method == payment_method
+        and entry.remits_id == getattr(remits, "pk", None)
+    )
+
+
 def _validate_existing_source(
     existing,
     *,
@@ -59,17 +87,24 @@ def _validate_existing_source(
     effective_date,
     flight=None,
     correction_group=None,
+    guest_name="",
+    payment_method="",
+    remits=None,
 ):
     if not existing:
         raise IntegrityError("Source key insert failed without a persisted entry.")
-    values_match = (
-        existing.ledger_id == ledger.id
-        and existing.kind == kind
-        and existing.effect == effect
-        and existing.amount == amount
-        and existing.effective_date == effective_date
-        and existing.flight_id == getattr(flight, "pk", None)
-        and existing.correction_group == correction_group
+    values_match = _entry_matches_source_payload(
+        existing,
+        ledger=ledger,
+        kind=kind,
+        effect=effect,
+        amount=amount,
+        effective_date=effective_date,
+        flight=flight,
+        correction_group=correction_group,
+        guest_name=guest_name,
+        payment_method=payment_method,
+        remits=remits,
     )
     if not values_match:
         raise ValidationError("Source key already identifies a different entry.")
@@ -109,14 +144,18 @@ def post_entry(
     if source_key:
         existing = LedgerEntry.objects.filter(source_key=source_key).first()
         if existing:
-            values_match = (
-                existing.ledger_id == ledger.id
-                and existing.kind == kind
-                and existing.effect == effect
-                and existing.amount == amount
-                and existing.effective_date == effective_date
-                and existing.flight_id == getattr(flight, "pk", None)
-                and existing.correction_group == correction_group
+            values_match = _entry_matches_source_payload(
+                existing,
+                ledger=ledger,
+                kind=kind,
+                effect=effect,
+                amount=amount,
+                effective_date=effective_date,
+                flight=flight,
+                correction_group=correction_group,
+                guest_name=guest_name,
+                payment_method=payment_method,
+                remits=remits,
             )
             if not values_match:
                 raise ValidationError(
@@ -155,6 +194,9 @@ def post_entry(
             effective_date=effective_date,
             flight=flight,
             correction_group=correction_group,
+            guest_name=guest_name,
+            payment_method=payment_method,
+            remits=remits,
         )
 
 

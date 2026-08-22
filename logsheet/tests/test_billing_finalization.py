@@ -249,3 +249,69 @@ def test_finalization_freezes_costs_but_skips_ledger_when_billing_is_disabled(
     assert not FlightChargeSnapshot.objects.filter(flight=flight).exists()
     assert RevisionLog.objects.filter(logsheet=logsheet).count() == 1
     enqueue_summary.assert_called_once_with(logsheet.pk)
+
+
+@pytest.mark.django_db
+def test_guest_finalization_ignores_zero_cost_guest_flight_without_payment(member):
+    airfield = Airfield.objects.create(identifier="KGZ0", name="Zero Guest")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    flight = _flight(
+        logsheet,
+        member,
+        guest_pilot_name="Guest Zero",
+        commercial_ride=False,
+        tow_cost_actual=Decimal("0.00"),
+        rental_cost_actual=Decimal("0.00"),
+        instruction_fee_actual=Decimal("0.00"),
+    )
+
+    assert logsheet_services.finalize_logsheet_financials(
+        logsheet_id=logsheet.pk,
+        actor=member,
+        enqueue_summary=Mock(),
+    )
+
+    assert Logsheet.objects.get(pk=logsheet.pk).finalized
+    assert not LogsheetGuestPayment.objects.filter(logsheet=logsheet).exists()
+    assert not LedgerEntry.objects.filter(
+        source_key__startswith="guest-payment:",
+        flight=flight,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_guest_finalization_rejects_non_positive_payment_for_payable_guest_flight(
+    member,
+):
+    airfield = Airfield.objects.create(identifier="KGP0", name="Payable Guest")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    flight = _flight(
+        logsheet,
+        member,
+        guest_pilot_name="Guest Pilot",
+        commercial_ride=False,
+    )
+    LogsheetGuestPayment.objects.create(
+        logsheet=logsheet,
+        flight=flight,
+        responsible_member=member,
+        guest_name="Guest Pilot",
+        amount=Decimal("0.00"),
+        payment_method="cash",
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="positive payment amount",
+    ):
+        logsheet_services.finalize_logsheet_financials(
+            logsheet_id=logsheet.pk,
+            actor=member,
+            enqueue_summary=Mock(),
+        )
+
+    assert not Logsheet.objects.get(pk=logsheet.pk).finalized

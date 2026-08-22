@@ -2968,9 +2968,12 @@ def manage_logsheet_finances(request, pk):
                 elif raw_payment_method in allowed_methods:
                     guest_payment.payment_method = raw_payment_method
                 # else: unknown value; keep the prior value
+                note_max_length = LogsheetGuestPayment._meta.get_field(
+                    "note"
+                ).max_length
                 guest_payment.note = request.POST.get(
                     f"guest_payment_note_{guest_payment.pk}", ""
-                ).strip()
+                ).strip()[:note_max_length]
                 guest_payment.save(
                     update_fields=["responsible_member", "payment_method", "note"]
                 )

@@ -946,3 +946,28 @@ def test_guest_payment_method_validated_on_post(
     assert response.status_code in (200, 302)
     payment.refresh_from_db()
     assert payment.payment_method is None
+
+
+@pytest.mark.django_db
+def test_guest_payment_note_truncated_to_model_max_length(
+    client, active_member, logsheet_with_flights, guest_payment_row
+):
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+    max_length = LogsheetGuestPayment._meta.get_field("note").max_length
+    long_note = "x" * (max_length + 25)
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.post(
+        url,
+        {
+            f"guest_responsible_member_{payment.pk}": str(active_member.pk),
+            f"guest_payment_method_{payment.pk}": "cash",
+            f"guest_payment_note_{payment.pk}": long_note,
+        },
+    )
+
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert len(payment.note) == max_length
+    assert payment.note == long_note[:max_length]
