@@ -412,3 +412,35 @@ def test_guest_finalization_heals_zero_payment_for_payable_guest_flight(
     entry = LedgerEntry.objects.get(source_key=f"guest-payment:{guest_payment.pk}")
     assert entry.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING
     assert entry.amount == Decimal("40.00")
+
+
+@pytest.mark.django_db
+def test_guest_payment_clean_allows_zero_amount_until_method_selected(member):
+    """A zero-amount row is tolerated while incomplete (healing flow relies
+    on this), but once a payment method is selected the row is expected to
+    carry a real amount."""
+    airfield = Airfield.objects.create(identifier="KGCN", name="Guest Clean")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    flight = _flight(
+        logsheet,
+        member,
+        guest_pilot_name="Guest Pilot",
+        commercial_ride=False,
+    )
+
+    incomplete = LogsheetGuestPayment(
+        logsheet=logsheet,
+        flight=flight,
+        responsible_member=member,
+        guest_name="Guest Pilot",
+        amount=Decimal("0.00"),
+        payment_method=None,
+    )
+    # No ValidationError: zero amount is allowed while the row is incomplete.
+    incomplete.full_clean()
+
+    incomplete.payment_method = "cash"
+    with pytest.raises(ValidationError, match="greater than zero"):
+        incomplete.full_clean()

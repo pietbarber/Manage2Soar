@@ -1889,7 +1889,13 @@ class LogsheetGuestPayment(models.Model):
         super().clean()
         if self.flight_id and self.flight.logsheet_id != self.logsheet_id:
             raise ValidationError("Guest payment flight must belong to its logsheet.")
-        if self.amount <= 0:
+        # A zero amount is tolerated while the row is incomplete: the
+        # finalization flow heals stale/zero rows to the authoritative
+        # frozen flight total before posting (see
+        # finalize_logsheet_financials). Once a payment method is selected
+        # the row is intended to be complete and must carry a real amount;
+        # finalization still enforces this for payable guest flights.
+        if self.payment_method and self.amount <= 0:
             raise ValidationError("Guest payment amount must be greater than zero.")
 
     def __str__(self):

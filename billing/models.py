@@ -196,6 +196,14 @@ class LedgerEntry(models.Model):
                 | models.Q(remits__isnull=False),
                 name="billing_guest_remittance_has_collection",
             ),
+            # Only guest remittances may reference a collection; any other
+            # kind (e.g. a manual credit) must leave `remits` unset so the
+            # remittance link stays a faithful guest-collection ledger.
+            models.CheckConstraint(
+                condition=models.Q(kind="guest_remittance")
+                | models.Q(remits__isnull=True),
+                name="billing_remits_only_guest_remittance",
+            ),
         ]
         indexes = [
             models.Index(
@@ -234,6 +242,10 @@ class LedgerEntry(models.Model):
                 raise ValidationError("A remittance must use the collection ledger.")
             if collection.amount != self.amount:
                 raise ValidationError("Guest remittance must be for the full amount.")
+        if self.remits_id and self.kind != self.Kind.GUEST_REMITTANCE:
+            raise ValidationError(
+                "Only a guest remittance may reference a collection via remits."
+            )
         if self.kind in debit_kinds and self.effect != self.Effect.DEBIT:
             raise ValidationError("Charge entries must be debits.")
         if self.kind in credit_kinds and self.effect != self.Effect.CREDIT:

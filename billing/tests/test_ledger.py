@@ -199,6 +199,36 @@ def test_source_semantic_conflict_includes_remits_reference(member, actor):
         )
 
 
+def test_remits_reference_restricted_to_guest_remittances(member, actor):
+    """Only guest remittances may set `remits`: a manual credit that tries
+    to reference a pending collection must be rejected (constraint + clean)."""
+    pending = post_guest_payment_pending(
+        member=member,
+        actor=actor,
+        amount="25",
+        effective_date=date.today(),
+        guest_name="Guest One",
+        payment_method="cash",
+        description="Guest payment pending",
+        source_key="guest:remits-guard",
+    )
+
+    with pytest.raises(ValidationError, match="guest remittance"):
+        post_entry(
+            member=member,
+            actor=actor,
+            kind=LedgerEntry.Kind.CREDIT,
+            effect=LedgerEntry.Effect.CREDIT,
+            amount="25",
+            effective_date=date.today(),
+            description="Manual credit that wrongly references a collection",
+            source_key="manual:remits-guard",
+            remits=pending,
+        )
+
+    assert not LedgerEntry.objects.filter(source_key="manual:remits-guard").exists()
+
+
 def test_flight_charge_requires_a_flight(member, actor):
     with pytest.raises(ValidationError):
         post_charge(
