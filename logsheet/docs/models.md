@@ -114,9 +114,9 @@ erDiagram
     LogsheetPayment {
         int id PK
         int logsheet_id FK
-        int paid_by_id FK
-        string payment_method "default=account; cash/check/zelle"
-        text notes
+        int member_id FK
+        string payment_method "default=account; cash/check/zelle; nullable"
+        string note "max_length=200; blank"
     }
 
     LogsheetGuestPayment {
@@ -124,10 +124,10 @@ erDiagram
         int logsheet_id FK
         int flight_id FK "OneToOne to Flight"
         int responsible_member_id FK "nullable"
-        string guest_name
-        decimal amount
+        string guest_name "max_length=150"
+        decimal amount "max_digits=12; decimal_places=2"
         string payment_method "cash/check/zelle; nullable"
-        text note
+        string note "max_length=200; blank"
     }
 
     LogsheetCloseout {

@@ -313,10 +313,12 @@ def remit_guest_payment_entry(request, entry_id):
     form = GuestRemittanceForm(request.POST)
     if form.is_valid():
         try:
+            from siteconfig.timezone_utils import get_club_today
+
             remit_guest_payment(
                 entry=entry,
                 actor=request.user,
-                effective_date=date.today(),
+                effective_date=get_club_today(),
                 reference=form.cleaned_data["reference"],
             )
         except ValidationError as exc:

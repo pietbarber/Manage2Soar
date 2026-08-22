@@ -119,6 +119,53 @@ def test_treasurer_can_confirm_full_guest_remittance(client, member, treasurer):
     assert get_balance(member.billing_ledger) == Decimal("0.00")
 
 
+def test_guest_remittance_uses_club_local_date_not_server_date(
+    client, member, treasurer, monkeypatch
+):
+    """The remittance effective date must come from the club-local date, not
+    the server date: when the server runs ahead of the club timezone (e.g.
+    UTC server, club behind), server date.today() is a future club date and
+    posting would be rejected."""
+    from datetime import timedelta
+
+    from siteconfig import timezone_utils
+
+    club_date = date.today()
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return club_date + timedelta(days=1)
+
+    # Club-local operational date stays at the real today...
+    monkeypatch.setattr(timezone_utils, "get_club_today", lambda: club_date)
+    # ...while the server clock is a full day ahead of it.
+    monkeypatch.setattr("billing.views.date", _FakeDate)
+
+    pending = post_guest_payment_pending(
+        member=member,
+        actor=treasurer,
+        amount="75.00",
+        effective_date=club_date,
+        guest_name="Guest Pilot",
+        payment_method="zelle",
+        description="Guest payment pending",
+    )
+    client.force_login(treasurer)
+
+    response = client.post(
+        reverse("billing:guest_payment_remit", args=[pending.pk]),
+        {"reference": "ZELLE-75"},
+    )
+
+    assert response.status_code == 302
+    pending.refresh_from_db()
+    assert pending.remittance.amount == Decimal("75.00")
+    # Posted with the club-local date, not the (future) server date.
+    assert pending.remittance.effective_date == club_date
+    assert get_balance(member.billing_ledger) == Decimal("0.00")
+
+
 def test_ledger_list_redirects_when_billing_is_disabled(client, treasurer):
     SiteConfiguration.objects.update(billing_app_enabled=False)
     client.force_login(treasurer)
