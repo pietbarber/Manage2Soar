@@ -3119,16 +3119,13 @@ def manage_logsheet_finances(request, pk):
     # Reuse cached SiteConfiguration to avoid extra DB lookups.
     rental_enabled = site_config.allow_towplane_rental if site_config else False
     treasurer_title = site_config.treasurer_title if site_config else "Treasurer"
-    # Only the charges actually billed to a member drive the instruction
-    # column; guest flights settle via the guest-payment section and the
-    # billing layer returns no allocation for them. A set of primary keys
-    # keeps the per-row membership check O(1).
-    guest_flight_ids = {flight.pk for flight in guest_flights}
-    instruction_fees_present = any(
-        (costs.get("instruction") or Decimal("0.00")) > Decimal("0.00")
-        for flight, costs in flight_data
-        if flight.pk not in guest_flight_ids
-    )
+    # The Instruction column/total reflects every non-commercial flight's
+    # instruction fees — guest flights included — because total_instruction
+    # (and the per-flight totals) already sum over all of them. Key the
+    # display flag off total_instruction so the column is always shown
+    # exactly when the footer total is non-zero, avoiding a misleading
+    # breakdown when instruction exists only on guest flights.
+    instruction_fees_present = total_instruction > Decimal("0.00")
 
     context = {
         "logsheet": logsheet,

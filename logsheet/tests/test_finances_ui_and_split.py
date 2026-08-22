@@ -185,6 +185,43 @@ def test_guest_flight_in_summary_totals_but_not_member_charges(
 
 
 @pytest.mark.django_db
+def test_instruction_flag_shown_when_instruction_only_on_guest_flight(
+    client, active_member, logsheet_with_flights, guest_payment_row
+):
+    """instruction_fees_present must track total_instruction (all
+    non-commercial flights, guest included). If instruction fees exist
+    only on the guest flight, the column must still be shown so the
+    footer total is not hidden."""
+    # Finalize so flight_costs reads instruction_fee_actual (a derived
+    # property that depends on config/instructor/billing rules), then set
+    # instruction on the guest flight only and clear it elsewhere.
+    logsheet_with_flights.finalized = True
+    logsheet_with_flights.save(update_fields=["finalized"])
+
+    guest_flight = guest_payment_row.flight
+    for flight in logsheet_with_flights.flights.all():
+        if flight == guest_flight:
+            continue
+        flight.instruction_fee_actual = None
+        flight.save(update_fields=["instruction_fee_actual"])
+
+    guest_flight.instruction_fee_actual = Decimal("35.00")
+    guest_flight.save(update_fields=["instruction_fee_actual"])
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+    assert response.status_code == 200
+
+    context = response.context
+    assert context["total_instruction"] == Decimal("35.00")
+    assert context["instruction_fees_present"] is True
+
+    content = response.content.decode("utf-8")
+    assert ">Instruction Total</th>" in content
+
+
+@pytest.mark.django_db
 def test_finalized_legacy_null_instruction_snapshot_stays_zero(
     client,
     active_member,
