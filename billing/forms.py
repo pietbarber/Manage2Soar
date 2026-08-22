@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from django import forms
 
+from billing.services import OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION
+
 
 class ManualEntryForm(forms.Form):
     KIND_CHOICES = (
@@ -53,9 +55,10 @@ class OpeningBalanceOverrideForm(forms.Form):
     effective_date = forms.DateField(
         initial=date.today, widget=forms.DateInput(attrs={"type": "date"})
     )
-    # Keep below 255 so the "Opening balance override: " prefix added at
-    # posting time still fits LedgerEntry.member_description (max 255).
-    description = forms.CharField(max_length=233)
+    # Must stay short enough that the "Opening balance override: " prefix
+    # added at posting time still fits LedgerEntry.member_description;
+    # derived from the same constant the service layer enforces.
+    description = forms.CharField(max_length=OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION)
     reason = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}))
 
 

@@ -507,10 +507,20 @@ def post_opening_balance(
         effective_date=effective_date,
         description=description,
         internal_note=reason,
+        # Deterministic key: a double-submit race that slips past the
+        # pre-check converges on the winner's row instead of raising an
+        # IntegrityError (500).
+        source_key=f"opening-balance:{ledger.pk}",
     )
 
 
 OPENING_BALANCE_OVERRIDE_PREFIX = "Opening balance override: "
+
+#: Longest member description that still fits LedgerEntry.member_description
+#: after the override prefix is added at posting time.
+OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION = LedgerEntry._meta.get_field(
+    "member_description"
+).max_length - len(OPENING_BALANCE_OVERRIDE_PREFIX)
 
 
 @transaction.atomic
@@ -521,9 +531,7 @@ def override_opening_balance(
     require_manual_transaction_access(actor)
     description = require_audit_text(description, "member description")
     reason = require_audit_text(reason, "reason")
-    if len(description) > LedgerEntry._meta.get_field(
-        "member_description"
-    ).max_length - len(OPENING_BALANCE_OVERRIDE_PREFIX):
+    if len(description) > OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION:
         raise ValidationError(
             "Member description is too long; it must stay short enough for the "
             "opening balance override prefix."
