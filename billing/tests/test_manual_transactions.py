@@ -269,6 +269,35 @@ def test_opening_balance_override_posts_an_auditable_adjustment(member, treasure
     )
 
 
+def test_opening_balance_override_rejects_description_too_long_for_prefix(
+    member, treasurer
+):
+    post_opening_balance(
+        member=member,
+        actor=treasurer,
+        amount="25",
+        effect=LedgerEntry.Effect.DEBIT,
+        effective_date=date.today(),
+        description="Opening receivable",
+        reason="Imported opening balance",
+    )
+
+    # 234 chars: fits the 255-char member_description on its own, but the
+    # "Opening balance override: " prefix would push the posted entry past
+    # the column limit.
+    too_long = "x" * 234
+    with pytest.raises(ValidationError, match="too long"):
+        override_opening_balance(
+            member=member,
+            actor=treasurer,
+            amount="10",
+            effect=LedgerEntry.Effect.CREDIT,
+            effective_date=date.today(),
+            description=too_long,
+            reason="Treasurer corrected import",
+        )
+
+
 def test_opening_balance_override_accounts_for_reversed_opening_balance(
     member, treasurer
 ):

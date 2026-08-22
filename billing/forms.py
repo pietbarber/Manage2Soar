@@ -53,7 +53,9 @@ class OpeningBalanceOverrideForm(forms.Form):
     effective_date = forms.DateField(
         initial=date.today, widget=forms.DateInput(attrs={"type": "date"})
     )
-    description = forms.CharField(max_length=255)
+    # Keep below 255 so the "Opening balance override: " prefix added at
+    # posting time still fits LedgerEntry.member_description (max 255).
+    description = forms.CharField(max_length=233)
     reason = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}))
 
 

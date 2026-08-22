@@ -510,6 +510,9 @@ def post_opening_balance(
     )
 
 
+OPENING_BALANCE_OVERRIDE_PREFIX = "Opening balance override: "
+
+
 @transaction.atomic
 def override_opening_balance(
     *, member, actor, amount, effect, effective_date, description, reason
@@ -518,6 +521,13 @@ def override_opening_balance(
     require_manual_transaction_access(actor)
     description = require_audit_text(description, "member description")
     reason = require_audit_text(reason, "reason")
+    if len(description) > LedgerEntry._meta.get_field(
+        "member_description"
+    ).max_length - len(OPENING_BALANCE_OVERRIDE_PREFIX):
+        raise ValidationError(
+            "Member description is too long; it must stay short enough for the "
+            "opening balance override prefix."
+        )
     if effect not in LedgerEntry.Effect.values:
         raise ValidationError("Opening balance must specify a debit or credit effect.")
 
