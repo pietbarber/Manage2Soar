@@ -222,6 +222,33 @@ def test_instruction_flag_shown_when_instruction_only_on_guest_flight(
 
 
 @pytest.mark.django_db
+def test_finalize_view_handles_service_validation_error(
+    client, active_member, logsheet_with_flights, monkeypatch
+):
+    """finalize_logsheet_financials raises ValidationError for a payable
+    guest flight with no settlement row. The view must surface that as a
+    user-facing error redirect (302), not a 500."""
+    from logsheet import views as logsheet_views
+
+    def _raising(*args, **kwargs):
+        raise ValidationError(
+            "Complete guest payment details before finalizing flights: #1"
+        )
+
+    monkeypatch.setattr(logsheet_views, "finalize_logsheet_financials", _raising)
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.post(url, {"finalize": "1"})
+
+    # A graceful redirect, not a 500.
+    assert response.status_code == 302
+    assert response.url == reverse(
+        "logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk]
+    )
+
+
+@pytest.mark.django_db
 def test_finalized_legacy_null_instruction_snapshot_stays_zero(
     client,
     active_member,

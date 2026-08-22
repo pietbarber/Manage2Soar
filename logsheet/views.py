@@ -1854,11 +1854,25 @@ def manage_logsheet(request, pk):
         # on_commit() is registered inside the block so the summary email,
         # and any post-finalization behavior outside this block, run after
         # the DB commit rather than inline.
-        if not finalize_logsheet_financials(
-            logsheet_id=logsheet.pk,
-            actor=request.user,
-            enqueue_summary=enqueue_finalization_summary_email_job,
-        ):
+        try:
+            finalized = finalize_logsheet_financials(
+                logsheet_id=logsheet.pk,
+                actor=request.user,
+                enqueue_summary=enqueue_finalization_summary_email_job,
+            )
+        except ValidationError as exc:
+            # The service performs final completeness checks (e.g. a payable
+            # guest flight with no settlement row) that this view cannot
+            # fully pre-check. Surface those as a user error instead of a
+            # 500.
+            transaction.set_rollback(True)
+            messages.error(
+                request,
+                f"Cannot finalize. {get_validation_message(exc)}",
+            )
+            return redirect("logsheet:manage", pk=logsheet.pk)
+
+        if not finalized:
             messages.info(request, "This logsheet has already been finalized.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
@@ -3054,11 +3068,25 @@ def manage_logsheet_finances(request, pk):
                 )
                 return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
-            if not finalize_logsheet_financials(
-                logsheet_id=logsheet.pk,
-                actor=request.user,
-                enqueue_summary=enqueue_finalization_summary_email_job,
-            ):
+            try:
+                finalized = finalize_logsheet_financials(
+                    logsheet_id=logsheet.pk,
+                    actor=request.user,
+                    enqueue_summary=enqueue_finalization_summary_email_job,
+                )
+            except ValidationError as exc:
+                # The service performs final completeness checks (e.g. a
+                # payable guest flight with no settlement row) that this
+                # view cannot fully pre-check. Surface those as a user
+                # error instead of a 500.
+                transaction.set_rollback(True)
+                messages.error(
+                    request,
+                    f"Cannot finalize. {get_validation_message(exc)}",
+                )
+                return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
+
+            if not finalized:
                 messages.info(request, "This logsheet has already been finalized.")
                 return redirect("logsheet:manage", pk=logsheet.pk)
 
