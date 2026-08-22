@@ -2752,30 +2752,46 @@ def manage_logsheet_finances(request, pk):
         total_sum += costs["total"] or 0
 
     guest_payment_data = []
-    for guest_flight in guest_flights:
-        computed_total = quantize_currency(flight_costs(guest_flight)["total"])
-        guest_payment, created = LogsheetGuestPayment.objects.get_or_create(
-            logsheet=logsheet,
-            flight=guest_flight,
-            defaults={
-                "guest_name": guest_flight.guest_pilot_name.strip(),
-                "amount": computed_total,
-                "responsible_member": guest_flight.pilot,
-            },
+    if not logsheet.finalized:
+        # Mutate guest-payment rows only before finalization; once finalized the
+        # posted ledger entries are immutable and the rows must remain frozen.
+        for guest_flight in guest_flights:
+            computed_total = quantize_currency(flight_costs(guest_flight)["total"])
+            guest_payment, created = LogsheetGuestPayment.objects.get_or_create(
+                logsheet=logsheet,
+                flight=guest_flight,
+                defaults={
+                    "guest_name": guest_flight.guest_pilot_name.strip(),
+                    "amount": computed_total,
+                    "responsible_member": guest_flight.pilot,
+                },
+            )
+            if not created:
+                # Keep user-edited responsible_member/payment_method/note intact,
+                # but re-sync the derived fields (amount, guest_name) with the
+                # current flight costs so a stale amount is never carried into
+                # finalization.
+                guest_payment.guest_name = guest_flight.guest_pilot_name.strip()
+                guest_payment.amount = computed_total
+                guest_payment.save(update_fields=["guest_name", "amount"])
+            # A non-positive total (fresh or pre-existing) cannot be posted to
+            # the ledger (LedgerEntry enforces amount > 0), so drop it.
+            if guest_payment.amount <= 0:
+                guest_payment.delete()
+                continue
+            guest_payment_data.append(guest_payment)
+    else:
+        # Read-only: display existing guest-payment rows as they were at
+        # posting time. Do not create, update, or delete any rows. Scoped to the
+        # same guest flights the non-finalized path would show, for consistency.
+        guest_payment_data = list(
+            LogsheetGuestPayment.objects.filter(
+                logsheet=logsheet,
+                flight__in=guest_flights.values_list("pk", flat=True),
+            )
+            .select_related("flight", "responsible_member")
+            .order_by("pk")
         )
-        if not created:
-            # Keep user-edited responsible_member/payment_method/note intact, but
-            # re-sync the derived fields (amount, guest_name) with the current
-            # flight costs so a stale amount is never carried into finalization.
-            guest_payment.guest_name = guest_flight.guest_pilot_name.strip()
-            guest_payment.amount = computed_total
-            guest_payment.save(update_fields=["guest_name", "amount"])
-        # A non-positive total (fresh or pre-existing) cannot be posted to the
-        # ledger (LedgerEntry enforces amount > 0), so drop it.
-        if guest_payment.amount <= 0:
-            guest_payment.delete()
-            continue
-        guest_payment_data.append(guest_payment)
 
     # Add towplane rental costs
     towplane_data = []
@@ -2905,21 +2921,24 @@ def manage_logsheet_finances(request, pk):
             }
         )
     if request.method == "POST":
-        for guest_payment in guest_payment_data:
-            responsible_member_id = request.POST.get(
-                f"guest_responsible_member_{guest_payment.pk}"
-            )
-            if responsible_member_id:
-                guest_payment.responsible_member_id = responsible_member_id
-            guest_payment.payment_method = (
-                request.POST.get(f"guest_payment_method_{guest_payment.pk}") or None
-            )
-            guest_payment.note = request.POST.get(
-                f"guest_payment_note_{guest_payment.pk}", ""
-            ).strip()
-            guest_payment.save(
-                update_fields=["responsible_member", "payment_method", "note"]
-            )
+        # Guest-payment rows are frozen once finalized; do not allow crafted
+        # POSTs to alter settlement details after ledger entries are posted.
+        if not logsheet.finalized:
+            for guest_payment in guest_payment_data:
+                responsible_member_id = request.POST.get(
+                    f"guest_responsible_member_{guest_payment.pk}"
+                )
+                if responsible_member_id:
+                    guest_payment.responsible_member_id = responsible_member_id
+                guest_payment.payment_method = (
+                    request.POST.get(f"guest_payment_method_{guest_payment.pk}") or None
+                )
+                guest_payment.note = request.POST.get(
+                    f"guest_payment_note_{guest_payment.pk}", ""
+                ).strip()
+                guest_payment.save(
+                    update_fields=["responsible_member", "payment_method", "note"]
+                )
 
         if "finalize" in request.POST:
             if logsheet.finalized:
