@@ -131,6 +131,49 @@ def test_guest_finalization_posts_pending_payment_to_responsible_member(member):
 
 
 @pytest.mark.django_db
+def test_guest_finalization_uses_frozen_total_not_stale_row_amount(member):
+    """The pending guest entry is posted from the frozen *_actual totals,
+    and the guest row is synced to that value, even if the row still holds
+    a stale amount from before closeout edits."""
+    airfield = Airfield.objects.create(identifier="KGST2", name="Guest Sync")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    # Frozen totals sum to 40 (20 + 15 + 5).
+    flight = _flight(
+        logsheet,
+        member,
+        guest_pilot_name="Guest Pilot",
+        commercial_ride=False,
+    )
+    # Row holds a stale amount (30) that predates the cost freeze.
+    guest_payment = LogsheetGuestPayment.objects.create(
+        logsheet=logsheet,
+        flight=flight,
+        responsible_member=member,
+        guest_name="Guest Pilot",
+        amount=Decimal("30.00"),
+        payment_method="zelle",
+    )
+
+    logsheet_services.finalize_logsheet_financials(
+        logsheet_id=logsheet.pk,
+        actor=member,
+        enqueue_summary=Mock(),
+    )
+
+    entry = LedgerEntry.objects.get(source_key=f"guest-payment:{guest_payment.pk}")
+    assert entry.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING
+    assert entry.effect == LedgerEntry.Effect.DEBIT
+    # Posted from the frozen total (40), not the stale row amount (30).
+    assert entry.amount == Decimal("40.00")
+    assert get_balance(member.billing_ledger) == Decimal("40.00")
+    # The row is synced to the authoritative frozen total.
+    guest_payment.refresh_from_db()
+    assert guest_payment.amount == Decimal("40.00")
+
+
+@pytest.mark.django_db
 def test_guest_finalization_requires_explicit_payment_method(member):
     airfield = Airfield.objects.create(identifier="KGM1", name="Guest Method")
     logsheet = Logsheet.objects.create(
@@ -332,9 +375,12 @@ def test_guest_finalization_ignores_zero_cost_guest_flight_without_payment(membe
 
 
 @pytest.mark.django_db
-def test_guest_finalization_rejects_non_positive_payment_for_payable_guest_flight(
+def test_guest_finalization_heals_zero_payment_for_payable_guest_flight(
     member,
 ):
+    """A payable guest flight (positive frozen total) with a zero-amount row
+    is healed to the authoritative frozen total and posted, rather than
+    rejected: the frozen *_actual fields are the source of truth."""
     airfield = Airfield.objects.create(identifier="KGP0", name="Payable Guest")
     logsheet = Logsheet.objects.create(
         log_date=date.today(), airfield=airfield, created_by=member
@@ -345,7 +391,7 @@ def test_guest_finalization_rejects_non_positive_payment_for_payable_guest_fligh
         guest_pilot_name="Guest Pilot",
         commercial_ride=False,
     )
-    LogsheetGuestPayment.objects.create(
+    guest_payment = LogsheetGuestPayment.objects.create(
         logsheet=logsheet,
         flight=flight,
         responsible_member=member,
@@ -354,14 +400,15 @@ def test_guest_finalization_rejects_non_positive_payment_for_payable_guest_fligh
         payment_method="cash",
     )
 
-    with pytest.raises(
-        ValidationError,
-        match="positive payment amount",
-    ):
-        logsheet_services.finalize_logsheet_financials(
-            logsheet_id=logsheet.pk,
-            actor=member,
-            enqueue_summary=Mock(),
-        )
+    assert logsheet_services.finalize_logsheet_financials(
+        logsheet_id=logsheet.pk,
+        actor=member,
+        enqueue_summary=Mock(),
+    )
 
-    assert not Logsheet.objects.get(pk=logsheet.pk).finalized
+    assert Logsheet.objects.get(pk=logsheet.pk).finalized
+    guest_payment.refresh_from_db()
+    assert guest_payment.amount == Decimal("40.00")
+    entry = LedgerEntry.objects.get(source_key=f"guest-payment:{guest_payment.pk}")
+    assert entry.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING
+    assert entry.amount == Decimal("40.00")

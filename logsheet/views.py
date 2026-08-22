@@ -2815,12 +2815,17 @@ def manage_logsheet_finances(request, pk):
 
     from .models import LogsheetPayment
 
+    # Reuse the costs already computed for the per-flight summary so every
+    # derived summary (pilot totals, member charges) uses the exact same
+    # values and we avoid recomputing flight_costs per flight.
+    costs_by_flight = {flight: costs for flight, costs in flight_data}
+
     # Summary per pilot
     pilot_summary = defaultdict(
         lambda: {"count": 0, "tow": 0, "rental": 0, "instruction": 0, "total": 0}
     )
     for flight in flights:
-        costs = flight_costs(flight)
+        costs = costs_by_flight[flight]
         pilot = flight.pilot
         if pilot:
             summary = pilot_summary[pilot]
@@ -2842,7 +2847,7 @@ def manage_logsheet_finances(request, pk):
         }
     )
     for flight in flights:
-        costs = flight_costs(flight)
+        costs = costs_by_flight[flight]
         tow = costs["tow"] or Decimal("0.00")
         rental = costs["rental"] or Decimal("0.00")
         instruction = costs["instruction"] or Decimal("0.00")

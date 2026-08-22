@@ -74,7 +74,12 @@ def finalize_logsheet_financials(
     # Guest settlement excludes commercial rides (prepaid; handled via the
     # commercial-ride ticket flow), so they do not require a pending entry.
     # Only guest flights with a positive frozen total require posting.
-    payable_guest_flight_ids = set()
+    # Re-derive the payable total for each guest flight from the frozen
+    # *_actual cost fields. These are authoritative at finalization time and
+    # may differ from a guest-payment row's last-saved amount (e.g. closeout
+    # edits between finance-page load and finalization). Syncing the row to
+    # the frozen total and posting that value avoids recording a stale amount.
+    payable_guest_frozen_totals = {}
     for flight in locked_flights:
         if flight.commercial_ride or not (flight.guest_pilot_name or "").strip():
             continue
@@ -84,7 +89,19 @@ def finalize_logsheet_financials(
             + (flight.instruction_fee_actual or Decimal("0.00"))
         )
         if frozen_total > 0:
-            payable_guest_flight_ids.add(flight.pk)
+            payable_guest_frozen_totals[flight.pk] = frozen_total
+
+    payable_guest_flight_ids = set(payable_guest_frozen_totals)
+
+    # Sync each payable guest row to the authoritative frozen total so both
+    # the completeness validation and the ledger posting use the same value.
+    for guest_payment in guest_payments:
+        if guest_payment.flight_id not in payable_guest_frozen_totals:
+            continue
+        synced_amount = payable_guest_frozen_totals[guest_payment.flight_id]
+        if guest_payment.amount != synced_amount:
+            guest_payment.amount = synced_amount
+            guest_payment.save(update_fields=["amount"])
 
     recorded_guest_flight_ids = {payment.flight_id for payment in guest_payments}
     missing_guest_payments = payable_guest_flight_ids - recorded_guest_flight_ids
