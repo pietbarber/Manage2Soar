@@ -3121,11 +3121,13 @@ def manage_logsheet_finances(request, pk):
     treasurer_title = site_config.treasurer_title if site_config else "Treasurer"
     # Only the charges actually billed to a member drive the instruction
     # column; guest flights settle via the guest-payment section and the
-    # billing layer returns no allocation for them.
+    # billing layer returns no allocation for them. A set of primary keys
+    # keeps the per-row membership check O(1).
+    guest_flight_ids = {flight.pk for flight in guest_flights}
     instruction_fees_present = any(
         (costs.get("instruction") or Decimal("0.00")) > Decimal("0.00")
         for flight, costs in flight_data
-        if flight not in guest_flights
+        if flight.pk not in guest_flight_ids
     )
 
     context = {
