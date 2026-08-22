@@ -589,8 +589,13 @@ def reverse_entry(*, entry, actor, effective_date, reason, correction_group=None
     original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
     if original.kind not in REVERSIBLE_KINDS:
         raise ValidationError("A reversal cannot itself be reversed.")
-    if original.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING and hasattr(
-        original, "remittance"
+    if (
+        original.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING
+        and hasattr(original, "remittance")
+        # A remittance that has itself been reversed no longer clears the
+        # collection, so the collection may be reversed again (correction
+        # workflow: reverse remittance, then reverse collection).
+        and not hasattr(original.remittance, "reversal")
     ):
         raise ValidationError(
             "Reverse the guest remittance before reversing its collection."

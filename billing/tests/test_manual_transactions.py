@@ -129,6 +129,62 @@ def test_guest_payment_remains_member_liability_until_full_remittance(
         )
 
 
+def test_guest_collection_reversible_after_remittance_reversed(member, treasurer):
+    """The correction workflow: reverse the remittance, then the collection.
+
+    Reversing a collection is blocked while its remittance is still active,
+    but once the remittance itself is reversed the collection can be reversed
+    — otherwise a collection would be permanently non-reversible once any
+    remittance row had ever been created.
+    """
+    pending = post_guest_payment_pending(
+        member=member,
+        actor=member,
+        amount="100",
+        effective_date=date.today(),
+        guest_name="Guest Pilot",
+        payment_method="zelle",
+        description="Guest flight payment pending",
+    )
+    remittance = remit_guest_payment(
+        entry=pending,
+        actor=treasurer,
+        effective_date=date.today(),
+        reference="Zelle confirmation 123",
+    )
+
+    # While the remittance is still active, the collection cannot be reversed.
+    with pytest.raises(ValidationError, match="Reverse the guest remittance"):
+        reverse_manual_entry(
+            entry=pending,
+            actor=treasurer,
+            effective_date=date.today(),
+            reason="Blocked: remittance still active",
+        )
+
+    # Reverse the remittance first.
+    remittance_reversal = reverse_manual_entry(
+        entry=remittance,
+        actor=treasurer,
+        effective_date=date.today(),
+        reason="Correction: remittance posted in error",
+    )
+    assert remittance_reversal.kind == LedgerEntry.Kind.REVERSAL
+
+    # Now the collection can be reversed.
+    collection_reversal = reverse_manual_entry(
+        entry=pending,
+        actor=treasurer,
+        effective_date=date.today(),
+        reason="Correction: reverse collection after remittance",
+    )
+    assert collection_reversal.kind == LedgerEntry.Kind.REVERSAL
+    assert collection_reversal.reverses_id == pending.pk
+
+    # Balance returns to zero (debit and credit both netted out).
+    assert get_balance(member.billing_ledger) == Decimal("0.00")
+
+
 def test_guest_payment_remittance_is_treasurer_only(member, treasurer):
     pending = post_guest_payment_pending(
         member=member,
