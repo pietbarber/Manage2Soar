@@ -2682,20 +2682,20 @@ def manage_logsheet_finances(request, pk):
 
     logsheet = get_object_or_404(Logsheet, pk=pk)
 
-    # OPTIMIZATION: Use select_related to avoid N+1 queries for pilot, glider, towplane
-    flights = logsheet.flights.select_related(
-        "pilot", "instructor", "glider", "towplane", "split_with"
-    ).exclude(
-        Q(commercial_ride=True)
-        | (Q(guest_pilot_name__isnull=False) & ~Q(guest_pilot_name=""))
+    # Trim-consistent guest detection: a flight is a guest flight iff its
+    # guest_pilot_name is non-NULL AND non-blank after trimming. This matches
+    # the billing layer (get_billing_allocations / finalization), which uses
+    # `.strip()` — so a whitespace-only value is treated as a *member* flight,
+    # never a guest flight. Filter in Python for correctness and simplicity.
+    all_non_commercial = list(
+        logsheet.flights.select_related(
+            "pilot", "instructor", "glider", "towplane", "split_with"
+        ).exclude(Q(commercial_ride=True))
     )
-    # Guest settlement excludes commercial rides: they are prepaid and handled
-    # through the commercial-ride ticket flow, not member/guest settlement.
-    guest_flights = logsheet.flights.select_related("pilot").filter(
-        ~Q(commercial_ride=True)
-        & Q(guest_pilot_name__isnull=False)
-        & ~Q(guest_pilot_name="")
-    )
+    flights = [f for f in all_non_commercial if not (f.guest_pilot_name or "").strip()]
+    guest_flights = [
+        f for f in all_non_commercial if (f.guest_pilot_name or "").strip()
+    ]
 
     # Get towplane rental costs for this logsheet
     # OPTIMIZATION: Already optimized with select_related
@@ -2709,8 +2709,10 @@ def manage_logsheet_finances(request, pk):
 
     site_config = SiteConfiguration.objects.first()
 
-    # Pre-cache config on all Flight instances to avoid repeated DB lookups
-    for flight in flights:
+    # Pre-cache config on every non-commercial Flight instance (both member and
+    # guest flights) to avoid a SiteConfiguration query per row, including in
+    # the guest-payment build loop where flight_costs() reads it.
+    for flight in all_non_commercial:
         flight._site_config_cache = site_config
 
     # Use locked-in values if finalized, else use capped property
@@ -2787,7 +2789,7 @@ def manage_logsheet_finances(request, pk):
         guest_payment_data = list(
             LogsheetGuestPayment.objects.filter(
                 logsheet=logsheet,
-                flight__in=guest_flights.values_list("pk", flat=True),
+                flight_id__in=[f.pk for f in guest_flights],
             )
             .select_related("flight", "responsible_member")
             .order_by("pk")
@@ -2949,9 +2951,23 @@ def manage_logsheet_finances(request, pk):
                         if member is not None:
                             guest_payment.responsible_member = member
                         # else: unknown member; keep the prior value
-                guest_payment.payment_method = (
-                    request.POST.get(f"guest_payment_method_{guest_payment.pk}") or None
+                # Validate the posted payment method:
+                #   - blank ""     -> clear to None (user explicitly chose "Select method")
+                #   - valid code   -> assign (cash / check / zelle)
+                #   - unknown code -> leave the existing value intact so a crafted
+                #     POST cannot store a value that post_guest_payment_pending
+                #     will later reject, producing a confusing finalize failure.
+                allowed_methods = {
+                    code for code, _ in LogsheetGuestPayment.PAYMENT_METHOD_CHOICES
+                }
+                raw_payment_method = request.POST.get(
+                    f"guest_payment_method_{guest_payment.pk}"
                 )
+                if raw_payment_method == "":
+                    guest_payment.payment_method = None
+                elif raw_payment_method in allowed_methods:
+                    guest_payment.payment_method = raw_payment_method
+                # else: unknown value; keep the prior value
                 guest_payment.note = request.POST.get(
                     f"guest_payment_note_{guest_payment.pk}", ""
                 ).strip()

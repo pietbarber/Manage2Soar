@@ -863,3 +863,86 @@ def test_guest_responsible_member_ignores_invalid_values(
     assert response.status_code in (200, 302)
     payment.refresh_from_db()
     assert payment.responsible_member_id == prior_member
+
+
+@pytest.mark.django_db
+def test_whitespace_only_guest_name_treated_as_member_flight(
+    client, active_member, logsheet_with_flights, glider
+):
+    """A whitespace-only guest_pilot_name is a *member* flight, not a guest flight.
+
+    The billing layer (get_billing_allocations / finalization) treats
+    whitespace-only values as member flights via `.strip()`. The finance view
+    must agree: such a flight must NOT spawn a guest-payment row and must NOT
+    be hidden from the pilot's member charges.
+    """
+    glider.rental_rate = Decimal("50.00")
+    glider.save(update_fields=["rental_rate"])
+
+    flight = Flight.objects.create(
+        logsheet=logsheet_with_flights,
+        pilot=active_member,
+        glider=glider,
+        flight_type="dual",
+        guest_pilot_name="   ",
+        commercial_ride=False,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+        release_altitude=3000,
+    )
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+    assert response.status_code == 200
+
+    # No guest-payment row is created for a whitespace-only guest name.
+    assert not LogsheetGuestPayment.objects.filter(flight=flight).exists()
+    # The pilot is charged as a member (flight appears in the pilot summary).
+    pilot_summary_sorted = response.context.get("pilot_summary_sorted", [])
+    assert any(
+        pilot == active_member for pilot, _summary in pilot_summary_sorted
+    ), "pilot should be charged as a member"
+
+
+@pytest.mark.django_db
+def test_guest_payment_method_validated_on_post(
+    client, active_member, logsheet_with_flights, guest_payment_row
+):
+    """POSTed payment methods are validated: unknown values are ignored.
+
+    A crafted POST with a method outside {cash, check, zelle} (e.g. "wire")
+    must not be stored — post_guest_payment_pending would otherwise reject it
+    at finalize time, producing a confusing failure. Blank clears to None.
+    """
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+    assert payment.payment_method == "cash"
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+
+    # Unknown method "wire" is ignored; prior value is preserved.
+    response = client.post(
+        url,
+        {
+            f"guest_responsible_member_{payment.pk}": str(active_member.pk),
+            f"guest_payment_method_{payment.pk}": "wire",
+            f"guest_payment_note_{payment.pk}": "",
+        },
+    )
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert payment.payment_method == "cash"
+
+    # Blank clears the payment method to None.
+    response = client.post(
+        url,
+        {
+            f"guest_responsible_member_{payment.pk}": str(active_member.pk),
+            f"guest_payment_method_{payment.pk}": "",
+            f"guest_payment_note_{payment.pk}": "",
+        },
+    )
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert payment.payment_method is None
