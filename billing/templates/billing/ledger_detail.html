@@ -129,6 +129,8 @@
                      <input id="guest-remit-reference-{{ entry.pk }}" type="text" name="reference" maxlength="100" class="form-control form-control-sm d-inline-block me-2" style="width: 14rem;" placeholder="Confirmation reference">
                      <button class="btn btn-sm btn-outline-success" type="submit">Confirm full remittance</button>
                    </form>
+                   {% elif entry.kind == 'guest_payment_pending' and entry.remittance and not entry.remittance.reversal %}
+                   <span class="badge text-bg-success">Remitted</span>
                    {% else %}
                    <form method="post" action="{% url 'billing:entry_reverse' entry.pk %}" class="d-inline">
                     {% csrf_token %}

@@ -130,6 +130,61 @@ def test_summary_by_flight_footer_includes_instruction_when_present(
 
 
 @pytest.mark.django_db
+def test_guest_flight_in_summary_totals_but_not_member_charges(
+    client, active_member, logsheet_with_flights, glider, guest_payment_row
+):
+    """Guest flights count toward Summary by Flight day totals but are not
+    charged to the pilot (the billing layer returns no allocation for them)."""
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+    assert response.status_code == 200
+
+    context = response.context
+    guest_flight = guest_payment_row.flight
+
+    # Guest flight appears in the per-flight summary and day totals...
+    flight_rows = [flight for flight, _ in context["flight_data_sorted"]]
+    assert guest_flight in flight_rows
+    assert context["total_rental"] >= Decimal("50.00")
+    assert context["total_sum"] >= Decimal("50.00")
+    assert context["instruction_fees_present"] is False
+
+    # ...but its cost is NOT billed to the pilot: pilot summary and member
+    # charges are scoped to the non-guest flights only.
+    guest_costs = next(
+        costs
+        for flight, costs in context["flight_data_sorted"]
+        if flight == guest_flight
+    )
+    guest_flight_cost = (
+        (guest_costs.get("tow") or 0)
+        + (guest_costs.get("rental") or 0)
+        + (guest_costs.get("instruction") or 0)
+    )
+    assert guest_flight_cost > 0  # sanity: the guest flight has real costs
+
+    # The guest flight cost must NOT appear in the pilot's billed charges:
+    # if it were included, charged total would exceed the sum of all
+    # non-guest-flight costs. The non-guest flight is split evenly with
+    # another_member, so active_member's share is at most the full cost of
+    # that one flight — well below (non-guest cost + guest cost).
+    member_charges = dict(context["member_charges_sorted"])
+    charged = member_charges[active_member]
+    non_guest_flight_costs = [
+        (costs.get("tow") or 0)
+        + (costs.get("rental") or 0)
+        + (costs.get("instruction") or 0)
+        for flight, costs in context["flight_data_sorted"]
+        if flight != guest_flight
+    ]
+    max_possible_non_guest_charge = sum(non_guest_flight_costs)
+    # The pilot's charge must fit within the non-guest flights' costs,
+    # proving the guest flight contributed nothing to the billing.
+    assert charged["total"] <= max_possible_non_guest_charge
+
+
+@pytest.mark.django_db
 def test_finalized_legacy_null_instruction_snapshot_stays_zero(
     client,
     active_member,

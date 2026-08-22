@@ -2742,10 +2742,16 @@ def manage_logsheet_finances(request, pk):
             ),
         }
 
+    # Summary by Flight and day totals cover every non-commercial flight,
+    # including guest flights: they are still real tow/rental/instruction
+    # costs and must be reflected in the daily summary. Guest-flight costs
+    # are NOT charged to the pilot (the billing layer returns no allocation
+    # for them) — they are settled via the guest-payment section below — so
+    # pilot_summary / member_charges stay scoped to the non-guest `flights`.
     flight_data = []
     total_tow = total_rental = total_instruction = total_towplane_rental = total_sum = 0
 
-    for flight in flights:
+    for flight in all_non_commercial:
         costs = flight_costs(flight)
         flight_data.append((flight, costs))
         total_tow += costs["tow"] or 0
@@ -2813,7 +2819,8 @@ def manage_logsheet_finances(request, pk):
     pilot_summary = defaultdict(
         lambda: {"count": 0, "tow": 0, "rental": 0, "instruction": 0, "total": 0}
     )
-    for flight, costs in flight_data:
+    for flight in flights:
+        costs = flight_costs(flight)
         pilot = flight.pilot
         if pilot:
             summary = pilot_summary[pilot]
@@ -2834,7 +2841,8 @@ def manage_logsheet_finances(request, pk):
             "total": Decimal("0.00"),
         }
     )
-    for flight, costs in flight_data:
+    for flight in flights:
+        costs = flight_costs(flight)
         tow = costs["tow"] or Decimal("0.00")
         rental = costs["rental"] or Decimal("0.00")
         instruction = costs["instruction"] or Decimal("0.00")
@@ -3106,9 +3114,13 @@ def manage_logsheet_finances(request, pk):
     # Reuse cached SiteConfiguration to avoid extra DB lookups.
     rental_enabled = site_config.allow_towplane_rental if site_config else False
     treasurer_title = site_config.treasurer_title if site_config else "Treasurer"
+    # Only the charges actually billed to a member drive the instruction
+    # column; guest flights settle via the guest-payment section and the
+    # billing layer returns no allocation for them.
     instruction_fees_present = any(
         (costs.get("instruction") or Decimal("0.00")) > Decimal("0.00")
-        for _, costs in flight_data
+        for flight, costs in flight_data
+        if flight not in guest_flights
     )
 
     context = {
