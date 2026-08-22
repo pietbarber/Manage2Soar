@@ -54,46 +54,64 @@ def finalize_logsheet_financials(
                 allocations=get_billing_allocations(flight),
             )
 
-    if billing_enabled:
-        # Lock the guest-payment rows alongside the logsheet/flights so their
-        # details cannot change mid-transaction. Lock the base table only (no
-        # joins): PostgreSQL rejects FOR UPDATE on the nullable side of an outer
-        # join, and responsible_member is nullable. Then re-fetch the related
-        # fields for the posting loop below (materialized to a list once).
-        locked_guest_pks = list(
-            locked_logsheet.guest_payments.select_for_update().values_list(
-                "pk", flat=True
-            )
-        )
-        guest_payments = list(
-            LogsheetGuestPayment.objects.select_related("flight", "responsible_member")
-            .filter(logsheet=locked_logsheet, pk__in=locked_guest_pks)
-            .order_by("pk")
-        )
-        # Guest settlement excludes commercial rides (prepaid; handled via the
-        # commercial-ride ticket flow), so they do not require a pending entry.
-        # Only guest flights with a positive frozen total require posting.
-        payable_guest_flight_ids = set()
-        for flight in locked_flights:
-            if flight.commercial_ride or not (flight.guest_pilot_name or "").strip():
-                continue
-            frozen_total = (
-                (flight.tow_cost_actual or Decimal("0.00"))
-                + (flight.rental_cost_actual or Decimal("0.00"))
-                + (flight.instruction_fee_actual or Decimal("0.00"))
-            )
-            if frozen_total > 0:
-                payable_guest_flight_ids.add(flight.pk)
+    # Lock the guest-payment rows alongside the logsheet/flights so their
+    # details cannot change mid-transaction. Lock the base table only (no
+    # joins): PostgreSQL rejects FOR UPDATE on the nullable side of an outer
+    # join, and responsible_member is nullable. Then re-fetch the related
+    # fields for the posting loop below (materialized to a list once).
+    locked_guest_pks = list(
+        locked_logsheet.guest_payments.select_for_update().values_list("pk", flat=True)
+    )
+    guest_payments = list(
+        LogsheetGuestPayment.objects.select_related("flight", "responsible_member")
+        .filter(logsheet=locked_logsheet, pk__in=locked_guest_pks)
+        .order_by("pk")
+    )
 
-        recorded_guest_flight_ids = {payment.flight_id for payment in guest_payments}
-        missing_guest_payments = payable_guest_flight_ids - recorded_guest_flight_ids
-        if missing_guest_payments:
+    # Guest-payment completeness is validated even when billing is disabled:
+    # a finalized logsheet cannot be re-finalized to backfill settlement rows
+    # later, so payable guest flights must have complete rows up front.
+    # Guest settlement excludes commercial rides (prepaid; handled via the
+    # commercial-ride ticket flow), so they do not require a pending entry.
+    # Only guest flights with a positive frozen total require posting.
+    payable_guest_flight_ids = set()
+    for flight in locked_flights:
+        if flight.commercial_ride or not (flight.guest_pilot_name or "").strip():
+            continue
+        frozen_total = (
+            (flight.tow_cost_actual or Decimal("0.00"))
+            + (flight.rental_cost_actual or Decimal("0.00"))
+            + (flight.instruction_fee_actual or Decimal("0.00"))
+        )
+        if frozen_total > 0:
+            payable_guest_flight_ids.add(flight.pk)
+
+    recorded_guest_flight_ids = {payment.flight_id for payment in guest_payments}
+    missing_guest_payments = payable_guest_flight_ids - recorded_guest_flight_ids
+    if missing_guest_payments:
+        raise ValidationError(
+            "Complete guest payment details before finalizing flights: "
+            + ", ".join(f"#{flight_id}" for flight_id in sorted(missing_guest_payments))
+        )
+    for guest_payment in guest_payments:
+        # Commercial rides are prepaid; do not require settlement entries.
+        if guest_payment.flight.commercial_ride:
+            continue
+        # Zero-cost guest flights do not need settlement entries.
+        if guest_payment.flight_id not in payable_guest_flight_ids:
+            continue
+        if not guest_payment.responsible_member_id:
             raise ValidationError(
-                "Complete guest payment details before finalizing flights: "
-                + ", ".join(
-                    f"#{flight_id}" for flight_id in sorted(missing_guest_payments)
-                )
+                "Every guest payment must identify a responsible member."
             )
+        if not guest_payment.payment_method:
+            raise ValidationError("Every guest payment must identify a payment method.")
+        if guest_payment.amount <= 0:
+            raise ValidationError(
+                "Every payable guest flight must have a positive payment amount."
+            )
+
+    if billing_enabled:
         for guest_payment in guest_payments:
             # Commercial rides are prepaid; do not post a pending guest entry.
             if guest_payment.flight.commercial_ride:
@@ -101,18 +119,6 @@ def finalize_logsheet_financials(
             # Zero-cost guest flights do not need settlement entries.
             if guest_payment.flight_id not in payable_guest_flight_ids:
                 continue
-            if not guest_payment.responsible_member_id:
-                raise ValidationError(
-                    "Every guest payment must identify a responsible member."
-                )
-            if not guest_payment.payment_method:
-                raise ValidationError(
-                    "Every guest payment must identify a payment method."
-                )
-            if guest_payment.amount <= 0:
-                raise ValidationError(
-                    "Every payable guest flight must have a positive payment amount."
-                )
             post_guest_payment_pending(
                 member=guest_payment.responsible_member,
                 actor=actor,

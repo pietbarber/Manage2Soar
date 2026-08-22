@@ -252,6 +252,56 @@ def test_finalization_freezes_costs_but_skips_ledger_when_billing_is_disabled(
 
 
 @pytest.mark.django_db
+def test_guest_payment_completeness_required_even_when_billing_disabled(
+    member, enable_billing_app
+):
+    """Guest-payment completeness is validated even with billing disabled.
+
+    A finalized logsheet cannot be re-finalized to backfill settlement rows
+    later, so payable guest flights must have complete settlement rows up
+    front even though no ledger entries are posted while billing is off.
+    """
+    enable_billing_app.billing_app_enabled = False
+    enable_billing_app.save(update_fields=["billing_app_enabled"])
+    airfield = Airfield.objects.create(identifier="KGD1", name="Disabled Guest")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    flight = _flight(
+        logsheet,
+        member,
+        guest_pilot_name="Guest Pilot",
+        commercial_ride=False,
+    )
+
+    with pytest.raises(ValidationError, match="Complete guest payment details"):
+        logsheet_services.finalize_logsheet_financials(
+            logsheet_id=logsheet.pk,
+            actor=member,
+            enqueue_summary=Mock(),
+        )
+
+    assert not Logsheet.objects.get(pk=logsheet.pk).finalized
+
+    # With a complete guest-payment row, finalization succeeds (no posting).
+    LogsheetGuestPayment.objects.create(
+        logsheet=logsheet,
+        flight=flight,
+        responsible_member=member,
+        guest_name="Guest Pilot",
+        amount=Decimal("40.00"),
+        payment_method="cash",
+    )
+    assert logsheet_services.finalize_logsheet_financials(
+        logsheet_id=logsheet.pk,
+        actor=member,
+        enqueue_summary=Mock(),
+    )
+    assert Logsheet.objects.get(pk=logsheet.pk).finalized
+    assert not LedgerEntry.objects.filter(flight=flight).exists()
+
+
+@pytest.mark.django_db
 def test_guest_finalization_ignores_zero_cost_guest_flight_without_payment(member):
     airfield = Airfield.objects.create(identifier="KGZ0", name="Zero Guest")
     logsheet = Logsheet.objects.create(
