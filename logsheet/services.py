@@ -93,15 +93,25 @@ def finalize_logsheet_financials(
 
     payable_guest_flight_ids = set(payable_guest_frozen_totals)
 
-    # Sync each payable guest row to the authoritative frozen total so both
-    # the completeness validation and the ledger posting use the same value.
+    # Sync each payable guest row to the authoritative frozen values (the
+    # frozen *_actual total and the flight's guest name) so both the
+    # completeness validation and the ledger posting use the same value.
+    # Re-syncing guest_name covers a flight whose guest_pilot_name was
+    # corrected after the finance page was last loaded.
     for guest_payment in guest_payments:
         if guest_payment.flight_id not in payable_guest_frozen_totals:
             continue
+        update_fields = []
         synced_amount = payable_guest_frozen_totals[guest_payment.flight_id]
         if guest_payment.amount != synced_amount:
             guest_payment.amount = synced_amount
-            guest_payment.save(update_fields=["amount"])
+            update_fields.append("amount")
+        authoritative_name = (guest_payment.flight.guest_pilot_name or "").strip()
+        if authoritative_name and guest_payment.guest_name != authoritative_name:
+            guest_payment.guest_name = authoritative_name
+            update_fields.append("guest_name")
+        if update_fields:
+            guest_payment.save(update_fields=update_fields)
 
     recorded_guest_flight_ids = {payment.flight_id for payment in guest_payments}
     missing_guest_payments = payable_guest_flight_ids - recorded_guest_flight_ids

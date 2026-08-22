@@ -415,6 +415,45 @@ def test_guest_finalization_heals_zero_payment_for_payable_guest_flight(
 
 
 @pytest.mark.django_db
+def test_guest_finalization_resyncs_guest_name_from_flight(member):
+    """If the flight's guest_pilot_name was corrected after the guest row was
+    created, finalization re-syncs the row and posts the corrected name."""
+    airfield = Airfield.objects.create(identifier="KGST3", name="Guest Name")
+    logsheet = Logsheet.objects.create(
+        log_date=date.today(), airfield=airfield, created_by=member
+    )
+    flight = _flight(
+        logsheet,
+        member,
+        guest_pilot_name="Guest Pilot",
+        commercial_ride=False,
+    )
+    # Row was created with an outdated guest name.
+    guest_payment = LogsheetGuestPayment.objects.create(
+        logsheet=logsheet,
+        flight=flight,
+        responsible_member=member,
+        guest_name="Old Guest Name",
+        amount=Decimal("40.00"),
+        payment_method="zelle",
+    )
+    # The flight's guest name is corrected after the row was created.
+    flight.guest_pilot_name = "Corrected Guest Name"
+    flight.save(update_fields=["guest_pilot_name"])
+
+    logsheet_services.finalize_logsheet_financials(
+        logsheet_id=logsheet.pk,
+        actor=member,
+        enqueue_summary=Mock(),
+    )
+
+    guest_payment.refresh_from_db()
+    assert guest_payment.guest_name == "Corrected Guest Name"
+    entry = LedgerEntry.objects.get(source_key=f"guest-payment:{guest_payment.pk}")
+    assert entry.guest_name == "Corrected Guest Name"
+
+
+@pytest.mark.django_db
 def test_guest_payment_clean_allows_zero_amount_until_method_selected(member):
     """A zero-amount row is tolerated while incomplete (healing flow relies
     on this), but once a payment method is selected the row is expected to
