@@ -13,6 +13,7 @@ CHARGE_KINDS = {
     LedgerEntry.Kind.FLIGHT_CHARGE,
     LedgerEntry.Kind.MISC_CHARGE,
     LedgerEntry.Kind.MANUAL_CHARGE,
+    LedgerEntry.Kind.GUEST_PAYMENT_PENDING,
 }
 REVERSIBLE_KINDS = set(LedgerEntry.Kind.values) - {LedgerEntry.Kind.REVERSAL}
 
@@ -48,6 +49,34 @@ def get_or_create_ledger(member):
         return Ledger.objects.get(member=member)
 
 
+def _entry_matches_source_payload(
+    entry,
+    *,
+    ledger,
+    kind,
+    effect,
+    amount,
+    effective_date,
+    flight=None,
+    correction_group=None,
+    guest_name="",
+    payment_method="",
+    remits=None,
+):
+    return (
+        entry.ledger_id == ledger.id
+        and entry.kind == kind
+        and entry.effect == effect
+        and entry.amount == amount
+        and entry.effective_date == effective_date
+        and entry.flight_id == getattr(flight, "pk", None)
+        and entry.correction_group == correction_group
+        and entry.guest_name == guest_name
+        and entry.payment_method == payment_method
+        and entry.remits_id == getattr(remits, "pk", None)
+    )
+
+
 def _validate_existing_source(
     existing,
     *,
@@ -58,17 +87,24 @@ def _validate_existing_source(
     effective_date,
     flight=None,
     correction_group=None,
+    guest_name="",
+    payment_method="",
+    remits=None,
 ):
     if not existing:
         raise IntegrityError("Source key insert failed without a persisted entry.")
-    values_match = (
-        existing.ledger_id == ledger.id
-        and existing.kind == kind
-        and existing.effect == effect
-        and existing.amount == amount
-        and existing.effective_date == effective_date
-        and existing.flight_id == getattr(flight, "pk", None)
-        and existing.correction_group == correction_group
+    values_match = _entry_matches_source_payload(
+        existing,
+        ledger=ledger,
+        kind=kind,
+        effect=effect,
+        amount=amount,
+        effective_date=effective_date,
+        flight=flight,
+        correction_group=correction_group,
+        guest_name=guest_name,
+        payment_method=payment_method,
+        remits=remits,
     )
     if not values_match:
         raise ValidationError("Source key already identifies a different entry.")
@@ -89,6 +125,9 @@ def post_entry(
     source_key=None,
     flight=None,
     correction_group=None,
+    guest_name="",
+    payment_method="",
+    remits=None,
 ):
     """Post one immutable entry, returning an existing identical source entry."""
     _require_billing_enabled()
@@ -105,14 +144,18 @@ def post_entry(
     if source_key:
         existing = LedgerEntry.objects.filter(source_key=source_key).first()
         if existing:
-            values_match = (
-                existing.ledger_id == ledger.id
-                and existing.kind == kind
-                and existing.effect == effect
-                and existing.amount == amount
-                and existing.effective_date == effective_date
-                and existing.flight_id == getattr(flight, "pk", None)
-                and existing.correction_group == correction_group
+            values_match = _entry_matches_source_payload(
+                existing,
+                ledger=ledger,
+                kind=kind,
+                effect=effect,
+                amount=amount,
+                effective_date=effective_date,
+                flight=flight,
+                correction_group=correction_group,
+                guest_name=guest_name,
+                payment_method=payment_method,
+                remits=remits,
             )
             if not values_match:
                 raise ValidationError(
@@ -131,6 +174,9 @@ def post_entry(
         source_key=source_key,
         flight=flight,
         correction_group=correction_group,
+        guest_name=guest_name,
+        payment_method=payment_method,
+        remits=remits,
     )
     try:
         with transaction.atomic():
@@ -148,6 +194,9 @@ def post_entry(
             effective_date=effective_date,
             flight=flight,
             correction_group=correction_group,
+            guest_name=guest_name,
+            payment_method=payment_method,
+            remits=remits,
         )
 
 
@@ -331,6 +380,71 @@ def post_manual_charge(
     )
 
 
+def post_guest_payment_pending(
+    *,
+    member,
+    actor,
+    amount,
+    effective_date,
+    guest_name,
+    payment_method,
+    description,
+    flight=None,
+    source_key=None,
+):
+    """Record a guest liability held by the responsible member."""
+    description = require_audit_text(description, "member description")
+    guest_name = require_audit_text(guest_name, "guest name")
+    if payment_method not in {"cash", "check", "zelle"}:
+        raise ValidationError("Choose cash, check, or Zelle for guest payments.")
+    return post_entry(
+        member=member,
+        actor=actor,
+        kind=LedgerEntry.Kind.GUEST_PAYMENT_PENDING,
+        effect=LedgerEntry.Effect.DEBIT,
+        amount=amount,
+        effective_date=effective_date,
+        description=description,
+        source_key=source_key,
+        flight=flight,
+        guest_name=guest_name,
+        payment_method=payment_method,
+    )
+
+
+@transaction.atomic
+def remit_guest_payment(*, entry, actor, effective_date, reference=""):
+    """Clear a guest payment in full after treasurer confirmation."""
+    require_manual_transaction_access(actor)
+    original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
+    if original.kind != LedgerEntry.Kind.GUEST_PAYMENT_PENDING:
+        raise ValidationError("Only pending guest payments can be remitted.")
+    # A reversed collection no longer owes anything; remitting it would
+    # record a credit against a liability that no longer exists.
+    if hasattr(original, "reversal"):
+        raise ValidationError(
+            "This guest payment was reversed and can no longer be remitted."
+        )
+    if hasattr(original, "remittance"):
+        raise ValidationError("This guest payment has already been remitted.")
+    reference = reference.strip() if isinstance(reference, str) else ""
+    return post_entry(
+        member=original.ledger.member,
+        actor=actor,
+        kind=LedgerEntry.Kind.GUEST_REMITTANCE,
+        effect=LedgerEntry.Effect.CREDIT,
+        amount=original.amount,
+        effective_date=effective_date,
+        description=f"Guest remittance: {original.guest_name}",
+        internal_note=reference,
+        source_key=f"guest-remittance:{original.pk}",
+        flight=original.flight,
+        guest_name=original.guest_name,
+        payment_method=original.payment_method,
+        remits=original,
+    )
+
+
 def post_manual_payment(
     *, member, actor, amount, effective_date, description, reason, source_key=None
 ):
@@ -366,6 +480,7 @@ def post_manual_credit(
     )
 
 
+@transaction.atomic
 def post_opening_balance(
     *, member, actor, amount, effect, effective_date, description, reason
 ):
@@ -374,6 +489,15 @@ def post_opening_balance(
     reason = require_audit_text(reason, "reason")
     if effect not in LedgerEntry.Effect.values:
         raise ValidationError("Opening balance must specify a debit or credit effect.")
+    ledger = get_or_create_ledger(member)
+    if (
+        LedgerEntry.objects.select_for_update()
+        .filter(ledger=ledger, kind=LedgerEntry.Kind.OPENING_BALANCE)
+        .exists()
+    ):
+        raise ValidationError(
+            "An opening balance has already been posted for this account."
+        )
     return post_entry(
         member=member,
         actor=actor,
@@ -383,6 +507,87 @@ def post_opening_balance(
         effective_date=effective_date,
         description=description,
         internal_note=reason,
+        # Deterministic key: a double-submit race that slips past the
+        # pre-check converges on the winner's row instead of raising an
+        # IntegrityError (500).
+        source_key=f"opening-balance:{ledger.pk}",
+    )
+
+
+OPENING_BALANCE_OVERRIDE_PREFIX = "Opening balance override: "
+
+#: Longest member description that still fits LedgerEntry.member_description
+#: after the override prefix is added at posting time.
+OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION = LedgerEntry._meta.get_field(
+    "member_description"
+).max_length - len(OPENING_BALANCE_OVERRIDE_PREFIX)
+
+
+@transaction.atomic
+def override_opening_balance(
+    *, member, actor, amount, effect, effective_date, description, reason
+):
+    """Adjust an account's opening balance without changing posted history."""
+    require_manual_transaction_access(actor)
+    description = require_audit_text(description, "member description")
+    reason = require_audit_text(reason, "reason")
+    if len(description) > OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION:
+        raise ValidationError(
+            "Member description is too long; it must stay short enough for the "
+            "opening balance override prefix."
+        )
+    if effect not in LedgerEntry.Effect.values:
+        raise ValidationError("Opening balance must specify a debit or credit effect.")
+
+    ledger = get_or_create_ledger(member)
+    entries = list(LedgerEntry.objects.select_for_update().filter(ledger=ledger))
+    if not any(entry.kind == LedgerEntry.Kind.OPENING_BALANCE for entry in entries):
+        raise ValidationError(
+            "An opening balance must be posted before it can be overridden."
+        )
+
+    override_prefix = f"opening-override:{ledger.pk}:"
+    opening_entry_ids = {
+        entry.pk
+        for entry in entries
+        if entry.kind == LedgerEntry.Kind.OPENING_BALANCE
+        or (entry.source_key and entry.source_key.startswith(override_prefix))
+    }
+    current_opening_balance = sum(
+        (
+            entry.signed_amount
+            for entry in entries
+            if entry.pk in opening_entry_ids
+            or (
+                entry.kind == LedgerEntry.Kind.REVERSAL
+                and entry.reverses_id in opening_entry_ids
+            )
+        ),
+        Decimal("0.00"),
+    )
+    target_balance = _money(amount)
+    if effect == LedgerEntry.Effect.CREDIT:
+        target_balance = -target_balance
+    adjustment = target_balance - current_opening_balance
+    if adjustment == 0:
+        raise ValidationError("The account already has this opening balance.")
+
+    return post_entry(
+        member=member,
+        actor=actor,
+        kind=(
+            LedgerEntry.Kind.MANUAL_CHARGE
+            if adjustment > 0
+            else LedgerEntry.Kind.CREDIT
+        ),
+        effect=(
+            LedgerEntry.Effect.DEBIT if adjustment > 0 else LedgerEntry.Effect.CREDIT
+        ),
+        amount=abs(adjustment),
+        effective_date=effective_date,
+        description=f"Opening balance override: {description}",
+        internal_note=reason,
+        source_key=f"{override_prefix}{uuid4()}",
     )
 
 
@@ -408,6 +613,17 @@ def reverse_entry(*, entry, actor, effective_date, reason, correction_group=None
     original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
     if original.kind not in REVERSIBLE_KINDS:
         raise ValidationError("A reversal cannot itself be reversed.")
+    if (
+        original.kind == LedgerEntry.Kind.GUEST_PAYMENT_PENDING
+        and hasattr(original, "remittance")
+        # A remittance that has itself been reversed no longer clears the
+        # collection, so the collection may be reversed again (correction
+        # workflow: reverse remittance, then reverse collection).
+        and not hasattr(original.remittance, "reversal")
+    ):
+        raise ValidationError(
+            "Reverse the guest remittance before reversing its collection."
+        )
     if hasattr(original, "reversal"):
         raise ValidationError("This entry has already been reversed.")
     reversal = LedgerEntry(

@@ -9,7 +9,12 @@ from django.utils import timezone
 from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.periods import close_period
 from billing.services import post_flight_charges
-from logsheet.models import Flight, FlightSplitRequest
+from logsheet.models import (
+    Flight,
+    FlightSplitRequest,
+    LogsheetGuestPayment,
+    LogsheetPayment,
+)
 from logsheet.utils.flight_charges import get_billing_allocations
 from siteconfig.models import (
     BillingPricingMode,
@@ -43,6 +48,29 @@ def test_payment_method_tracker_has_splits_column(
     assert response.status_code == 200
     assert b"Edit Split" in response.content
     assert b"Payment Method Tracker" in response.content
+
+
+@pytest.mark.django_db
+def test_member_payment_defaults_to_on_account(
+    client, active_member, logsheet_with_flights
+):
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+
+    response = client.get(url)
+
+    assert response.status_code == 200
+    payment = LogsheetPayment.objects.get(
+        logsheet=logsheet_with_flights,
+        member=active_member,
+    )
+    assert payment.payment_method == "account"
+    row = next(
+        row
+        for row in response.context["member_payment_data_sorted"]
+        if row["member"].pk == active_member.pk
+    )
+    assert row["payment_method"] == "account"
 
 
 @pytest.mark.django_db
@@ -99,6 +127,98 @@ def test_summary_by_flight_footer_includes_instruction_when_present(
     content = response.content.decode("utf-8")
     assert ">Instruction Fee</th>" in content
     assert "$12.00" in content
+
+
+@pytest.mark.django_db
+def test_guest_flight_in_summary_totals_but_not_member_charges(
+    client, active_member, logsheet_with_flights, glider, guest_payment_row
+):
+    """Guest flights count toward Summary by Flight day totals but are not
+    charged to the pilot (the billing layer returns no allocation for them)."""
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+    assert response.status_code == 200
+
+    context = response.context
+    guest_flight = guest_payment_row.flight
+
+    # Guest flight appears in the per-flight summary and day totals...
+    flight_rows = [flight for flight, _ in context["flight_data_sorted"]]
+    assert guest_flight in flight_rows
+    assert context["total_rental"] >= Decimal("50.00")
+    assert context["total_sum"] >= Decimal("50.00")
+    assert context["instruction_fees_present"] is False
+
+    # ...but its cost is NOT billed to the pilot: pilot summary and member
+    # charges are scoped to the non-guest flights only.
+    guest_costs = next(
+        costs
+        for flight, costs in context["flight_data_sorted"]
+        if flight == guest_flight
+    )
+    guest_flight_cost = (
+        (guest_costs.get("tow") or 0)
+        + (guest_costs.get("rental") or 0)
+        + (guest_costs.get("instruction") or 0)
+    )
+    assert guest_flight_cost > 0  # sanity: the guest flight has real costs
+
+    # The guest flight cost must NOT appear in the pilot's billed charges:
+    # if it were included, charged total would exceed the sum of all
+    # non-guest-flight costs. The non-guest flight is split evenly with
+    # another_member, so active_member's share is at most the full cost of
+    # that one flight — well below (non-guest cost + guest cost).
+    member_charges = dict(context["member_charges_sorted"])
+    charged = member_charges[active_member]
+    non_guest_flight_costs = [
+        (costs.get("tow") or 0)
+        + (costs.get("rental") or 0)
+        + (costs.get("instruction") or 0)
+        for flight, costs in context["flight_data_sorted"]
+        if flight != guest_flight
+    ]
+    max_possible_non_guest_charge = sum(non_guest_flight_costs)
+    # The pilot's charge must fit within the non-guest flights' costs,
+    # proving the guest flight contributed nothing to the billing.
+    assert charged["total"] <= max_possible_non_guest_charge
+
+
+@pytest.mark.django_db
+def test_instruction_flag_shown_when_instruction_only_on_guest_flight(
+    client, active_member, logsheet_with_flights, guest_payment_row
+):
+    """instruction_fees_present must track total_instruction (all
+    non-commercial flights, guest included). If instruction fees exist
+    only on the guest flight, the column must still be shown so the
+    footer total is not hidden."""
+    # Finalize so flight_costs reads instruction_fee_actual (a derived
+    # property that depends on config/instructor/billing rules), then set
+    # instruction on the guest flight only and clear it elsewhere.
+    logsheet_with_flights.finalized = True
+    logsheet_with_flights.save(update_fields=["finalized"])
+
+    guest_flight = guest_payment_row.flight
+    for flight in logsheet_with_flights.flights.all():
+        if flight == guest_flight:
+            continue
+        flight.instruction_fee_actual = None
+        flight.save(update_fields=["instruction_fee_actual"])
+
+    guest_flight.instruction_fee_actual = Decimal("35.00")
+    guest_flight.save(update_fields=["instruction_fee_actual"])
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+    assert response.status_code == 200
+
+    context = response.context
+    assert context["total_instruction"] == Decimal("35.00")
+    assert context["instruction_fees_present"] is True
+
+    content = response.content.decode("utf-8")
+    assert ">Instruction Total</th>" in content
 
 
 @pytest.mark.django_db
@@ -730,3 +850,216 @@ def test_export_finances_csv_excludes_commercial_ride_rows(
     body = response.content.decode("utf-8")
     assert "3000Tow1Tow" in body
     assert "6600Tow1Tow" not in body
+
+
+@pytest.fixture
+def guest_payment_row(client, active_member, logsheet_with_flights, glider):
+    """A non-commercial guest flight with a pre-existing guest-payment row.
+
+    The glider is given a rental_rate so the flight's *calculated* cost is
+    positive; otherwise the view deletes zero-cost guest-payment rows during
+    the GET/POST build loop.
+    """
+    glider.rental_rate = Decimal("50.00")
+    glider.save(update_fields=["rental_rate"])
+
+    flight = Flight.objects.create(
+        logsheet=logsheet_with_flights,
+        pilot=active_member,
+        glider=glider,
+        flight_type="dual",
+        guest_pilot_name="Guest Rider",
+        commercial_ride=False,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+        release_altitude=3000,
+    )
+    payment = LogsheetGuestPayment.objects.create(
+        logsheet=logsheet_with_flights,
+        flight=flight,
+        responsible_member=active_member,
+        guest_name="Guest Rider",
+        amount=Decimal("50.00"),
+        payment_method="cash",
+    )
+    return payment
+
+
+def _post_guest_responsible(client, active_member, logsheet, payment, value):
+    """POST the finance form selecting `value` for the guest responsible member."""
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet.pk])
+    client.force_login(active_member)
+    return client.post(
+        url,
+        {
+            f"guest_responsible_member_{payment.pk}": value,
+            f"guest_payment_method_{payment.pk}": "cash",
+            f"guest_payment_note_{payment.pk}": "",
+        },
+    )
+
+
+@pytest.mark.django_db
+def test_guest_responsible_member_clear_blank_selection(
+    client, active_member, another_member, logsheet_with_flights, guest_payment_row
+):
+    """Selecting the blank option clears the responsible member."""
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+    assert payment.responsible_member_id == active_member.pk
+
+    response = _post_guest_responsible(
+        client, active_member, logsheet_with_flights, payment, ""
+    )
+    assert response.status_code in (200, 302)
+
+    payment.refresh_from_db()
+    assert payment.responsible_member_id is None
+
+
+@pytest.mark.django_db
+def test_guest_responsible_member_assigns_valid_member(
+    client, active_member, another_member, logsheet_with_flights, guest_payment_row
+):
+    """A valid member pk is assigned to the guest payment row."""
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+
+    response = _post_guest_responsible(
+        client, active_member, logsheet_with_flights, payment, str(another_member.pk)
+    )
+    assert response.status_code in (200, 302)
+
+    payment.refresh_from_db()
+    assert payment.responsible_member_id == another_member.pk
+
+
+@pytest.mark.django_db
+def test_guest_responsible_member_ignores_invalid_values(
+    client, active_member, another_member, logsheet_with_flights, guest_payment_row
+):
+    """Invalid (non-integer or non-member) values do not 500 and keep prior value."""
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+    prior_member = payment.responsible_member_id
+
+    # Non-integer value must be ignored, not crash.
+    response = _post_guest_responsible(
+        client, active_member, logsheet_with_flights, payment, "not-an-int"
+    )
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert payment.responsible_member_id == prior_member
+
+    # A pk with no matching member must also be ignored.
+    response = _post_guest_responsible(
+        client, active_member, logsheet_with_flights, payment, "99999999"
+    )
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert payment.responsible_member_id == prior_member
+
+
+@pytest.mark.django_db
+def test_whitespace_only_guest_name_treated_as_member_flight(
+    client, active_member, logsheet_with_flights, glider
+):
+    """A whitespace-only guest_pilot_name is a *member* flight, not a guest flight.
+
+    The billing layer (get_billing_allocations / finalization) treats
+    whitespace-only values as member flights via `.strip()`. The finance view
+    must agree: such a flight must NOT spawn a guest-payment row and must NOT
+    be hidden from the pilot's member charges.
+    """
+    glider.rental_rate = Decimal("50.00")
+    glider.save(update_fields=["rental_rate"])
+
+    flight = Flight.objects.create(
+        logsheet=logsheet_with_flights,
+        pilot=active_member,
+        glider=glider,
+        flight_type="dual",
+        guest_pilot_name="   ",
+        commercial_ride=False,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+        release_altitude=3000,
+    )
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+    assert response.status_code == 200
+
+    # No guest-payment row is created for a whitespace-only guest name.
+    assert not LogsheetGuestPayment.objects.filter(flight=flight).exists()
+    # The pilot is charged as a member (flight appears in the pilot summary).
+    pilot_summary_sorted = response.context.get("pilot_summary_sorted", [])
+    assert any(
+        pilot == active_member for pilot, _summary in pilot_summary_sorted
+    ), "pilot should be charged as a member"
+
+
+@pytest.mark.django_db
+def test_guest_payment_method_validated_on_post(
+    client, active_member, logsheet_with_flights, guest_payment_row
+):
+    """POSTed payment methods are validated: unknown values are ignored.
+
+    A crafted POST with a method outside {cash, check, zelle} (e.g. "wire")
+    must not be stored — post_guest_payment_pending would otherwise reject it
+    at finalize time, producing a confusing failure. Blank clears to None.
+    """
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+    assert payment.payment_method == "cash"
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+
+    # Unknown method "wire" is ignored; prior value is preserved.
+    response = client.post(
+        url,
+        {
+            f"guest_responsible_member_{payment.pk}": str(active_member.pk),
+            f"guest_payment_method_{payment.pk}": "wire",
+            f"guest_payment_note_{payment.pk}": "",
+        },
+    )
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert payment.payment_method == "cash"
+
+    # Blank clears the payment method to None.
+    response = client.post(
+        url,
+        {
+            f"guest_responsible_member_{payment.pk}": str(active_member.pk),
+            f"guest_payment_method_{payment.pk}": "",
+            f"guest_payment_note_{payment.pk}": "",
+        },
+    )
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert payment.payment_method is None
+
+
+@pytest.mark.django_db
+def test_guest_payment_note_truncated_to_model_max_length(
+    client, active_member, logsheet_with_flights, guest_payment_row
+):
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+    max_length = LogsheetGuestPayment._meta.get_field("note").max_length
+    long_note = "x" * (max_length + 25)
+
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.post(
+        url,
+        {
+            f"guest_responsible_member_{payment.pk}": str(active_member.pk),
+            f"guest_payment_method_{payment.pk}": "cash",
+            f"guest_payment_note_{payment.pk}": long_note,
+        },
+    )
+
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert len(payment.note) == max_length
+    assert payment.note == long_note[:max_length]

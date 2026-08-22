@@ -60,6 +60,7 @@ from .models import (
     Glider,
     Logsheet,
     LogsheetCloseout,
+    LogsheetGuestPayment,
     LogsheetPayment,
     MaintenanceDeadline,
     MaintenanceIssue,
@@ -2681,10 +2682,20 @@ def manage_logsheet_finances(request, pk):
 
     logsheet = get_object_or_404(Logsheet, pk=pk)
 
-    # OPTIMIZATION: Use select_related to avoid N+1 queries for pilot, glider, towplane
-    flights = logsheet.flights.select_related(
-        "pilot", "instructor", "glider", "towplane", "split_with"
-    ).exclude(commercial_ride=True)
+    # Trim-consistent guest detection: a flight is a guest flight iff its
+    # guest_pilot_name is non-NULL AND non-blank after trimming. This matches
+    # the billing layer (get_billing_allocations / finalization), which uses
+    # `.strip()` — so a whitespace-only value is treated as a *member* flight,
+    # never a guest flight. Filter in Python for correctness and simplicity.
+    all_non_commercial = list(
+        logsheet.flights.select_related(
+            "pilot", "instructor", "glider", "towplane", "split_with"
+        ).exclude(Q(commercial_ride=True))
+    )
+    flights = [f for f in all_non_commercial if not (f.guest_pilot_name or "").strip()]
+    guest_flights = [
+        f for f in all_non_commercial if (f.guest_pilot_name or "").strip()
+    ]
 
     # Get towplane rental costs for this logsheet
     # OPTIMIZATION: Already optimized with select_related
@@ -2698,8 +2709,10 @@ def manage_logsheet_finances(request, pk):
 
     site_config = SiteConfiguration.objects.first()
 
-    # Pre-cache config on all Flight instances to avoid repeated DB lookups
-    for flight in flights:
+    # Pre-cache config on every non-commercial Flight instance (both member and
+    # guest flights) to avoid a SiteConfiguration query per row, including in
+    # the guest-payment build loop where flight_costs() reads it.
+    for flight in all_non_commercial:
         flight._site_config_cache = site_config
 
     # Use locked-in values if finalized, else use capped property
@@ -2729,16 +2742,64 @@ def manage_logsheet_finances(request, pk):
             ),
         }
 
+    # Summary by Flight and day totals cover every non-commercial flight,
+    # including guest flights: they are still real tow/rental/instruction
+    # costs and must be reflected in the daily summary. Guest-flight costs
+    # are NOT charged to the pilot (the billing layer returns no allocation
+    # for them) — they are settled via the guest-payment section below — so
+    # pilot_summary / member_charges stay scoped to the non-guest `flights`.
     flight_data = []
     total_tow = total_rental = total_instruction = total_towplane_rental = total_sum = 0
 
-    for flight in flights:
+    for flight in all_non_commercial:
         costs = flight_costs(flight)
         flight_data.append((flight, costs))
         total_tow += costs["tow"] or 0
         total_rental += costs["rental"] or 0
         total_instruction += costs["instruction"] or 0
         total_sum += costs["total"] or 0
+
+    guest_payment_data = []
+    if not logsheet.finalized:
+        # Mutate guest-payment rows only before finalization; once finalized the
+        # posted ledger entries are immutable and the rows must remain frozen.
+        for guest_flight in guest_flights:
+            computed_total = quantize_currency(flight_costs(guest_flight)["total"])
+            guest_payment, created = LogsheetGuestPayment.objects.get_or_create(
+                logsheet=logsheet,
+                flight=guest_flight,
+                defaults={
+                    "guest_name": guest_flight.guest_pilot_name.strip(),
+                    "amount": computed_total,
+                    "responsible_member": guest_flight.pilot,
+                },
+            )
+            if not created:
+                # Keep user-edited responsible_member/payment_method/note intact,
+                # but re-sync the derived fields (amount, guest_name) with the
+                # current flight costs so a stale amount is never carried into
+                # finalization.
+                guest_payment.guest_name = guest_flight.guest_pilot_name.strip()
+                guest_payment.amount = computed_total
+                guest_payment.save(update_fields=["guest_name", "amount"])
+            # A non-positive total (fresh or pre-existing) cannot be posted to
+            # the ledger (LedgerEntry enforces amount > 0), so drop it.
+            if guest_payment.amount <= 0:
+                guest_payment.delete()
+                continue
+            guest_payment_data.append(guest_payment)
+    else:
+        # Read-only: display existing guest-payment rows as they were at
+        # posting time. Do not create, update, or delete any rows. Scoped to the
+        # same guest flights the non-finalized path would show, for consistency.
+        guest_payment_data = list(
+            LogsheetGuestPayment.objects.filter(
+                logsheet=logsheet,
+                flight_id__in=[f.pk for f in guest_flights],
+            )
+            .select_related("flight", "responsible_member")
+            .order_by("pk")
+        )
 
     # Add towplane rental costs
     towplane_data = []
@@ -2754,11 +2815,17 @@ def manage_logsheet_finances(request, pk):
 
     from .models import LogsheetPayment
 
+    # Reuse the costs already computed for the per-flight summary so every
+    # derived summary (pilot totals, member charges) uses the exact same
+    # values and we avoid recomputing flight_costs per flight.
+    costs_by_flight = {flight: costs for flight, costs in flight_data}
+
     # Summary per pilot
     pilot_summary = defaultdict(
         lambda: {"count": 0, "tow": 0, "rental": 0, "instruction": 0, "total": 0}
     )
-    for flight, costs in flight_data:
+    for flight in flights:
+        costs = costs_by_flight[flight]
         pilot = flight.pilot
         if pilot:
             summary = pilot_summary[pilot]
@@ -2779,7 +2846,8 @@ def manage_logsheet_finances(request, pk):
             "total": Decimal("0.00"),
         }
     )
-    for flight, costs in flight_data:
+    for flight in flights:
+        costs = costs_by_flight[flight]
         tow = costs["tow"] or Decimal("0.00")
         rental = costs["rental"] or Decimal("0.00")
         instruction = costs["instruction"] or Decimal("0.00")
@@ -2868,6 +2936,61 @@ def manage_logsheet_finances(request, pk):
             }
         )
     if request.method == "POST":
+        # Guest-payment rows are frozen once finalized; do not allow crafted
+        # POSTs to alter settlement details after ledger entries are posted.
+        if not logsheet.finalized:
+            for guest_payment in guest_payment_data:
+                # The select always posts a value (blank when "Select member" is
+                # chosen), so .get() returns "" rather than None for a clear.
+                raw_responsible_member_id = request.POST.get(
+                    f"guest_responsible_member_{guest_payment.pk}"
+                )
+                # Resolve the selected responsible member safely:
+                #   - blank ""      -> clear the value (None). The finalize check
+                #     then correctly flags the guest as missing a member.
+                #   - valid member  -> assign that member.
+                #   - non-blank but non-integer, or a pk with no matching member
+                #     -> leave the existing value intact so a crafted FK cannot
+                #     500 on save or bypass the finalize check.
+                if raw_responsible_member_id == "":
+                    guest_payment.responsible_member = None
+                else:
+                    try:
+                        member_pk = int(raw_responsible_member_id)
+                    except (TypeError, ValueError):
+                        member_pk = None
+                    if member_pk is not None:
+                        member = Member.objects.filter(pk=member_pk).first()
+                        if member is not None:
+                            guest_payment.responsible_member = member
+                        # else: unknown member; keep the prior value
+                # Validate the posted payment method:
+                #   - blank ""     -> clear to None (user explicitly chose "Select method")
+                #   - valid code   -> assign (cash / check / zelle)
+                #   - unknown code -> leave the existing value intact so a crafted
+                #     POST cannot store a value that post_guest_payment_pending
+                #     will later reject, producing a confusing finalize failure.
+                allowed_methods = {
+                    code for code, _ in LogsheetGuestPayment.PAYMENT_METHOD_CHOICES
+                }
+                raw_payment_method = request.POST.get(
+                    f"guest_payment_method_{guest_payment.pk}"
+                )
+                if raw_payment_method == "":
+                    guest_payment.payment_method = None
+                elif raw_payment_method in allowed_methods:
+                    guest_payment.payment_method = raw_payment_method
+                # else: unknown value; keep the prior value
+                note_max_length = LogsheetGuestPayment._meta.get_field(
+                    "note"
+                ).max_length
+                guest_payment.note = request.POST.get(
+                    f"guest_payment_note_{guest_payment.pk}", ""
+                ).strip()[:note_max_length]
+                guest_payment.save(
+                    update_fields=["responsible_member", "payment_method", "note"]
+                )
+
         if "finalize" in request.POST:
             if logsheet.finalized:
                 messages.info(request, "This logsheet has already been finalized.")
@@ -2915,6 +3038,19 @@ def manage_logsheet_finances(request, pk):
                     request,
                     "Cannot finalize. Missing payment method for: "
                     + ", ".join(missing),
+                )
+                return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
+
+            guest_missing = [
+                payment
+                for payment in guest_payment_data
+                if not payment.responsible_member_id or not payment.payment_method
+            ]
+            if guest_missing:
+                messages.error(
+                    request,
+                    "Cannot finalize. Every guest flight needs a responsible member "
+                    "and payment method.",
                 )
                 return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
@@ -2983,10 +3119,13 @@ def manage_logsheet_finances(request, pk):
     # Reuse cached SiteConfiguration to avoid extra DB lookups.
     rental_enabled = site_config.allow_towplane_rental if site_config else False
     treasurer_title = site_config.treasurer_title if site_config else "Treasurer"
-    instruction_fees_present = any(
-        (costs.get("instruction") or Decimal("0.00")) > Decimal("0.00")
-        for _, costs in flight_data
-    )
+    # The Instruction column/total reflects every non-commercial flight's
+    # instruction fees — guest flights included — because total_instruction
+    # (and the per-flight totals) already sum over all of them. Key the
+    # display flag off total_instruction so the column is always shown
+    # exactly when the footer total is non-zero, avoiding a misleading
+    # breakdown when instruction exists only on guest flights.
+    instruction_fees_present = total_instruction > Decimal("0.00")
 
     context = {
         "logsheet": logsheet,
@@ -3002,6 +3141,14 @@ def manage_logsheet_finances(request, pk):
         "pilot_summary_sorted": pilot_summary_sorted,
         "member_charges_sorted": member_charges_sorted,
         "member_payment_data_sorted": member_payment_data_sorted,
+        "guest_payment_data_sorted": sorted(
+            guest_payment_data,
+            key=lambda payment: (
+                payment.guest_name.lower(),
+                payment.flight_id,
+            ),
+        ),
+        "responsible_member_choices": list(active_members) + list(inactive_members),
         "misc_charges_data": misc_charges_data,
         "active_members": active_members,
         "inactive_members": inactive_members,

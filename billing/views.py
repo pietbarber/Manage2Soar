@@ -1,3 +1,4 @@
+import csv
 from datetime import date
 from functools import wraps
 
@@ -6,23 +7,32 @@ from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import ValidationError
 from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
-from django.http import HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from billing.decorators import billing_app_required
-from billing.forms import ManualEntryForm, ReverseEntryForm
+from billing.forms import (
+    GuestRemittanceForm,
+    ManualEntryForm,
+    OpeningBalanceOverrideForm,
+    ReverseEntryForm,
+)
 from billing.models import BillingPeriod, Ledger, LedgerEntry
 from billing.periods import close_period, reopen_period
 from billing.services import (
     get_balance,
+    get_statement_rows,
+    override_opening_balance,
     post_manual_charge,
     post_manual_credit,
     post_manual_payment,
     post_opening_balance,
+    remit_guest_payment,
     reverse_manual_entry,
 )
 from members.models import Member
+from utils.csv import sanitize_csv_cell
 
 
 def treasurer_required(view_func):
@@ -137,12 +147,13 @@ def billing_period_list(request):
 def ledger_detail(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     ledger = Ledger.objects.filter(member=member).first()
-    entries = (
-        ledger.entries.select_related("created_by").order_by("-effective_date", "-id")
-        if ledger
-        else []
+    statement_rows = list(reversed(get_statement_rows(ledger)))
+    has_opening_balance = bool(
+        ledger and ledger.entries.filter(kind=LedgerEntry.Kind.OPENING_BALANCE).exists()
     )
-    form = ManualEntryForm(request.POST or None)
+    form = ManualEntryForm(
+        request.POST or None, allow_opening_balance=not has_opening_balance
+    )
 
     if request.method == "POST":
         if not form.is_valid():
@@ -152,8 +163,10 @@ def ledger_detail(request, member_id):
                 {
                     "member": member,
                     "ledger": ledger,
-                    "entries": entries,
+                    "statement_rows": statement_rows,
                     "form": form,
+                    "has_opening_balance": has_opening_balance,
+                    "override_form": OpeningBalanceOverrideForm(),
                     "balance": get_balance(ledger) if ledger else 0,
                 },
             )
@@ -187,11 +200,82 @@ def ledger_detail(request, member_id):
         {
             "member": member,
             "ledger": ledger,
-            "entries": entries,
+            "statement_rows": statement_rows,
             "form": form,
+            "has_opening_balance": has_opening_balance,
+            "override_form": OpeningBalanceOverrideForm(),
             "balance": get_balance(ledger) if ledger else 0,
         },
     )
+
+
+@require_POST
+@billing_app_required
+@treasurer_required
+def override_opening_balance_view(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    form = OpeningBalanceOverrideForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "A complete opening-balance override is required.")
+    else:
+        try:
+            override_opening_balance(
+                member=member, actor=request.user, **form.cleaned_data
+            )
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        else:
+            messages.success(request, "Opening balance override posted.")
+    return redirect("billing:ledger_detail", member_id=member.pk)
+
+
+@billing_app_required
+@treasurer_required
+def ledger_detail_csv(request, member_id):
+    """Export one member's ledger, including staff-only audit notes."""
+    member = get_object_or_404(Member, pk=member_id)
+    ledger = Ledger.objects.filter(member=member).first()
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="ledger_{member.pk}.csv"'
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "Date",
+            "Type",
+            "Description",
+            "Debit",
+            "Credit",
+            "Balance",
+            "Created By",
+            "Internal Note",
+        ]
+    )
+    for row in get_statement_rows(ledger):
+        entry = row["entry"]
+        writer.writerow(
+            [
+                entry.effective_date.isoformat(),
+                sanitize_csv_cell(entry.get_kind_display()),
+                sanitize_csv_cell(entry.member_description),
+                (
+                    f"{entry.amount:.2f}"
+                    if entry.effect == LedgerEntry.Effect.DEBIT
+                    else ""
+                ),
+                (
+                    f"{entry.amount:.2f}"
+                    if entry.effect == LedgerEntry.Effect.CREDIT
+                    else ""
+                ),
+                f"{row['running_balance']:.2f}",
+                sanitize_csv_cell(
+                    entry.created_by.get_full_name() or entry.created_by.username
+                ),
+                sanitize_csv_cell(entry.internal_note),
+            ]
+        )
+    return response
 
 
 @require_POST
@@ -214,4 +298,33 @@ def reverse_entry(request, entry_id):
             messages.success(request, "Ledger entry reversed.")
     else:
         messages.error(request, "A reversal reason is required.")
+    return redirect("billing:ledger_detail", member_id=entry.ledger.member_id)
+
+
+@require_POST
+@billing_app_required
+@treasurer_required
+def remit_guest_payment_entry(request, entry_id):
+    entry = get_object_or_404(
+        LedgerEntry,
+        pk=entry_id,
+        kind=LedgerEntry.Kind.GUEST_PAYMENT_PENDING,
+    )
+    form = GuestRemittanceForm(request.POST)
+    if form.is_valid():
+        try:
+            from siteconfig.timezone_utils import get_club_today
+
+            remit_guest_payment(
+                entry=entry,
+                actor=request.user,
+                effective_date=get_club_today(),
+                reference=form.cleaned_data["reference"],
+            )
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        else:
+            messages.success(request, "Guest payment remitted in full.")
+    else:
+        messages.error(request, "A valid remittance confirmation is required.")
     return redirect("billing:ledger_detail", member_id=entry.ledger.member_id)
