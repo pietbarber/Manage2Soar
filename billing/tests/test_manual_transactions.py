@@ -184,6 +184,17 @@ def test_guest_collection_reversible_after_remittance_reversed(member, treasurer
     # Balance returns to zero (debit and credit both netted out).
     assert get_balance(member.billing_ledger) == Decimal("0.00")
 
+    # A reversed collection no longer owes anything: it must no longer be
+    # remit-able, otherwise a credit would be recorded against a liability
+    # that no longer exists.
+    with pytest.raises(ValidationError, match="was reversed"):
+        remit_guest_payment(
+            entry=pending,
+            actor=treasurer,
+            effective_date=date.today(),
+            reference="Crafted remittance attempt",
+        )
+
 
 def test_guest_payment_remittance_is_treasurer_only(member, treasurer):
     pending = post_guest_payment_pending(

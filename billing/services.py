@@ -419,6 +419,12 @@ def remit_guest_payment(*, entry, actor, effective_date, reference=""):
     original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
     if original.kind != LedgerEntry.Kind.GUEST_PAYMENT_PENDING:
         raise ValidationError("Only pending guest payments can be remitted.")
+    # A reversed collection no longer owes anything; remitting it would
+    # record a credit against a liability that no longer exists.
+    if hasattr(original, "reversal"):
+        raise ValidationError(
+            "This guest payment was reversed and can no longer be remitted."
+        )
     if hasattr(original, "remittance"):
         raise ValidationError("This guest payment has already been remitted.")
     reference = reference.strip() if isinstance(reference, str) else ""
