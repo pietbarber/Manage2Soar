@@ -2925,11 +2925,30 @@ def manage_logsheet_finances(request, pk):
         # POSTs to alter settlement details after ledger entries are posted.
         if not logsheet.finalized:
             for guest_payment in guest_payment_data:
-                responsible_member_id = request.POST.get(
+                # The select always posts a value (blank when "Select member" is
+                # chosen), so .get() returns "" rather than None for a clear.
+                raw_responsible_member_id = request.POST.get(
                     f"guest_responsible_member_{guest_payment.pk}"
                 )
-                if responsible_member_id:
-                    guest_payment.responsible_member_id = responsible_member_id
+                # Resolve the selected responsible member safely:
+                #   - blank ""      -> clear the value (None). The finalize check
+                #     then correctly flags the guest as missing a member.
+                #   - valid member  -> assign that member.
+                #   - non-blank but non-integer, or a pk with no matching member
+                #     -> leave the existing value intact so a crafted FK cannot
+                #     500 on save or bypass the finalize check.
+                if raw_responsible_member_id == "":
+                    guest_payment.responsible_member = None
+                else:
+                    try:
+                        member_pk = int(raw_responsible_member_id)
+                    except (TypeError, ValueError):
+                        member_pk = None
+                    if member_pk is not None:
+                        member = Member.objects.filter(pk=member_pk).first()
+                        if member is not None:
+                            guest_payment.responsible_member = member
+                        # else: unknown member; keep the prior value
                 guest_payment.payment_method = (
                     request.POST.get(f"guest_payment_method_{guest_payment.pk}") or None
                 )

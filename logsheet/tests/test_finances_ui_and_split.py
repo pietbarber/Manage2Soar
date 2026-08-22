@@ -9,7 +9,12 @@ from django.utils import timezone
 from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.periods import close_period
 from billing.services import post_flight_charges
-from logsheet.models import Flight, FlightSplitRequest, LogsheetPayment
+from logsheet.models import (
+    Flight,
+    FlightSplitRequest,
+    LogsheetGuestPayment,
+    LogsheetPayment,
+)
 from logsheet.utils.flight_charges import get_billing_allocations
 from siteconfig.models import (
     BillingPricingMode,
@@ -753,3 +758,108 @@ def test_export_finances_csv_excludes_commercial_ride_rows(
     body = response.content.decode("utf-8")
     assert "3000Tow1Tow" in body
     assert "6600Tow1Tow" not in body
+
+
+@pytest.fixture
+def guest_payment_row(client, active_member, logsheet_with_flights, glider):
+    """A non-commercial guest flight with a pre-existing guest-payment row.
+
+    The glider is given a rental_rate so the flight's *calculated* cost is
+    positive; otherwise the view deletes zero-cost guest-payment rows during
+    the GET/POST build loop.
+    """
+    glider.rental_rate = Decimal("50.00")
+    glider.save(update_fields=["rental_rate"])
+
+    flight = Flight.objects.create(
+        logsheet=logsheet_with_flights,
+        pilot=active_member,
+        glider=glider,
+        flight_type="dual",
+        guest_pilot_name="Guest Rider",
+        commercial_ride=False,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+        release_altitude=3000,
+    )
+    payment = LogsheetGuestPayment.objects.create(
+        logsheet=logsheet_with_flights,
+        flight=flight,
+        responsible_member=active_member,
+        guest_name="Guest Rider",
+        amount=Decimal("50.00"),
+        payment_method="cash",
+    )
+    return payment
+
+
+def _post_guest_responsible(client, active_member, logsheet, payment, value):
+    """POST the finance form selecting `value` for the guest responsible member."""
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet.pk])
+    client.force_login(active_member)
+    return client.post(
+        url,
+        {
+            f"guest_responsible_member_{payment.pk}": value,
+            f"guest_payment_method_{payment.pk}": "cash",
+            f"guest_payment_note_{payment.pk}": "",
+        },
+    )
+
+
+@pytest.mark.django_db
+def test_guest_responsible_member_clear_blank_selection(
+    client, active_member, another_member, logsheet_with_flights, guest_payment_row
+):
+    """Selecting the blank option clears the responsible member."""
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+    assert payment.responsible_member_id == active_member.pk
+
+    response = _post_guest_responsible(
+        client, active_member, logsheet_with_flights, payment, ""
+    )
+    assert response.status_code in (200, 302)
+
+    payment.refresh_from_db()
+    assert payment.responsible_member_id is None
+
+
+@pytest.mark.django_db
+def test_guest_responsible_member_assigns_valid_member(
+    client, active_member, another_member, logsheet_with_flights, guest_payment_row
+):
+    """A valid member pk is assigned to the guest payment row."""
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+
+    response = _post_guest_responsible(
+        client, active_member, logsheet_with_flights, payment, str(another_member.pk)
+    )
+    assert response.status_code in (200, 302)
+
+    payment.refresh_from_db()
+    assert payment.responsible_member_id == another_member.pk
+
+
+@pytest.mark.django_db
+def test_guest_responsible_member_ignores_invalid_values(
+    client, active_member, another_member, logsheet_with_flights, guest_payment_row
+):
+    """Invalid (non-integer or non-member) values do not 500 and keep prior value."""
+    payment = LogsheetGuestPayment.objects.get(pk=guest_payment_row.pk)
+    prior_member = payment.responsible_member_id
+
+    # Non-integer value must be ignored, not crash.
+    response = _post_guest_responsible(
+        client, active_member, logsheet_with_flights, payment, "not-an-int"
+    )
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert payment.responsible_member_id == prior_member
+
+    # A pk with no matching member must also be ignored.
+    response = _post_guest_responsible(
+        client, active_member, logsheet_with_flights, payment, "99999999"
+    )
+    assert response.status_code in (200, 302)
+    payment.refresh_from_db()
+    assert payment.responsible_member_id == prior_member
