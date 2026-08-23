@@ -86,6 +86,8 @@ class LedgerEntry(models.Model):
         PAYMENT = "payment", "Payment"
         CREDIT = "credit", "Credit"
         OPENING_BALANCE = "opening_balance", "Opening balance"
+        GUEST_PAYMENT_PENDING = "guest_payment_pending", "Guest payment pending"
+        GUEST_REMITTANCE = "guest_remittance", "Guest payment remittance"
         REVERSAL = "reversal", "Reversal"
 
     class Effect(models.TextChoices):
@@ -125,6 +127,23 @@ class LedgerEntry(models.Model):
         null=True,
         related_name="reversal",
     )
+    remits = models.OneToOneField(
+        "self",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="remittance",
+    )
+    guest_name = models.CharField(max_length=150, blank=True)
+    payment_method = models.CharField(
+        max_length=10,
+        choices=(
+            ("cash", "Cash"),
+            ("check", "Check"),
+            ("zelle", "Zelle"),
+        ),
+        blank=True,
+    )
 
     class Meta:
         ordering = ("effective_date", "created_at", "id")
@@ -138,6 +157,11 @@ class LedgerEntry(models.Model):
                 condition=models.Q(source_key__isnull=False),
                 name="billing_entry_source_key_unique",
             ),
+            models.UniqueConstraint(
+                fields=("ledger",),
+                condition=models.Q(kind="opening_balance"),
+                name="billing_one_opening_balance_per_ledger",
+            ),
             models.CheckConstraint(
                 condition=(
                     models.Q(
@@ -145,11 +169,12 @@ class LedgerEntry(models.Model):
                             "flight_charge",
                             "misc_charge",
                             "manual_charge",
+                            "guest_payment_pending",
                         ),
                         effect="debit",
                     )
                     | models.Q(
-                        kind__in=("payment", "credit"),
+                        kind__in=("payment", "credit", "guest_remittance"),
                         effect="credit",
                     )
                     | models.Q(kind="opening_balance")
@@ -165,6 +190,19 @@ class LedgerEntry(models.Model):
                 condition=~models.Q(kind="flight_charge")
                 | models.Q(flight__isnull=False),
                 name="billing_flight_charge_has_flight",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(kind="guest_remittance")
+                | models.Q(remits__isnull=False),
+                name="billing_guest_remittance_has_collection",
+            ),
+            # Only guest remittances may reference a collection; any other
+            # kind (e.g. a manual credit) must leave `remits` unset so the
+            # remittance link stays a faithful guest-collection ledger.
+            models.CheckConstraint(
+                condition=models.Q(kind="guest_remittance")
+                | models.Q(remits__isnull=True),
+                name="billing_remits_only_guest_remittance",
             ),
         ]
         indexes = [
@@ -183,6 +221,31 @@ class LedgerEntry(models.Model):
             self.Kind.MANUAL_CHARGE,
         }
         credit_kinds = {self.Kind.PAYMENT, self.Kind.CREDIT}
+        if self.kind == self.Kind.GUEST_PAYMENT_PENDING:
+            if self.effect != self.Effect.DEBIT:
+                raise ValidationError("Pending guest payments must be debits.")
+            if not self.guest_name.strip():
+                raise ValidationError("A guest name is required.")
+            if not self.payment_method:
+                raise ValidationError("A guest payment method is required.")
+        if self.kind == self.Kind.GUEST_REMITTANCE:
+            if self.effect != self.Effect.CREDIT:
+                raise ValidationError("Guest remittances must be credits.")
+            if not self.remits_id:
+                raise ValidationError(
+                    "A guest remittance must identify its collection."
+                )
+            collection = self.remits
+            if collection.kind != self.Kind.GUEST_PAYMENT_PENDING:
+                raise ValidationError("A remittance must clear a guest payment.")
+            if collection.ledger_id != self.ledger_id:
+                raise ValidationError("A remittance must use the collection ledger.")
+            if collection.amount != self.amount:
+                raise ValidationError("Guest remittance must be for the full amount.")
+        if self.remits_id and self.kind != self.Kind.GUEST_REMITTANCE:
+            raise ValidationError(
+                "Only a guest remittance may reference a collection via remits."
+            )
         if self.kind in debit_kinds and self.effect != self.Effect.DEBIT:
             raise ValidationError("Charge entries must be debits.")
         if self.kind in credit_kinds and self.effect != self.Effect.CREDIT:

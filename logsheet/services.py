@@ -1,9 +1,12 @@
+from decimal import Decimal
+
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from billing.services import post_flight_charges
+from billing.services import post_flight_charges, post_guest_payment_pending
 from siteconfig.models import SiteConfiguration
 
-from .models import Flight, Logsheet, RevisionLog
+from .models import Flight, Logsheet, LogsheetGuestPayment, RevisionLog
 from .utils.finalization_email import enqueue_finalization_summary_email_job
 from .utils.flight_charges import get_billing_allocations
 
@@ -23,7 +26,9 @@ def finalize_logsheet_financials(
 
     # Keep nullable relationships out of the locking query. PostgreSQL rejects
     # FOR UPDATE queries that lock the nullable side of an outer join.
-    locked_flights = Flight.objects.select_for_update().filter(logsheet=locked_logsheet)
+    locked_flights = list(
+        Flight.objects.select_for_update().filter(logsheet=locked_logsheet)
+    )
     for flight in locked_flights:
         # Track which cost fields actually changed to avoid no-op saves
         costs_to_save = []
@@ -47,6 +52,112 @@ def finalize_logsheet_financials(
                 flight=flight,
                 actor=actor,
                 allocations=get_billing_allocations(flight),
+            )
+
+    # Lock the guest-payment rows alongside the logsheet/flights so their
+    # details cannot change mid-transaction. Lock the base table only (no
+    # joins): PostgreSQL rejects FOR UPDATE on the nullable side of an outer
+    # join, and responsible_member is nullable. Then re-fetch the related
+    # fields for the posting loop below (materialized to a list once).
+    locked_guest_pks = list(
+        locked_logsheet.guest_payments.select_for_update().values_list("pk", flat=True)
+    )
+    guest_payments = list(
+        LogsheetGuestPayment.objects.select_related("flight", "responsible_member")
+        .filter(logsheet=locked_logsheet, pk__in=locked_guest_pks)
+        .order_by("pk")
+    )
+
+    # Guest-payment completeness is validated even when billing is disabled:
+    # a finalized logsheet cannot be re-finalized to backfill settlement rows
+    # later, so payable guest flights must have complete rows up front.
+    # Guest settlement excludes commercial rides (prepaid; handled via the
+    # commercial-ride ticket flow), so they do not require a pending entry.
+    # Only guest flights with a positive frozen total require posting.
+    # Re-derive the payable total for each guest flight from the frozen
+    # *_actual cost fields. These are authoritative at finalization time and
+    # may differ from a guest-payment row's last-saved amount (e.g. closeout
+    # edits between finance-page load and finalization). Syncing the row to
+    # the frozen total and posting that value avoids recording a stale amount.
+    payable_guest_frozen_totals = {}
+    for flight in locked_flights:
+        if flight.commercial_ride or not (flight.guest_pilot_name or "").strip():
+            continue
+        frozen_total = (
+            (flight.tow_cost_actual or Decimal("0.00"))
+            + (flight.rental_cost_actual or Decimal("0.00"))
+            + (flight.instruction_fee_actual or Decimal("0.00"))
+        )
+        if frozen_total > 0:
+            payable_guest_frozen_totals[flight.pk] = frozen_total
+
+    payable_guest_flight_ids = set(payable_guest_frozen_totals)
+
+    # Sync each payable guest row to the authoritative frozen values (the
+    # frozen *_actual total and the flight's guest name) so both the
+    # completeness validation and the ledger posting use the same value.
+    # Re-syncing guest_name covers a flight whose guest_pilot_name was
+    # corrected after the finance page was last loaded.
+    for guest_payment in guest_payments:
+        if guest_payment.flight_id not in payable_guest_frozen_totals:
+            continue
+        update_fields = []
+        synced_amount = payable_guest_frozen_totals[guest_payment.flight_id]
+        if guest_payment.amount != synced_amount:
+            guest_payment.amount = synced_amount
+            update_fields.append("amount")
+        authoritative_name = (guest_payment.flight.guest_pilot_name or "").strip()
+        if authoritative_name and guest_payment.guest_name != authoritative_name:
+            guest_payment.guest_name = authoritative_name
+            update_fields.append("guest_name")
+        if update_fields:
+            guest_payment.save(update_fields=update_fields)
+
+    recorded_guest_flight_ids = {payment.flight_id for payment in guest_payments}
+    missing_guest_payments = payable_guest_flight_ids - recorded_guest_flight_ids
+    if missing_guest_payments:
+        raise ValidationError(
+            "Complete guest payment details before finalizing flights: "
+            + ", ".join(f"#{flight_id}" for flight_id in sorted(missing_guest_payments))
+        )
+    for guest_payment in guest_payments:
+        # Commercial rides are prepaid; do not require settlement entries.
+        if guest_payment.flight.commercial_ride:
+            continue
+        # Zero-cost guest flights do not need settlement entries.
+        if guest_payment.flight_id not in payable_guest_flight_ids:
+            continue
+        if not guest_payment.responsible_member_id:
+            raise ValidationError(
+                "Every guest payment must identify a responsible member."
+            )
+        if not guest_payment.payment_method:
+            raise ValidationError("Every guest payment must identify a payment method.")
+        if guest_payment.amount <= 0:
+            raise ValidationError(
+                "Every payable guest flight must have a positive payment amount."
+            )
+
+    if billing_enabled:
+        for guest_payment in guest_payments:
+            # Commercial rides are prepaid; do not post a pending guest entry.
+            if guest_payment.flight.commercial_ride:
+                continue
+            # Zero-cost guest flights do not need settlement entries.
+            if guest_payment.flight_id not in payable_guest_flight_ids:
+                continue
+            post_guest_payment_pending(
+                member=guest_payment.responsible_member,
+                actor=actor,
+                amount=guest_payment.amount,
+                effective_date=locked_logsheet.log_date,
+                guest_name=guest_payment.guest_name,
+                payment_method=guest_payment.payment_method,
+                description=(
+                    f"Guest payment pending for flight #{guest_payment.flight_id}"
+                ),
+                flight=guest_payment.flight,
+                source_key=f"guest-payment:{guest_payment.pk}",
             )
 
     locked_logsheet.finalized = True
