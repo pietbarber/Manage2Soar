@@ -1861,11 +1861,10 @@ def manage_logsheet(request, pk):
                 enqueue_summary=enqueue_finalization_summary_email_job,
             )
         except ValidationError as exc:
-            # The service performs final completeness checks (e.g. a payable
-            # guest flight with no settlement row) that this view cannot
-            # fully pre-check. Surface those as a user error instead of a
-            # 500.
-            transaction.set_rollback(True)
+            # finalize_logsheet_financials is @transaction.atomic, so a
+            # ValidationError raised inside it already rolls back its writes.
+            # Surface the service's completeness failure as a user error
+            # instead of a 500.
             messages.error(
                 request,
                 f"Cannot finalize. {get_validation_message(exc)}",
@@ -3075,11 +3074,10 @@ def manage_logsheet_finances(request, pk):
                     enqueue_summary=enqueue_finalization_summary_email_job,
                 )
             except ValidationError as exc:
-                # The service performs final completeness checks (e.g. a
-                # payable guest flight with no settlement row) that this
-                # view cannot fully pre-check. Surface those as a user
-                # error instead of a 500.
-                transaction.set_rollback(True)
+                # finalize_logsheet_financials is @transaction.atomic, so a
+                # ValidationError raised inside it already rolls back its
+                # writes. Surface the service's completeness failure as a
+                # user error instead of a 500.
                 messages.error(
                     request,
                     f"Cannot finalize. {get_validation_message(exc)}",
