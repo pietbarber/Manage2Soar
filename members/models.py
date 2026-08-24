@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import date
 from typing import Any, cast
@@ -18,6 +19,8 @@ from utils.upload_entropy import (
 
 # Membership application models are in models_applications.py to avoid circular imports
 from .utils.avatar_generator import generate_identicon
+
+logger = logging.getLogger(__name__)
 
 
 def get_membership_status_choices():
@@ -391,13 +394,18 @@ class Member(AbstractUser):
         if not self.profile_photo and not (
             hasattr(settings, "TESTING") and settings.TESTING
         ):
-            file_path = os.path.join("generated_avatars", f"profile_{self.pk}.png")
-            from django.core.files.storage import default_storage
+            try:
+                file_path = os.path.join("generated_avatars", f"profile_{self.pk}.png")
+                from django.core.files.storage import default_storage
 
-            if not default_storage.exists(file_path):
-                generate_identicon(self.username, file_path)
-            type(self).objects.filter(pk=self.pk).update(profile_photo=file_path)
-            self.profile_photo = file_path
+                if not default_storage.exists(file_path):
+                    generate_identicon(self.username, file_path)
+                type(self).objects.filter(pk=self.pk).update(profile_photo=file_path)
+                self.profile_photo = file_path
+            except Exception:
+                # Avatar generation is ancillary to member creation. The member
+                # remains usable and the avatar can be generated on a later save.
+                logger.exception("Failed to generate avatar for member %s", self.pk)
 
         # 5) now safe to touch M2M
         transaction.on_commit(self._sync_groups)

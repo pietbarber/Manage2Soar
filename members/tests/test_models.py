@@ -1,7 +1,7 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django import forms
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from members.forms import SetPasswordForm
@@ -12,6 +12,20 @@ from utils.upload_entropy import upload_biography
 
 
 class MemberModelTests(TestCase):
+    @override_settings(TESTING=False)
+    @patch("django.core.files.storage.default_storage.exists", return_value=False)
+    @patch("members.models.generate_identicon", side_effect=OSError("storage down"))
+    def test_avatar_generation_failure_does_not_abort_member_save(
+        self, _generate_identicon, _storage_exists
+    ):
+        member = Member(username="avatar_failure", membership_status="Full Member")
+
+        member.save()
+
+        member.refresh_from_db()
+        self.assertIsNotNone(member.pk)
+        self.assertFalse(member.profile_photo)
+
     def test_biography_upload_path_uses_member_id(self):
         biography = Biography(member_id=42)
 
