@@ -266,5 +266,7 @@ infrastructure/ansible/group_vars/gcs_*/vars.yml
 .env.backup
 infrastructure/ansible/group_vars/all/vault.yml
 
+.opencode/
+graphify-out/
 .mcp.json
 .claude.json
