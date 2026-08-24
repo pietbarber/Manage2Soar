@@ -3,9 +3,9 @@ import secrets
 
 
 def upload_biography(instance, filename):
-    name, ext = os.path.splitext(filename)
+    name, ext = os.path.splitext(os.path.basename(filename))
     token = secrets.token_urlsafe(6)
-    return f"biography/{name}-{token}{ext}"
+    return f"biography/{instance.member_id}/{name}-{token}{ext}"
 
 
 def upload_profile_photo(instance, filename):

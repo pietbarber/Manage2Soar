@@ -1,7 +1,6 @@
 import base64
 import logging
 import os
-import re
 from datetime import date, timedelta
 
 from django.conf import settings
@@ -528,8 +527,8 @@ def set_password(request):
 #########################
 # tinymce_image_upload() View
 
-# Handles image uploads via TinyMCE's file picker. Stores images under
-# media/biography/<username>/ for the currently logged-in user.
+# Handles image uploads via TinyMCE's file picker. Stores images under the
+# shared media/tinymce/ prefix; TinyMCE embeds the returned URL in the HTML.
 
 # Methods:
 # - POST: accepts an image file uploaded from the TinyMCE editor
@@ -604,43 +603,25 @@ def badge_board(request):
     return render(request, "members/badges.html", {"badges": badges})
 
 
-def pydenticon_view(request, username):
+def pydenticon_view(request, member_id):
     """Serve generated identicon for users without profile photos.
 
     Note: In production, this endpoint should be served by nginx/Apache or CDN
     rather than Django for better performance and proper handling of ranges/etags.
     """
-    # Validate username with strict allowlist (only alphanumeric, underscore, hyphen)
-    if not re.match(r"^[a-zA-Z0-9_-]+$", username):
-        raise Http404("Invalid username")
+    member = get_object_or_404(Member, pk=member_id)
+    relative_path = os.path.join("generated_avatars", f"profile_{member.pk}.png")
 
-    # Define base path for generated avatars
-    base_path = os.path.join(settings.MEDIA_ROOT, "generated_avatars")
-
-    # Ensure base directory exists
-    if not os.path.isdir(base_path):
-        raise Http404("Avatar directory not found")
-
-    # Construct filename and full path, then normalize
-    # Using os.path.normpath + startswith pattern that CodeQL recognizes as safe
-    filename = f"profile_{username}.png"
-    fullpath = os.path.normpath(os.path.join(base_path, filename))
-
-    # CRITICAL: Verify normalized path is within base directory (CodeQL-recognized pattern)
-    if not fullpath.startswith(base_path + os.sep):
-        raise Http404("Invalid path")
-
-    # If file doesn't exist, generate it
-    relative_path = os.path.join("generated_avatars", filename)
-    # Use try-except to avoid TOCTOU vulnerability
-    try:
-        file_handle = open(fullpath, "rb")  # noqa: SIM115
-    except FileNotFoundError:
+    if not default_storage.exists(relative_path):
         try:
-            generate_identicon(username, relative_path)
-            file_handle = open(fullpath, "rb")  # noqa: SIM115
+            generate_identicon(member.username, relative_path)
         except (IOError, OSError, ValueError):
             raise Http404("Avatar could not be generated")
+
+    try:
+        file_handle = default_storage.open(relative_path, "rb")
+    except (FileNotFoundError, IOError, OSError):
+        raise Http404("Avatar not found")
 
     # Serve the file
     try:

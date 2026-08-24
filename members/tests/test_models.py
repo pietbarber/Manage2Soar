@@ -8,9 +8,18 @@ from members.forms import SetPasswordForm
 from members.models import Biography, Member
 from members.utils.membership import clear_active_membership_statuses_cache
 from siteconfig.models import MembershipStatus
+from utils.upload_entropy import upload_biography
 
 
 class MemberModelTests(TestCase):
+    def test_biography_upload_path_uses_member_id(self):
+        biography = Biography(member_id=42)
+
+        path = upload_biography(biography, "portrait.jpg")
+
+        assert path.startswith("biography/42/portrait-")
+        assert path.endswith(".jpg")
+
     def test_full_display_name_prefers_nickname(self):
         m = Member(first_name="Brett", last_name="Gilbert", nickname="Sam")
         self.assertEqual(m.full_display_name, "Sam Gilbert")
@@ -88,14 +97,14 @@ class ProfileImageUrlTests(TestCase):
 
     def test_profile_image_url_small_falls_back_to_pydenticon(self):
         """Should fall back to pydenticon when no photos are available."""
-        member = Member(username="test_pydenticon")
+        member = Member(pk=42, username="test_pydenticon")
         member.profile_photo_small = ""
         member.profile_photo_medium = ""
         member.profile_photo = ""
 
         url = member.profile_image_url_small
         # Should return pydenticon URL
-        expected_url = reverse("pydenticon", kwargs={"username": "test_pydenticon"})
+        expected_url = reverse("pydenticon", kwargs={"member_id": member.pk})
         self.assertEqual(url, expected_url)
 
     def test_profile_image_url_medium_falls_back_to_full(self):

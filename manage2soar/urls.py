@@ -257,7 +257,9 @@ urlpatterns = [
     path("", include("siteconfig.urls")),
     # API endpoints for mail server integration
     path("api/email-lists/", email_lists, name="api_email_lists"),
-    path("avatar/<str:username>.png", members_views.pydenticon_view, name="pydenticon"),
+    path(
+        "avatar/<int:member_id>.png", members_views.pydenticon_view, name="pydenticon"
+    ),
     # Public contact form for visitors (no authentication required)
     path("contact/", cms_views.contact, name="contact"),
     path("contact/success/", cms_views.contact_success, name="contact_success"),

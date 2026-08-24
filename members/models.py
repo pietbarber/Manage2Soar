@@ -34,6 +34,8 @@ def get_membership_status_choices():
         return MEMBERSHIP_STATUS_CHOICES
 
 
+# Kept for migrations/0001_initial.py. New biography uploads use
+# utils.upload_entropy.upload_biography and member-ID-based paths.
 def biography_upload_path(instance, filename):
     return f"biography/{instance.member.username}/{filename}"
 
@@ -250,7 +252,9 @@ class Member(AbstractUser):
                 return self.profile_photo.url  # type: ignore[attr-defined]
             # Fallback for string paths
             return f"{settings.MEDIA_URL}{self.profile_photo}"
-        return reverse("pydenticon", kwargs={"username": self.username})
+        if not self.pk:
+            return ""
+        return reverse("pydenticon", kwargs={"member_id": self.pk})
 
     @property
     def profile_image_url_medium(self):
@@ -379,23 +383,21 @@ class Member(AbstractUser):
         if not self.is_superuser:  # Don't override superuser active status
             self.is_active = self.is_active_member()
 
-        # 3) avatar generation (safe pre-save)
-        if not self.profile_photo:
-            # Skip avatar generation in test environments to prevent storage pollution
-            if not (hasattr(settings, "TESTING") and settings.TESTING):
-                filename = f"profile_{self.username}.png"
-                file_path = os.path.join("generated_avatars", filename)
-                full_path = os.path.join("media", file_path)
-                # Use try-except to avoid TOCTOU vulnerability
-                try:
-                    with open(full_path, "rb"):
-                        pass  # File exists, do nothing
-                except FileNotFoundError:
-                    generate_identicon(self.username, file_path)
-                self.profile_photo = file_path
-
-        # 4) persist first – get a PK
+        # 3) persist first so generated media can use the member's immutable PK
         super().save(*args, **kwargs)
+
+        # 4) Generate an avatar only for members without a profile photo. Existing
+        # generated avatars are migrated by copying their bytes, never regenerated.
+        if not self.profile_photo and not (
+            hasattr(settings, "TESTING") and settings.TESTING
+        ):
+            file_path = os.path.join("generated_avatars", f"profile_{self.pk}.png")
+            from django.core.files.storage import default_storage
+
+            if not default_storage.exists(file_path):
+                generate_identicon(self.username, file_path)
+            type(self).objects.filter(pk=self.pk).update(profile_photo=file_path)
+            self.profile_photo = file_path
 
         # 5) now safe to touch M2M
         transaction.on_commit(self._sync_groups)
