@@ -246,6 +246,11 @@ class Member(AbstractUser):
         default=False,
         help_text="If set, personal contact details (address, phones, email, QR) are hidden from non-privileged viewers.",
     )
+    contact_visibility = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Per-field contact sharing preferences: inherit, share, or hide.",
+    )
 
     @property
     def profile_image_url(self):
@@ -457,6 +462,109 @@ class Member(AbstractUser):
 # - parent_badge: optional FK to the parent badge (for legs referencing full badge)
 
 # Used in a many-to-many relationship with members through MemberBadge.
+
+
+class EmergencyContact(models.Model):
+    """A member's optional emergency contact."""
+
+    class PreferredContactMethod(models.TextChoices):
+        HOME_PHONE = "home_phone", "Home phone"
+        MOBILE_PHONE = "mobile_phone", "Mobile phone"
+        EMAIL = "email", "Email"
+        OTHER = "other", "Other"
+
+    member = models.ForeignKey(
+        Member, on_delete=models.CASCADE, related_name="emergency_contacts"
+    )
+    name = models.CharField(max_length=200)
+    relationship = models.CharField(max_length=100, blank=True)
+    home_phone = models.CharField(max_length=20, blank=True)
+    mobile_phone = models.CharField(max_length=20, blank=True)
+    preferred_contact_method = models.CharField(
+        max_length=20,
+        choices=PreferredContactMethod.choices,
+        blank=True,
+    )
+    preferred_contact_details = models.CharField(max_length=200, blank=True)
+    address = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.name} ({self.member})"
+
+
+class ProfileInformationRequest(models.Model):
+    """A staff request or member change request for profile information."""
+
+    class Origin(models.TextChoices):
+        MEMBER_CHANGE = "member_change", "Member change"
+        STAFF_REQUEST = "staff_request", "Staff request"
+
+    class Status(models.TextChoices):
+        REQUESTED = "requested", "Requested"
+        SUBMITTED = "submitted", "Submitted"
+        UNDER_REVIEW = "under_review", "Under review"
+        COMPLETED = "completed", "Completed"
+        DECLINED = "declined", "Declined"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    member = models.ForeignKey(
+        Member, on_delete=models.CASCADE, related_name="profile_information_requests"
+    )
+    requested_by = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="profile_information_requests_created",
+    )
+    origin = models.CharField(max_length=20, choices=Origin.choices)
+    requested_fields = models.JSONField(default=list)
+    reason = models.TextField(blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    overdue_notified_at = models.DateTimeField(null=True, blank=True)
+    submitted_values = models.JSONField(default=dict, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.REQUESTED
+    )
+    reviewer = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="profile_information_requests_reviewed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewer_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["member", "status"]),
+            models.Index(fields=["status", "due_date"]),
+        ]
+
+
+class ProfileInformationRequestEvent(models.Model):
+    request = models.ForeignKey(
+        ProfileInformationRequest, on_delete=models.CASCADE, related_name="events"
+    )
+    actor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=50)
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["request", "created_at"])]
 
 
 class Badge(models.Model):

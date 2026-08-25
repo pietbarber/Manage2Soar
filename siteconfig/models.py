@@ -14,6 +14,44 @@ from tinymce.models import HTMLField
 from utils.favicon import generate_favicon_from_logo
 from utils.upload_entropy import upload_site_logo
 
+MEMBER_PROFILE_POLICY_FIELDS = (
+    "username",
+    "email",
+    "phone",
+    "address",
+    "emergency_contacts",
+    "nickname",
+    "profile_photo",
+    "biography",
+    "password",
+    "contact_visibility",
+)
+
+
+def default_member_profile_field_policies():
+    return {
+        "username": "direct",
+        "email": "request",
+        "phone": "request",
+        "address": "request",
+        "emergency_contacts": "request",
+        "nickname": "request",
+        "profile_photo": "direct",
+        "biography": "direct",
+        "password": "direct",
+        "contact_visibility": "direct",
+    }
+
+
+def get_member_profile_field_policy(field):
+    config = SiteConfiguration.objects.first()
+    if not config or not config.member_profile_self_service_enabled:
+        return "disabled"
+    policy = config.member_profile_field_policies.get(field, "disabled")
+    if field in {"password", "profile_photo"} and policy == "request":
+        return "disabled"
+    return policy
+
 
 class MailingListCriterion(models.TextChoices):
     """Available criteria for mailing list membership."""
@@ -241,6 +279,26 @@ class SiteConfiguration(models.Model):
     )
 
     # Contact information
+    share_member_email_by_default = models.BooleanField(
+        default=True,
+        help_text="Share member email addresses by default unless a member changes it.",
+    )
+    share_member_phone_by_default = models.BooleanField(
+        default=True,
+        help_text="Share member phone numbers by default unless a member changes it.",
+    )
+    share_member_address_by_default = models.BooleanField(
+        default=True,
+        help_text="Share member addresses by default unless a member changes it.",
+    )
+    member_profile_self_service_enabled = models.BooleanField(
+        default=True,
+        help_text="Allow members to update or request changes to configured profile fields.",
+    )
+    member_profile_field_policies = models.JSONField(
+        default=default_member_profile_field_policies,
+        help_text="Per-field member profile policies.",
+    )
     contact_welcome_text = models.TextField(
         blank=True,
         default="Interested in learning to fly gliders? Have questions about our club? We'd love to hear from you! Fill out the form below and one of our member managers will get back to you soon.",

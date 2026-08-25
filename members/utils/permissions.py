@@ -27,3 +27,39 @@ def can_view_personal_info(viewer, subject_member):
     if not getattr(subject_member, "redact_contact", False):
         return True
     return is_privileged_viewer(viewer)
+
+
+def can_view_contact_field(viewer, subject_member, field, site_config=None):
+    """Return whether a viewer may see one contact field on a member profile."""
+    if field not in {"email", "phone", "address"}:
+        raise ValueError(f"Unsupported contact field: {field}")
+    if viewer == subject_member or is_privileged_viewer(viewer):
+        return True
+    if getattr(subject_member, "redact_contact", False):
+        return False
+
+    return contact_field_visibility(subject_member, field, site_config)["shared"]
+
+
+def contact_field_visibility(subject_member, field, site_config=None):
+    """Return effective regular-member visibility and its source."""
+    if field not in {"email", "phone", "address"}:
+        raise ValueError(f"Unsupported contact field: {field}")
+    if getattr(subject_member, "redact_contact", False):
+        return {"shared": False, "source": "legacy full redaction"}
+
+    preference = (getattr(subject_member, "contact_visibility", None) or {}).get(field)
+    if preference == "share":
+        return {"shared": True, "source": "member choice: Share"}
+    if preference == "hide":
+        return {"shared": False, "source": "member choice: Hide"}
+
+    if site_config is None:
+        from siteconfig.models import SiteConfiguration
+
+        site_config = SiteConfiguration.objects.first()
+    shared = bool(getattr(site_config, f"share_member_{field}_by_default", True))
+    return {
+        "shared": shared,
+        "source": f"club default: {'Share' if shared else 'Hide'}",
+    }

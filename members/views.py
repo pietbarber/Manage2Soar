@@ -21,7 +21,14 @@ from django.views.decorators.http import require_http_methods
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
+from members.utils import (
+    can_view_contact_field,
+)
 from members.utils import can_view_personal_info as can_view_personal_info_fn
+from members.utils import (
+    contact_field_visibility,
+    is_privileged_viewer,
+)
 from members.utils.membership import get_active_membership_statuses
 from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
@@ -37,14 +44,23 @@ from .decorators import active_member_required
 from .forms import (
     BiographyForm,
     DirectRecipientPasswordResetForm,
+    EmergencyContactDeclineForm,
+    EmergencyContactForm,
     MemberProfilePhotoForm,
     SafetyReportForm,
     SetPasswordForm,
 )
-from .models import Badge, Biography, Member, MemberBadge, VisitingPilotVisit
+from .models import (
+    Badge,
+    Biography,
+    EmergencyContact,
+    Member,
+    MemberBadge,
+    VisitingPilotVisit,
+)
 from .utils.avatar_generator import generate_identicon
 from .utils.badge_utils import suppress_badge_board_legs, suppress_member_badge_legs
-from .utils.vcard_tools import generate_vcard_qr
+from .utils.vcard_tools import generate_vcard, generate_vcard_qr
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +192,12 @@ def member_list(request):
     paginator = Paginator(members, 150)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
+    site_config = SiteConfiguration.objects.first()
+    for member in page_obj.object_list:
+        member.directory_contact_visibility = {
+            field: can_view_contact_field(request.user, member, field, site_config)
+            for field in ("email", "phone", "address")
+        }
 
     return render(
         request,
@@ -234,17 +256,30 @@ def member_view(request, member_id):
 
     # Determine whether the requester can view personal info, and generate
     # a QR code accordingly (redacted QR omits contact fields).
+    site_config = SiteConfiguration.objects.first()
+    contact_visibility = {
+        field: can_view_contact_field(request.user, member, field, site_config)
+        for field in ("email", "phone", "address")
+    }
     can_view_personal = can_view_personal_info_fn(request.user, member)
-    qr_png = generate_vcard_qr(member, include_contact=can_view_personal)
+    qr_png = generate_vcard_qr(
+        member,
+        include_contact=can_view_personal,
+        contact_visibility=contact_visibility,
+    )
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
 
     # Compute phone/mobile display values. Use the canonical can_view_personal
     # check (which includes member self, staff, and privileged viewers).
-    phone_display = member.phone if member.phone and can_view_personal else None
+    phone_display = (
+        member.phone if member.phone and contact_visibility["phone"] else None
+    )
     phone_link = bool(phone_display)
 
     mobile_display = (
-        member.mobile_phone if member.mobile_phone and can_view_personal else None
+        member.mobile_phone
+        if member.mobile_phone and contact_visibility["phone"]
+        else None
     )
     mobile_link = bool(mobile_display)
 
@@ -280,6 +315,28 @@ def member_view(request, member_id):
         "active_statuses": set(get_active_membership_statuses()),
         "qr_base64": qr_base64,
         "can_view_personal_info": can_view_personal,
+        "can_view_email": contact_visibility["email"],
+        "can_view_phone": contact_visibility["phone"],
+        "can_view_address": contact_visibility["address"],
+        "privacy_sharing": contact_visibility if is_self else None,
+        "staff_contact_status": (
+            [
+                {
+                    "label": label,
+                    "shared": contact_visibility[field],
+                    "source": contact_field_visibility(member, field, site_config)[
+                        "source"
+                    ],
+                }
+                for field, label in (
+                    ("email", "Email"),
+                    ("phone", "Phone"),
+                    ("address", "Address"),
+                )
+            ]
+            if not is_self and is_privileged_viewer(request.user)
+            else None
+        ),
         "form": form,
         "is_self": is_self,
         "can_edit": can_edit,
@@ -297,6 +354,96 @@ def member_view(request, member_id):
         "mobile_link": mobile_link,
     }
     return render(request, "members/member_view.html", context)
+
+
+@active_member_required
+def member_vcard(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    site_config = SiteConfiguration.objects.first()
+    visibility = {
+        field: can_view_contact_field(request.user, member, field, site_config)
+        for field in ("email", "phone", "address")
+    }
+    response = HttpResponse(
+        generate_vcard(member, contact_visibility=visibility), content_type="text/vcard"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{member.username}.vcf"'
+    return response
+
+
+@active_member_required
+@require_http_methods(["POST"])
+def update_contact_visibility(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    if request.user != member:
+        return render(request, "403.html", status=403)
+
+    member.contact_visibility = {
+        field: "share" if request.POST.get(f"share_{field}") else "hide"
+        for field in ("email", "phone", "address")
+    }
+    member.save(update_fields=["contact_visibility"])
+    messages.success(request, "Contact visibility preferences updated.")
+    return redirect("members:member_view", member_id=member.id)
+
+
+@active_member_required
+@require_http_methods(["GET", "POST"])
+def emergency_contact_edit(request, member_id, contact_id=None):
+    member = get_object_or_404(Member, pk=member_id)
+    if request.user != member:
+        return render(request, "403.html", status=403)
+
+    contact = None
+    if contact_id is not None:
+        contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
+
+    form = EmergencyContactForm(request.POST or None, instance=contact)
+    if request.method == "POST" and form.is_valid():
+        saved_contact = form.save(commit=False)
+        saved_contact.member = member
+        saved_contact.save()
+        messages.success(request, "Emergency contact saved.")
+        return redirect("members:member_view", member_id=member.id)
+
+    return render(
+        request,
+        "members/emergency_contact_form.html",
+        {"form": form, "member": member, "contact": contact},
+    )
+
+
+@active_member_required
+@require_http_methods(["GET", "POST"])
+def emergency_contact_delete(request, member_id, contact_id):
+    member = get_object_or_404(Member, pk=member_id)
+    contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
+    if request.user != member:
+        return render(request, "403.html", status=403)
+
+    is_last_contact = member.emergency_contacts.count() == 1
+    form = (
+        EmergencyContactDeclineForm(request.POST or None) if is_last_contact else None
+    )
+    if request.method == "POST" and not is_last_contact:
+        contact.delete()
+        messages.success(request, "Emergency contact removed.")
+        return redirect("members:member_view", member_id=member.id)
+    if request.method == "POST" and form and form.is_valid():
+        contact.delete()
+        messages.success(request, "Emergency contact removed.")
+        return redirect("members:member_view", member_id=member.id)
+
+    return render(
+        request,
+        "members/emergency_contact_delete.html",
+        {
+            "contact": contact,
+            "form": form,
+            "member": member,
+            "is_last_contact": is_last_contact,
+        },
+    )
 
 
 @active_member_required
