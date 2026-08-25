@@ -34,6 +34,41 @@ class MemberModelTests(TestCase):
         assert path.startswith("biography/42/portrait-")
         assert path.endswith(".jpg")
 
+    @override_settings(TESTING=False)
+    @patch("members.models.generate_identicon")
+    @patch("django.core.files.storage.default_storage")
+    def test_avatar_generation_success_uses_id_path_and_is_not_regenerated(
+        self, _default_storage, _generate_identicon
+    ):
+        _default_storage.exists.return_value = False
+        member = Member(
+            username="avatar_success",
+            email="avatar_success@example.com",
+            membership_status="Full Member",
+        )
+
+        member.save()
+
+        expected_path = f"generated_avatars/profile_{member.pk}.png"
+        # Successful generation must target the immutable ID-based path.
+        self.assertEqual(_generate_identicon.call_count, 1)
+        self.assertEqual(
+            _generate_identicon.call_args.args, ("avatar_success", expected_path)
+        )
+        # The path must be persisted on the member record.
+        member.refresh_from_db()
+        self.assertEqual(member.profile_photo, expected_path)
+
+        # Saving again must not regenerate an avatar that already exists.
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=True
+        ):
+            member.save()
+
+        self.assertEqual(_generate_identicon.call_count, 1)
+        member.refresh_from_db()
+        self.assertEqual(member.profile_photo, expected_path)
+
     def test_full_display_name_prefers_nickname(self):
         m = Member(first_name="Brett", last_name="Gilbert", nickname="Sam")
         self.assertEqual(m.full_display_name, "Sam Gilbert")

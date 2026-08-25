@@ -66,7 +66,7 @@ class Command(BaseCommand):
             missing += result == "missing"
 
         for biography in Biography.objects.select_related("member").only(
-            "uploaded_image", "member__pk"
+            "uploaded_image", "member_id"
         ):
             if not biography.uploaded_image:
                 continue
