@@ -64,10 +64,32 @@ def _load_lists_from_virtual(virtual_file='/etc/postfix/virtual'):
     return lists
 
 
+def _is_bounces_alias(addr):
+    """Return True if ``addr`` is a list ``-bounces`` delivery alias.
+
+    ``m2s-mail-sync`` writes a ``{list}-bounces@{domain} -> admin`` delivery
+    alias into /etc/postfix/virtual for every mailing list.  These are
+    *bounce delivery* aliases, NOT user-facing mailing lists, so they must
+    never be treated as a detectable list by this rewriter.  If they were, an
+    outbound email addressed to the bounces alias's delivery target (e.g. the
+    club admin) would be false-positively detected as "list traffic" and its
+    From header rewritten to a doubled ``{list}-bounces-bounces@...`` address
+    (issue #1038).
+    """
+    local = addr.rsplit('@', 1)[0]
+    return local.endswith('-bounces')
+
+
 # Combine hardcoded list addresses with any dynamically-configured aliases.
 # Dynamic lists are added by the app's MailingList model and written to
 # /etc/postfix/virtual; we must include them here so they are not bounced.
-ALL_KNOWN_LISTS = MAILING_LISTS | _load_lists_from_virtual()
+# ``*-bounces@`` delivery aliases are excluded so they are never treated as a
+# detectable mailing list (see _is_bounces_alias and issue #1038).
+ALL_KNOWN_LISTS = {
+    addr
+    for addr in (MAILING_LISTS | _load_lists_from_virtual())
+    if not _is_bounces_alias(addr)
+}
 
 
 def rewrite_headers(msg, recipient, envelope_sender=None):

@@ -202,10 +202,19 @@ gke_tenants:
     # Optional overrides:
     # namespace: "ssc-production"
     # replicas: 3
+    #
+    # Per-tenant outbound sender domain (issue #1038). Override the shared
+    # noreply@<mail_domain> sender so a tenant's system mail is sent from its
+    # own domain (e.g. noreply@skylinesoaring.org). This prevents cross-tenant
+    # email reflection/contamination as the tenant count grows. If omitted, the
+    # global gke_default_from_email is used.
+    # default_from_email: "noreply@skylinesoaring.org"
 
   - prefix: "masa"
     name: "Mid-Atlantic Soaring Association"
     domain: "m2s.midatlanticsoaring.org"
+    # Per-tenant outbound sender domain (issue #1038).
+    # default_from_email: "noreply@masa.manage2soar.com"
 
   # Add more tenants as needed:
   # - prefix: "nfss"
