@@ -26,6 +26,7 @@ from members.utils import (
 )
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils import (
+    contact_field_visibility,
     is_privileged_viewer,
 )
 from members.utils.membership import get_active_membership_statuses
@@ -59,7 +60,7 @@ from .models import (
 )
 from .utils.avatar_generator import generate_identicon
 from .utils.badge_utils import suppress_badge_board_legs, suppress_member_badge_legs
-from .utils.vcard_tools import generate_vcard_qr
+from .utils.vcard_tools import generate_vcard, generate_vcard_qr
 
 logger = logging.getLogger(__name__)
 
@@ -323,9 +324,9 @@ def member_view(request, member_id):
                 {
                     "label": label,
                     "shared": contact_visibility[field],
-                    "source": (member.contact_visibility or {}).get(
-                        field, "club default"
-                    ),
+                    "source": contact_field_visibility(member, field, site_config)[
+                        "source"
+                    ],
                 }
                 for field, label in (
                     ("email", "Email"),
@@ -353,6 +354,21 @@ def member_view(request, member_id):
         "mobile_link": mobile_link,
     }
     return render(request, "members/member_view.html", context)
+
+
+@active_member_required
+def member_vcard(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    site_config = SiteConfiguration.objects.first()
+    visibility = {
+        field: can_view_contact_field(request.user, member, field, site_config)
+        for field in ("email", "phone", "address")
+    }
+    response = HttpResponse(
+        generate_vcard(member, contact_visibility=visibility), content_type="text/vcard"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{member.username}.vcf"'
+    return response
 
 
 @active_member_required
