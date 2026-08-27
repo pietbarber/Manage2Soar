@@ -430,17 +430,12 @@ def test_all_known_lists_excludes_bounces_delivery_aliases():
     # Simulate a /etc/postfix/virtual file that includes a -bounces delivery
     # alias alongside a real list, then rebuild the known-lists set the same
     # way the template does.
-    import tempfile as _tempfile
-    from pathlib import Path as _Path
-    from unittest.mock import mock_open as _mock_open
-    from unittest.mock import patch as _patch
-
     virtual_content = (
         "board@skylinesoaring.org board1@example.com,board2@example.com\n"
         "board-bounces@skylinesoaring.org admin@example.com\n"
     )
 
-    with _patch("builtins.open", _mock_open(read_data=virtual_content)):
+    with patch("builtins.open", mock_open(read_data=virtual_content)):
         load_lists = get_callable(ns, "_load_lists_from_virtual")
         is_bounces = get_callable(ns, "_is_bounces_alias")
         combined = {

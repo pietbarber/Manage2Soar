@@ -75,8 +75,13 @@ def _is_bounces_alias(addr):
     club admin) would be false-positively detected as "list traffic" and its
     From header rewritten to a doubled ``{list}-bounces-bounces@...`` address
     (issue #1038).
+
+    The input is normalized (falsey values, surrounding whitespace and case)
+    so the check is robust regardless of how the address was sourced.
     """
-    local = addr.rsplit('@', 1)[0]
+    if not addr:
+        return False
+    local = addr.strip().lower().rsplit('@', 1)[0]
     return local.endswith('-bounces')
 
 
