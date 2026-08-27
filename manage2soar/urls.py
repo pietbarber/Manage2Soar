@@ -122,9 +122,9 @@ def manifest_view(request):
     # Use the club name from SiteConfiguration so the shortcut is branded correctly.
     # Guard against DB-not-ready errors (migrations, startup) the same way
     # utils.url_helpers.get_canonical_url() does.
-    try:
-        from django.db.utils import OperationalError, ProgrammingError
+    from django.db.utils import OperationalError, ProgrammingError
 
+    try:
         siteconfig = SiteConfiguration.objects.first()
         club_name = (
             siteconfig.club_name

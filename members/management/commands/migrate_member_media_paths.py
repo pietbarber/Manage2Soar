@@ -49,7 +49,8 @@ class Command(BaseCommand):
         for member in Member.objects.only("pk", "profile_photo"):
             if not member.profile_photo:
                 continue
-            old_path = member.profile_photo.name
+            # Pylance infers profile_photo as str after .only(); cast to FieldFile
+            old_path = member.profile_photo.name  # type: ignore[attr-defined]
             new_path = f"generated_avatars/profile_{member.pk}.png"
             if not old_path.startswith("generated_avatars/") or old_path == new_path:
                 continue
@@ -72,7 +73,9 @@ class Command(BaseCommand):
                 continue
             old_path = biography.uploaded_image.name
             path_parts = old_path.split("/")
-            new_prefix = f"biography/{biography.member_id}/"
+            # Pylance cannot infer the FK accessor via select_related
+            member_id = biography.member_id  # type: ignore[attr-defined]
+            new_prefix = f"biography/{member_id}/"
             if old_path.startswith(new_prefix) or len(path_parts) < 2:
                 continue
             new_path = f"{new_prefix}{os.path.basename(old_path)}"
