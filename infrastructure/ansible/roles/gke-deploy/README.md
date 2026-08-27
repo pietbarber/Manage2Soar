@@ -136,6 +136,10 @@ gke_tenants:
   - prefix: "ssc"
     name: "Skyline Soaring Club"
     domain: "m2s.skylinesoaring.org"
+    # Per-tenant outbound sender domain (issue #1038). Overrides the shared
+    # noreply@<mail_domain> sender with the tenant's own domain. If omitted,
+    # the global gke_default_from_email is used.
+    # default_from_email: "noreply@skylinesoaring.org"
 
   - prefix: "masa"
     name: "Mid-Atlantic Soaring Association"

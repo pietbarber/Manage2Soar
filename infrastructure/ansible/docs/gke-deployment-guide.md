@@ -464,7 +464,7 @@ ansible-playbook ... --skip-tags docker
 | `gke_email_host` | `localhost` | SMTP server host |
 | `gke_email_port` | `587` | SMTP server port |
 | `gke_email_use_tls` | `true` | Enable TLS encryption |
-| `gke_default_from_email` | `noreply@...` | Default sender address |
+| `gke_default_from_email` | `noreply@...` | Default sender address. Can be overridden per-tenant via `default_from_email` in each `gke_tenants` entry (issue #1038) |
 | `gke_email_dev_mode` | `false` | **SAFETY**: Enable email dev mode |
 | `gke_email_dev_mode_redirect_to` | `""` | Redirect all emails to these addresses |
 

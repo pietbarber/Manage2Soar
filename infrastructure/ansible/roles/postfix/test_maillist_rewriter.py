@@ -40,11 +40,16 @@ def load_template_namespace():
         "template structure may have changed"
     )
 
-    # Avoid filesystem dependency during module import.
+    # Avoid filesystem dependency during module import.  The template builds
+    # ALL_KNOWN_LISTS from MAILING_LISTS plus aliases read from
+    # /etc/postfix/virtual (and filters out ``*-bounces`` delivery aliases);
+    # for tests we replace the whole assignment with a static copy of
+    # MAILING_LISTS so the module import does not depend on the filesystem.
     source, all_known_lists_replacements = re.subn(
-        r"ALL_KNOWN_LISTS\s*=\s*MAILING_LISTS\s*\|\s*_load_lists_from_virtual\(\)",
-        "ALL_KNOWN_LISTS = MAILING_LISTS.copy()",
+        r"ALL_KNOWN_LISTS\s*=\s*\{.*?\}\n|ALL_KNOWN_LISTS\s*=\s*MAILING_LISTS\s*\|\s*_load_lists_from_virtual\(\)",
+        "ALL_KNOWN_LISTS = MAILING_LISTS.copy()\n",
         source,
+        flags=re.DOTALL,
     )
     assert all_known_lists_replacements == 1, (
         "Failed to replace ALL_KNOWN_LISTS initialization in maillist-rewriter "
@@ -389,3 +394,90 @@ def test_rewrite_headers_external_spoofed_from_cannot_bypass_rewriting():
 
     # Must be rewritten — the envelope sender is external
     assert "board-bounces@skylinesoaring.org" in result["From"]
+
+
+def test_is_bounces_alias_classifies_bounces_delivery_aliases():
+    """_is_bounces_alias identifies list -bounces delivery aliases (issue #1038).
+
+    m2s-mail-sync writes a ``{list}-bounces@{domain} -> admin`` delivery alias
+    into /etc/postfix/virtual for every list.  These are bounce delivery
+    aliases, not user-facing lists, so they must be recognized and excluded
+    from list detection.
+    """
+    ns = load_template_namespace()
+    is_bounces_alias = get_callable(ns, "_is_bounces_alias")
+
+    assert is_bounces_alias("board-bounces@skylinesoaring.org") is True
+    assert is_bounces_alias("members-bounces@ssc.manage2soar.com") is True
+    # Ordinary user-facing lists are NOT bounces aliases.
+    assert is_bounces_alias("board@skylinesoaring.org") is False
+    assert is_bounces_alias("members@skylinesoaring.org") is False
+    # A plain address with no local/domain boundary must not crash.
+    assert is_bounces_alias("bounces") is False
+    assert is_bounces_alias("board-bounces") is True
+
+
+def test_all_known_lists_excludes_bounces_delivery_aliases():
+    """ALL_KNOWN_LISTS must not contain any ``*-bounces`` delivery aliases.
+
+    This is the direct guard behind the issue #1038 fix: if a ``-bounces``
+    delivery alias leaked into the known-lists set, an outbound email addressed
+    to its delivery target (e.g. the club admin) would be false-positively
+    detected as "list traffic" and rewritten to a doubled -bounces sender.
+    """
+    ns = load_template_namespace()
+
+    # Simulate a /etc/postfix/virtual file that includes a -bounces delivery
+    # alias alongside a real list, then rebuild the known-lists set the same
+    # way the template does.
+    virtual_content = (
+        "board@skylinesoaring.org board1@example.com,board2@example.com\n"
+        "board-bounces@skylinesoaring.org admin@example.com\n"
+    )
+
+    with patch("builtins.open", mock_open(read_data=virtual_content)):
+        load_lists = get_callable(ns, "_load_lists_from_virtual")
+        is_bounces = get_callable(ns, "_is_bounces_alias")
+        combined = {
+            addr
+            for addr in (ns["MAILING_LISTS"] | load_lists())
+            if not is_bounces(addr)
+        }
+
+    assert "board-bounces@skylinesoaring.org" not in combined
+    assert "board@skylinesoaring.org" in combined
+
+
+def test_email_to_bounces_delivery_target_is_not_detected_as_list():
+    """An outbound email to a list's bounces delivery target passes through.
+
+    Regression test for issue #1038: m2s-mail-sync writes
+    ``board-bounces@skylinesoaring.org -> admin@example.com`` into
+    /etc/postfix/virtual.  Before the fix, that alias was loaded into
+    ALL_KNOWN_LISTS, so an application email addressed to admin@example.com
+    was exact-matched to the ``board-bounces`` alias and rewritten to a
+    doubled ``board-bounces-bounces@skylinesoaring.org`` From header.
+
+    After the fix, the ``-bounces`` alias is excluded from list detection, so
+    no list is detected and the email is treated as a transactional message
+    (detect_original_list returns None -> passthrough, no From rewrite).
+    """
+    ns = load_template_namespace()
+    detect_original_list = get_callable(ns, "detect_original_list")
+
+    msg = EmailMessage()
+    msg["From"] = "Manage2Soar <noreply@manage2soar.com>"
+    msg["To"] = "admin@example.com"
+    msg["Subject"] = "Pre-Ops Report"
+    msg.set_content("Body")
+
+    virtual_content = (
+        "board@skylinesoaring.org board1@example.com,board2@example.com\n"
+        "board-bounces@skylinesoaring.org admin@example.com\n"
+    )
+
+    with patch("builtins.open", mock_open(read_data=virtual_content)):
+        original_to = detect_original_list(msg, ["admin@example.com"])
+
+    # No list should be detected for the bounces alias's delivery target.
+    assert original_to is None
