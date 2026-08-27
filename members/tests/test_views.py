@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.urls import reverse
 
 from members.models import Biography
@@ -562,3 +563,88 @@ def test_member_view_status_badge_uses_configured_active_statuses(client):
     assert inactive_response.status_code == 200
     assert b"badge bg-secondary fs-6" in inactive_response.content
     assert b"Grounded" in inactive_response.content
+
+
+@pytest.mark.django_db
+@override_settings(TESTING=True)
+def test_pydenticon_view_serves_existing_id_based_avatar(
+    client, django_user_model, settings, tmp_path
+):
+    settings.MEDIA_ROOT = str(tmp_path)
+    member = django_user_model.objects.create_user(
+        username="avatar_user",
+        password="pass",
+        membership_status="Full Member",
+    )
+    relative_path = f"generated_avatars/profile_{member.pk}.png"
+    target = tmp_path / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"legacy-avatar-bytes")
+
+    response = client.get(reverse("pydenticon", kwargs={"member_id": member.pk}))
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "image/png"
+    content = b"".join(response.streaming_content)
+    assert content == b"legacy-avatar-bytes"
+
+
+@pytest.mark.django_db
+@override_settings(TESTING=True)
+def test_pydenticon_view_generates_missing_avatar_with_username_seed(
+    client, django_user_model, settings, tmp_path
+):
+    settings.MEDIA_ROOT = str(tmp_path)
+    member = django_user_model.objects.create_user(
+        username="seed_user",
+        password="pass",
+        membership_status="Full Member",
+    )
+    relative_path = f"generated_avatars/profile_{member.pk}.png"
+    target = tmp_path / relative_path
+
+    from unittest import mock
+
+    from members.views import pydenticon_view
+
+    def _fake_generate(username, path):
+        assert username == "seed_user"
+        assert path == relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"generated-bytes")
+
+    with mock.patch("members.views.generate_identicon", side_effect=_fake_generate):
+        response = client.get(reverse("pydenticon", kwargs={"member_id": member.pk}))
+
+    assert response.status_code == 200
+    content = b"".join(response.streaming_content)
+    assert content == b"generated-bytes"
+
+
+@override_settings(TESTING=True)
+@pytest.mark.django_db
+def test_pydenticon_view_returns_404_for_unknown_member(client):
+    response = client.get(reverse("pydenticon", kwargs={"member_id": 99999}))
+    assert response.status_code == 404
+
+
+@override_settings(TESTING=True)
+@pytest.mark.django_db
+def test_pydenticon_view_returns_404_when_generation_fails(
+    client, django_user_model, settings, tmp_path
+):
+    settings.MEDIA_ROOT = str(tmp_path)
+    member = django_user_model.objects.create_user(
+        username="fail_user",
+        password="pass",
+        membership_status="Full Member",
+    )
+
+    from unittest import mock
+
+    with mock.patch(
+        "members.views.generate_identicon", side_effect=OSError("storage down")
+    ):
+        response = client.get(reverse("pydenticon", kwargs={"member_id": member.pk}))
+
+    assert response.status_code == 404

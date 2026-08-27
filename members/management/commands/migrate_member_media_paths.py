@@ -42,15 +42,27 @@ class Command(BaseCommand):
         migrated = 0
         already_present = 0
         missing = 0
+        blank = 0
 
         if delete_old and not dry_run:
             self._cleanup_pending()
 
-        for member in Member.objects.only("pk", "profile_photo"):
-            if not member.profile_photo:
-                continue
-            # Pylance infers profile_photo as str after .only(); cast to FieldFile
-            old_path = member.profile_photo.name  # type: ignore[attr-defined]
+        for member in Member.objects.defer("profile_photo"):
+            # Pylance infers profile_photo as str after .defer(); cast to FieldFile
+            photo = member.profile_photo  # type: ignore[attr-defined]
+            was_blank = not photo
+            if photo:
+                old_path = photo.name  # type: ignore[attr-defined]
+            else:
+                # Historical save path wrote
+                # generated_avatars/profile_<username>.png without assigning
+                # profile_photo, so most legacy generated avatars belong to
+                # members with a blank field. Probe the legacy path and
+                # migrate/attach the stored bytes instead of regenerating.
+                legacy_path = f"generated_avatars/profile_{member.username}.png"
+                if not default_storage.exists(legacy_path):
+                    continue
+                old_path = legacy_path
             new_path = f"generated_avatars/profile_{member.pk}.png"
             if not old_path.startswith("generated_avatars/") or old_path == new_path:
                 continue
@@ -65,6 +77,7 @@ class Command(BaseCommand):
             migrated += result == "migrated"
             already_present += result == "existing"
             missing += result == "missing"
+            blank += was_blank
 
         for biography in Biography.objects.select_related("member").only(
             "uploaded_image", "member_id"
@@ -93,7 +106,8 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Migrated: {migrated}; already present: {already_present}; missing: {missing}"
+                f"Migrated: {migrated}; already present: {already_present}; "
+                f"missing: {missing}; blank-photo: {blank}"
             )
         )
 

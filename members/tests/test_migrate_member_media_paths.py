@@ -8,7 +8,7 @@ from unittest import mock
 from django.core.files.storage import FileSystemStorage
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from members.management.commands import migrate_member_media_paths
 from members.models import Biography, Member
@@ -22,8 +22,13 @@ def _member_kwargs(username):
     }
 
 
+@override_settings(TESTING=True)
 class MigrateMemberMediaPathsTests(TestCase):
-    """Tests for the resumable legacy media path migration command."""
+    """Tests for the resumable legacy media path migration command.
+
+    TESTING=True keeps Member.save() from auto-generating ID-based avatars,
+    so tests can reproduce the historical blank-profile-photo state.
+    """
 
     def setUp(self):
         self.temp_dir = Path(tempfile.mkdtemp(prefix="m2s-media-test-"))
@@ -177,3 +182,35 @@ class MigrateMemberMediaPathsTests(TestCase):
         biography = Biography.objects.get(member=member)
         self.assertEqual(biography.uploaded_image, new_path)
         self.assertEqual(self._read(new_path), b"biography-bytes")
+
+    def test_blank_photo_member_with_legacy_username_avatar_is_migrated(self):
+        """Historical save() wrote profile_<username>.png without setting
+        profile_photo, so most legacy generated avatars are blank-photo members.
+        The command must probe the legacy path, copy the bytes, and attach the
+        new ID-based path to the field."""
+        member = Member.objects.create(
+            **_member_kwargs("legacy_blank"), profile_photo=""
+        )
+        legacy_path = "generated_avatars/profile_legacy_blank.png"
+        new_path = f"generated_avatars/profile_{member.pk}.png"
+        self._write(legacy_path, f"legacy-bytes:{member.pk}".encode("utf-8"))
+
+        self._call_command("--pending-file", str(self.pending_file), "--delete-old")
+
+        member.refresh_from_db()
+        self.assertEqual(member.profile_photo, new_path)
+        self.assertEqual(
+            self._read(new_path), f"legacy-bytes:{member.pk}".encode("utf-8")
+        )
+        self.assertFalse(self._exists(legacy_path))
+        self.assertFalse(self.pending_file.exists())
+
+    def test_blank_photo_member_without_legacy_avatar_is_skipped(self):
+        member = Member.objects.create(**_member_kwargs("no_avatar"), profile_photo="")
+
+        output = self._call_command("--pending-file", str(self.pending_file))
+
+        member.refresh_from_db()
+        self.assertFalse(member.profile_photo)
+        self.assertFalse(self.pending_file.exists())
+        self.assertNotIn("Migrate:", output)
