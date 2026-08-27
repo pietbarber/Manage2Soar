@@ -1,5 +1,6 @@
 import json
 import os
+from hashlib import sha256
 from pathlib import Path
 
 from django.core.files.base import ContentFile
@@ -42,13 +43,16 @@ class Command(BaseCommand):
         migrated = 0
         already_present = 0
         missing = 0
+        conflicts = 0
         blank = 0
 
         if delete_old and not dry_run:
             self._cleanup_pending()
 
-        for member in Member.objects.defer("profile_photo"):
-            # Pylance infers profile_photo as str after .defer(); cast to FieldFile
+        for member in Member.objects.only("pk", "username", "profile_photo").iterator(
+            chunk_size=500
+        ):
+            # Pylance infers profile_photo as str after .only(); cast to FieldFile
             photo = member.profile_photo  # type: ignore[attr-defined]
             was_blank = not photo
             if photo:
@@ -77,6 +81,7 @@ class Command(BaseCommand):
             migrated += result == "migrated"
             already_present += result == "existing"
             missing += result == "missing"
+            conflicts += result == "conflict"
             blank += was_blank
 
         for biography in Biography.objects.select_related("member").only(
@@ -103,11 +108,12 @@ class Command(BaseCommand):
             migrated += result == "migrated"
             already_present += result == "existing"
             missing += result == "missing"
+            conflicts += result == "conflict"
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"Migrated: {migrated}; already present: {already_present}; "
-                f"missing: {missing}; blank-photo: {blank}"
+                f"missing: {missing}; conflicts: {conflicts}; blank-photo: {blank}"
             )
         )
 
@@ -115,6 +121,12 @@ class Command(BaseCommand):
         self, instance, field_name, old_path, new_path, dry_run, delete_old
     ):
         if default_storage.exists(new_path):
+            if not default_storage.exists(old_path):
+                self.stdout.write(f"Missing: {old_path}")
+                return "missing"
+            if not self._paths_match(old_path, new_path):
+                self.stderr.write(f"Conflict: {old_path} -> {new_path}")
+                return "conflict"
             self.stdout.write(f"Already present: {old_path} -> {new_path}")
             if not dry_run:
                 self._record_pending(old_path, new_path)
@@ -146,6 +158,22 @@ class Command(BaseCommand):
             self._cleanup_pending()
         return "migrated"
 
+    def _paths_match(self, old_path, new_path):
+        return self._storage_hash(old_path) == self._storage_hash(new_path)
+
+    def _storage_hash(self, path):
+        digest = sha256()
+        with default_storage.open(path, "rb") as handle:
+            for chunk in iter(lambda: handle.read(64 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _is_referenced(self, path):
+        return (
+            Member.objects.filter(profile_photo=path).exists()
+            or Biography.objects.filter(uploaded_image=path).exists()
+        )
+
     def _load_pending(self):
         if not self.pending_file.exists():
             return {}
@@ -168,8 +196,8 @@ class Command(BaseCommand):
         remaining = {}
         for old_path, new_path in self.pending.items():
             if (
-                Member.objects.filter(profile_photo=old_path).exists()
-                or Biography.objects.filter(uploaded_image=old_path).exists()
+                self._is_referenced(old_path)
+                or not self._is_referenced(new_path)
                 or not default_storage.exists(new_path)
             ):
                 remaining[old_path] = new_path

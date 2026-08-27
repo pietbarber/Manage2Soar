@@ -110,20 +110,42 @@ class MigrateMemberMediaPathsTests(TestCase):
         self.assertEqual(member.profile_photo, new_path)
         self.assertFalse(self.pending_file.exists())
 
-    def test_preexisting_destination_is_not_overwritten(self):
+    def test_preexisting_destination_with_different_bytes_reports_conflict(self):
         member = self._member_with_legacy_avatar(
             "existing_user", "generated_avatars/profile_existing_user.png"
         )
+        legacy_path = "generated_avatars/profile_existing_user.png"
         new_path = f"generated_avatars/profile_{member.pk}.png"
         self._write(new_path, b"existing-target-bytes")
+
+        output = self._call_command(
+            "--pending-file", str(self.pending_file), "--delete-old"
+        )
+
+        member.refresh_from_db()
+        self.assertEqual(member.profile_photo, legacy_path)
+        # Conflicting destination is preserved, source stays attached and is not deleted.
+        self.assertEqual(self._read(legacy_path), b"avatar-bytes:existing_user")
+        self.assertEqual(self._read(new_path), b"existing-target-bytes")
+        self.assertTrue(self._exists(legacy_path))
+        self.assertFalse(self.pending_file.exists())
+        self.assertIn("Conflict:", output)
+
+    def test_preexisting_destination_with_matching_bytes_updates_and_cleans_up(self):
+        member = self._member_with_legacy_avatar(
+            "existing_match", "generated_avatars/profile_existing_match.png"
+        )
+        legacy_path = "generated_avatars/profile_existing_match.png"
+        new_path = f"generated_avatars/profile_{member.pk}.png"
+        self._write(new_path, self._read(legacy_path))
 
         self._call_command("--pending-file", str(self.pending_file), "--delete-old")
 
         member.refresh_from_db()
         self.assertEqual(member.profile_photo, new_path)
-        # Pre-existing target must be preserved; legacy source cleaned up.
-        self.assertEqual(self._read(new_path), b"existing-target-bytes")
-        self.assertFalse(self._exists("generated_avatars/profile_existing_user.png"))
+        self.assertEqual(self._read(new_path), b"avatar-bytes:existing_match")
+        self.assertFalse(self._exists(legacy_path))
+        self.assertFalse(self.pending_file.exists())
 
     def test_missing_source_is_skipped(self):
         legacy_path = "generated_avatars/profile_missing_user.png"
@@ -214,3 +236,21 @@ class MigrateMemberMediaPathsTests(TestCase):
         self.assertFalse(member.profile_photo)
         self.assertFalse(self.pending_file.exists())
         self.assertNotIn("Migrate:", output)
+
+    def test_cleanup_pending_requires_destination_db_reference(self):
+        member = Member.objects.create(
+            **_member_kwargs("partial_copy"), profile_photo=""
+        )
+        legacy_path = "generated_avatars/profile_partial_copy.png"
+        new_path = f"generated_avatars/profile_{member.pk}.png"
+        self._write(legacy_path, b"correct-source-bytes")
+        self._write(new_path, b"partial-destination-bytes")
+        self.pending_file.write_text(
+            json.dumps({legacy_path: new_path}), encoding="utf-8"
+        )
+
+        self._call_command("--pending-file", str(self.pending_file), "--delete-old")
+
+        # Destination is unreferenced, so cleanup must defer deletion.
+        self.assertTrue(self._exists(legacy_path))
+        self.assertTrue(self.pending_file.exists())
