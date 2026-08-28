@@ -275,3 +275,29 @@ class MigrateMemberMediaPathsTests(TestCase):
         # Destination is unreferenced, so cleanup must defer deletion.
         self.assertTrue(self._exists(legacy_path))
         self.assertTrue(self.pending_file.exists())
+
+    def test_compare_and_set_prevents_overwriting_concurrent_photo_change(self):
+        member = self._member_with_legacy_avatar(
+            "cas_user", "generated_avatars/profile_cas_user.png"
+        )
+        legacy_path = "generated_avatars/profile_cas_user.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
+
+        with mock.patch.object(
+            migrate_member_media_paths.Command, "_compare_and_set", return_value=False
+        ):
+            output = self._call_command(
+                "--pending-file", str(self.pending_file), "--delete-old"
+            )
+
+        member.refresh_from_db()
+        # CAS failure must keep the existing DB field value untouched.
+        self.assertEqual(member.profile_photo, legacy_path)
+        # Source bytes are preserved and cleanup is not triggered.
+        self.assertTrue(self._exists(legacy_path))
+        # Destination may already have been copied before CAS check; keep pending
+        # entry so migration can be resumed safely.
+        self.assertTrue(self._exists(new_path))
+        pending = json.loads(self.pending_file.read_text(encoding="utf-8"))
+        self.assertEqual(pending, {legacy_path: new_path})
+        self.assertIn("Skip concurrent update:", output)

@@ -6,6 +6,7 @@ from pathlib import Path
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
 
 from members.models import Biography, Member
 
@@ -60,6 +61,7 @@ class Command(BaseCommand):
             was_blank = not photo
             if photo:
                 old_path = photo.name  # type: ignore[attr-defined]
+                expected_current_value = old_path
             else:
                 # Historical save path wrote
                 # generated_avatars/profile_<username>.png without assigning
@@ -70,6 +72,7 @@ class Command(BaseCommand):
                 if not default_storage.exists(legacy_path):
                     continue
                 old_path = legacy_path
+                expected_current_value = ""
             new_path = self._member_id_avatar_path(member.pk)
             if not old_path.startswith(LEGACY_AVATAR_PREFIX) or old_path == new_path:
                 continue
@@ -78,6 +81,7 @@ class Command(BaseCommand):
                 "profile_photo",
                 old_path,
                 new_path,
+                expected_current_value,
                 dry_run,
                 delete_old,
             )
@@ -105,6 +109,7 @@ class Command(BaseCommand):
                 "uploaded_image",
                 old_path,
                 new_path,
+                old_path,
                 dry_run,
                 delete_old,
             )
@@ -121,7 +126,14 @@ class Command(BaseCommand):
         )
 
     def _migrate_field(
-        self, instance, field_name, old_path, new_path, dry_run, delete_old
+        self,
+        instance,
+        field_name,
+        old_path,
+        new_path,
+        expected_current_value,
+        dry_run,
+        delete_old,
     ):
         if default_storage.exists(new_path):
             # Resume incomplete copies from a previous interrupted run. If this
@@ -158,10 +170,17 @@ class Command(BaseCommand):
                     return "conflict"
                 self.stdout.write(f"Already present: {old_path} -> {new_path}")
                 if not dry_run:
+                    if not self._compare_and_set(
+                        instance,
+                        field_name,
+                        expected_current_value,
+                        new_path,
+                    ):
+                        self.stderr.write(
+                            f"Skip concurrent update: {field_name} changed for {type(instance).__name__}#{instance.pk}"
+                        )
+                        return "conflict"
                     self._record_pending(old_path, new_path)
-                    type(instance).objects.filter(pk=instance.pk).update(
-                        **{field_name: new_path}
-                    )
                     if delete_old:
                         self._cleanup_pending()
                 return "existing"
@@ -182,10 +201,29 @@ class Command(BaseCommand):
                 f"Storage saved {old_path} as unexpected path {saved_path}"
             )
 
-        type(instance).objects.filter(pk=instance.pk).update(**{field_name: new_path})
+        if not self._compare_and_set(
+            instance,
+            field_name,
+            expected_current_value,
+            new_path,
+        ):
+            self.stderr.write(
+                f"Skip concurrent update: {field_name} changed for {type(instance).__name__}#{instance.pk}"
+            )
+            return "conflict"
         if delete_old:
             self._cleanup_pending()
         return "migrated"
+
+    def _compare_and_set(self, instance, field_name, expected_current_value, new_path):
+        queryset = type(instance).objects.filter(pk=instance.pk)
+        if expected_current_value in (None, ""):
+            queryset = queryset.filter(
+                Q(**{f"{field_name}__isnull": True}) | Q(**{field_name: ""})
+            )
+        else:
+            queryset = queryset.filter(**{field_name: expected_current_value})
+        return queryset.update(**{field_name: new_path}) == 1
 
     def _paths_match(self, old_path, new_path):
         return self._storage_hash(old_path) == self._storage_hash(new_path)
