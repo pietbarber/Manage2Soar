@@ -680,3 +680,25 @@ def test_pydenticon_view_returns_404_when_generation_fails(
         response = client.get(reverse("pydenticon", kwargs={"member_id": member.pk}))
 
     assert response.status_code == 404
+
+
+@override_settings(TESTING=True)
+@pytest.mark.django_db
+def test_pydenticon_view_returns_404_when_storage_exists_check_fails(
+    client, django_user_model, settings, tmp_path
+):
+    settings.MEDIA_ROOT = str(tmp_path)
+    member = django_user_model.objects.create_user(
+        username="exists_fail_user",
+        password="pass",
+        membership_status="Full Member",
+    )
+
+    from unittest import mock
+
+    with mock.patch(
+        "members.views.default_storage.exists", side_effect=OSError("gcs down")
+    ):
+        response = client.get(reverse("pydenticon", kwargs={"member_id": member.pk}))
+
+    assert response.status_code == 404

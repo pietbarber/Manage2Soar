@@ -27,6 +27,26 @@ class MemberModelTests(TestCase):
         self.assertFalse(member.profile_photo)
 
     @override_settings(TESTING=False)
+    @patch(
+        "django.core.files.storage.default_storage.exists",
+        side_effect=Exception("gcs unavailable"),
+    )
+    @patch("members.models.generate_identicon")
+    def test_avatar_storage_exists_exception_does_not_abort_member_save(
+        self, _generate_identicon, _storage_exists
+    ):
+        member = Member(
+            username="avatar_exists_exception",
+            membership_status="Full Member",
+        )
+
+        member.save()
+
+        member.refresh_from_db()
+        self.assertIsNotNone(member.pk)
+        self.assertFalse(member.profile_photo)
+
+    @override_settings(TESTING=False)
     @patch("members.models.generate_identicon")
     @patch("django.core.files.storage.default_storage.exists", return_value=False)
     @patch("members.models.Member.objects.filter")

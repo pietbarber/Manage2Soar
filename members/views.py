@@ -616,11 +616,11 @@ def pydenticon_view(request, member_id):
         "generated_avatars", "by-member-id", f"profile_{member.pk}.png"
     )
 
-    if not default_storage.exists(relative_path):
-        try:
+    try:
+        if not default_storage.exists(relative_path):
             generate_identicon(member.username, relative_path)
-        except (IOError, OSError, ValueError):
-            raise Http404("Avatar could not be generated")
+    except Exception:
+        raise Http404("Avatar could not be generated")
 
     try:
         file_handle = default_storage.open(relative_path, "rb")

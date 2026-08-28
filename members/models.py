@@ -402,7 +402,7 @@ class Member(AbstractUser):
             try:
                 if not default_storage.exists(file_path):
                     generate_identicon(self.username, file_path)
-            except (IOError, OSError, ValueError):
+            except Exception:
                 # Avatar generation is ancillary to member creation. The member
                 # remains usable and the avatar can be generated on a later save.
                 logger.exception("Failed to generate avatar for member %s", self.pk)
