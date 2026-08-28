@@ -1,0 +1,7 @@
+{
+  "include": ["members", "manage2soar", "utils"],
+  "exclude": [".venv", "graphify-out"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": [".venv/lib/python3.14/site-packages"]
+}

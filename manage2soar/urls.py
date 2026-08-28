@@ -122,9 +122,9 @@ def manifest_view(request):
     # Use the club name from SiteConfiguration so the shortcut is branded correctly.
     # Guard against DB-not-ready errors (migrations, startup) the same way
     # utils.url_helpers.get_canonical_url() does.
-    try:
-        from django.db.utils import OperationalError, ProgrammingError
+    from django.db.utils import OperationalError, ProgrammingError
 
+    try:
         siteconfig = SiteConfiguration.objects.first()
         club_name = (
             siteconfig.club_name
@@ -257,7 +257,9 @@ urlpatterns = [
     path("", include("siteconfig.urls")),
     # API endpoints for mail server integration
     path("api/email-lists/", email_lists, name="api_email_lists"),
-    path("avatar/<str:username>.png", members_views.pydenticon_view, name="pydenticon"),
+    path(
+        "avatar/<int:member_id>.png", members_views.pydenticon_view, name="pydenticon"
+    ),
     # Public contact form for visitors (no authentication required)
     path("contact/", cms_views.contact, name="contact"),
     path("contact/success/", cms_views.contact_success, name="contact_success"),

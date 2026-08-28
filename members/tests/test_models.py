@@ -1,16 +1,140 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django import forms
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from members.forms import SetPasswordForm
 from members.models import Biography, Member
 from members.utils.membership import clear_active_membership_statuses_cache
 from siteconfig.models import MembershipStatus
+from utils.upload_entropy import upload_biography
 
 
 class MemberModelTests(TestCase):
+    @override_settings(TESTING=False)
+    @patch("django.core.files.storage.default_storage.exists", return_value=False)
+    @patch("members.models.generate_identicon", side_effect=OSError("storage down"))
+    def test_avatar_generation_failure_does_not_abort_member_save(
+        self, _generate_identicon, _storage_exists
+    ):
+        member = Member(username="avatar_failure", membership_status="Full Member")
+
+        member.save()
+
+        member.refresh_from_db()
+        self.assertIsNotNone(member.pk)
+        self.assertFalse(member.profile_photo)
+
+    @override_settings(TESTING=False)
+    @patch(
+        "django.core.files.storage.default_storage.exists",
+        side_effect=Exception("gcs unavailable"),
+    )
+    @patch("members.models.generate_identicon")
+    def test_avatar_storage_exists_exception_does_not_abort_member_save(
+        self, _generate_identicon, _storage_exists
+    ):
+        member = Member(
+            username="avatar_exists_exception",
+            membership_status="Full Member",
+        )
+
+        member.save()
+
+        member.refresh_from_db()
+        self.assertIsNotNone(member.pk)
+        self.assertFalse(member.profile_photo)
+
+    @override_settings(TESTING=False)
+    @patch("members.models.generate_identicon")
+    @patch("django.core.files.storage.default_storage.exists", return_value=False)
+    @patch("members.models.Member.objects.filter")
+    def test_avatar_db_update_failure_is_not_swallowed(
+        self, _member_filter, _storage_exists, _generate_identicon
+    ):
+        member = Member(
+            username="avatar_db_fail",
+            email="avatar_db_fail@example.com",
+            membership_status="Full Member",
+        )
+        _member_filter.return_value.update.side_effect = RuntimeError("db write failed")
+
+        with self.assertRaises(RuntimeError):
+            member.save()
+
+        self.assertEqual(_generate_identicon.call_count, 1)
+
+    def test_biography_upload_path_uses_member_id(self):
+        biography = Biography(member_id=42)
+
+        path = upload_biography(biography, "portrait.jpg")
+
+        assert path.startswith("biography/42/portrait-")
+        assert path.endswith(".jpg")
+
+    @override_settings(TESTING=False)
+    @patch("members.models.generate_identicon")
+    @patch("django.core.files.storage.default_storage")
+    def test_avatar_generation_success_uses_id_path_and_is_not_regenerated(
+        self, _default_storage, _generate_identicon
+    ):
+        _default_storage.exists.return_value = False
+        member = Member(
+            username="avatar_success",
+            email="avatar_success@example.com",
+            membership_status="Full Member",
+        )
+
+        member.save()
+
+        expected_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
+        # Successful generation must target the immutable ID-based path.
+        self.assertEqual(_generate_identicon.call_count, 1)
+        self.assertEqual(
+            _generate_identicon.call_args.args, ("avatar_success", expected_path)
+        )
+        # The path must be persisted on the member record.
+        member.refresh_from_db()
+        self.assertEqual(member.profile_photo, expected_path)
+
+        # Saving again must not regenerate an avatar that already exists.
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=True
+        ):
+            member.save()
+
+        self.assertEqual(_generate_identicon.call_count, 1)
+        member.refresh_from_db()
+        self.assertEqual(member.profile_photo, expected_path)
+
+    @override_settings(TESTING=False)
+    @patch("members.models.generate_identicon")
+    @patch("django.core.files.storage.default_storage.exists", return_value=False)
+    @patch("members.models.Member.objects.only")
+    @patch("members.models.Member.objects.filter")
+    def test_avatar_compare_and_set_race_loads_concurrent_value(
+        self,
+        _member_filter,
+        _member_only,
+        _storage_exists,
+        _generate_identicon,
+    ):
+        member = Member(
+            username="avatar_cas_race",
+            email="avatar_cas_race@example.com",
+            membership_status="Full Member",
+        )
+        _member_filter.return_value.update.return_value = 0
+        _member_only.return_value.get.return_value = Member(
+            profile_photo="profile_photos/concurrent_upload.jpg"
+        )
+
+        member.save()
+
+        self.assertEqual(_generate_identicon.call_count, 1)
+        self.assertEqual(member.profile_photo, "profile_photos/concurrent_upload.jpg")
+
     def test_full_display_name_prefers_nickname(self):
         m = Member(first_name="Brett", last_name="Gilbert", nickname="Sam")
         self.assertEqual(m.full_display_name, "Sam Gilbert")
@@ -88,14 +212,14 @@ class ProfileImageUrlTests(TestCase):
 
     def test_profile_image_url_small_falls_back_to_pydenticon(self):
         """Should fall back to pydenticon when no photos are available."""
-        member = Member(username="test_pydenticon")
+        member = Member(pk=42, username="test_pydenticon")
         member.profile_photo_small = ""
         member.profile_photo_medium = ""
         member.profile_photo = ""
 
         url = member.profile_image_url_small
         # Should return pydenticon URL
-        expected_url = reverse("pydenticon", kwargs={"username": "test_pydenticon"})
+        expected_url = reverse("pydenticon", kwargs={"member_id": member.pk})
         self.assertEqual(url, expected_url)
 
     def test_profile_image_url_medium_falls_back_to_full(self):
