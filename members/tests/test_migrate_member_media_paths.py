@@ -216,6 +216,23 @@ class MigrateMemberMediaPathsTests(TestCase):
         with self.assertRaises(CommandError):
             self._call_command("--pending-file", "relative/pending.json")
 
+    def test_kubernetes_requires_storage_manifest_key(self):
+        with mock.patch.dict("os.environ", {"KUBERNETES_SERVICE_HOST": "1"}):
+            with self.assertRaises(CommandError):
+                self._call_command("--pending-file", str(self.pending_file))
+
+    def test_storage_manifest_key_is_supported(self):
+        member = self._member_with_legacy_avatar(
+            "storage_manifest_user",
+            "generated_avatars/profile_storage_manifest_user.png",
+        )
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
+
+        self._call_command("--pending-storage-key", "migration/pending.json")
+
+        member.refresh_from_db()
+        self.assertEqual(member.profile_photo, new_path)
+
     def test_biography_upload_uses_member_id_path(self):
         member = Member.objects.create(**_member_kwargs("bio_user"))
         legacy_path = "biography/someone_else/portrait.jpg"

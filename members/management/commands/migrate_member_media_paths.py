@@ -30,19 +30,44 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--pending-file",
-            required=True,
             help=(
-                "Absolute path on durable storage for the manifest used to "
-                "resume legacy-file cleanup."
+                "Absolute path for the pending manifest used to resume "
+                "legacy-file cleanup (development/local only)."
+            ),
+        )
+        parser.add_argument(
+            "--pending-storage-key",
+            help=(
+                "Default-storage object key for the pending manifest. Use this "
+                "in production so state survives pod restarts."
             ),
         )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         delete_old = options["delete_old"]
-        self.pending_file = Path(options["pending_file"])
-        if not self.pending_file.is_absolute():
-            raise CommandError("--pending-file must be an absolute durable path")
+        pending_file_option = options.get("pending_file")
+        pending_storage_key = options.get("pending_storage_key")
+        if not pending_file_option and not pending_storage_key:
+            raise CommandError(
+                "Provide --pending-storage-key (recommended) or --pending-file"
+            )
+        if pending_file_option and pending_storage_key:
+            raise CommandError("Use either --pending-file or --pending-storage-key")
+
+        self.pending_storage_key = pending_storage_key
+        self.pending_file = Path(pending_file_option) if pending_file_option else None
+        self.use_storage_manifest = self.pending_storage_key is not None
+
+        if self._is_kubernetes_runtime() and not self.use_storage_manifest:
+            raise CommandError(
+                "In Kubernetes, --pending-storage-key is required so pending "
+                "state is durable across pod restarts"
+            )
+
+        if self.pending_file is not None and not self.pending_file.is_absolute():
+            raise CommandError("--pending-file must be an absolute path")
+
         self.pending = self._load_pending()
         migrated = 0
         already_present = 0
@@ -248,7 +273,16 @@ class Command(BaseCommand):
         return f"{ID_AVATAR_PREFIX}profile_{member_id}.png"
 
     def _load_pending(self):
-        if not self.pending_file.exists():
+        if self.use_storage_manifest:
+            key = self.pending_storage_key
+            if key is None:
+                raise RuntimeError("pending_storage_key is not configured")
+            if not default_storage.exists(key):
+                return {}
+            with default_storage.open(key, "r") as handle:
+                return json.load(handle)
+
+        if self.pending_file is None or not self.pending_file.exists():
             return {}
         return json.loads(self.pending_file.read_text(encoding="utf-8"))
 
@@ -258,6 +292,17 @@ class Command(BaseCommand):
             self._save_pending()
 
     def _save_pending(self):
+        if self.use_storage_manifest:
+            key = self.pending_storage_key
+            if key is None:
+                raise RuntimeError("pending_storage_key is not configured")
+            payload = json.dumps(self.pending, indent=2, sort_keys=True)
+            default_storage.delete(key)
+            default_storage.save(key, ContentFile(payload.encode("utf-8")))
+            return
+
+        if self.pending_file is None:
+            raise RuntimeError("pending_file is not configured")
         self.pending_file.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.pending_file.with_suffix(f"{self.pending_file.suffix}.tmp")
         temporary.write_text(
@@ -297,5 +342,13 @@ class Command(BaseCommand):
         self.pending = remaining
         if self.pending:
             self._save_pending()
-        elif self.pending_file.exists():
+        elif self.use_storage_manifest:
+            key = self.pending_storage_key
+            if key is None:
+                raise RuntimeError("pending_storage_key is not configured")
+            default_storage.delete(key)
+        elif self.pending_file is not None and self.pending_file.exists():
             self.pending_file.unlink()
+
+    def _is_kubernetes_runtime(self):
+        return "KUBERNETES_SERVICE_HOST" in os.environ
