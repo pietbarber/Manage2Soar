@@ -2,6 +2,7 @@ import json
 import os
 from hashlib import sha256
 from pathlib import Path
+from time import time_ns
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -12,6 +13,7 @@ from members.models import Biography, Member
 
 LEGACY_AVATAR_PREFIX = "generated_avatars/"
 ID_AVATAR_PREFIX = "generated_avatars/by-member-id/"
+MANIFEST_POINTER_PREFIX = "manifest:"
 
 
 class Command(BaseCommand):
@@ -279,7 +281,23 @@ class Command(BaseCommand):
                 raise RuntimeError("pending_storage_key is not configured")
             if not default_storage.exists(key):
                 return {}
-            with default_storage.open(key, "r") as handle:
+            with default_storage.open(key, "rb") as handle:
+                pointer_or_payload = handle.read().decode("utf-8")
+
+            # Backward compatibility for manifests written directly to `key`.
+            stripped = pointer_or_payload.lstrip()
+            if stripped.startswith("{"):
+                return json.loads(pointer_or_payload)
+
+            if not pointer_or_payload.startswith(MANIFEST_POINTER_PREFIX):
+                raise RuntimeError(f"Invalid storage manifest pointer at {key}")
+
+            manifest_key = pointer_or_payload[len(MANIFEST_POINTER_PREFIX) :]
+            if not manifest_key:
+                raise RuntimeError(f"Empty storage manifest pointer at {key}")
+            if not default_storage.exists(manifest_key):
+                return {}
+            with default_storage.open(manifest_key, "r") as handle:
                 return json.load(handle)
 
         if self.pending_file is None or not self.pending_file.exists():
@@ -297,8 +315,42 @@ class Command(BaseCommand):
             if key is None:
                 raise RuntimeError("pending_storage_key is not configured")
             payload = json.dumps(self.pending, indent=2, sort_keys=True)
-            default_storage.delete(key)
-            default_storage.save(key, ContentFile(payload.encode("utf-8")))
+            previous_manifest_key = None
+            if default_storage.exists(key):
+                with default_storage.open(key, "rb") as handle:
+                    pointer_or_payload = handle.read().decode("utf-8")
+                if pointer_or_payload.startswith(MANIFEST_POINTER_PREFIX):
+                    previous_manifest_key = pointer_or_payload[
+                        len(MANIFEST_POINTER_PREFIX) :
+                    ]
+
+            requested_manifest_key = f"{key}.v{time_ns()}"
+            persisted_manifest_key = default_storage.save(
+                requested_manifest_key,
+                ContentFile(payload.encode("utf-8")),
+            )
+            if not default_storage.exists(persisted_manifest_key):
+                raise RuntimeError(
+                    "Storage did not persist pending manifest key "
+                    f"{persisted_manifest_key}"
+                )
+
+            with default_storage.open(key, "wb") as handle:
+                handle.write(
+                    f"{MANIFEST_POINTER_PREFIX}{persisted_manifest_key}".encode("utf-8")
+                )
+
+            if (
+                previous_manifest_key
+                and previous_manifest_key != persisted_manifest_key
+                and default_storage.exists(previous_manifest_key)
+            ):
+                try:
+                    default_storage.delete(previous_manifest_key)
+                except Exception:
+                    # Best effort only: stale versions are safe and can be
+                    # cleaned up by lifecycle policies.
+                    pass
             return
 
         if self.pending_file is None:
@@ -346,7 +398,19 @@ class Command(BaseCommand):
             key = self.pending_storage_key
             if key is None:
                 raise RuntimeError("pending_storage_key is not configured")
+            manifest_key_to_delete = None
+            if default_storage.exists(key):
+                with default_storage.open(key, "rb") as handle:
+                    pointer_or_payload = handle.read().decode("utf-8")
+                if pointer_or_payload.startswith(MANIFEST_POINTER_PREFIX):
+                    manifest_key_to_delete = pointer_or_payload[
+                        len(MANIFEST_POINTER_PREFIX) :
+                    ]
             default_storage.delete(key)
+            if manifest_key_to_delete and default_storage.exists(
+                manifest_key_to_delete
+            ):
+                default_storage.delete(manifest_key_to_delete)
         elif self.pending_file is not None and self.pending_file.exists():
             self.pending_file.unlink()
 

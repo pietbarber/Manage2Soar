@@ -1,3 +1,4 @@
+import io
 import json
 import shutil
 import tempfile
@@ -232,6 +233,55 @@ class MigrateMemberMediaPathsTests(TestCase):
 
         member.refresh_from_db()
         self.assertEqual(member.profile_photo, new_path)
+
+    def test_storage_manifest_save_uses_versioned_key_and_pointer(self):
+        command = migrate_member_media_paths.Command()
+        command.use_storage_manifest = True
+        command.pending_storage_key = "migration/pending.json"
+        command.pending = {"legacy/file.png": "new/file.png"}
+
+        pointer_written = {}
+
+        def _open(path, mode):
+            if path == "migration/pending.json" and mode == "rb":
+                return io.BytesIO(b"manifest:migration/pending.json.v-old")
+            if path == "migration/pending.json" and mode == "wb":
+                writer = io.BytesIO()
+
+                class _WriterContext:
+                    def __enter__(self_nonlocal):
+                        return writer
+
+                    def __exit__(self_nonlocal, exc_type, exc, tb):
+                        pointer_written["value"] = writer.getvalue().decode("utf-8")
+                        return False
+
+                return _WriterContext()
+            raise AssertionError(f"Unexpected open call: {path} ({mode})")
+
+        def _exists(path):
+            return path in {
+                "migration/pending.json",
+                "migration/pending.json.v-old",
+                "migration/pending.json.v-new-suffix",
+            }
+
+        storage = mock.Mock()
+        storage.exists.side_effect = _exists
+        storage.open.side_effect = _open
+        storage.save.return_value = "migration/pending.json.v-new-suffix"
+
+        with mock.patch.object(migrate_member_media_paths, "default_storage", storage):
+            command._save_pending()
+
+        self.assertEqual(
+            pointer_written["value"], "manifest:migration/pending.json.v-new-suffix"
+        )
+        self.assertEqual(storage.save.call_count, 1)
+        self.assertEqual(storage.delete.call_count, 1)
+        self.assertEqual(
+            storage.delete.call_args.args[0], "migration/pending.json.v-old"
+        )
 
     def test_biography_upload_uses_member_id_path(self):
         member = Member.objects.create(**_member_kwargs("bio_user"))

@@ -6,6 +6,7 @@ from typing import Any, cast
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models, transaction
+from django.db.models import Q
 from tinymce.models import HTMLField
 
 from members.constants.membership import MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
@@ -409,8 +410,25 @@ class Member(AbstractUser):
             else:
                 # Let DB errors propagate so transaction state is not silently
                 # marked rollback-only under admin atomic blocks.
-                type(self).objects.filter(pk=self.pk).update(profile_photo=file_path)
-                self.profile_photo = file_path
+                updated = (
+                    type(self)
+                    .objects.filter(
+                        Q(pk=self.pk)
+                        & (Q(profile_photo__isnull=True) | Q(profile_photo=""))
+                    )
+                    .update(profile_photo=file_path)
+                )
+                if updated == 1:
+                    self.profile_photo = file_path
+                else:
+                    # Preserve in-memory state when another writer set a photo
+                    # concurrently between super().save() and this update.
+                    self.profile_photo = (
+                        type(self)
+                        .objects.only("profile_photo")
+                        .get(pk=self.pk)
+                        .profile_photo
+                    )
 
         # 5) now safe to touch M2M
         transaction.on_commit(self._sync_groups)

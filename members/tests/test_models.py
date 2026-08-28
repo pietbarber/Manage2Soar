@@ -108,6 +108,33 @@ class MemberModelTests(TestCase):
         member.refresh_from_db()
         self.assertEqual(member.profile_photo, expected_path)
 
+    @override_settings(TESTING=False)
+    @patch("members.models.generate_identicon")
+    @patch("django.core.files.storage.default_storage.exists", return_value=False)
+    @patch("members.models.Member.objects.only")
+    @patch("members.models.Member.objects.filter")
+    def test_avatar_compare_and_set_race_loads_concurrent_value(
+        self,
+        _member_filter,
+        _member_only,
+        _storage_exists,
+        _generate_identicon,
+    ):
+        member = Member(
+            username="avatar_cas_race",
+            email="avatar_cas_race@example.com",
+            membership_status="Full Member",
+        )
+        _member_filter.return_value.update.return_value = 0
+        _member_only.return_value.get.return_value = Member(
+            profile_photo="profile_photos/concurrent_upload.jpg"
+        )
+
+        member.save()
+
+        self.assertEqual(_generate_identicon.call_count, 1)
+        self.assertEqual(member.profile_photo, "profile_photos/concurrent_upload.jpg")
+
     def test_full_display_name_prefers_nickname(self):
         m = Member(first_name="Brett", last_name="Gilbert", nickname="Sam")
         self.assertEqual(m.full_display_name, "Sam Gilbert")
