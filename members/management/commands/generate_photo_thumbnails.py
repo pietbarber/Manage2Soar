@@ -14,9 +14,11 @@ Usage:
 
 import logging
 import os
+import re
 from io import BytesIO
 
 from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from PIL import Image
@@ -88,13 +90,15 @@ class Command(BaseCommand):
             photo_name = str(member.profile_photo)
 
             if dry_run:
-                self.stdout.write(f"  Would process: {member.username} ({photo_name})")
+                self.stdout.write(
+                    f"  Would process member {member.pk} ({member.username}): {photo_name}"
+                )
                 processed += 1
                 continue
 
             try:
                 # Read the photo from storage (works with both local and cloud storage)
-                with member.profile_photo.open("rb") as photo_file:
+                with default_storage.open(photo_name, "rb") as photo_file:
                     img = Image.open(photo_file)
                     img.load()  # Force load before file closes
                     img = img.convert("RGB")
@@ -112,10 +116,15 @@ class Command(BaseCommand):
                 small.save(small_buffer, format="JPEG", quality=85, optimize=True)
                 small_content = ContentFile(small_buffer.getvalue())
 
-                # Get base filename for thumbnails
+                # Get base filename for thumbnails.
+                # For generated avatars, normalize to the current immutable
+                # member-ID naming scheme even if the source photo path is
+                # still username-based from historical data.
                 base_name = os.path.basename(photo_name)
                 # Convert to jpg extension
                 name_without_ext = os.path.splitext(base_name)[0]
+                if re.match(r"^profile_[^/]+$", name_without_ext):
+                    name_without_ext = f"profile_{member.pk}"
                 medium_name = f"medium_{name_without_ext}.jpg"
                 small_name = f"small_{name_without_ext}.jpg"
 
@@ -131,23 +140,27 @@ class Command(BaseCommand):
                 )
 
                 self.stdout.write(
-                    self.style.SUCCESS(f"  Generated thumbnails for: {member.username}")
+                    self.style.SUCCESS(
+                        f"  Generated thumbnails for member {member.pk} ({member.username})"
+                    )
                 )
                 processed += 1
 
             except FileNotFoundError:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"  Skipping {member.username}: photo file not found"
+                        f"  Skipping member {member.pk} ({member.username}): photo file not found"
                     )
                 )
                 skipped += 1
             except Exception as e:
                 self.stdout.write(
-                    self.style.ERROR(f"  Error processing {member.username}: {e}")
+                    self.style.ERROR(
+                        f"  Error processing member {member.pk} ({member.username}): {e}"
+                    )
                 )
                 errors += 1
-                logger.exception(f"Error generating thumbnails for {member.username}")
+                logger.exception("Error generating thumbnails for member %s", member.pk)
 
         # Summary
         self.stdout.write("")
