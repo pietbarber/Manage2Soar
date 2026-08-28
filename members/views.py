@@ -624,7 +624,7 @@ def pydenticon_view(request, member_id):
 
     try:
         file_handle = default_storage.open(relative_path, "rb")
-    except (FileNotFoundError, IOError, OSError):
+    except Exception:
         raise Http404("Avatar not found")
 
     # Serve the file

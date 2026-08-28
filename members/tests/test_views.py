@@ -702,3 +702,30 @@ def test_pydenticon_view_returns_404_when_storage_exists_check_fails(
         response = client.get(reverse("pydenticon", kwargs={"member_id": member.pk}))
 
     assert response.status_code == 404
+
+
+@override_settings(TESTING=True)
+@pytest.mark.django_db
+def test_pydenticon_view_returns_404_when_storage_open_fails(
+    client, django_user_model, settings, tmp_path
+):
+    settings.MEDIA_ROOT = str(tmp_path)
+    member = django_user_model.objects.create_user(
+        username="open_fail_user",
+        password="pass",
+        membership_status="Full Member",
+    )
+
+    relative_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
+    target = tmp_path / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"preseeded-avatar")
+
+    from unittest import mock
+
+    with mock.patch(
+        "members.views.default_storage.open", side_effect=Exception("gcs forbidden")
+    ):
+        response = client.get(reverse("pydenticon", kwargs={"member_id": member.pk}))
+
+    assert response.status_code == 404
