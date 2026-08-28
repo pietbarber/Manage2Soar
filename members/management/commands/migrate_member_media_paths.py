@@ -9,6 +9,9 @@ from django.core.management.base import BaseCommand, CommandError
 
 from members.models import Biography, Member
 
+LEGACY_AVATAR_PREFIX = "generated_avatars/"
+ID_AVATAR_PREFIX = "generated_avatars/by-member-id/"
+
 
 class Command(BaseCommand):
     help = "Migrate member media paths from username-based paths to member IDs."
@@ -63,12 +66,12 @@ class Command(BaseCommand):
                 # profile_photo, so most legacy generated avatars belong to
                 # members with a blank field. Probe the legacy path and
                 # migrate/attach the stored bytes instead of regenerating.
-                legacy_path = f"generated_avatars/profile_{member.username}.png"
+                legacy_path = self._legacy_username_avatar_path(member.username)
                 if not default_storage.exists(legacy_path):
                     continue
                 old_path = legacy_path
-            new_path = f"generated_avatars/profile_{member.pk}.png"
-            if not old_path.startswith("generated_avatars/") or old_path == new_path:
+            new_path = self._member_id_avatar_path(member.pk)
+            if not old_path.startswith(LEGACY_AVATAR_PREFIX) or old_path == new_path:
                 continue
             result = self._migrate_field(
                 member,
@@ -121,21 +124,47 @@ class Command(BaseCommand):
         self, instance, field_name, old_path, new_path, dry_run, delete_old
     ):
         if default_storage.exists(new_path):
-            if not default_storage.exists(old_path):
-                self.stdout.write(f"Missing: {old_path}")
-                return "missing"
-            if not self._paths_match(old_path, new_path):
-                self.stderr.write(f"Conflict: {old_path} -> {new_path}")
-                return "conflict"
-            self.stdout.write(f"Already present: {old_path} -> {new_path}")
-            if not dry_run:
-                self._record_pending(old_path, new_path)
-                type(instance).objects.filter(pk=instance.pk).update(
-                    **{field_name: new_path}
-                )
-                if delete_old:
-                    self._cleanup_pending()
-            return "existing"
+            # Resume incomplete copies from a previous interrupted run. If this
+            # mapping is still pending and no DB row points to the destination,
+            # treat destination bytes as incomplete and retry the copy.
+            if self.pending.get(old_path) == new_path and not self._is_referenced(
+                new_path
+            ):
+                if dry_run:
+                    self.stdout.write(
+                        f"Would resume copy by replacing incomplete destination: {old_path} -> {new_path}"
+                    )
+                    return "migrated"
+                try:
+                    default_storage.delete(new_path)
+                except Exception:
+                    self.stderr.write(
+                        f"Cleanup deferred: could not remove incomplete destination {new_path}"
+                    )
+                    return "conflict"
+
+                if default_storage.exists(new_path):
+                    self.stderr.write(
+                        f"Conflict: could not remove incomplete destination {new_path}"
+                    )
+                    return "conflict"
+
+            if default_storage.exists(new_path):
+                if not default_storage.exists(old_path):
+                    self.stdout.write(f"Missing: {old_path}")
+                    return "missing"
+                if not self._paths_match(old_path, new_path):
+                    self.stderr.write(f"Conflict: {old_path} -> {new_path}")
+                    return "conflict"
+                self.stdout.write(f"Already present: {old_path} -> {new_path}")
+                if not dry_run:
+                    self._record_pending(old_path, new_path)
+                    type(instance).objects.filter(pk=instance.pk).update(
+                        **{field_name: new_path}
+                    )
+                    if delete_old:
+                        self._cleanup_pending()
+                return "existing"
 
         if not default_storage.exists(old_path):
             self.stdout.write(f"Missing: {old_path}")
@@ -174,6 +203,12 @@ class Command(BaseCommand):
             or Biography.objects.filter(uploaded_image=path).exists()
         )
 
+    def _legacy_username_avatar_path(self, username):
+        return f"{LEGACY_AVATAR_PREFIX}profile_{username}.png"
+
+    def _member_id_avatar_path(self, member_id):
+        return f"{ID_AVATAR_PREFIX}profile_{member_id}.png"
+
     def _load_pending(self):
         if not self.pending_file.exists():
             return {}
@@ -203,6 +238,19 @@ class Command(BaseCommand):
                 remaining[old_path] = new_path
                 continue
             if default_storage.exists(old_path):
+                try:
+                    if not self._paths_match(old_path, new_path):
+                        self.stderr.write(
+                            f"Cleanup deferred: destination bytes differ for {old_path}"
+                        )
+                        remaining[old_path] = new_path
+                        continue
+                except Exception:
+                    self.stderr.write(
+                        f"Cleanup deferred: could not verify destination bytes for {old_path}"
+                    )
+                    remaining[old_path] = new_path
+                    continue
                 try:
                     default_storage.delete(old_path)
                 except Exception:

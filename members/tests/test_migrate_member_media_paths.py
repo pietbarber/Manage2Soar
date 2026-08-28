@@ -71,7 +71,7 @@ class MigrateMemberMediaPathsTests(TestCase):
         member = self._member_with_legacy_avatar(
             "legacy_user", "generated_avatars/profile_legacy_user.png"
         )
-        new_path = f"generated_avatars/profile_{member.pk}.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
 
         self._call_command("--pending-file", str(self.pending_file))
 
@@ -91,7 +91,7 @@ class MigrateMemberMediaPathsTests(TestCase):
         member = self._member_with_legacy_avatar(
             "resume_user", "generated_avatars/profile_resume_user.png"
         )
-        new_path = f"generated_avatars/profile_{member.pk}.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
         legacy_path = "generated_avatars/profile_resume_user.png"
 
         # First run migrated the record but simulated an interruption before
@@ -110,12 +110,36 @@ class MigrateMemberMediaPathsTests(TestCase):
         self.assertEqual(member.profile_photo, new_path)
         self.assertFalse(self.pending_file.exists())
 
+    def test_interrupted_partial_destination_is_replaced_and_migration_resumes(self):
+        member = Member.objects.create(
+            **_member_kwargs("resume_partial"), profile_photo=""
+        )
+        legacy_path = "generated_avatars/profile_resume_partial.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
+        self._write(legacy_path, b"correct-legacy-bytes")
+        # Simulate interrupted prior run that left a partial destination.
+        self._write(new_path, b"partial")
+        self.pending_file.write_text(
+            json.dumps({legacy_path: new_path}), encoding="utf-8"
+        )
+
+        output = self._call_command(
+            "--pending-file", str(self.pending_file), "--delete-old"
+        )
+
+        member.refresh_from_db()
+        self.assertEqual(member.profile_photo, new_path)
+        self.assertEqual(self._read(new_path), b"correct-legacy-bytes")
+        self.assertFalse(self._exists(legacy_path))
+        self.assertFalse(self.pending_file.exists())
+        self.assertIn("Migrate:", output)
+
     def test_preexisting_destination_with_different_bytes_reports_conflict(self):
         member = self._member_with_legacy_avatar(
             "existing_user", "generated_avatars/profile_existing_user.png"
         )
         legacy_path = "generated_avatars/profile_existing_user.png"
-        new_path = f"generated_avatars/profile_{member.pk}.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
         self._write(new_path, b"existing-target-bytes")
 
         output = self._call_command(
@@ -136,7 +160,7 @@ class MigrateMemberMediaPathsTests(TestCase):
             "existing_match", "generated_avatars/profile_existing_match.png"
         )
         legacy_path = "generated_avatars/profile_existing_match.png"
-        new_path = f"generated_avatars/profile_{member.pk}.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
         self._write(new_path, self._read(legacy_path))
 
         self._call_command("--pending-file", str(self.pending_file), "--delete-old")
@@ -164,7 +188,7 @@ class MigrateMemberMediaPathsTests(TestCase):
         member = self._member_with_legacy_avatar(
             "dryrun_user", "generated_avatars/profile_dryrun_user.png"
         )
-        new_path = f"generated_avatars/profile_{member.pk}.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
 
         self._call_command("--pending-file", str(self.pending_file), "--dry-run")
 
@@ -178,7 +202,7 @@ class MigrateMemberMediaPathsTests(TestCase):
     def test_delete_old_removes_legacy_file_after_migration(self):
         legacy_path = "generated_avatars/profile_delete_user.png"
         member = self._member_with_legacy_avatar("delete_user", legacy_path)
-        new_path = f"generated_avatars/profile_{member.pk}.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
 
         self._call_command("--pending-file", str(self.pending_file), "--delete-old")
 
@@ -214,7 +238,7 @@ class MigrateMemberMediaPathsTests(TestCase):
             **_member_kwargs("legacy_blank"), profile_photo=""
         )
         legacy_path = "generated_avatars/profile_legacy_blank.png"
-        new_path = f"generated_avatars/profile_{member.pk}.png"
+        new_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
         self._write(legacy_path, f"legacy-bytes:{member.pk}".encode("utf-8"))
 
         self._call_command("--pending-file", str(self.pending_file), "--delete-old")
@@ -238,11 +262,8 @@ class MigrateMemberMediaPathsTests(TestCase):
         self.assertNotIn("Migrate:", output)
 
     def test_cleanup_pending_requires_destination_db_reference(self):
-        member = Member.objects.create(
-            **_member_kwargs("partial_copy"), profile_photo=""
-        )
-        legacy_path = "generated_avatars/profile_partial_copy.png"
-        new_path = f"generated_avatars/profile_{member.pk}.png"
+        legacy_path = "generated_avatars/profile_orphaned.png"
+        new_path = "generated_avatars/by-member-id/profile_999.png"
         self._write(legacy_path, b"correct-source-bytes")
         self._write(new_path, b"partial-destination-bytes")
         self.pending_file.write_text(

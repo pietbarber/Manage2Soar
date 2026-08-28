@@ -576,7 +576,7 @@ def test_pydenticon_view_serves_existing_id_based_avatar(
         password="pass",
         membership_status="Full Member",
     )
-    relative_path = f"generated_avatars/profile_{member.pk}.png"
+    relative_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
     target = tmp_path / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(b"legacy-avatar-bytes")
@@ -600,7 +600,7 @@ def test_pydenticon_view_generates_missing_avatar_with_username_seed(
         password="pass",
         membership_status="Full Member",
     )
-    relative_path = f"generated_avatars/profile_{member.pk}.png"
+    relative_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
     target = tmp_path / relative_path
 
     from unittest import mock
@@ -619,6 +619,38 @@ def test_pydenticon_view_generates_missing_avatar_with_username_seed(
     assert response.status_code == 200
     content = b"".join(response.streaming_content)
     assert content == b"generated-bytes"
+
+
+@pytest.mark.django_db
+@override_settings(TESTING=True)
+def test_pydenticon_view_uses_by_member_id_namespace_avoids_numeric_username_collision(
+    client, django_user_model, settings, tmp_path
+):
+    settings.MEDIA_ROOT = str(tmp_path)
+    target = django_user_model.objects.create_user(
+        username="target_user",
+        password="pass",
+        membership_status="Full Member",
+    )
+    collider = django_user_model.objects.create_user(
+        username=str(target.pk),
+        password="pass",
+        membership_status="Full Member",
+    )
+    legacy_collision_path = f"generated_avatars/profile_{collider.username}.png"
+    legacy_target = tmp_path / legacy_collision_path
+    legacy_target.parent.mkdir(parents=True, exist_ok=True)
+    legacy_target.write_bytes(b"legacy-collision-bytes")
+
+    id_path = f"generated_avatars/by-member-id/profile_{target.pk}.png"
+    id_target = tmp_path / id_path
+    id_target.parent.mkdir(parents=True, exist_ok=True)
+    id_target.write_bytes(b"expected-id-avatar-bytes")
+
+    response = client.get(reverse("pydenticon", kwargs={"member_id": target.pk}))
+
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content) == b"expected-id-avatar-bytes"
 
 
 @override_settings(TESTING=True)

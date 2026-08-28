@@ -26,6 +26,25 @@ class MemberModelTests(TestCase):
         self.assertIsNotNone(member.pk)
         self.assertFalse(member.profile_photo)
 
+    @override_settings(TESTING=False)
+    @patch("members.models.generate_identicon")
+    @patch("django.core.files.storage.default_storage.exists", return_value=False)
+    @patch("members.models.Member.objects.filter")
+    def test_avatar_db_update_failure_is_not_swallowed(
+        self, _member_filter, _storage_exists, _generate_identicon
+    ):
+        member = Member(
+            username="avatar_db_fail",
+            email="avatar_db_fail@example.com",
+            membership_status="Full Member",
+        )
+        _member_filter.return_value.update.side_effect = RuntimeError("db write failed")
+
+        with self.assertRaises(RuntimeError):
+            member.save()
+
+        self.assertEqual(_generate_identicon.call_count, 1)
+
     def test_biography_upload_path_uses_member_id(self):
         biography = Biography(member_id=42)
 
@@ -49,7 +68,7 @@ class MemberModelTests(TestCase):
 
         member.save()
 
-        expected_path = f"generated_avatars/profile_{member.pk}.png"
+        expected_path = f"generated_avatars/by-member-id/profile_{member.pk}.png"
         # Successful generation must target the immutable ID-based path.
         self.assertEqual(_generate_identicon.call_count, 1)
         self.assertEqual(

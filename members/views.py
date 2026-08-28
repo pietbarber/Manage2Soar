@@ -259,9 +259,11 @@ def member_view(request, member_id):
     )
 
     # Filter badges: suppress legs if parent badge has been earned (Issue #560)
-    member_badges_qs = member.badges.select_related(
-        "badge", "badge__parent_badge"
-    ).order_by("badge__order")
+    member_badges_qs = (
+        MemberBadge.objects.filter(member=member)
+        .select_related("badge", "badge__parent_badge")
+        .order_by("badge__order")
+    )
     member_badges = suppress_member_badge_legs(member_badges_qs)
 
     if is_self and request.method == "POST":
@@ -269,7 +271,7 @@ def member_view(request, member_id):
         if form.is_valid():
             form.save()
             messages.success(request, "Profile photo updated.")
-            return redirect("members:member_view", member_id=member.id)
+            return redirect("members:member_view", member_id=member.pk)
     else:
         form = MemberProfilePhotoForm(instance=member) if is_self else None
 
@@ -332,7 +334,7 @@ def toggle_redaction(request, member_id):
                     message = f"{actor_name} has {action} personal contact information for member {subject_name}."
 
                 url = build_absolute_url(
-                    reverse("members:member_view", kwargs={"member_id": member.id})
+                    reverse("members:member_view", kwargs={"member_id": member.pk})
                 )
 
                 # Notify every user with member_manager privilege, but dedupe
@@ -392,7 +394,7 @@ def toggle_redaction(request, member_id):
 
                     to_create = []
                     for rm in member_managers:
-                        if rm.id in existing_user_ids:
+                        if rm.pk in existing_user_ids:
                             continue
                         to_create.append(
                             Notification(user=rm, message=message, url=url)
@@ -418,7 +420,7 @@ def toggle_redaction(request, member_id):
                 "Your personal contact information is now visible to other members.",
             )
 
-    return redirect("members:member_view", member_id=member.id)
+    return redirect("members:member_view", member_id=member.pk)
 
 
 #########################
@@ -447,7 +449,7 @@ def biography_view(request, member_id):
         form = BiographyForm(request.POST, request.FILES, instance=biography)
         if form.is_valid():
             form.save()
-            return redirect("members:member_view", member_id=member.id)
+            return redirect("members:member_view", member_id=member.pk)
     else:
         form = BiographyForm(instance=biography)
 
@@ -610,7 +612,9 @@ def pydenticon_view(request, member_id):
     rather than Django for better performance and proper handling of ranges/etags.
     """
     member = get_object_or_404(Member, pk=member_id)
-    relative_path = os.path.join("generated_avatars", f"profile_{member.pk}.png")
+    relative_path = os.path.join(
+        "generated_avatars", "by-member-id", f"profile_{member.pk}.png"
+    )
 
     if not default_storage.exists(relative_path):
         try:
@@ -992,6 +996,7 @@ def visiting_pilot_signup(request, token):
                         "members/visiting_pilot_signup.html",
                         {"form": form, "config": config},
                     )
+                member = None
                 for _attempt in range(MAX_USERNAME_RETRIES):
                     candidate_username = generate_username(
                         form.cleaned_data["first_name"],
@@ -1025,6 +1030,9 @@ def visiting_pilot_signup(request, token):
                             raise
                         if _attempt == MAX_USERNAME_RETRIES - 1:
                             raise  # username race, but exhausted retries
+
+                if member is None:
+                    raise RuntimeError("Unable to create member after username retries")
 
                 # Mark account as unusable for password login
                 member.set_unusable_password()
@@ -1154,6 +1162,7 @@ def visiting_pilot_qr_code(request):
         from io import BytesIO
 
         import qrcode
+        from qrcode.constants import ERROR_CORRECT_L
 
         # Get the site configuration and generate daily token
         config = SiteConfiguration.objects.first()
@@ -1179,7 +1188,7 @@ def visiting_pilot_qr_code(request):
         # Generate QR code
         qr = qrcode.QRCode(
             version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            error_correction=ERROR_CORRECT_L,
             box_size=10,
             border=4,
         )

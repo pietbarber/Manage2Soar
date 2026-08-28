@@ -394,18 +394,23 @@ class Member(AbstractUser):
         if not self.profile_photo and not (
             hasattr(settings, "TESTING") and settings.TESTING
         ):
-            try:
-                file_path = os.path.join("generated_avatars", f"profile_{self.pk}.png")
-                from django.core.files.storage import default_storage
+            file_path = os.path.join(
+                "generated_avatars", "by-member-id", f"profile_{self.pk}.png"
+            )
+            from django.core.files.storage import default_storage
 
+            try:
                 if not default_storage.exists(file_path):
                     generate_identicon(self.username, file_path)
-                type(self).objects.filter(pk=self.pk).update(profile_photo=file_path)
-                self.profile_photo = file_path
-            except Exception:
+            except (IOError, OSError, ValueError):
                 # Avatar generation is ancillary to member creation. The member
                 # remains usable and the avatar can be generated on a later save.
                 logger.exception("Failed to generate avatar for member %s", self.pk)
+            else:
+                # Let DB errors propagate so transaction state is not silently
+                # marked rollback-only under admin atomic blocks.
+                type(self).objects.filter(pk=self.pk).update(profile_photo=file_path)
+                self.profile_photo = file_path
 
         # 5) now safe to touch M2M
         transaction.on_commit(self._sync_groups)
