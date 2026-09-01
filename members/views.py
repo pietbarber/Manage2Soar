@@ -9,6 +9,7 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Count, F, Func, Prefetch, Q
@@ -38,6 +39,7 @@ from siteconfig.forms import (
     VisitingPilotSignupForm,
 )
 from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
+from utils.email import enforce_noreply_from_email
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .decorators import active_member_required
@@ -505,13 +507,16 @@ def request_email_change(request):
     confirmation_url = request.build_absolute_uri(
         reverse("members:confirm_email_change", args=[token])
     )
-    send_mail(
-        "Confirm your Manage2Soar email address",
-        f"Confirm your new email address by visiting:\n\n{confirmation_url}\n\n"
-        "This link expires in 24 hours.",
-        settings.DEFAULT_FROM_EMAIL,
-        [new_email],
+    message = EmailMultiAlternatives(
+        subject="Confirm your Manage2Soar email address",
+        body=(
+            f"Confirm your new email address by visiting:\n\n{confirmation_url}\n\n"
+            "This link expires in 24 hours."
+        ),
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[new_email],
     )
+    message.send()
     messages.success(request, "A confirmation link was sent to your new email address.")
     return redirect("members:member_view", member_id=request.user.id)
 
