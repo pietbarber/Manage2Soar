@@ -69,8 +69,8 @@ def test_approved_application_creates_structured_emergency_contact():
 def test_profile_policy_defaults_are_explicit_and_safe():
     policies = default_member_profile_field_policies()
 
-    assert policies["username"] == "direct"
-    assert policies["email"] == "request"
+    assert policies["username"] == "disabled"
+    assert policies["email"] == "disabled"
     assert policies["emergency_contacts"] == "request"
     assert policies["password"] == "direct"
     assert policies["profile_photo"] == "direct"

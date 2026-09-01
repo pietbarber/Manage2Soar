@@ -9,7 +9,7 @@ from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
 from members.utils.permissions import can_view_contact_field, contact_field_visibility
 from members.utils.vcard_tools import generate_vcard_qr
-from siteconfig.models import MembershipStatus
+from siteconfig.models import MembershipStatus, SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -188,3 +188,45 @@ def test_vcard_download_filters_contact_fields_for_regular_member():
     assert b"hidden@example.com" not in response.content
     assert b"555-0100" in response.content
     assert b"1 Hidden Way" not in response.content
+
+
+@pytest.mark.django_db
+def test_email_change_requires_confirmation_before_replacing_email():
+    MembershipStatus.objects.create(name="Email Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example",
+        club_abbreviation="TEST",
+        member_profile_field_policies={"email": "direct"},
+    )
+    member = Member.objects.create_user(
+        username="email_member",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    client = Client()
+    client.force_login(member)
+
+    response = client.post(
+        reverse("members:request_email_change"), {"email": "new@example.com"}
+    )
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.email == "old@example.com"
+    assert member.pending_email == "new@example.com"
+    assert mail.outbox[-1].to == ["new@example.com"]
+
+    token = signing.dumps(
+        {"member_id": member.pk, "email": "new@example.com"},
+        salt="members.email-change",
+    )
+    client.logout()
+    response = client.get(reverse("members:confirm_email_change", args=[token]))
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.email == "new@example.com"
+    assert member.pending_email == ""
+    assert member.pending_email_requested_at is None

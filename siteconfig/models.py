@@ -30,8 +30,8 @@ MEMBER_PROFILE_POLICY_FIELDS = (
 
 def default_member_profile_field_policies():
     return {
-        "username": "direct",
-        "email": "request",
+        "username": "disabled",
+        "email": "disabled",
         "phone": "request",
         "address": "request",
         "emergency_contacts": "request",
