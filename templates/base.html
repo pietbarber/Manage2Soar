@@ -320,6 +320,9 @@
               <li><a class="dropdown-item" href="{% url 'members:member_view' member_id=user.pk %}">
                 <i class="fas fa-user me-1"></i> View my Profile
               </a></li>
+              <li><a class="dropdown-item" href="{% url 'members:account_settings' %}">
+                <i class="fas fa-cog me-1"></i> Account Settings
+              </a></li>
               <li><a class="dropdown-item" href="{% url 'members:biography_view' member_id=user.pk %}">
                 <i class="fas fa-pen me-1"></i> Edit my Biography
               </a></li>

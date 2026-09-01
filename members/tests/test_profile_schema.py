@@ -178,6 +178,12 @@ def test_direct_username_and_email_policies_expose_member_edit_paths():
     response = client.get(reverse("members:member_view", args=[member.id]))
 
     assert response.status_code == 200
+    assert b"username/change" not in response.content
+    assert b"email/change" not in response.content
+
+    response = client.get(reverse("members:account_settings"))
+
+    assert response.status_code == 200
     assert b"username/change" in response.content
     assert b"email/change" in response.content
 

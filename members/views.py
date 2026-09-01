@@ -332,10 +332,6 @@ def member_view(request, member_id):
             and get_member_profile_field_policy("contact_visibility") == "direct"
             else None
         ),
-        "email_change_enabled": get_member_profile_field_policy("email")
-        in {"direct", "request"},
-        "username_change_enabled": get_member_profile_field_policy("username")
-        == "direct",
         "staff_contact_status": (
             [
                 {
@@ -371,6 +367,21 @@ def member_view(request, member_id):
         "mobile_link": mobile_link,
     }
     return render(request, "members/member_view.html", context)
+
+
+@active_member_required
+def account_settings(request):
+    return render(
+        request,
+        "members/account_settings.html",
+        {
+            "member": request.user,
+            "email_change_enabled": get_member_profile_field_policy("email")
+            == "direct",
+            "username_change_enabled": get_member_profile_field_policy("username")
+            == "direct",
+        },
+    )
 
 
 @active_member_required
