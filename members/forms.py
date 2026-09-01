@@ -78,6 +78,12 @@ class MemberProfilePhotoForm(forms.ModelForm):
         return instance
 
 
+class UsernameChangeForm(forms.ModelForm):
+    class Meta:
+        model = Member
+        fields = ["username"]
+
+
 #########################
 # BiographyForm Class
 

@@ -155,3 +155,36 @@ def test_admin_profile_policy_choices_exclude_paused_request_mode():
         "Request mode is not available"
         in form.fields["member_profile_field_policies"].help_text
     )
+
+
+@pytest.mark.django_db
+def test_direct_username_and_email_policies_expose_member_edit_paths():
+    MembershipStatus.objects.create(name="Direct Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example",
+        club_abbreviation="TEST",
+        member_profile_field_policies={"username": "direct", "email": "direct"},
+    )
+    member = Member.objects.create_user(
+        username="editable_member",
+        email="old@example.com",
+        membership_status="Direct Active",
+    )
+    client = Client()
+    client.force_login(member)
+
+    response = client.get(reverse("members:member_view", args=[member.id]))
+
+    assert response.status_code == 200
+    assert b"username/change" in response.content
+    assert b"email/change" in response.content
+
+    response = client.post(
+        reverse("members:update_username"), {"username": "renamed_member"}
+    )
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.username == "renamed_member"

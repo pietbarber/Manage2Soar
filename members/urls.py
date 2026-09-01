@@ -16,6 +16,13 @@ urlpatterns = [
     path("tinymce/", include("tinymce.urls")),
     path("<int:member_id>/view/", views.member_view, name="member_view"),
     path("<int:member_id>/vcard/", views.member_vcard, name="member_vcard"),
+    path("username/change/", views.update_username, name="update_username"),
+    path("email/change/", views.request_email_change, name="request_email_change"),
+    path(
+        "email/confirm/<str:token>/",
+        views.confirm_email_change,
+        name="confirm_email_change",
+    ),
     path(
         "<int:member_id>/contact-visibility/",
         views.update_contact_visibility,

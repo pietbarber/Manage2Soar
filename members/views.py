@@ -49,6 +49,7 @@ from .forms import (
     MemberProfilePhotoForm,
     SafetyReportForm,
     SetPasswordForm,
+    UsernameChangeForm,
 )
 from .models import (
     Badge,
@@ -333,6 +334,8 @@ def member_view(request, member_id):
         ),
         "email_change_enabled": get_member_profile_field_policy("email")
         in {"direct", "request"},
+        "username_change_enabled": get_member_profile_field_policy("username")
+        == "direct",
         "staff_contact_status": (
             [
                 {
@@ -499,6 +502,20 @@ def request_email_change(request):
         [new_email],
     )
     messages.success(request, "A confirmation link was sent to your new email address.")
+    return redirect("members:member_view", member_id=request.user.id)
+
+
+@active_member_required
+@require_http_methods(["POST"])
+def update_username(request):
+    if get_member_profile_field_policy("username") != "direct":
+        return render(request, "403.html", status=403)
+    form = UsernameChangeForm(request.POST, instance=request.user)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Your username has been updated.")
+    else:
+        messages.error(request, form.errors.get("username", ["Invalid username."])[0])
     return redirect("members:member_view", member_id=request.user.id)
 
 
