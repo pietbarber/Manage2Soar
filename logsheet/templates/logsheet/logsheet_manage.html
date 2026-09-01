@@ -2632,31 +2632,40 @@ document.addEventListener("click", async function(e) {
 <script>
   // Custom tablesort methods
   if (typeof Tablesort !== 'undefined') {
+    // Tablesort passes each comparator the *already-extracted* sort value
+    // (the data-sort attribute text, or the cell text as a fallback) — NOT
+    // the DOM cell. So we must parse the value directly rather than calling
+    // .getAttribute() on it. (See Issue #909.)
+    // Note: like tablesort's own number plugin, comparators are written
+    // descending-first (b - a) so the library's internal reversal yields the
+    // correct ascending/descending row order and arrow state.
+    function sortValueToNumber(v) {
+      if (v == null) return 0;
+      // Defensive: if a cell element is ever passed, read its data-sort/text.
+      var raw = (v.getAttribute && v.getAttribute('data-sort')) || (v.textContent) || v;
+      var n = parseInt(String(raw), 10);
+      return isNaN(n) ? 0 : n;
+    }
+
     // Custom status sort
     Tablesort.extend('status', function(item) {
       return item.search(/data-sort="[123]"/) !== -1;
     }, function(a, b) {
-      const aVal = parseInt(a.getAttribute('data-sort')) || 0;
-      const bVal = parseInt(b.getAttribute('data-sort')) || 0;
-      return aVal - bVal;
+      return sortValueToNumber(b) - sortValueToNumber(a);
     });
 
     // Custom time sort
     Tablesort.extend('time', function(item) {
       return item.search(/data-sort="\d{4}"/) !== -1;
     }, function(a, b) {
-      const aVal = parseInt(a.getAttribute('data-sort')) || 0;
-      const bVal = parseInt(b.getAttribute('data-sort')) || 0;
-      return aVal - bVal;
+      return sortValueToNumber(b) - sortValueToNumber(a);
     });
 
     // Custom duration sort
     Tablesort.extend('duration', function(item) {
       return item.search(/duration-col/) !== -1;
     }, function(a, b) {
-      const aVal = parseInt(a.getAttribute('data-sort')) || 0;
-      const bVal = parseInt(b.getAttribute('data-sort')) || 0;
-      return aVal - bVal;
+      return sortValueToNumber(b) - sortValueToNumber(a);
     });
 
     // Initialize table sorting
