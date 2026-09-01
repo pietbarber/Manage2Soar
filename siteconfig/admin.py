@@ -8,7 +8,6 @@ from duty_roster.models import DutyRoleDefinition
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
-    MEMBER_PROFILE_POLICY_FIELDS,
     ChargeableItem,
     MailingList,
     MailingListCriterion,
@@ -69,25 +68,13 @@ class SiteConfigurationAdminForm(forms.ModelForm):
         model = SiteConfiguration
         fields = "__all__"
 
-    PROFILE_POLICY_CHOICES = (("direct", "Direct"), ("disabled", "Disabled"))
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        policies = self.initial.get(
-            "member_profile_field_policies",
-            getattr(self.instance, "member_profile_field_policies", {}) or {},
+        policy_field = self.fields["member_profile_field_policies"]
+        policy_field.help_text = (
+            "JSON mapping of profile fields to Direct or Disabled. The paused "
+            "Request mode is not available."
         )
-        self.fields.pop("member_profile_field_policies", None)
-        for field_name in MEMBER_PROFILE_POLICY_FIELDS:
-            self.fields[f"profile_policy_{field_name}"] = forms.ChoiceField(
-                choices=self.PROFILE_POLICY_CHOICES,
-                label=field_name.replace("_", " ").title(),
-                initial=(
-                    policies.get(field_name, "disabled")
-                    if policies.get(field_name) in {"direct", "disabled"}
-                    else "disabled"
-                ),
-            )
         reservation_cap_field = self.fields.get("max_reservations_per_year")
         if reservation_cap_field:
             reservation_cap_field.label = "Max reservations per selected period"
@@ -223,6 +210,14 @@ class SiteConfigurationAdminForm(forms.ModelForm):
             instance.save()
         return instance
 
+    def clean_member_profile_field_policies(self):
+        policies = self.cleaned_data["member_profile_field_policies"]
+        allowed = {"direct", "disabled"}
+        return {
+            field_name: policy if policy in allowed else "disabled"
+            for field_name, policy in policies.items()
+        }
+
 
 class DutyRoleDefinitionInline(admin.TabularInline):
     model = DutyRoleDefinition
@@ -303,10 +298,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             {
                 "fields": (
                     "member_profile_self_service_enabled",
-                    *[
-                        f"profile_policy_{field_name}"
-                        for field_name in MEMBER_PROFILE_POLICY_FIELDS
-                    ],
+                    "member_profile_field_policies",
                 ),
                 "description": (
                     "Configure which profile fields members may change. Use direct for "

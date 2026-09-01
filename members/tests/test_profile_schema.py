@@ -149,8 +149,9 @@ def test_admin_profile_policy_choices_exclude_paused_request_mode():
         instance=SiteConfiguration(member_profile_field_policies={"phone": "request"})
     )
 
-    assert form.fields["profile_policy_phone"].choices == [
-        ("direct", "Direct"),
-        ("disabled", "Disabled"),
-    ]
-    assert form.fields["profile_policy_phone"].initial == "disabled"
+    form.cleaned_data = {"member_profile_field_policies": {"phone": "request"}}
+    assert form.clean_member_profile_field_policies() == {"phone": "disabled"}
+    assert (
+        "Request mode is not available"
+        in form.fields["member_profile_field_policies"].help_text
+    )
