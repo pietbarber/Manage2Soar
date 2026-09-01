@@ -2,7 +2,13 @@ import pytest
 
 from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
-from siteconfig.models import default_member_profile_field_policies
+from members.utils.membership import clear_active_membership_statuses_cache
+from siteconfig.models import (
+    MembershipStatus,
+    SiteConfiguration,
+    default_member_profile_field_policies,
+    get_member_profile_field_policy,
+)
 
 
 @pytest.mark.django_db
@@ -67,3 +73,70 @@ def test_profile_policy_defaults_are_explicit_and_safe():
     assert policies["emergency_contacts"] == "request"
     assert policies["password"] == "direct"
     assert policies["profile_photo"] == "direct"
+
+
+@pytest.mark.django_db
+def test_staff_request_and_member_submission_update_contact_information():
+    MembershipStatus.objects.create(name="Request Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    staff = Member.objects.create_user(
+        username="request_staff",
+        membership_status="Request Active",
+        member_manager=True,
+    )
+    member = Member.objects.create_user(
+        username="request_member", membership_status="Request Active"
+    )
+    staff_client = Client()
+    staff_client.force_login(staff)
+
+    response = staff_client.post(
+        reverse("members:create_profile_information_request", args=[member.id]),
+        {"phone": "1", "address": "1", "reason": "Please verify your contact details."},
+    )
+
+    assert response.status_code == 302
+    profile_request = member.profile_information_requests.get()
+    assert profile_request.requested_fields == ["phone", "address"]
+    assert profile_request.events.get(action="requested")
+
+    member_client = Client()
+    member_client.force_login(member)
+    response = member_client.post(
+        reverse(
+            "members:submit_profile_information_request", args=[profile_request.id]
+        ),
+        {"phone": "555-0199", "address": "1 Soaring Way"},
+    )
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    profile_request.refresh_from_db()
+    assert member.phone == "555-0199"
+    assert member.address == "1 Soaring Way"
+    assert profile_request.status == ProfileInformationRequest.Status.COMPLETED
+    assert profile_request.submitted_values == {
+        "phone": "555-0199",
+        "address": "1 Soaring Way",
+    }
+    assert profile_request.events.get(action="submitted")
+
+
+@pytest.mark.django_db
+def test_site_configuration_controls_profile_policy_safely():
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example",
+        club_abbreviation="TEST",
+        member_profile_field_policies={"phone": "direct", "address": "bogus"},
+    )
+
+    assert get_member_profile_field_policy("phone") == "direct"
+    assert get_member_profile_field_policy("address") == "disabled"
+    assert get_member_profile_field_policy("email") == "disabled"
+
+    config = SiteConfiguration.objects.first()
+    config.member_profile_self_service_enabled = False
+    config.save(update_fields=["member_profile_self_service_enabled"])
+
+    assert get_member_profile_field_policy("phone") == "disabled"

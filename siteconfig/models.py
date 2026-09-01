@@ -45,9 +45,14 @@ def default_member_profile_field_policies():
 
 def get_member_profile_field_policy(field):
     config = SiteConfiguration.objects.first()
-    if not config or not config.member_profile_self_service_enabled:
+    if not config:
+        # Preserve the pre-policy behavior until a site configuration exists.
+        return default_member_profile_field_policies().get(field, "disabled")
+    if not config.member_profile_self_service_enabled:
         return "disabled"
     policy = config.member_profile_field_policies.get(field, "disabled")
+    if policy not in {"direct", "request", "disabled"}:
+        return "disabled"
     if field in {"password", "profile_photo"} and policy == "request":
         return "disabled"
     return policy

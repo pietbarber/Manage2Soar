@@ -37,7 +37,7 @@ from siteconfig.forms import (
     VisitingPilotReturningUpdateForm,
     VisitingPilotSignupForm,
 )
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .decorators import active_member_required
@@ -247,6 +247,7 @@ def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     is_self = request.user == member
     can_edit = is_self or request.user.is_superuser
+    profile_photo_policy = get_member_profile_field_policy("profile_photo")
 
     # Decide whether to show solo/checkride buttons
     show_need_buttons = member.glider_rating not in ("private", "commercial")
@@ -301,14 +302,20 @@ def member_view(request, member_id):
     )
     member_badges = suppress_member_badge_legs(member_badges_qs)
 
-    if is_self and request.method == "POST":
+    if is_self and request.method == "POST" and profile_photo_policy == "direct":
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
             form.save()
             messages.success(request, "Profile photo updated.")
             return redirect("members:member_view", member_id=member.pk)
+    elif is_self and request.method == "POST":
+        return render(request, "403.html", status=403)
     else:
-        form = MemberProfilePhotoForm(instance=member) if is_self else None
+        form = (
+            MemberProfilePhotoForm(instance=member)
+            if is_self and profile_photo_policy == "direct"
+            else None
+        )
 
     context = {
         "member": member,
@@ -318,7 +325,14 @@ def member_view(request, member_id):
         "can_view_email": contact_visibility["email"],
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
-        "privacy_sharing": contact_visibility if is_self else None,
+        "privacy_sharing": (
+            contact_visibility
+            if is_self
+            and get_member_profile_field_policy("contact_visibility") == "direct"
+            else None
+        ),
+        "email_change_enabled": get_member_profile_field_policy("email")
+        in {"direct", "request"},
         "staff_contact_status": (
             [
                 {
@@ -373,7 +387,155 @@ def member_vcard(request, member_id):
 
 @active_member_required
 @require_http_methods(["POST"])
+def create_profile_information_request(request, member_id):
+    if not is_privileged_viewer(request.user):
+        return render(request, "403.html", status=403)
+    member = get_object_or_404(Member, pk=member_id)
+    fields = [field for field in ("phone", "address") if request.POST.get(field)]
+    if not fields:
+        messages.error(request, "Select at least one contact field to request.")
+        return redirect("members:member_view", member_id=member.id)
+    profile_request = ProfileInformationRequest.objects.create(
+        member=member,
+        requested_by=request.user,
+        origin=ProfileInformationRequest.Origin.STAFF_REQUEST,
+        requested_fields=fields,
+        reason=request.POST.get("reason", "").strip(),
+    )
+    ProfileInformationRequestEvent.objects.create(
+        request=profile_request,
+        actor=request.user,
+        action="requested",
+        details={"fields": fields},
+    )
+    if Notification is not None:
+        Notification.objects.create(
+            user=member,
+            message="A staff member requested updated contact information.",
+            url=reverse("members:member_view", args=[member.id]),
+        )
+    messages.success(request, "Contact information request sent to the member.")
+    return redirect("members:member_view", member_id=member.id)
+
+
+@active_member_required
+@require_http_methods(["POST"])
+def submit_profile_information_request(request, request_id):
+    profile_request = get_object_or_404(
+        ProfileInformationRequest,
+        pk=request_id,
+        member=request.user,
+        status=ProfileInformationRequest.Status.REQUESTED,
+    )
+    supported_fields = {"phone", "address"}
+    submitted_values = {
+        field: request.POST.get(field, "").strip()
+        for field in profile_request.requested_fields
+        if field in supported_fields
+    }
+    for field, value in submitted_values.items():
+        setattr(request.user, field, value)
+    if submitted_values:
+        request.user.save(update_fields=list(submitted_values))
+    profile_request.submitted_values = submitted_values
+    profile_request.submitted_at = timezone.now()
+    profile_request.status = ProfileInformationRequest.Status.COMPLETED
+    profile_request.save(
+        update_fields=["submitted_values", "submitted_at", "status", "updated_at"]
+    )
+    ProfileInformationRequestEvent.objects.create(
+        request=profile_request,
+        actor=request.user,
+        action="submitted",
+        details={"fields": list(submitted_values)},
+    )
+    if profile_request.requested_by and Notification is not None:
+        Notification.objects.create(
+            user=profile_request.requested_by,
+            message=f"{request.user.full_display_name} submitted requested contact information.",
+            url=reverse("members:member_view", args=[request.user.id]),
+        )
+    messages.success(request, "Your requested contact information was submitted.")
+    return redirect("members:member_view", member_id=request.user.id)
+
+
+@active_member_required
+@require_http_methods(["POST"])
+def request_email_change(request):
+    if get_member_profile_field_policy("email") == "disabled":
+        return render(request, "403.html", status=403)
+    new_email = request.POST.get("email", "").strip().lower()
+    try:
+        new_email = forms.EmailField().clean(new_email)
+    except ValidationError:
+        messages.error(request, "Enter a valid email address.")
+        return redirect("members:member_view", member_id=request.user.id)
+    if new_email == request.user.email.lower():
+        messages.info(request, "That is already your current email address.")
+        return redirect("members:member_view", member_id=request.user.id)
+    if (
+        Member.objects.filter(email__iexact=new_email)
+        .exclude(pk=request.user.pk)
+        .exists()
+    ):
+        messages.error(request, "That email address is already in use.")
+        return redirect("members:member_view", member_id=request.user.id)
+
+    request.user.pending_email = new_email
+    request.user.pending_email_requested_at = timezone.now()
+    request.user.save(update_fields=["pending_email", "pending_email_requested_at"])
+    token = signing.dumps(
+        {"member_id": request.user.pk, "email": new_email},
+        salt="members.email-change",
+    )
+    confirmation_url = request.build_absolute_uri(
+        reverse("members:confirm_email_change", args=[token])
+    )
+    send_mail(
+        "Confirm your Manage2Soar email address",
+        f"Confirm your new email address by visiting:\n\n{confirmation_url}\n\n"
+        "This link expires in 24 hours.",
+        settings.DEFAULT_FROM_EMAIL,
+        [new_email],
+    )
+    messages.success(request, "A confirmation link was sent to your new email address.")
+    return redirect("members:member_view", member_id=request.user.id)
+
+
+@require_http_methods(["GET"])
+def confirm_email_change(request, token):
+    try:
+        data = signing.loads(
+            token, salt="members.email-change", max_age=EMAIL_CHANGE_TOKEN_MAX_AGE
+        )
+    except signing.BadSignature:
+        return render(request, "403.html", status=403)
+    member = get_object_or_404(Member, pk=data.get("member_id"))
+    if member.pending_email != data.get("email"):
+        return render(request, "403.html", status=403)
+    if (
+        Member.objects.filter(email__iexact=member.pending_email)
+        .exclude(pk=member.pk)
+        .exists()
+    ):
+        member.pending_email = ""
+        member.pending_email_requested_at = None
+        member.save(update_fields=["pending_email", "pending_email_requested_at"])
+        messages.error(request, "That email address is no longer available.")
+        return redirect("members:member_view", member_id=member.id)
+    member.email = member.pending_email
+    member.pending_email = ""
+    member.pending_email_requested_at = None
+    member.save(update_fields=["email", "pending_email", "pending_email_requested_at"])
+    messages.success(request, "Your email address has been updated.")
+    return redirect("members:member_view", member_id=member.id)
+
+
+@active_member_required
+@require_http_methods(["POST"])
 def update_contact_visibility(request, member_id):
+    if get_member_profile_field_policy("contact_visibility") != "direct":
+        return render(request, "403.html", status=403)
     member = get_object_or_404(Member, pk=member_id)
     if request.user != member:
         return render(request, "403.html", status=403)
@@ -590,7 +752,10 @@ def biography_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     biography, _ = Biography.objects.get_or_create(member=member)
 
-    can_edit = request.user == member or request.user.is_superuser
+    can_edit = request.user.is_superuser or (
+        request.user == member
+        and get_member_profile_field_policy("biography") == "direct"
+    )
 
     if request.method == "POST" and can_edit:
         form = BiographyForm(request.POST, request.FILES, instance=biography)
@@ -660,6 +825,8 @@ def home(request):
 
 @active_member_required
 def set_password(request):
+    if get_member_profile_field_policy("password") != "direct":
+        return render(request, "403.html", status=403)
     member = request.user
     if request.method == "POST":
         form = SetPasswordForm(request.POST)

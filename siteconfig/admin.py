@@ -201,6 +201,20 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Member Profile Self-Service",
+            {
+                "fields": (
+                    "member_profile_self_service_enabled",
+                    "member_profile_field_policies",
+                ),
+                "description": (
+                    "Configure which profile fields members may change. Use direct for "
+                    "immediate changes, request for a future approval workflow, or "
+                    "disabled to prevent member changes."
+                ),
+            },
+        ),
+        (
             "Scheduling Options",
             {
                 "fields": (
