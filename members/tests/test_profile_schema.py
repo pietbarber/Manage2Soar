@@ -3,6 +3,7 @@ import pytest
 from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
 from members.utils.membership import clear_active_membership_statuses_cache
+from siteconfig.admin import SiteConfigurationAdminForm
 from siteconfig.models import (
     MembershipStatus,
     SiteConfiguration,
@@ -140,3 +141,16 @@ def test_site_configuration_controls_profile_policy_safely():
     config.save(update_fields=["member_profile_self_service_enabled"])
 
     assert get_member_profile_field_policy("phone") == "disabled"
+
+
+@pytest.mark.django_db
+def test_admin_profile_policy_choices_exclude_paused_request_mode():
+    form = SiteConfigurationAdminForm(
+        instance=SiteConfiguration(member_profile_field_policies={"phone": "request"})
+    )
+
+    assert form.fields["profile_policy_phone"].choices == [
+        ("direct", "Direct"),
+        ("disabled", "Disabled"),
+    ]
+    assert form.fields["profile_policy_phone"].initial == "disabled"

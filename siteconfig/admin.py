@@ -8,6 +8,7 @@ from duty_roster.models import DutyRoleDefinition
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
+    MEMBER_PROFILE_POLICY_FIELDS,
     ChargeableItem,
     MailingList,
     MailingListCriterion,
@@ -68,8 +69,25 @@ class SiteConfigurationAdminForm(forms.ModelForm):
         model = SiteConfiguration
         fields = "__all__"
 
+    PROFILE_POLICY_CHOICES = (("direct", "Direct"), ("disabled", "Disabled"))
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        policies = self.initial.get(
+            "member_profile_field_policies",
+            getattr(self.instance, "member_profile_field_policies", {}) or {},
+        )
+        self.fields.pop("member_profile_field_policies", None)
+        for field_name in MEMBER_PROFILE_POLICY_FIELDS:
+            self.fields[f"profile_policy_{field_name}"] = forms.ChoiceField(
+                choices=self.PROFILE_POLICY_CHOICES,
+                label=field_name.replace("_", " ").title(),
+                initial=(
+                    policies.get(field_name, "disabled")
+                    if policies.get(field_name) in {"direct", "disabled"}
+                    else "disabled"
+                ),
+            )
         reservation_cap_field = self.fields.get("max_reservations_per_year")
         if reservation_cap_field:
             reservation_cap_field.label = "Max reservations per selected period"
@@ -124,6 +142,86 @@ class SiteConfigurationAdminForm(forms.ModelForm):
                 label=visiting_pilot_status_field.label,
                 help_text=visiting_pilot_status_field.help_text,
             )
+
+        # Initialize preset toggle based on whether any non-specific preset is enabled.
+        configured = getattr(self.instance, "glider_reservation_time_preferences", None)
+        configured_periods = configured or [
+            v for v, _ in GliderReservation.TIME_PREFERENCE_CHOICES
+        ]
+        presets_enabled = any(period != "specific" for period in configured_periods)
+        self.fields["glider_reservation_presets_mode"].initial = presets_enabled
+
+        # If presets disabled, hide time-range inputs server-side for clarity
+        if not presets_enabled:
+            for period in self.RESERVATION_TIME_RANGE_FIELDS:
+                self.fields[f"glider_reservation_{period}_start"].widget = (
+                    forms.HiddenInput()
+                )
+                self.fields[f"glider_reservation_{period}_end"].widget = (
+                    forms.HiddenInput()
+                )
+
+        configured_ranges = (
+            getattr(self.instance, "glider_reservation_time_ranges", None)
+            or default_glider_reservation_time_ranges()
+        )
+        for period in self.RESERVATION_TIME_RANGE_FIELDS:
+            range_config = configured_ranges.get(period, {})
+            self.fields[f"glider_reservation_{period}_start"].initial = (
+                range_config.get("start")
+            )
+            self.fields[f"glider_reservation_{period}_end"].initial = range_config.get(
+                "end"
+            )
+
+    def clean_glider_reservation_time_preferences(self):
+        return self.cleaned_data["glider_reservation_time_preferences"]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        presets_enabled = cleaned_data.get("glider_reservation_presets_mode")
+        if not presets_enabled:
+            cleaned_data["glider_reservation_time_preferences"] = ["specific"]
+        elif not cleaned_data.get("glider_reservation_time_preferences"):
+            raise forms.ValidationError("Select at least one reservation time period.")
+
+        selected_periods = set(
+            cleaned_data.get("glider_reservation_time_preferences") or []
+        )
+
+        ranges = {}
+        for period in self.RESERVATION_TIME_RANGE_FIELDS:
+            start_value = cleaned_data.get(f"glider_reservation_{period}_start")
+            end_value = cleaned_data.get(f"glider_reservation_{period}_end")
+            if period in selected_periods and (not start_value or not end_value):
+                raise forms.ValidationError(
+                    f"{period.title()} reservations need both a start and end time."
+                )
+            if start_value and end_value:
+                if end_value <= start_value:
+                    raise forms.ValidationError(
+                        f"{period.title()} reservation end time must be after the start time."
+                    )
+                ranges[period] = {
+                    "start": start_value.strftime("%H:%M"),
+                    "end": end_value.strftime("%H:%M"),
+                }
+
+        cleaned_data["glider_reservation_time_ranges"] = ranges
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.glider_reservation_time_ranges = self.cleaned_data.get(
+            "glider_reservation_time_ranges", {}
+        )
+        instance.member_profile_field_policies = {
+            field_name: self.cleaned_data[f"profile_policy_{field_name}"]
+            for field_name in MEMBER_PROFILE_POLICY_FIELDS
+        }
+        if commit:
+            instance.save()
+        return instance
 
 
 class DutyRoleDefinitionInline(admin.TabularInline):
@@ -205,7 +303,10 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             {
                 "fields": (
                     "member_profile_self_service_enabled",
-                    "member_profile_field_policies",
+                    *[
+                        f"profile_policy_{field_name}"
+                        for field_name in MEMBER_PROFILE_POLICY_FIELDS
+                    ],
                 ),
                 "description": (
                     "Configure which profile fields members may change. Use direct for "

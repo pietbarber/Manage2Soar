@@ -51,7 +51,7 @@ def get_member_profile_field_policy(field):
     if not config.member_profile_self_service_enabled:
         return "disabled"
     policy = config.member_profile_field_policies.get(field, "disabled")
-    if policy not in {"direct", "request", "disabled"}:
+    if policy not in {"direct", "disabled"}:
         return "disabled"
     if field in {"password", "profile_photo"} and policy == "request":
         return "disabled"
