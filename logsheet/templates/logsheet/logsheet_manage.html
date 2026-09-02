@@ -2626,57 +2626,12 @@ document.addEventListener("click", async function(e) {
 
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
-  <!-- Tablesort: shared CDN + initializer included in base.html now -->
-
+<!-- Tablesort registration/initialization lives in the extra_scripts block
+     below. base.html loads the single vendored tablesort copy AFTER the
+     content block, so the extend()+init() must run there — registering in this
+     content script bound to a different/earlier instance whose method registry
+     the flights-table never saw (Issue #909). -->
 <script>
-  // Custom tablesort methods
-  if (typeof Tablesort !== 'undefined') {
-    // Tablesort passes each comparator the *already-extracted* sort value
-    // (the data-sort attribute text, or the cell text as a fallback) — NOT
-    // the DOM cell. So we must parse the value directly rather than calling
-    // .getAttribute() on it. (See Issue #909.)
-    // Note: like tablesort's own number plugin, comparators are written
-    // descending-first (b - a) so the library's internal reversal yields the
-    // correct ascending/descending row order and arrow state.
-    function sortValueToNumber(v) {
-      if (v == null) return 0;
-      // Defensive: if a cell element is ever passed, read its data-sort/text.
-      var raw = (v.getAttribute && v.getAttribute('data-sort')) || (v.textContent) || v;
-      var n = parseInt(String(raw), 10);
-      return isNaN(n) ? 0 : n;
-    }
-
-    // Custom status sort
-    Tablesort.extend('status', function(item) {
-      return item.search(/data-sort="[123]"/) !== -1;
-    }, function(a, b) {
-      return sortValueToNumber(b) - sortValueToNumber(a);
-    });
-
-    // Custom time sort
-    Tablesort.extend('time', function(item) {
-      return item.search(/data-sort="\d{4}"/) !== -1;
-    }, function(a, b) {
-      return sortValueToNumber(b) - sortValueToNumber(a);
-    });
-
-    // Custom duration sort
-    Tablesort.extend('duration', function(item) {
-      return item.search(/duration-col/) !== -1;
-    }, function(a, b) {
-      return sortValueToNumber(b) - sortValueToNumber(a);
-    });
-
-    // Initialize table sorting
-    document.addEventListener('DOMContentLoaded', function() {
-      const table = document.querySelector('[data-sort]');
-      if (table) {
-        new Tablesort(table);
-      }
-    });
-  }
-
   // Live duration updates for flying aircraft - re-cache elements each update for dynamic flights
   function updateLiveDurations() {
     const now = new Date();
@@ -2733,4 +2688,65 @@ document.addEventListener("click", async function(e) {
   });
 </script>
 
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Custom tablesort methods for the flights table.
+  //
+  // This block (extra_scripts) runs AFTER base.html has loaded the single
+  // vendored tablesort copy, so `Tablesort` here is the same instance whose
+  // method registry the flights-table actually consults. (Registering these in
+  // the content block — which renders before base.html's tablesort <script> —
+  // bound them to a different/earlier instance and had no effect, Issue #909.)
+  //
+  // Notes:
+  //  - Comparators receive the *already-extracted* sort value (the data-sort
+  //    attribute text, or the cell text as a fallback) — NOT the DOM cell — so
+  //    we parse the value directly rather than calling .getAttribute() on it.
+  //  - Like tablesort's own number plugin, comparators are written
+  //    descending-first (b - a) so the library's internal reversal yields the
+  //    correct ascending/descending row order and arrow state.
+  if (typeof Tablesort !== 'undefined') {
+    function sortValueToNumber(v) {
+      if (v == null) return 0;
+      // Defensive: if a cell element is ever passed, read its data-sort/text.
+      var raw = (v.getAttribute && v.getAttribute('data-sort')) || (v.textContent) || v;
+      var n = parseInt(String(raw), 10);
+      return isNaN(n) ? 0 : n;
+    }
+
+    // Pattern functions receive the *extracted sort value* (the same string
+    // passed to the comparators above) — not an HTML snippet. So they validate
+    // the value itself: status is 1-3, time is a 4-digit HHMM, duration is an
+    // integer number of seconds.
+    // Custom status sort
+    Tablesort.extend('status', function(item) {
+      return /^[123]$/.test(String(item));
+    }, function(a, b) {
+      return sortValueToNumber(b) - sortValueToNumber(a);
+    });
+
+    // Custom time sort
+    Tablesort.extend('time', function(item) {
+      return /^\d{4}$/.test(String(item));
+    }, function(a, b) {
+      return sortValueToNumber(b) - sortValueToNumber(a);
+    });
+
+    // Custom duration sort
+    Tablesort.extend('duration', function(item) {
+      return /^\d+$/.test(String(item));
+    }, function(a, b) {
+      var ra = sortValueToNumber(a), rb = sortValueToNumber(b);
+      return rb - ra;
+    });
+
+    // Initialize table sorting
+    const table = document.querySelector('[data-sort]');
+    if (table) {
+      new Tablesort(table);
+    }
+  }
+</script>
 {% endblock %}
