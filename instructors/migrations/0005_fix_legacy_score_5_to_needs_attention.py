@@ -2,12 +2,15 @@
 #
 # Data Migration: Fix Legacy Score "5" → "!" (Needs Attention)
 #
-# Context: Legacy import (Jan 2026) failed to translate score "5" from the old system
-# to the new system's "!" (Needs Attention) score. This migration corrects all 131
-# orphaned score "5" records in the database by converting them to "!".
+# Context: The Jan 2026 legacy import copied the old system's numeric mode values
+# directly into LessonScore. The production audit for Issue #1001 found 131 such
+# records, all predating that import, and confirmed that legacy "5" represents the
+# old system's Needs Attention state. The current schema reserves numeric values
+# 1-4 for proficiency and uses "!" for Needs Attention, so those records are
+# normalized to "!" here. No current form accepts "5".
 #
-# Backup: Database backup completed before migration:
-#   gs://m2s-database-backups-manage2soar/postgresql/m2s_all_2026-09-03_210727.sql.enc
+# Operational note: Take and verify the applicable tenant database backup before
+# applying this forward-only data migration.
 #
 # See: Issue #1001 - Training grid Max showing blank for out-of-scale scores
 
