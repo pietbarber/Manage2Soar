@@ -85,12 +85,13 @@ except ImportError:
     # guarded by checks for Notification is not None.
     Notification = None
 
-# The only score values the training grid is allowed to display/rank.
+# The only score values that can be ranked as the "Max" score in training grids.
 # Derived from the model choices so this stays in sync with SCORE_CHOICES
 # (currently "1"–"4" and "!"). Out-of-scale values (e.g. a legacy "5" from
-# an older scoring scale) must never win the Max cell, because the template
-# has no branch to render them and they would silently display as a blank
-# em-dash (see Issue #1001, row 2j).
+# an older scoring scale) must never win the Max cell. The template has a
+# defensive fallback that renders unexpected values as escaped text rather
+# than silently displaying them as blank. This constraint ensures only valid
+# scores compete for the Max ranking (see Issue #1001).
 VALID_SCORE_VALUES = frozenset(value for value, _label in SCORE_CHOICES)
 
 
