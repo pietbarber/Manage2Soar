@@ -17,25 +17,24 @@ from django.db import migrations
 def fix_legacy_score_5_to_needs_attention(apps, schema_editor):
     """Convert all legacy score '5' to '!' (Needs Attention)."""
     LessonScore = apps.get_model("instructors", "LessonScore")
+    GroundLessonScore = apps.get_model("instructors", "GroundLessonScore")
+    db_alias = schema_editor.connection.alias
 
-    # Count records before migration
-    count_before = LessonScore.objects.filter(score="5").count()
+    lesson_scores = LessonScore.objects.using(db_alias).filter(score="5")
+    ground_lesson_scores = GroundLessonScore.objects.using(db_alias).filter(score="5")
 
-    if count_before > 0:
-        # Update all score "5" to "!" (Needs Attention)
-        updated_count, _ = LessonScore.objects.filter(score="5").update(score="!")
+    lesson_scores.update(score="!")
+    ground_lesson_scores.update(score="!")
 
-        # Verify the update
-        count_after = LessonScore.objects.filter(score="5").count()
-        if count_after != 0:
-            raise RuntimeError(
-                f"Migration failed: {count_after} score '5' records still exist after update"
-            )
-
-        print(
-            f"\n✅ Successfully migrated {updated_count} legacy score '5' records to '!' (Needs Attention)")
-    else:
-        print("\n✓ No score '5' records found to migrate")
+    remaining_lesson_scores = lesson_scores.count()
+    remaining_ground_lesson_scores = ground_lesson_scores.count()
+    if remaining_lesson_scores or remaining_ground_lesson_scores:
+        raise RuntimeError(
+            "Migration failed: "
+            f"{remaining_lesson_scores} LessonScore and "
+            f"{remaining_ground_lesson_scores} GroundLessonScore records "
+            "with score '5' remain after update"
+        )
 
 
 class Migration(migrations.Migration):
