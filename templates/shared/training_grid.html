@@ -172,6 +172,11 @@
             {% elif row.max_score == "!" %}
               <img src="{% static 'images/blob5.png' %}" alt="Needs attention">
               <span class="print-score-text">!</span>
+            {% elif row.max_score %}
+              {# Defensive fallback: an unexpected score value should still be
+                 visible (as escaped text) rather than silently rendering as
+                 a blank em-dash. See Issue #1001, row 2j. #}
+              <span class="print-score-text">{{ row.max_score }}</span>
             {% else %}
               &mdash;
             {% endif %}

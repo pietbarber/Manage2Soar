@@ -470,3 +470,46 @@ class TestTrainingGridMultipleInstructors(TestCase):
         )
         assert lesson_row is not None
         assert lesson_row["max_score"] == "3"
+
+    def test_training_grid_max_ignores_out_of_scale_score(self):
+        """
+        Issue #1001: an out-of-scale score value (e.g. a legacy "5" from an
+        older 1-5 scoring scale) must NOT win the Max cell.
+
+        With the old `score_rank` (which only checked `.isdigit()`), a "5"
+        ranked highest and became the max, but the template has no branch to
+        render "5", so the Max cell silently displayed as a blank em-dash.
+        The Max must instead show the highest *valid* score (here "3").
+        """
+        report = InstructionReport.objects.get(
+            student=self.student,
+            instructor=self.instructor1,
+            report_date=self.log_date,
+        )
+        # A valid score on the saved report column.
+        LessonScore.objects.create(report=report, lesson=self.lesson, score="3")
+
+        # An out-of-scale legacy score from another instructor's report.
+        out_of_scale_date = self.log_date - timedelta(days=6)
+        other_report = InstructionReport.objects.create(
+            student=self.student,
+            instructor=self.instructor2,
+            report_date=out_of_scale_date,
+        )
+        LessonScore.objects.create(report=other_report, lesson=self.lesson, score="5")
+
+        self.client.force_login(self.student)
+        url = reverse("instructors:member_training_grid", args=[self.student.id])
+        response = self.client.get(url)
+
+        lesson_row = next(
+            (
+                row
+                for row in response.context["lesson_data"]
+                if row["lesson_id"] == self.lesson.id
+            ),
+            None,
+        )
+        assert lesson_row is not None
+        # The out-of-scale "5" must be ignored; the best valid score is "3".
+        assert lesson_row["max_score"] == "3"
