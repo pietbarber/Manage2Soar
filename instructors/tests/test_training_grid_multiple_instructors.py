@@ -476,10 +476,11 @@ class TestTrainingGridMultipleInstructors(TestCase):
         Issue #1001: an out-of-scale score value (e.g. a legacy "5" from an
         older 1-5 scoring scale) must NOT win the Max cell.
 
-        With the old `score_rank` (which only checked `.isdigit()`), a "5"
-        ranked highest and became the max, but the template has no branch to
-        render "5", so the Max cell silently displayed as a blank em-dash.
-        The Max must instead show the highest *valid* score (here "3").
+        VALID_SCORE_VALUES constrains which scores can be ranked as the Max.
+        Even if a "5" score exists in the database, the score_rank() function
+        only ranks scores in VALID_SCORE_VALUES ("1", "2", "3", "4", "!").
+        This ensures the Max cell shows the highest *valid* score (here "3"),
+        not the out-of-scale "5".
         """
         report = InstructionReport.objects.get(
             student=self.student,

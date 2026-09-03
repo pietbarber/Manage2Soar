@@ -17,39 +17,25 @@ from django.db import migrations
 def fix_legacy_score_5_to_needs_attention(apps, schema_editor):
     """Convert all legacy score '5' to '!' (Needs Attention)."""
     LessonScore = apps.get_model("instructors", "LessonScore")
-    
+
     # Count records before migration
     count_before = LessonScore.objects.filter(score="5").count()
-    
+
     if count_before > 0:
         # Update all score "5" to "!" (Needs Attention)
         updated_count, _ = LessonScore.objects.filter(score="5").update(score="!")
-        
+
         # Verify the update
         count_after = LessonScore.objects.filter(score="5").count()
-        assert count_after == 0, f"Migration failed: {count_after} score '5' records still exist"
-        
-        print(f"\n✅ Successfully migrated {updated_count} legacy score '5' records to '!' (Needs Attention)")
+        if count_after != 0:
+            raise RuntimeError(
+                f"Migration failed: {count_after} score '5' records still exist after update"
+            )
+
+        print(
+            f"\n✅ Successfully migrated {updated_count} legacy score '5' records to '!' (Needs Attention)")
     else:
         print("\n✓ No score '5' records found to migrate")
-
-
-def reverse_legacy_score_5_migration(apps, schema_editor):
-    """Reverse: Convert '!' back to '5' (only those migrated in this batch)."""
-    # NOTE: This reverse function is a safety net only. In production, we would NOT
-    # actually reverse this migration. If reversal is needed, restore from backup:
-    # gs://m2s-database-backups-manage2soar/postgresql/m2s_all_2026-09-03_210727.sql.enc
-    
-    LessonScore = apps.get_model("instructors", "LessonScore")
-    
-    # We cannot reliably reverse this without knowing which "!" values were originally "5",
-    # so we log a warning and skip the reverse.
-    count_exclamation = LessonScore.objects.filter(score="!").count()
-    
-    print(f"\n⚠️  Reverse migration for score '5' → '!' is not supported.")
-    print(f"   If rollback is needed, restore from backup:")
-    print(f"   gs://m2s-database-backups-manage2soar/postgresql/m2s_all_2026-09-03_210727.sql.enc")
-    print(f"   Current '!' records in database: {count_exclamation}")
 
 
 class Migration(migrations.Migration):
@@ -61,6 +47,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(
             fix_legacy_score_5_to_needs_attention,
-            reverse_legacy_score_5_migration,
+            migrations.RunPython.noop,
         ),
     ]
