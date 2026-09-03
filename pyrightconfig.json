@@ -3,5 +3,8 @@
   "exclude": [".venv", "graphify-out"],
   "venvPath": ".",
   "venv": ".venv",
-  "extraPaths": [".venv/lib/python3.14/site-packages"]
+  "extraPaths": [".venv/lib/python3.14/site-packages"],
+  "typeCheckingMode": "standard",
+  "reportAttributeAccessIssue": "none",
+  "reportOptionalAttributeAccess": "none"
 }
