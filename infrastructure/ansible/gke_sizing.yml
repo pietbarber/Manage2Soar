@@ -13,9 +13,9 @@
 #   change to node sizing now goes through a pull request, exactly as the
 #   project's IaC-first + PR-mandatory policy requires.
 #
-# PRECEDENCE (Ansible 2.20): play `vars_files` (rank 14) beats inventory vars
-# (rank 3-7) and role defaults, so the values here win. To change sizing, edit
-# THIS file and open a PR — do not edit the gitignored inventory.
+# PRECEDENCE: play `vars_files` overrides inventory vars and role defaults, so the
+# values here win over the gitignored inventory. Note: extra-vars (-e) still take
+# precedence if explicitly provided at runtime.
 #
 # ROLLBACK: change the values back to the previous numbers and open a PR; the
 # provision playbook is idempotent and will scale the cluster back down/up.
