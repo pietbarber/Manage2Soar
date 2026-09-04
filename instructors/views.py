@@ -41,6 +41,7 @@ from instructors.forms import (
     SyllabusDocumentForm,
 )
 from instructors.models import (
+    SCORE_CHOICES,
     ClubQualificationType,
     GroundInstruction,
     GroundLessonScore,
@@ -83,6 +84,15 @@ except ImportError:
     # available, fall back to None and make notification-related code
     # guarded by checks for Notification is not None.
     Notification = None
+
+# The only score values that can be ranked as the "Max" score in training grids.
+# Derived from the model choices so this stays in sync with SCORE_CHOICES
+# (currently "1"–"4" and "!"). Out-of-scale values (e.g. a legacy "5" from
+# an older scoring scale) must never win the Max cell. The template has a
+# defensive fallback that renders unexpected values as escaped text rather
+# than silently displaying them as blank. This constraint ensures only valid
+# scores compete for the Max ranking (see Issue #1001).
+VALID_SCORE_VALUES = frozenset(value for value, _label in SCORE_CHOICES)
 
 
 @active_member_required
@@ -584,10 +594,12 @@ def member_training_grid(request, member_id):
     lessons = TrainingLesson.objects.all().order_by("sort_key")
 
     def score_rank(score):
-        if score and score.isdigit():
+        if score and score.isdigit() and score in VALID_SCORE_VALUES:
             return (2, int(score))
         if score == "!":
             return (1, 0)
+        if score:
+            return (0, 1)
         return (0, 0)
 
     def pick_best_score(current_score, candidate_score):

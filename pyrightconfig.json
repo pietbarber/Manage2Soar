@@ -1,7 +1,24 @@
 {
-  "include": ["members", "manage2soar", "utils"],
-  "exclude": [".venv", "graphify-out"],
+  "include": [
+    "members",
+    "manage2soar",
+    "utils",
+    "instructors"
+  ],
+  "exclude": [
+    ".venv",
+    "graphify-out",
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.git",
+    "**/.pytest_cache",
+    "**/.mypy_cache",
+    "**/.*"
+  ],
   "venvPath": ".",
   "venv": ".venv",
-  "extraPaths": [".venv/lib/python3.14/site-packages"]
+  "typeCheckingMode": "standard",
+  "reportAttributeAccessIssue": "none",
+  "reportOptionalAttributeAccess": "none",
+  "reportMissingDefaultExcludes": "none"
 }
