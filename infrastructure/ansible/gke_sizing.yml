@@ -26,18 +26,18 @@
 # ============================================================
 
 # Initial node count.
-#   Phase 1 (Issue #1042): 2 -> 1. The cluster hosts 5 tenants
-#   (ssc, hh busy; masa, svs idle; demo canary) sharing one node pool with
-#   autoscaling enabled. One node is the steady-state minimum; the autoscaler
-#   adds nodes under load. gke_min_nodes remains 1, so this does not remove
-#   any availability floor.
+#   Phase 1 (Issue #1042): 2 -> 1. This multi-tenant cluster shares one node
+#   pool with autoscaling enabled, so a single node is the steady-state
+#   minimum and the autoscaler adds nodes under load. gke_min_nodes remains
+#   1, so this does not remove the availability floor. Revisit if the tenant
+#   or workload footprint grows.
 gke_initial_node_count: 1
 
 # Autoscaling window.
 #   gke_enable_autoscaling: kept true (already set in inventory).
 #   gke_min_nodes: unchanged at 1 (single-node floor, spot VMs enabled).
-#   Phase 1 (Issue #1042): gke_max_nodes 5 -> 3. Ceiling of 3 is sufficient
-#   for the current 2-replica-per-tenant workload; autoscaler will scale up
-#   to 3 under peak load and back down when idle.
+#   Phase 1 (Issue #1042): gke_max_nodes 5 -> 3. Lower ceiling reduces
+#   idle-capacity cost while still allowing the autoscaler to scale up under
+#   peak load and back down when idle. Revisit the ceiling as workloads grow.
 gke_min_nodes: 1
 gke_max_nodes: 3
