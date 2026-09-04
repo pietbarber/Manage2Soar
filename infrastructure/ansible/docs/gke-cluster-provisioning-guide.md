@@ -116,11 +116,13 @@ Full control over nodes, node pools, and scaling. You pay for VM instances (can 
 ```yaml
 gke_cluster_type: "standard"
 gke_machine_type: "e2-medium"
-gke_initial_node_count: 2
+gke_initial_node_count: 1   # from gke_sizing.yml (Phase 1 of #1042)
 gke_enable_autoscaling: true
 gke_min_nodes: 1
-gke_max_nodes: 5
+gke_max_nodes: 3            # from gke_sizing.yml (Phase 1 of #1042)
 ```
+
+> **Node sizing source of truth:** `gke_initial_node_count`, `gke_min_nodes`, and `gke_max_nodes` are defined in the committed [`gke_sizing.yml`](../gke_sizing.yml) file (next to `playbooks/`), which the playbook imports via play-level `vars_files`. It takes precedence over the gitignored `inventory/gcp_cluster.yml`. Edit `gke_sizing.yml` and open a PR to change node sizing — see [Phase 1 of #1042](https://github.com/pietbarber/Manage2Soar/issues/1042).
 
 **Pros:**
 - Full control over node configuration
@@ -239,7 +241,7 @@ Notes:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `gke_cluster_type` | `"standard"` | Cluster type: `standard` or `autopilot` |
-| `gke_initial_node_count` | `2` | Initial nodes (Standard only) |
+| `gke_initial_node_count` | `1` (from `gke_sizing.yml`) | Initial nodes (Standard only) |
 | `gke_machine_type` | `"e2-medium"` | Node machine type |
 | `gke_disk_size_gb` | `50` | Node disk size |
 | `gke_disk_type` | `"pd-standard"` | Disk type |
@@ -249,9 +251,11 @@ Notes:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `gke_enable_autoscaling` | `true` | Enable node autoscaling |
-| `gke_min_nodes` | `1` | Minimum nodes |
-| `gke_max_nodes` | `5` | Maximum nodes |
+| `gke_min_nodes` | `1` (from `gke_sizing.yml`) | Minimum nodes |
+| `gke_max_nodes` | `3` (from `gke_sizing.yml`) | Maximum nodes |
 | `gke_use_spot_vms` | `false` | Use spot/preemptible VMs |
+
+> Node counts (`gke_initial_node_count`, `gke_min_nodes`, `gke_max_nodes`) are set in [`gke_sizing.yml`](../gke_sizing.yml) — the committed source of truth (Phase 1 of #1042) — which overrides the gitignored inventory.
 
 ### Networking
 
