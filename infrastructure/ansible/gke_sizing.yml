@@ -1,0 +1,43 @@
+# GKE Cluster Node Sizing — REVIEWABLE SOURCE OF TRUTH
+#
+# This file is COMMITTED to version control and is the single source of truth
+# for GKE node pool sizing. It is imported (via play-level `vars_files`) by
+# playbooks/gcp-cluster-provision.yml so that its values take precedence over
+# the local, gitignored inventory file (inventory/gcp_cluster.yml).
+#
+# WHY THIS FILE EXISTS (Issue #1042 — Phase 1 cost optimization):
+#   The production node-count configuration lives in inventory/gcp_cluster.yml,
+#   which is deliberately gitignored (secret-hygiene pattern: only .example
+#   templates are committed). That meant the values that actually drive
+#   production had NO reviewable home in VCS. This file provides one: any
+#   change to node sizing now goes through a pull request, exactly as the
+#   project's IaC-first + PR-mandatory policy requires.
+#
+# PRECEDENCE (Ansible 2.20): play `vars_files` (rank 14) beats inventory vars
+# (rank 3-7) and role defaults, so the values here win. To change sizing, edit
+# THIS file and open a PR — do not edit the gitignored inventory.
+#
+# ROLLBACK: change the values back to the previous numbers and open a PR; the
+# provision playbook is idempotent and will scale the cluster back down/up.
+
+---
+# ============================================================
+# NODE POOL SIZING (Issue #1042 — Phase 1)
+# ============================================================
+
+# Initial node count.
+#   Phase 1 (Issue #1042): 2 -> 1. The cluster hosts 5 tenants
+#   (ssc, hh busy; masa, svs idle; demo canary) sharing one node pool with
+#   autoscaling enabled. One node is the steady-state minimum; the autoscaler
+#   adds nodes under load. gke_min_nodes remains 1, so this does not remove
+#   any availability floor.
+gke_initial_node_count: 1
+
+# Autoscaling window.
+#   gke_enable_autoscaling: kept true (already set in inventory).
+#   gke_min_nodes: unchanged at 1 (single-node floor, spot VMs enabled).
+#   Phase 1 (Issue #1042): gke_max_nodes 5 -> 3. Ceiling of 3 is sufficient
+#   for the current 2-replica-per-tenant workload; autoscaler will scale up
+#   to 3 under peak load and back down when idle.
+gke_min_nodes: 1
+gke_max_nodes: 3

@@ -50,6 +50,14 @@
   become: false
   gather_facts: true
 
+  # Single source of truth for node sizing (Issue #1042).
+  # Play-level vars_files take precedence over the gitignored inventory, so the
+  # committed gke_sizing.yml is the authoritative value. See that file for the
+  # Phase 1 sizing rationale and rollback guidance.
+  # (Referenced via playbook_dir so the path resolves regardless of CWD.)
+  vars_files:
+    - "{{ playbook_dir }}/../gke_sizing.yml"
+
   pre_tasks:
     # ============================================================
     # VALIDATION
