@@ -1,0 +1,43 @@
+# GKE Cluster Node Sizing — REVIEWABLE SOURCE OF TRUTH
+#
+# This file is COMMITTED to version control and is the single source of truth
+# for GKE node pool sizing. It is imported (via play-level `vars_files`) by
+# playbooks/gcp-cluster-provision.yml so that its values take precedence over
+# the local, gitignored inventory file (inventory/gcp_cluster.yml).
+#
+# WHY THIS FILE EXISTS (Issue #1042 — Phase 1 cost optimization):
+#   The production node-count configuration lives in inventory/gcp_cluster.yml,
+#   which is deliberately gitignored (secret-hygiene pattern: only .example
+#   templates are committed). That meant the values that actually drive
+#   production had NO reviewable home in VCS. This file provides one: any
+#   change to node sizing now goes through a pull request, exactly as the
+#   project's IaC-first + PR-mandatory policy requires.
+#
+# PRECEDENCE: play `vars_files` overrides inventory vars and role defaults, so the
+# values here win over the gitignored inventory. Note: extra-vars (-e) still take
+# precedence if explicitly provided at runtime.
+#
+# ROLLBACK: change the values back to the previous numbers and open a PR; the
+# provision playbook is idempotent and will scale the cluster back down/up.
+
+---
+# ============================================================
+# NODE POOL SIZING (Issue #1042 — Phase 1)
+# ============================================================
+
+# Initial node count.
+#   Phase 1 (Issue #1042): 2 -> 1. This multi-tenant cluster shares one node
+#   pool with autoscaling enabled, so a single node is the steady-state
+#   minimum and the autoscaler adds nodes under load. gke_min_nodes remains
+#   1, so this does not remove the availability floor. Revisit if the tenant
+#   or workload footprint grows.
+gke_initial_node_count: 1
+
+# Autoscaling window.
+#   gke_enable_autoscaling: kept true (already set in inventory).
+#   gke_min_nodes: unchanged at 1 (single-node floor, spot VMs enabled).
+#   Phase 1 (Issue #1042): gke_max_nodes 5 -> 3. Lower ceiling reduces
+#   idle-capacity cost while still allowing the autoscaler to scale up under
+#   peak load and back down when idle. Revisit the ceiling as workloads grow.
+gke_min_nodes: 1
+gke_max_nodes: 3

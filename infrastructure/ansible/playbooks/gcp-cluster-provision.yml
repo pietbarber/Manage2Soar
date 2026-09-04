@@ -50,6 +50,14 @@
   become: false
   gather_facts: true
 
+  # Single source of truth for node sizing (Issue #1042).
+  # Play-level vars_files override inventory vars (including the gitignored inventory),
+  # making committed gke_sizing.yml the default source for reviewable sizing values.
+  # Note: extra-vars (-e) can still override these values; see gke_sizing.yml for rationale/rollback.
+  # (Referenced via playbook_dir so the path resolves regardless of CWD.)
+  vars_files:
+    - "{{ playbook_dir }}/../gke_sizing.yml"
+
   pre_tasks:
     # ============================================================
     # VALIDATION
