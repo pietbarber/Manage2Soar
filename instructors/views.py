@@ -598,6 +598,8 @@ def member_training_grid(request, member_id):
             return (2, int(score))
         if score == "!":
             return (1, 0)
+        if score:
+            return (0, 1)
         return (0, 0)
 
     def pick_best_score(current_score, candidate_score):

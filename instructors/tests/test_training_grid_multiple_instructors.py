@@ -514,3 +514,23 @@ class TestTrainingGridMultipleInstructors(TestCase):
         assert lesson_row is not None
         # The out-of-scale "5" must be ignored; the best valid score is "3".
         assert lesson_row["max_score"] == "3"
+
+    def test_training_grid_max_displays_only_unexpected_score(self):
+        """An unexpected non-empty score remains visible when no valid score exists."""
+        report = InstructionReport.objects.get(
+            student=self.student,
+            instructor=self.instructor1,
+            report_date=self.log_date,
+        )
+        LessonScore.objects.create(report=report, lesson=self.lesson, score="5")
+
+        self.client.force_login(self.student)
+        url = reverse("instructors:member_training_grid", args=[self.student.id])
+        response = self.client.get(url)
+
+        lesson_row = next(
+            row
+            for row in response.context["lesson_data"]
+            if row["lesson_id"] == self.lesson.id
+        )
+        assert lesson_row["max_score"] == "5"
