@@ -1763,32 +1763,37 @@ def manage_logsheet(request, pk):
             if flight.launch_time is None:
                 invalid_flights.append(f"Flight #{flight.id} is missing a launch time.")
 
-        # Enforce required duty crew before finalization
-        # Only require logsheet.tow_pilot if there are any towplane launches
-        # Use unfiltered queryset for validation
+        # Enforce required duty crew before finalization.
+        # Tow pilot is a hard requirement (only when there are towplane launches).
+        # Duty officer and instructor are optional (soft warning) — see Issue #1044:
+        # clubs have ad-hoc days with no formal duty officer and days with no
+        # instructor present, but still need a logsheet designated for the day.
         has_tow_flights = any(f.requires_tow for f in all_flights)
 
-        required_roles = {
-            "duty_officer": logsheet.duty_officer,
-            "duty_instructor": logsheet.duty_instructor,
-        }
-
-        # Only require tow pilot if any flights use towplane launches
-        if has_tow_flights:
-            required_roles["tow_pilot"] = logsheet.tow_pilot
-
-        missing_roles = [
-            label.replace("_", " ").title()
-            for label, value in required_roles.items()
-            if not value
-        ]
-
-        if missing_roles:
+        # HARD BLOCK: tow pilot is required when any flight uses a towplane launch
+        if has_tow_flights and not logsheet.tow_pilot:
             messages.error(
                 request,
-                "Cannot finalize. Missing duty crew: " + ", ".join(missing_roles),
+                "Cannot finalize. Missing duty crew: Tow Pilot.",
             )
             return redirect("logsheet:manage", pk=logsheet.pk)
+
+        # SOFT WARNING: duty officer and instructor are optional; finalize proceeds
+        missing_soft_roles = [
+            label
+            for label, value in [
+                ("Duty Officer", logsheet.duty_officer),
+                ("Instructor", logsheet.duty_instructor),
+            ]
+            if not value
+        ]
+        if missing_soft_roles:
+            messages.warning(
+                request,
+                "Heads up: no "
+                + " / ".join(missing_soft_roles)
+                + " was recorded for this logsheet. You can still finalize.",
+            )
 
         missing = []
 

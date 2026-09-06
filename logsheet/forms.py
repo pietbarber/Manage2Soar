@@ -948,48 +948,13 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         if not hasattr(self, "warnings"):
             self.warnings = []
 
-        # Check if this logsheet has any actual flight operations
-        logsheet = getattr(self.instance, "logsheet", None) if self.instance else None
-        has_flights = logsheet.flights.exists() if logsheet else False
-
-        # Check if this logsheet has only rental operations
-        # Optimize by checking if any closeout in an already-loaded queryset has rental hours
-        has_rental_closeouts = False
-        if logsheet and not has_flights:
-            # Check if any closeout has rental hours without hitting the database again
-            try:
-                # Try to use prefetched data if available
-                closeouts = getattr(logsheet, "_prefetched_objects_cache", {}).get(
-                    "towplane_closeouts"
-                )
-                if closeouts is not None:
-                    has_rental_closeouts = any(
-                        closeout.rental_hours_chargeable
-                        and closeout.rental_hours_chargeable > 0
-                        for closeout in closeouts
-                    )
-                else:
-                    # Fall back to database query if not prefetched
-                    has_rental_closeouts = logsheet.towplane_closeouts.filter(
-                        rental_hours_chargeable__gt=0
-                    ).exists()
-            except (AttributeError, KeyError):
-                # Fallback if there are any issues with the optimization
-                has_rental_closeouts = logsheet.towplane_closeouts.filter(
-                    rental_hours_chargeable__gt=0
-                ).exists()
-
-        has_only_rentals = bool(logsheet and not has_flights and has_rental_closeouts)
-
-        # Conditional duty officer validation
-        if not duty_officer:
-            if has_flights:
-                # Normal validation for operational days - duty officer required
-                raise ValidationError("Duty Officer is required for flight operations.")
-            elif has_only_rentals:
-                # For rental-only logsheets, duty officer is optional
-                pass  # Allow empty duty officer
-            # For completely empty logsheets, also allow empty (will be caught later in workflow)
+        # Note: Duty officer and instructor are intentionally optional (Issue #1044).
+        # Clubs have ad-hoc days with no formal duty officer and days with no
+        # instructor present. Finalization surfaces a soft warning instead of a
+        # hard block; the tow-pilot requirement is enforced in the view.
+        # (Previously a hard "Duty Officer is required" check lived here, but it
+        # relied on `self.instance.logsheet`, which does not exist on a Logsheet,
+        # so it never fired. Removed as dead code.)
 
         # PROHIBITIONS: Prevent instructor from being the same as surge instructor
         if duty_instructor and surge_instructor and duty_instructor == surge_instructor:

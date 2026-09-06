@@ -236,6 +236,17 @@
 
       <div class="form-section">
         <h4><i class="bi bi-people-fill"></i>Duty Crew</h4>
+        <p class="text-muted small mb-3">
+          <i class="bi bi-info-circle me-1"></i>Duty Officer and Instructor are optional
+          &mdash; leave blank if nobody is on duty. Tow Pilot is required for towplane launches.
+        </p>
+        {% if duty_form.warnings %}
+          <div class="alert alert-warning">
+            {% for warning in duty_form.warnings %}
+              <p class="mb-0">{{ warning }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
         <div class="row">
           <div class="col-md-6">
             <div class="mb-3">

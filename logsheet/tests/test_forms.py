@@ -366,6 +366,16 @@ def test_duty_crew_form_warns_duty_officer_towpilot(member_duty_officer_towpilot
 
 
 @pytest.mark.django_db
+def test_duty_crew_form_allows_blank_duty_officer_and_instructor():
+    """Issue #1044: blank duty officer and instructor are valid (optional fields)."""
+    form = LogsheetDutyCrewForm(data={})
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    # No hard "required" errors on the optional duty-crew fields
+    assert "duty_officer" not in form.errors
+    assert "duty_instructor" not in form.errors
+
+
+@pytest.mark.django_db
 def test_form_warnings_with_blank_duty_officer(
     member_instructor, member_towpilot, airfield
 ):

@@ -408,6 +408,66 @@ class TestFinalizationWithNonTowFlights:
         logsheet.refresh_from_db()
         assert logsheet.finalized is True
 
+    def test_finalize_succeeds_without_duty_officer_and_instructor(
+        self,
+        client,
+        logsheet,
+        pilot,
+        glider,
+        virtual_towplane_winch,
+        duty_officer,
+        duty_instructor,
+    ):
+        """Issue #1044: finalize succeeds even when duty officer and instructor are blank.
+
+        Duty officer and instructor are now optional — finalization proceeds and
+        surfaces a soft warning rather than a hard block.
+        """
+        # Create winch flight (no towplane launch, so tow pilot is not required)
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            glider=glider,
+            launch_method=Flight.LaunchMethod.WINCH,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            release_altitude=1000,
+            towplane=virtual_towplane_winch,
+        )
+
+        # Create closeout (required for finalization)
+        LogsheetCloseout.objects.create(logsheet=logsheet)
+
+        # Create payment
+        LogsheetPayment.objects.create(
+            logsheet=logsheet, member=pilot, payment_method="cash"
+        )
+
+        # Clear duty officer and instructor (ad-hoc day with no formal crew)
+        logsheet.duty_officer = None
+        logsheet.duty_instructor = None
+        logsheet.save()
+
+        # Log in as an active member (not necessarily a duty officer)
+        client.force_login(duty_officer)
+
+        # Attempt finalization - should succeed even with no duty officer/instructor
+        response = client.post(
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
+        )
+
+        logsheet.refresh_from_db()
+        assert logsheet.finalized is True
+
+        # A soft warning should be surfaced, not a hard "Cannot finalize" error
+        messages = list(get_messages(response.wsgi_request))
+        message_text = " ".join(str(m) for m in messages)
+        assert "Cannot finalize" not in message_text
+        assert "Duty Officer" in message_text
+        assert "Instructor" in message_text
+
     def test_manage_finalize_enqueues_summary_email(
         self,
         client,
