@@ -1768,13 +1768,33 @@ def manage_logsheet(request, pk):
         # Duty officer and instructor are optional (soft warning) — see Issue #1044:
         # clubs have ad-hoc days with no formal duty officer and days with no
         # instructor present, but still need a logsheet designated for the day.
-        has_tow_flights = any(f.requires_tow for f in all_flights)
+        has_tow_flights = (
+            all_flights.filter(
+                launch_method=Flight.LaunchMethod.TOWPLANE,
+            )
+            .filter(
+                Q(towplane__isnull=True)
+                | ~Q(towplane__n_number__in=Towplane.VIRTUAL_N_NUMBERS)
+            )
+            .exists()
+        )
+
+        site_config = SiteConfiguration.objects.first()
+        duty_officer_title = (
+            site_config.duty_officer_title if site_config else None
+        ) or "Duty Officer"
+        instructor_title = (
+            site_config.instructor_title if site_config else None
+        ) or "Instructor"
+        towpilot_title = (
+            site_config.towpilot_title if site_config else None
+        ) or "Tow Pilot"
 
         # HARD BLOCK: tow pilot is required when any flight uses a towplane launch
         if has_tow_flights and not logsheet.tow_pilot:
             messages.error(
                 request,
-                "Cannot finalize. Missing duty crew: Tow Pilot.",
+                f"Cannot finalize. Missing duty crew: {towpilot_title}.",
             )
             return redirect("logsheet:manage", pk=logsheet.pk)
 
@@ -1782,8 +1802,8 @@ def manage_logsheet(request, pk):
         missing_soft_roles = [
             label
             for label, value in [
-                ("Duty Officer", logsheet.duty_officer),
-                ("Instructor", logsheet.duty_instructor),
+                (duty_officer_title, logsheet.duty_officer),
+                (instructor_title, logsheet.duty_instructor),
             ]
             if not value
         ]

@@ -416,7 +416,6 @@ class TestFinalizationWithNonTowFlights:
         glider,
         virtual_towplane_winch,
         duty_officer,
-        duty_instructor,
     ):
         """Issue #1044: finalize succeeds even when duty officer and instructor are blank.
 
