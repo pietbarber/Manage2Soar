@@ -1788,11 +1788,13 @@ def manage_logsheet(request, pk):
             if not value
         ]
         if missing_soft_roles:
+            missing_roles_text = " / ".join(missing_soft_roles)
+            verb = "was" if len(missing_soft_roles) == 1 else "were"
             messages.warning(
                 request,
-                "Heads up: no "
-                + " / ".join(missing_soft_roles)
-                + " was recorded for this logsheet. You can still finalize.",
+                f"Heads up: no {missing_roles_text} {verb} recorded for this "
+                "logsheet. Missing duty crew will not by itself prevent "
+                "finalization; other validation checks still apply.",
             )
 
         missing = []

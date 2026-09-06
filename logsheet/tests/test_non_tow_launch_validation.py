@@ -467,6 +467,9 @@ class TestFinalizationWithNonTowFlights:
         assert "Cannot finalize" not in message_text
         assert "Duty Officer" in message_text
         assert "Instructor" in message_text
+        assert "were recorded" in message_text
+        assert "will not by itself prevent finalization" in message_text
+        assert "other validation checks still apply" in message_text
 
     def test_manage_finalize_enqueues_summary_email(
         self,
