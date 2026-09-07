@@ -366,6 +366,33 @@ def test_duty_crew_form_warns_duty_officer_towpilot(member_duty_officer_towpilot
 
 
 @pytest.mark.django_db
+def test_duty_crew_form_warning_uses_configured_role_titles(
+    member_duty_officer_instructor,
+):
+    """Duty-crew warnings use the configured field labels."""
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        duty_officer_title="Operations Lead",
+        instructor_title="Flight Coach",
+    )
+
+    form = LogsheetDutyCrewForm(
+        data={
+            "duty_officer": member_duty_officer_instructor.id,
+            "duty_instructor": member_duty_officer_instructor.id,
+        }
+    )
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert "Operations Lead" in form.warnings[0]
+    assert "Flight Coach" in form.warnings[0]
+
+
+@pytest.mark.django_db
 def test_duty_crew_form_allows_blank_duty_officer_and_instructor():
     """Issue #1044: blank duty officer and instructor are valid (optional fields)."""
     form = LogsheetDutyCrewForm(data={})

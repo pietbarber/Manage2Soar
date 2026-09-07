@@ -948,6 +948,10 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         if not hasattr(self, "warnings"):
             self.warnings = []
 
+        duty_officer_label = self.fields["duty_officer"].label
+        duty_instructor_label = self.fields["duty_instructor"].label
+        tow_pilot_label = self.fields["tow_pilot"].label
+
         # Note: Duty officer and instructor are intentionally optional (Issue #1044).
         # Clubs have ad-hoc days with no formal duty officer and days with no
         # instructor present. Finalization surfaces a soft warning instead of a
@@ -971,13 +975,15 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         # WARNINGS: Check for dual-role assignments that are allowed but noteworthy
         if duty_officer and duty_instructor and duty_officer == duty_instructor:
             self.warnings.append(
-                f"⚠️ {duty_officer.get_full_name()} is serving as both Duty Officer and Instructor. "
+                f"⚠️ {duty_officer.get_full_name()} is serving as both "
+                f"{duty_officer_label} and {duty_instructor_label}. "
                 f"This has historical precedent but may impact operational efficiency."
             )
 
         if duty_officer and tow_pilot and duty_officer == tow_pilot:
             self.warnings.append(
-                f"⚠️ {duty_officer.get_full_name()} is serving as both Duty Officer and Tow Pilot. "
+                f"⚠️ {duty_officer.get_full_name()} is serving as both "
+                f"{duty_officer_label} and {tow_pilot_label}. "
                 f"Please ensure adequate coverage for both responsibilities."
             )
 
@@ -1024,6 +1030,13 @@ class LogsheetDutyCrewForm(forms.ModelForm):
             self.fields["surge_tow_pilot"].label = (
                 config.surge_towpilot_title or "Surge Tow Pilot"
             )
+        else:
+            self.fields["duty_officer"].label = "Duty Officer"
+            self.fields["assistant_duty_officer"].label = "Assistant Duty Officer"
+            self.fields["duty_instructor"].label = "Instructor"
+            self.fields["surge_instructor"].label = "Surge Instructor"
+            self.fields["tow_pilot"].label = "Tow Pilot"
+            self.fields["surge_tow_pilot"].label = "Surge Tow Pilot"
 
     class Meta:
         model = Logsheet
