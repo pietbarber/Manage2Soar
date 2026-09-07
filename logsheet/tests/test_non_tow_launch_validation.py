@@ -375,6 +375,9 @@ class TestFinalizationWithNonTowFlights:
         duty_instructor,
     ):
         """Can finalize logsheet without tow_pilot if all flights are winch/self/other."""
+        virtual_towplane_winch.n_number = "winch"
+        virtual_towplane_winch.save(update_fields=["n_number"])
+
         # Create winch flight without tow pilot
         Flight.objects.create(
             logsheet=logsheet,

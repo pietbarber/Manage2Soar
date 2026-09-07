@@ -1768,14 +1768,16 @@ def manage_logsheet(request, pk):
         # Duty officer and instructor are optional (soft warning) — see Issue #1044:
         # clubs have ad-hoc days with no formal duty officer and days with no
         # instructor present, but still need a logsheet designated for the day.
+        virtual_towplane_filter = (
+            Q(towplane__n_number__iexact="SELF")
+            | Q(towplane__n_number__iexact="WINCH")
+            | Q(towplane__n_number__iexact="OTHER")
+        )
         has_tow_flights = (
             all_flights.filter(
                 launch_method=Flight.LaunchMethod.TOWPLANE,
             )
-            .filter(
-                Q(towplane__isnull=True)
-                | ~Q(towplane__n_number__in=Towplane.VIRTUAL_N_NUMBERS)
-            )
+            .filter(Q(towplane__isnull=True) | ~virtual_towplane_filter)
             .exists()
         )
 
