@@ -3291,7 +3291,9 @@ def edit_logsheet_closeout(request, pk):
     # Build formset for towplane closeouts - include all closeouts for this logsheet
     # This keeps any existing (possibly stale) closeouts visible so they can be reviewed and adjusted
     # Run cleanup_virtual_towplane_closeouts management command to remove truly stale virtual towplane closeouts
-    queryset = TowplaneCloseout.objects.filter(logsheet=logsheet)
+    queryset = TowplaneCloseout.objects.filter(logsheet=logsheet).prefetch_related(
+        "rental_charges"
+    )
     formset_class = TowplaneCloseoutFormSet
 
     # Rental charges are enabled only when site config allows them.
@@ -3313,7 +3315,7 @@ def edit_logsheet_closeout(request, pk):
         if not _rental_on:
             return built
         for i, cform in enumerate(target_formset.forms):
-            rc_queryset = TowplaneRentalCharge.objects.filter(closeout=cform.instance)
+            rc_queryset = cform.instance.rental_charges.all()
             kwargs = {"queryset": rc_queryset, "prefix": f"rc-{i}"}
             if is_post:
                 kwargs["data"] = request.POST
@@ -3345,16 +3347,13 @@ def edit_logsheet_closeout(request, pk):
                     break
 
         if forms_valid and logsheet.finalized and _rental_on:
-            # Post-finalization: any rental charge row is a billing correction.
-            # We cannot use ``rc_formset.deleted_objects`` because that
-            # property is only populated after ``save()``; instead, we
-            # inspect each form's ``cleaned_data`` for the DELETE flag and
-            # any member/hours values.
+            # Post-finalization: only changes to rental charge rows are billing
+            # corrections. Unchanged existing rows must not block operational
+            # closeout edits such as tach, fuel, or notes updates.
             for rc_formset in rental_formsets:
                 touched = False
                 for rcf in rc_formset.forms:
-                    cd = rcf.cleaned_data or {}
-                    if cd.get("DELETE") or cd.get("member") or cd.get("hours"):
+                    if rcf.has_changed():
                         touched = True
                         break
                 if touched:

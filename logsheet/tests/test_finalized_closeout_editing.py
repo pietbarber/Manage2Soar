@@ -11,6 +11,7 @@ from logsheet.models import (
     RevisionLog,
     Towplane,
     TowplaneCloseout,
+    TowplaneRentalCharge,
 )
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -88,6 +89,11 @@ class FinalizedCloseoutEditingTests(TestCase):
         return data
 
     def test_finalized_closeout_allows_operational_updates(self):
+        TowplaneRentalCharge.objects.create(
+            closeout=self.towplane_closeout,
+            member=self.member,
+            hours="2.0",
+        )
         response = self.client.post(
             reverse("logsheet:edit_logsheet_closeout", args=[self.logsheet.pk]),
             self._post_data(),
