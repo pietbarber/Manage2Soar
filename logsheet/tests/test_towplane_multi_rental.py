@@ -240,6 +240,27 @@ class TowplaneRentalChargeFormSetTestCase(TestCase):
         formset.save()
         self.assertEqual(self.closeout.rental_charges.count(), 1)
 
+    def test_formset_rejects_partial_row_without_member(self):
+        """Entered rental data must identify the member being charged."""
+        form_data = {
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-member": "",
+            "form-0-hours": "1.0",
+        }
+        formset = TowplaneRentalChargeFormSet(
+            data=form_data,
+            queryset=TowplaneRentalCharge.objects.filter(closeout=self.closeout),
+            prefix="form",
+        )
+        for form in formset.forms:
+            form.instance.closeout = self.closeout
+
+        self.assertFalse(formset.is_valid())
+        self.assertIn("Select a member", str(formset.non_form_errors()))
+
     def test_formset_deletes_marked_rows(self):
         existing = TowplaneRentalCharge.objects.create(
             closeout=self.closeout,

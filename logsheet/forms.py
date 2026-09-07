@@ -1179,8 +1179,8 @@ class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
 
     ``extra=0`` so no permanent blank row is rendered; rows are added on
     demand via the "Add Renter" button (see edit_closeout_form.html). Blank
-    rows (no member selected) are still skipped on save so an in-flight extra
-    row never fails the non-null ``member`` FK.
+    Fully blank rows are still skipped on save so an in-flight extra row never
+    fails the non-null ``member`` FK; partially filled rows are invalid.
     """
 
     def __init__(self, *args, **kwargs):
@@ -1201,6 +1201,22 @@ class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
             ):
                 form._errors.pop("member", None)
         super()._post_clean()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        for form in self.forms:
+            if self._should_delete_form(form):
+                continue
+            form_data = form.cleaned_data
+            has_data = any(
+                form_data.get(field) not in (None, "")
+                for field in ("member", "hours", "notes")
+            )
+            if has_data and not form_data.get("member"):
+                raise forms.ValidationError(
+                    "Select a member for each rental charge with entered data."
+                )
+        return cleaned_data
 
     def save(self, commit=True):
         for form in self.forms:
