@@ -1167,7 +1167,7 @@ class _TowplaneRentalChargeFormSetBase(
     modelformset_factory(
         TowplaneRentalCharge,
         form=TowplaneRentalChargeForm,
-        extra=1,
+        extra=0,
         can_delete=True,
     )
 ):
@@ -1177,8 +1177,10 @@ class _TowplaneRentalChargeFormSetBase(
 class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
     """Formset for per-renter towplane rental charges.
 
-    Blank rows (no member selected) are skipped on save so the ``extra=1``
-    empty row for adding a renter does not fail the non-null ``member`` FK.
+    ``extra=0`` so no permanent blank row is rendered; rows are added on
+    demand via the "Add Renter" button (see edit_closeout_form.html). Blank
+    rows (no member selected) are still skipped on save so an in-flight extra
+    row never fails the non-null ``member`` FK.
     """
 
     def _post_clean(self):

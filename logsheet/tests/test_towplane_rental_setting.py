@@ -88,10 +88,14 @@ class TowplaneRentalSettingTestCase(TestCase):
         )
         response = self.client.get(url)
 
-        # Check that rental formset is in the response
-        self.assertContains(response, 'name="rc-0-0-member"')
-        self.assertContains(response, 'name="rc-0-0-hours"')
+        # Check that the rental formset (and its blank-row template) is in
+        # the response. With extra=0 the always-present row is the hidden
+        # "Add Renter" template, which renders fields under the __prefix__
+        # token; saved rows would use numeric indices.
+        self.assertContains(response, 'name="rc-0-__prefix__-member"')
+        self.assertContains(response, 'name="rc-0-__prefix__-hours"')
         self.assertContains(response, "Non-Towing Rental Charges")
+        self.assertContains(response, "Add Renter")
 
     def test_financial_page_hides_rental_column_when_disabled(self):
         """Test that towplane rental column is hidden in financial management when disabled."""

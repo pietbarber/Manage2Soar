@@ -116,8 +116,9 @@ class TestTowplaneRentalRenters(DjangoPlaywrightTestCase):
         initial_total = int(total_input.input_value())
         self.assertEqual(initial_total, initial_count)
 
-        # There should be at least the saved renter plus one blank placeholder.
-        self.assertGreaterEqual(initial_count, 2)
+        # With extra=0 there is no permanent blank placeholder: only the
+        # saved renter row is rendered initially.
+        self.assertGreaterEqual(initial_count, 1)
 
         self.page.locator(".add-rental-charge").first.click()
 
@@ -128,8 +129,10 @@ class TestTowplaneRentalRenters(DjangoPlaywrightTestCase):
         self.assertEqual(new_total, initial_total + 1)
 
         # The newly-added row must be reindexed to the next index (rc-0-<n>-member).
+        # Scope to the visible list so the hidden template row (which uses
+        # __prefix__ instead of a numeric index) does not interfere.
         new_index = int(initial_total)
-        member_field = self.page.locator(
+        member_field = list_el.locator(
             f'.rental-charge-row [name="rc-0-{new_index}-member"]'
         )
         self.assertGreater(member_field.count(), 0)
@@ -151,10 +154,8 @@ class TestTowplaneRentalRenters(DjangoPlaywrightTestCase):
             list_el.locator(".rental-charge-row").count(), count_before + 1
         )
 
-        # Trashcan on the last (newest) row removes it.
-        self.page.locator(".rental-charge-row").last.locator(
-            ".rental-row-delete"
-        ).click()
+        # Trashcan on the last (newest) visible row removes it.
+        list_el.locator(".rental-charge-row").last.locator(".rental-row-delete").click()
         self.assertEqual(list_el.locator(".rental-charge-row").count(), count_before)
 
     # ------------------------------------------------------------------
@@ -165,8 +166,9 @@ class TestTowplaneRentalRenters(DjangoPlaywrightTestCase):
         """Trashcan on a saved row toggles the formset DELETE checkbox."""
         self.page.goto(self.url)
 
-        # The saved renter (Bob) row is the first row and carries the flag.
-        saved_row = self.page.locator(".rental-charge-row").first
+        # The saved renter (Bob) row is the first visible row and carries the flag.
+        list_el = self.page.locator(".rental-charges-list")
+        saved_row = list_el.locator(".rental-charge-row").first
         flag = saved_row.locator(".rental-row-delete-flag")
         self.assertTrue(flag.count() >= 1)
         self.assertFalse(flag.first.is_checked())
@@ -175,7 +177,7 @@ class TestTowplaneRentalRenters(DjangoPlaywrightTestCase):
         saved_row.locator(".rental-row-delete").click()
         self.assertTrue(flag.first.is_checked())
         # Row stays in the DOM (it is a saved record, not a temp row).
-        self.assertTrue(self.page.locator(".rental-charge-row").first.count() >= 1)
+        self.assertTrue(list_el.locator(".rental-charge-row").first.count() >= 1)
 
         # Clicking again un-marks it.
         saved_row.locator(".rental-row-delete").click()

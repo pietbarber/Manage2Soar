@@ -424,9 +424,34 @@
                       {% endfor %}
                     </div>
                     <div class="mt-2">
-                      <button type="button" class="btn btn-sm btn-outline-secondary add-rental-charge" data-target=".rental-charges-list" data-template-index="0">
+                      <button type="button" class="btn btn-sm btn-outline-secondary add-rental-charge" data-target=".rental-charges-list">
                         <i class="bi bi-plus-lg me-1"></i>Add Renter
                       </button>
+                    </div>
+                    {# Blank row template for "Add Renter". Hidden from view
+                       but present in the DOM so the JS can clone it. Field
+                       names use the formset's __prefix__ token which the JS
+                       replaces with the real row index. #}
+                    <div class="d-none rental-row-template" aria-hidden="true">
+                      <div class="rental-charge-row row g-2 align-items-end mb-2">
+                        <div class="col-md-5">
+                          <label class="form-label small mb-0">{{ towform.rental_formset.empty_form.member.label }}</label>
+                          {{ towform.rental_formset.empty_form.member }}
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0">{{ towform.rental_formset.empty_form.hours.label }}</label>
+                          {{ towform.rental_formset.empty_form.hours }}
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0">Notes</label>
+                          {{ towform.rental_formset.empty_form.notes }}
+                        </div>
+                        <div class="col-md-1 text-end">
+                          <button type="button" class="btn btn-sm btn-outline-danger rental-row-delete" title="Remove renter">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -711,25 +736,15 @@ document.addEventListener('DOMContentLoaded', function() {
 // brand-new row or toggles that row's hidden DELETE checkbox for existing
 // (already-saved) rows so the formset removes it on submit.
 document.addEventListener('DOMContentLoaded', function() {
-    // Resolve the per-card prefix (e.g. "rc-0") from any field in the list.
-    function rowPrefix(list) {
-        const field = list.querySelector('[name]');
-        if (!field) return null;
-        const m = (field.getAttribute('name') || '').match(/^(rc-\d+-\d+-)/);
-        return m ? m[1] : null;
-    }
-
+    // Point the blank row's __prefix__ tokens at the real row index. The
+    // formset renders the empty_form with names like rc-<card>-__prefix__-field,
+    // so a single token replace yields the correctly-indexed field names.
     function reindexRow(row, newIndex) {
-        // Re-point the row index of every rc-<card>-<row>-<field> token,
-        // preserving the card index, and clear the cloned field values.
         row.querySelectorAll('input, select, textarea, label').forEach(function(el) {
             ['name', 'id', 'for'].forEach(function(attr) {
                 const val = el.getAttribute(attr);
                 if (val) {
-                    el.setAttribute(
-                        attr,
-                        val.replace(/rc-(\d+)-(\d+)/, 'rc-$1-' + newIndex)
-                    );
+                    el.setAttribute(attr, val.replace(/__prefix__/, String(newIndex)));
                 }
             });
             if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') el.value = '';
@@ -741,51 +756,29 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.add-rental-charge').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const card = btn.closest('.col-md-12');
-            const list = card ? card.querySelector('.rental-charges-list') : null;
-            if (!list) return;
-            // The management form (TOTAL_FORMS) is a sibling of the list, so
-            // resolve it from the card rather than the list itself. Scope by
-            // the rc-<card>- prefix so we don't accidentally pick up the
-            // outer TowplaneCloseoutFormSet management form (form-TOTAL_FORMS).
-            const prefix = rowPrefix(list);
-            // prefix is "rc-<card>-<row>-" (e.g. "rc-0-0-"); strip the row
-            // index segment to get the formset prefix "rc-0-", then build
-            // the management-form name "rc-0-TOTAL_FORMS".
-            const formsetPrefix = prefix ? prefix.replace(/-\d+-$/, '-') : null;
-            const totalFormsInput = card
-                ? card.querySelector(
-                      formsetPrefix
-                          ? `input[name="${formsetPrefix}TOTAL_FORMS"]`
-                          : 'input[name$="-TOTAL_FORMS"]'
-                  )
-                : null;
-            const rows = list.querySelectorAll('.rental-charge-row');
-            if (!rows.length) return;
+            if (!card) return;
+            const list = card.querySelector('.rental-charges-list');
+            // The blank row template is a hidden sibling inside this card.
+            const template = card.querySelector('.rental-row-template');
+            if (!list || !template) return;
 
-            const newIndex = totalFormsInput ? parseInt(totalFormsInput.value, 10) : rows.length;
+            // The rental management form (TOTAL_FORMS) is a sibling of the
+            // list within this per-closeout card, so resolve it here. Scoping
+            // to the card avoids the outer TowplaneCloseoutFormSet's
+            // form-TOTAL_FORMS, which lives outside this card.
+            const totalFormsInput = card.querySelector('input[name$="-TOTAL_FORMS"]');
+            const newIndex = totalFormsInput
+                ? parseInt(totalFormsInput.value, 10)
+                : list.querySelectorAll('.rental-charge-row').length;
 
-            const templateRow = rows[rows.length - 1];
-            const clone = templateRow.cloneNode(true);
-            if (prefix) {
+            // Clone the hidden blank row (freshly added rows have no DELETE
+            // flag, which is exactly what we want) and index it at the next
+            // position.
+            const clone = template.firstElementChild.cloneNode(true);
+            if (clone) {
                 reindexRow(clone, newIndex);
-            } else {
-                // Fallback: generic re-index (no rc- card prefix found).
-                clone.querySelectorAll('input, select, textarea').forEach(function(el) {
-                    const name = el.getAttribute('name') || '';
-                    if (name) {
-                        el.setAttribute('name', name.replace(/(-\d+)(-|$)/, '-' + newIndex + '$2'));
-                    }
-                    if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') el.value = '';
-                    else if (el.type === 'checkbox') el.checked = false;
-                    else el.value = '';
-                });
+                list.appendChild(clone);
             }
-            // A freshly added row is never "deletable" — drop its delete flag.
-            const flag = clone.querySelector('.rental-row-delete-flag');
-            if (flag) flag.parentElement.remove();
-            const trash = clone.querySelector('.rental-row-delete');
-            if (trash) trash.style.display = '';
-            list.appendChild(clone);
             if (totalFormsInput) totalFormsInput.value = String(newIndex + 1);
         });
     });
