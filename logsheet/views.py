@@ -1058,6 +1058,7 @@ def get_validation_message(validation_error):
 def update_flight_split(request, flight_id):
     flight = get_object_or_404(Flight, id=flight_id)
     logsheet = flight.logsheet
+    reason = ""
     if logsheet.finalized:
         if not (
             request.user.is_superuser
@@ -2453,7 +2454,11 @@ def add_flight(request, logsheet_pk):
         raw_client_token = request.POST.get("client_token", "")
         client_token = _normalize_client_token(raw_client_token)
         client_token_max_length = Flight._meta.get_field("client_token").max_length
-        if client_token and len(client_token) > client_token_max_length:
+        if (
+            client_token
+            and client_token_max_length is not None
+            and len(client_token) > client_token_max_length
+        ):
             form.add_error(
                 None,
                 (
