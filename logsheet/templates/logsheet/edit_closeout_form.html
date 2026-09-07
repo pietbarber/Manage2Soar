@@ -786,8 +786,25 @@ document.addEventListener('DOMContentLoaded', function() {
             row.classList.toggle('rental-row-marked-deleted', flag.checked);
             trash.setAttribute('aria-pressed', flag.checked ? 'true' : 'false');
         } else {
-            // New (unsaved) row: remove it from the form entirely.
+            // New (unsaved) row: remove it and keep formset indices / TOTAL_FORMS consistent.
+            const card = trash.closest('.col-md-12');
+            const list = row.closest('.rental-charges-list');
             row.remove();
+            if (list) {
+                const rows = Array.from(list.querySelectorAll('.rental-charge-row'));
+                rows.forEach(function(r, idx) {
+                    r.querySelectorAll('input, select, textarea, label').forEach(function(el) {
+                        ['name', 'id', 'for'].forEach(function(attr) {
+                            const val = el.getAttribute(attr);
+                            if (val) {
+                                el.setAttribute(attr, val.replace(/(rc-\d+-)\d+(-)/, `$1${idx}$2`));
+                            }
+                        });
+                    });
+                });
+                const totalFormsInput = card ? card.querySelector('input[name$="-TOTAL_FORMS"]') : null;
+                if (totalFormsInput) totalFormsInput.value = String(rows.length);
+            }
         }
     });
 });
