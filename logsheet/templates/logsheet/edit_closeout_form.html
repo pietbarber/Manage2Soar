@@ -389,6 +389,7 @@
                     <div class="rental-charges-list">
                       {% for rent_form in towform.rental_formset %}
                       <div class="rental-charge-row row g-2 align-items-end mb-2">
+                        {{ rent_form.id }}
                         <div class="col-md-5">
                           <label class="form-label small mb-0">{{ rent_form.member.label }}</label>
                           {{ rent_form.member }}

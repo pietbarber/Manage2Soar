@@ -169,6 +169,10 @@ class TestTowplaneRentalRenters(DjangoPlaywrightTestCase):
         # The saved renter (Bob) row is the first visible row and carries the flag.
         list_el = self.page.locator(".rental-charges-list")
         saved_row = list_el.locator(".rental-charge-row").first
+        self.assertEqual(
+            saved_row.locator('input[type="hidden"][name="rc-0-0-id"]').count(),
+            1,
+        )
         flag = saved_row.locator(".rental-row-delete-flag")
         self.assertTrue(flag.count() >= 1)
         self.assertFalse(flag.first.is_checked())
