@@ -9,6 +9,17 @@
 {# Issue #397: TinyMCE YouTube fix must load after form.media #}
 <script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
 <link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
+<style>
+  .rental-row-marked-deleted {
+    opacity: 0.55;
+    text-decoration: line-through;
+  }
+  .rental-row-delete[aria-pressed="true"] {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -397,10 +408,12 @@
                           {{ rent_form.notes }}
                         </div>
                         <div class="col-md-1 text-end">
+                          <button type="button" class="btn btn-sm btn-outline-danger rental-row-delete" title="Remove renter">
+                            <i class="bi bi-trash"></i>
+                          </button>
                           {% if rent_form.instance.pk %}
-                          <div class="form-check">
-                            <label class="form-check-label small">Del</label>
-                            <input type="checkbox" class="form-check-input" {{ rent_form.DELETE }}>
+                          <div class="d-none">
+                            <input type="checkbox" class="rental-row-delete-flag" {{ rent_form.DELETE }}>
                           </div>
                           {% endif %}
                         </div>
@@ -692,36 +705,107 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // --- Per-renter towplane rental charge rows (Issue #968) ---
-// Each towplane card has its own nested formset (prefix rc-<n>). The
-// "Add Renter" button clones the blank placeholder row, re-indexes its
-// field names to the current TOTAL_FORMS value, and bumps TOTAL_FORMS.
+// Each towplane card has its own nested formset (prefix rc-<card>-<row>).
+// "Add Renter" clones the last row, re-indexes its ROW index to the current
+// TOTAL_FORMS value, and bumps TOTAL_FORMS. "Remove renter" either strips a
+// brand-new row or toggles that row's hidden DELETE checkbox for existing
+// (already-saved) rows so the formset removes it on submit.
 document.addEventListener('DOMContentLoaded', function() {
+    // Resolve the per-card prefix (e.g. "rc-0") from any field in the list.
+    function rowPrefix(list) {
+        const field = list.querySelector('[name]');
+        if (!field) return null;
+        const m = (field.getAttribute('name') || '').match(/^(rc-\d+-\d+-)/);
+        return m ? m[1] : null;
+    }
+
+    function reindexRow(row, newIndex) {
+        // Re-point the row index of every rc-<card>-<row>-<field> token,
+        // preserving the card index, and clear the cloned field values.
+        row.querySelectorAll('input, select, textarea, label').forEach(function(el) {
+            ['name', 'id', 'for'].forEach(function(attr) {
+                const val = el.getAttribute(attr);
+                if (val) {
+                    el.setAttribute(
+                        attr,
+                        val.replace(/rc-(\d+)-(\d+)/, 'rc-$1-' + newIndex)
+                    );
+                }
+            });
+            if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') el.value = '';
+            else if (el && el.type === 'checkbox') el.checked = false;
+            else if (el.tagName !== 'LABEL') el.value = '';
+        });
+    }
+
     document.querySelectorAll('.add-rental-charge').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            const list = btn.closest('.rental-charges-list');
+            const card = btn.closest('.col-md-12');
+            const list = card ? card.querySelector('.rental-charges-list') : null;
             if (!list) return;
-            const totalFormsInput = list.querySelector('input[name$="-TOTAL_FORMS"]');
-            if (!totalFormsInput) return;
+            // The management form (TOTAL_FORMS) is a sibling of the list, so
+            // resolve it from the card rather than the list itself. Scope by
+            // the rc-<card>- prefix so we don't accidentally pick up the
+            // outer TowplaneCloseoutFormSet management form (form-TOTAL_FORMS).
+            const prefix = rowPrefix(list);
+            // prefix is "rc-<card>-<row>-" (e.g. "rc-0-0-"); strip the row
+            // index segment to get the formset prefix "rc-0-", then build
+            // the management-form name "rc-0-TOTAL_FORMS".
+            const formsetPrefix = prefix ? prefix.replace(/-\d+-$/, '-') : null;
+            const totalFormsInput = card
+                ? card.querySelector(
+                      formsetPrefix
+                          ? `input[name="${formsetPrefix}TOTAL_FORMS"]`
+                          : 'input[name$="-TOTAL_FORMS"]'
+                  )
+                : null;
             const rows = list.querySelectorAll('.rental-charge-row');
             if (!rows.length) return;
-            const templateRow = rows[rows.length - 1];
-            const newIndex = parseInt(totalFormsInput.value, 10);
-            totalFormsInput.value = String(newIndex + 1);
 
+            const newIndex = totalFormsInput ? parseInt(totalFormsInput.value, 10) : rows.length;
+
+            const templateRow = rows[rows.length - 1];
             const clone = templateRow.cloneNode(true);
-            clone.querySelectorAll('input, select, textarea').forEach(function(el) {
-                const name = el.getAttribute('name') || '';
-                if (name) {
-                    el.setAttribute('name', name.replace(/(-\d+)(-|$)/, '-' + newIndex + '$2'));
-                }
-                el.value = '';
-                if (el.type === 'checkbox') el.checked = false;
-            });
-            // Remove any delete checkbox on the newly added blank row.
-            const del = clone.querySelector('input[type="checkbox"].form-check-input');
-            if (del) del.closest('.form-check').remove();
+            if (prefix) {
+                reindexRow(clone, newIndex);
+            } else {
+                // Fallback: generic re-index (no rc- card prefix found).
+                clone.querySelectorAll('input, select, textarea').forEach(function(el) {
+                    const name = el.getAttribute('name') || '';
+                    if (name) {
+                        el.setAttribute('name', name.replace(/(-\d+)(-|$)/, '-' + newIndex + '$2'));
+                    }
+                    if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') el.value = '';
+                    else if (el.type === 'checkbox') el.checked = false;
+                    else el.value = '';
+                });
+            }
+            // A freshly added row is never "deletable" — drop its delete flag.
+            const flag = clone.querySelector('.rental-row-delete-flag');
+            if (flag) flag.parentElement.remove();
+            const trash = clone.querySelector('.rental-row-delete');
+            if (trash) trash.style.display = '';
             list.appendChild(clone);
+            if (totalFormsInput) totalFormsInput.value = String(newIndex + 1);
         });
+    });
+
+    // "Remove renter" trashcan (event delegation handles dynamically-added rows).
+    document.addEventListener('click', function(e) {
+        const trash = e.target.closest('.rental-row-delete');
+        if (!trash) return;
+        const row = trash.closest('.rental-charge-row');
+        if (!row) return;
+        const flag = row.querySelector('.rental-row-delete-flag');
+        if (flag) {
+            // Existing (saved) row: toggle the formset DELETE checkbox.
+            flag.checked = !flag.checked;
+            row.classList.toggle('rental-row-marked-deleted', flag.checked);
+            trash.setAttribute('aria-pressed', flag.checked ? 'true' : 'false');
+        } else {
+            // New (unsaved) row: remove it from the form entirely.
+            row.remove();
+        }
     });
 });
 </script>
