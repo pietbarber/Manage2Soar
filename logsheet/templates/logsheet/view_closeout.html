@@ -181,8 +181,8 @@
             <th><i class="bi bi-speedometer2 me-1"></i>End Tach</th>
             <th><i class="bi bi-fuel-pump me-1"></i>Fuel Added</th>
             {% if towplane_rental_enabled %}
+            <th><i class="bi bi-person me-1"></i>Renter</th>
             <th><i class="bi bi-cash-coin me-1"></i>Rental Hours</th>
-            <th><i class="bi bi-person me-1"></i>Charged To</th>
             <th><i class="bi bi-dollar me-1"></i>Rental Cost</th>
             {% endif %}
             <th><i class="bi bi-chat-text me-1"></i>Notes</th>
@@ -190,18 +190,33 @@
         </thead>
         <tbody>
           {% for tow in towplanes %}
-          <tr>
-            <td><strong>{{ tow.towplane }}</strong></td>
-            <td>{{ tow.start_tach|default:"—" }}</td>
-            <td>{{ tow.end_tach|default:"—" }}</td>
-            <td>{{ tow.fuel_added|default:"—" }} {% if tow.fuel_added %}gal{% endif %}</td>
-            {% if towplane_rental_enabled %}
-            <td>{{ tow.rental_hours_chargeable|default:"—" }} {% if tow.rental_hours_chargeable %}hrs{% endif %}</td>
-            <td>{{ tow.rental_charged_to.full_display_name|default:"—" }}</td>
-            <td>{{ tow.rental_cost_display }}</td>
-            {% endif %}
-            <td>{{ tow.notes|default:"—"|safe }}</td>
-          </tr>
+          {% if towplane_rental_enabled and tow.rental_charges.exists %}
+            {% for charge in tow.rental_charges.all %}
+            <tr>
+              <td>{% if forloop.first %}<strong>{{ tow.towplane }}</strong>{% endif %}</td>
+              <td>{% if forloop.first %}{{ tow.start_tach|default:"—" }}{% endif %}</td>
+              <td>{% if forloop.first %}{{ tow.end_tach|default:"—" }}{% endif %}</td>
+              <td>{% if forloop.first %}{{ tow.fuel_added|default:"—" }} {% if tow.fuel_added %}gal{% endif %}{% endif %}</td>
+              <td>{{ charge.member.full_display_name }}</td>
+              <td>{{ charge.hours }} hrs</td>
+              <td>{{ charge.cost_display }}</td>
+              <td>{% if forloop.first %}{{ tow.notes|default:"—"|safe }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td><strong>{{ tow.towplane }}</strong></td>
+              <td>{{ tow.start_tach|default:"—" }}</td>
+              <td>{{ tow.end_tach|default:"—" }}</td>
+              <td>{{ tow.fuel_added|default:"—" }} {% if tow.fuel_added %}gal{% endif %}</td>
+              {% if towplane_rental_enabled %}
+              <td>{% if tow.rental_charged_to %}{{ tow.rental_charged_to.full_display_name }}{% else %}—{% endif %}</td>
+              <td>{{ tow.rental_hours_chargeable|default:"—" }} {% if tow.rental_hours_chargeable %}hrs{% endif %}</td>
+              <td>{{ tow.rental_cost_display }}</td>
+              {% endif %}
+              <td>{{ tow.notes|default:"—"|safe }}</td>
+            </tr>
+          {% endif %}
           {% endfor %}
         </tbody>
       </table>

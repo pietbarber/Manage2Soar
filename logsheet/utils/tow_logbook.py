@@ -84,6 +84,7 @@ def get_tow_logbook_data(member, start_date):
         TowplaneCloseout.objects.filter(logsheet_id__in=logsheet_ids)
         .exclude(virtual_towplane_q)
         .select_related("towplane")
+        .prefetch_related("rental_charges")
     ):
         member_towplane_ids = member_towplane_ids_by_logsheet.get(
             closeout.logsheet_id, set()
@@ -115,7 +116,9 @@ def get_tow_logbook_data(member, start_date):
             closeout_total = Decimal("0.00")
             has_actual = False
             for closeout in closeouts:
-                rental_hours = Decimal(closeout.rental_hours_chargeable or 0)
+                # Issue #968: sum of per-renter charges; falls back to the
+                # legacy single-renter scalar when no charge rows exist.
+                rental_hours = Decimal(closeout.total_rental_hours or 0)
                 if closeout.tach_time is not None:
                     closeout_total += max(
                         Decimal("0.00"), Decimal(closeout.tach_time) - rental_hours

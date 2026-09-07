@@ -200,42 +200,52 @@ class TowplaneRentalFormTestCase(TestCase):
             log_date="2025-11-21", airfield=self.airfield, created_by=self.member
         )
 
-    def test_towplane_closeout_form_includes_rental_field(self):
-        """Test that TowplaneCloseoutForm includes rental_hours_chargeable."""
+    def test_towplane_closeout_form_excludes_legacy_rental_fields(self):
+        """Issue #968: legacy single-renter fields moved to TowplaneRentalCharge."""
         from logsheet.forms import TowplaneCloseoutForm
 
         form = TowplaneCloseoutForm()
-        self.assertIn("rental_hours_chargeable", form.fields)
+        self.assertNotIn("rental_hours_chargeable", form.fields)
+        self.assertNotIn("rental_charged_to", form.fields)
 
-        # Check field label and help text
-        field = form.fields["rental_hours_chargeable"]
-        self.assertEqual(field.label, "Rental Hours (Non-Towing)")
-        self.assertIn("non-towing usage", field.help_text)
+    def test_rental_charge_formset_saves_per_renter_rows(self):
+        """Issue #968: rental charges are saved as per-renter rows."""
+        from logsheet.forms import TowplaneRentalChargeFormSet
+        from logsheet.models import TowplaneRentalCharge
 
-    def test_form_saves_rental_hours(self):
-        """Test that form correctly saves rental hours data."""
-        from logsheet.forms import TowplaneCloseoutForm
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.0"),
+            end_tach=Decimal("103.5"),
+            fuel_added=Decimal("12.5"),
+            notes="Test flight review",
+        )
 
         form_data = {
-            "towplane": self.towplane.pk,
-            "start_tach": "100.0",
-            "end_tach": "103.5",
-            "fuel_added": "12.5",
-            "rental_hours_chargeable": "2.0",
-            "rental_charged_to": self.member.pk,  # Required field when rentals enabled
-            "notes": "Test flight review",
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-member": self.member.pk,
+            "form-0-hours": "2.0",
+            "form-0-notes": "Flight review",
         }
 
-        form = TowplaneCloseoutForm(data=form_data)
-        self.assertTrue(form.is_valid())
+        formset = TowplaneRentalChargeFormSet(
+            data=form_data,
+            queryset=TowplaneRentalCharge.objects.filter(closeout=closeout),
+            prefix="form",
+        )
+        for f in formset.forms:
+            f.instance.closeout = closeout
+        self.assertTrue(formset.is_valid())
+        formset.save()
 
-        # Create closeout instance
-        closeout = form.save(commit=False)
-        closeout.logsheet = self.logsheet
-        closeout.save()
-
-        # Verify data was saved correctly
-        self.assertEqual(closeout.rental_hours_chargeable, Decimal("2.0"))
+        charge = TowplaneRentalCharge.objects.get(closeout=closeout)
+        self.assertEqual(charge.member, self.member)
+        self.assertEqual(charge.hours, Decimal("2.0"))
+        # 2.0 hours * $95.00/hour = $190.00
         self.assertEqual(closeout.rental_cost, Decimal("190.00"))
 
 

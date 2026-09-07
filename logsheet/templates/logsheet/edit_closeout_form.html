@@ -375,31 +375,45 @@
                     </div>
                   </div>
                 </div>
-                <!-- Rental Section - Only show if enabled in site configuration -->
-                {% if towform.rental_hours_chargeable %}
+                <!-- Rental Section - per-renter charge rows (Issue #968) -->
+                {% if towform.rental_formset %}
                 <div class="row">
                   <div class="col-md-12">
                     <h6 class="text-muted mb-3"><i class="bi bi-cash-coin me-2"></i>Non-Towing Rental Charges</h6>
-                    <div class="row">
-                      <div class="col-md-6">
-                        <div class="mb-3">
-                          {{ towform.rental_hours_chargeable.label_tag }}
-                          <div class="input-group">
-                            {{ towform.rental_hours_chargeable }}
-                            <span class="input-group-text">hours</span>
+                    {{ towform.rental_formset.management_form }}
+                    <div class="rental-charges-list">
+                      {% for rent_form in towform.rental_formset %}
+                      <div class="rental-charge-row row g-2 align-items-end mb-2">
+                        <div class="col-md-5">
+                          <label class="form-label small mb-0">{{ rent_form.member.label }}</label>
+                          {{ rent_form.member }}
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0">{{ rent_form.hours.label }}</label>
+                          {{ rent_form.hours }}
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0">Notes</label>
+                          {{ rent_form.notes }}
+                        </div>
+                        <div class="col-md-1 text-end">
+                          {% if rent_form.instance.pk %}
+                          <div class="form-check">
+                            <label class="form-check-label small">Del</label>
+                            <input type="checkbox" class="form-check-input" {{ rent_form.DELETE }}>
                           </div>
-                          <div class="form-text">{{ towform.rental_hours_chargeable.help_text }}</div>
-                          {{ towform.rental_hours_chargeable.errors }}
+                          {% endif %}
                         </div>
+                        {% if rent_form.non_field_errors %}
+                        <div class="col-12"><div class="text-danger small">{{ rent_form.non_field_errors }}</div></div>
+                        {% endif %}
                       </div>
-                      <div class="col-md-6">
-                        <div class="mb-3">
-                          {{ towform.rental_charged_to.label_tag }}
-                          {{ towform.rental_charged_to }}
-                          <div class="form-text">{{ towform.rental_charged_to.help_text }}</div>
-                          {{ towform.rental_charged_to.errors }}
-                        </div>
-                      </div>
+                      {% endfor %}
+                    </div>
+                    <div class="mt-2">
+                      <button type="button" class="btn btn-sm btn-outline-secondary add-rental-charge" data-target=".rental-charges-list" data-template-index="0">
+                        <i class="bi bi-plus-lg me-1"></i>Add Renter
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -675,6 +689,40 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+});
+
+// --- Per-renter towplane rental charge rows (Issue #968) ---
+// Each towplane card has its own nested formset (prefix rc-<n>). The
+// "Add Renter" button clones the blank placeholder row, re-indexes its
+// field names to the current TOTAL_FORMS value, and bumps TOTAL_FORMS.
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.add-rental-charge').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const list = btn.closest('.rental-charges-list');
+            if (!list) return;
+            const totalFormsInput = list.querySelector('input[name$="-TOTAL_FORMS"]');
+            if (!totalFormsInput) return;
+            const rows = list.querySelectorAll('.rental-charge-row');
+            if (!rows.length) return;
+            const templateRow = rows[rows.length - 1];
+            const newIndex = parseInt(totalFormsInput.value, 10);
+            totalFormsInput.value = String(newIndex + 1);
+
+            const clone = templateRow.cloneNode(true);
+            clone.querySelectorAll('input, select, textarea').forEach(function(el) {
+                const name = el.getAttribute('name') || '';
+                if (name) {
+                    el.setAttribute('name', name.replace(/(-\d+)(-|$)/, '-' + newIndex + '$2'));
+                }
+                el.value = '';
+                if (el.type === 'checkbox') el.checked = false;
+            });
+            // Remove any delete checkbox on the newly added blank row.
+            const del = clone.querySelector('input[type="checkbox"].form-check-input');
+            if (del) del.closest('.form-check').remove();
+            list.appendChild(clone);
+        });
+    });
 });
 </script>
 {% endblock %}

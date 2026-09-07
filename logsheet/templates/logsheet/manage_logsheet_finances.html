@@ -212,20 +212,29 @@
     <thead>
       <tr>
         <th data-sort-method="string">Towplane</th>
+        <th data-sort-method="string">Renter</th>
         <th data-sort-method="number">Rental Hours</th>
-        <th data-sort-method="string">Charged To</th>
         <th class="text-end" data-sort-method="number">Cost</th>
       </tr>
     </thead>
   <tbody>
     {% for closeout, rental_cost in towplane_data %}
-    {% if closeout.rental_hours_chargeable %}
-    <tr>
-      <td>{{ closeout.towplane }}</td>
-      <td>{{ closeout.rental_hours_chargeable }} hrs</td>
-      <td>{{ closeout.rental_charged_to.full_display_name|default:"—" }}</td>
-      <td class="text-end">{{ closeout.rental_cost_display }}</td>
-    </tr>
+    {% if rental_cost > 0 %}
+      {% for charge in closeout.rental_charges.all %}
+      <tr>
+        <td>{% if forloop.first %}{{ closeout.towplane }}{% endif %}</td>
+        <td>{{ charge.member.full_display_name }}</td>
+        <td>{{ charge.hours }} hrs</td>
+        <td class="text-end">{{ charge.cost_display }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td>{{ closeout.towplane }}</td>
+        <td>{{ closeout.rental_charged_to.full_display_name|default:"—" }}</td>
+        <td>{{ closeout.rental_hours_chargeable }} hrs</td>
+        <td class="text-end">{{ closeout.rental_cost_display }}</td>
+      </tr>
+      {% endfor %}
     {% endif %}
     {% endfor %}
     </tbody>

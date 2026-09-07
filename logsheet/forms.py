@@ -22,6 +22,7 @@ from .models import (
     MemberCharge,
     Towplane,
     TowplaneCloseout,
+    TowplaneRentalCharge,
 )
 
 
@@ -1086,39 +1087,14 @@ class TowplaneCloseoutForm(forms.ModelForm):
             "start_tach",
             "end_tach",
             "fuel_added",
-            "rental_hours_chargeable",
-            "rental_charged_to",
             "notes",
         ]
         widgets = {
             "notes": TinyMCE(mce_attrs={"height": 300}),
         }
-        labels = {
-            "rental_hours_chargeable": "Rental Hours (Non-Towing)",
-            "rental_charged_to": "Charge Rental To",
-        }
-        help_texts = {
-            "rental_hours_chargeable": "Hours of non-towing usage to charge as rental (sightseeing, flight reviews, retrieval flights, etc.)",
-            "rental_charged_to": "Member who should be charged for the towplane rental time",
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # Check if towplane rentals are enabled
-        config = SiteConfiguration.objects.first()
-        rental_enabled = config.allow_towplane_rental if config else False
-
-        # Remove rental fields if not enabled
-        if not rental_enabled:
-            if "rental_hours_chargeable" in self.fields:
-                del self.fields["rental_hours_chargeable"]
-            if "rental_charged_to" in self.fields:
-                del self.fields["rental_charged_to"]
-        else:
-            # Set up the rental_charged_to queryset if rentals are enabled
-            if "rental_charged_to" in self.fields:
-                self.fields["rental_charged_to"].queryset = get_active_members()
 
         towplanes = [
             tp for tp in Towplane.objects.filter(is_active=True) if not tp.is_grounded
@@ -1146,6 +1122,83 @@ TowplaneCloseoutFormSet = modelformset_factory(
     form=TowplaneCloseoutForm,
     extra=0,
 )
+
+
+def rental_enabled() -> bool:
+    """Return True if the SiteConfiguration allows towplane rental charges."""
+    config = SiteConfiguration.objects.first()
+    return bool(config.allow_towplane_rental) if config else False
+
+
+class TowplaneRentalChargeForm(forms.ModelForm):
+    """One row of the per-renter rental charge table (Issue #968)."""
+
+    class Meta:
+        model = TowplaneRentalCharge
+        fields = ["member", "hours", "notes"]
+        labels = {
+            "member": "Member charged",
+            "hours": "Hours (non-towing)",
+            "notes": "Notes",
+        }
+        help_texts = {
+            "hours": "Hours of non-towing usage charged to this member.",
+        }
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["member"].queryset = get_active_members()
+        self.fields["member"].empty_label = "—"
+        self.fields["member"].required = False
+        self.fields["hours"].widget.attrs.update(
+            {
+                "min": "0.1",
+                "step": "0.1",
+                "class": "form-control",
+                "style": "max-width: 8rem",
+            }
+        )
+
+
+class _TowplaneRentalChargeFormSetBase(
+    modelformset_factory(
+        TowplaneRentalCharge,
+        form=TowplaneRentalChargeForm,
+        extra=1,
+        can_delete=True,
+    )
+):
+    """Base formset generated from modelformset_factory."""
+
+
+class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
+    """Formset for per-renter towplane rental charges.
+
+    Blank rows (no member selected) are skipped on save so the ``extra=1``
+    empty row for adding a renter does not fail the non-null ``member`` FK.
+    """
+
+    def _post_clean(self):
+        # Clear the "member" required error on fully blank placeholder rows.
+        for form in self.forms:
+            if (
+                form.is_bound
+                and "member" in form._errors
+                and not form.cleaned_data.get("member")
+                and not form.cleaned_data.get("hours")
+            ):
+                form._errors.pop("member", None)
+        super()._post_clean()
+
+    def save(self, commit=True):
+        for form in self.forms:
+            if form.cleaned_data is None or form.cleaned_data.get("member") is None:
+                # Fully blank placeholder row — do not create a charge.
+                form.cleaned_data = None
+        return super().save(commit=commit)
 
 
 class MaintenanceIssueForm(forms.ModelForm):

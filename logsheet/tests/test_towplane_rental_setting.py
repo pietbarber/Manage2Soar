@@ -71,9 +71,9 @@ class TowplaneRentalSettingTestCase(TestCase):
         )
         response = self.client.get(url)
 
-        # Check that rental fields are not in the response
-        self.assertNotContains(response, 'name="form-0-rental_hours_chargeable"')
-        self.assertNotContains(response, 'name="form-0-rental_charged_to"')
+        # Check that rental formset is not in the response
+        self.assertNotContains(response, 'name="rc-0-0-member"')
+        self.assertNotContains(response, 'name="rc-0-0-hours"')
         self.assertNotContains(response, "Non-Towing Rental Charges")
 
     def test_rental_fields_shown_when_enabled(self):
@@ -88,9 +88,9 @@ class TowplaneRentalSettingTestCase(TestCase):
         )
         response = self.client.get(url)
 
-        # Check that rental fields are in the response
-        self.assertContains(response, 'name="form-0-rental_hours_chargeable"')
-        self.assertContains(response, 'name="form-0-rental_charged_to"')
+        # Check that rental formset is in the response
+        self.assertContains(response, 'name="rc-0-0-member"')
+        self.assertContains(response, 'name="rc-0-0-hours"')
         self.assertContains(response, "Non-Towing Rental Charges")
 
     def test_financial_page_hides_rental_column_when_disabled(self):
@@ -120,6 +120,15 @@ class TowplaneRentalSettingTestCase(TestCase):
         self.closeout.rental_hours_chargeable = 2.5
         self.closeout.rental_charged_to = self.member
         self.closeout.save()
+
+        # Also add a per-renter charge row (Issue #968)
+        from logsheet.models import TowplaneRentalCharge
+
+        TowplaneRentalCharge.objects.create(
+            closeout=self.closeout,
+            member=self.member,
+            hours=2.5,
+        )
 
         self.client.force_login(self.member)
         url = reverse(
@@ -196,20 +205,28 @@ class TowplaneRentalSettingTestCase(TestCase):
             "form-0-start_tach": "100.0",
             "form-0-end_tach": "105.0",
             "form-0-fuel_added": "25.0",
-            "form-0-rental_hours_chargeable": "2.5",
-            "form-0-rental_charged_to": self.member.pk,
             "form-0-notes": "Good flight with rental",
+            # Per-renter rental charges (Issue #968): one row for self.member.
+            "rc-0-TOTAL_FORMS": "1",
+            "rc-0-INITIAL_FORMS": "0",
+            "rc-0-MIN_NUM_FORMS": "0",
+            "rc-0-MAX_NUM_FORMS": "1000",
+            "rc-0-0-member": self.member.pk,
+            "rc-0-0-hours": "2.5",
         }
 
         response = self.client.post(url, form_data)
         # Should redirect on successful save
         self.assertEqual(response.status_code, 302)
 
-        # Verify closeout was updated with rental data
+        # Verify the rental charge row was created (Issue #968)
+        from logsheet.models import TowplaneRentalCharge
+
         self.closeout.refresh_from_db()
         self.assertEqual(self.closeout.fuel_added, 25.0)
-        self.assertEqual(self.closeout.rental_hours_chargeable, 2.5)
-        self.assertEqual(self.closeout.rental_charged_to, self.member)
+        charge = TowplaneRentalCharge.objects.get(closeout=self.closeout)
+        self.assertEqual(charge.member, self.member)
+        self.assertEqual(charge.hours, 2.5)
 
     def test_default_setting_is_disabled(self):
         """Test that towplane rental is disabled by default."""
