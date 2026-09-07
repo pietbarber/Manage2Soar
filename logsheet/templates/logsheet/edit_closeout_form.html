@@ -9,17 +9,6 @@
 {# Issue #397: TinyMCE YouTube fix must load after form.media #}
 <script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
 <link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
-<style>
-  .rental-row-marked-deleted {
-    opacity: 0.55;
-    text-decoration: line-through;
-  }
-  .rental-row-delete[aria-pressed="true"] {
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: #fff;
-  }
-</style>
 {% endblock %}
 
 {% block content %}

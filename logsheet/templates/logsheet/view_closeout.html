@@ -190,7 +190,7 @@
         </thead>
         <tbody>
           {% for tow in towplanes %}
-          {% if towplane_rental_enabled and tow.rental_charges.exists %}
+          {% if towplane_rental_enabled %}
             {% for charge in tow.rental_charges.all %}
             <tr>
               <td>{% if forloop.first %}<strong>{{ tow.towplane }}</strong>{% endif %}</td>
@@ -200,7 +200,18 @@
               <td>{{ charge.member.full_display_name }}</td>
               <td>{{ charge.hours }} hrs</td>
               <td>{{ charge.cost_display }}</td>
-              <td>{% if forloop.first %}{{ tow.notes|default:"—"|safe }}{% endif %}</td>
+              <td>{% if forloop.first %}<div class="cms-content">{{ tow.notes|default:"—"|safe }}</div>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td><strong>{{ tow.towplane }}</strong></td>
+              <td>{{ tow.start_tach|default:"—" }}</td>
+              <td>{{ tow.end_tach|default:"—" }}</td>
+              <td>{{ tow.fuel_added|default:"—" }} {% if tow.fuel_added %}gal{% endif %}</td>
+              <td>{% if tow.rental_charged_to %}{{ tow.rental_charged_to.full_display_name }}{% else %}—{% endif %}</td>
+              <td>{{ tow.rental_hours_chargeable|default:"—" }} {% if tow.rental_hours_chargeable %}hrs{% endif %}</td>
+              <td>{{ tow.rental_cost_display }}</td>
+              <td><div class="cms-content">{{ tow.notes|default:"—"|safe }}</div></td>
             </tr>
             {% endfor %}
           {% else %}
@@ -209,12 +220,7 @@
               <td>{{ tow.start_tach|default:"—" }}</td>
               <td>{{ tow.end_tach|default:"—" }}</td>
               <td>{{ tow.fuel_added|default:"—" }} {% if tow.fuel_added %}gal{% endif %}</td>
-              {% if towplane_rental_enabled %}
-              <td>{% if tow.rental_charged_to %}{{ tow.rental_charged_to.full_display_name }}{% else %}—{% endif %}</td>
-              <td>{{ tow.rental_hours_chargeable|default:"—" }} {% if tow.rental_hours_chargeable %}hrs{% endif %}</td>
-              <td>{{ tow.rental_cost_display }}</td>
-              {% endif %}
-              <td>{{ tow.notes|default:"—"|safe }}</td>
+              <td><div class="cms-content">{{ tow.notes|default:"—"|safe }}</div></td>
             </tr>
           {% endif %}
           {% endfor %}
