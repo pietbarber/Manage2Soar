@@ -121,6 +121,8 @@ class TowplaneRentalChargeModelTestCase(TestCase):
         self.assertEqual(self.closeout.rental_cost, Decimal("95.00"))
 
     def test_zero_hour_charge_yields_no_rental_cost(self):
+        self.closeout.rental_hours_chargeable = Decimal("3.0")
+        self.closeout.save()
         TowplaneRentalCharge.objects.create(
             closeout=self.closeout,
             member=self.member_a,

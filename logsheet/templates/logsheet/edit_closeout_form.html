@@ -412,9 +412,7 @@
                             <i class="bi bi-trash"></i>
                           </button>
                           {% if rent_form.instance.pk %}
-                          <div class="d-none">
-                            <input type="checkbox" class="rental-row-delete-flag" {{ rent_form.DELETE }}>
-                          </div>
+                          {{ rent_form.DELETE }}
                           {% endif %}
                         </div>
                         {% if rent_form.non_field_errors %}

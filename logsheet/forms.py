@@ -1155,7 +1155,7 @@ class TowplaneRentalChargeForm(forms.ModelForm):
         self.fields["member"].required = False
         self.fields["hours"].widget.attrs.update(
             {
-                "min": "0.1",
+                "min": "0.0",
                 "step": "0.1",
                 "class": "form-control",
                 "style": "max-width: 8rem",
@@ -1182,6 +1182,13 @@ class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
     rows (no member selected) are still skipped on save so an in-flight extra
     row never fails the non-null ``member`` FK.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for form in self.forms:
+            form.fields["DELETE"].widget.attrs[
+                "class"
+            ] = "d-none rental-row-delete-flag"
 
     def _post_clean(self):
         # Clear the "member" required error on fully blank placeholder rows.

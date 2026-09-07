@@ -1985,13 +1985,9 @@ class TowplaneCloseout(models.Model):
     @property
     def total_rental_hours(self):
         """Sum of hours across all per-renter charge rows, falling back to the legacy column."""
-        from django.db.models import Sum
-
-        total = self.rental_charges.aggregate(total=Sum("hours"))["total"] or Decimal(
-            "0"
-        )
-        if total > 0:
-            return total
+        charges = list(self.rental_charges.all())
+        if charges:
+            return sum((charge.hours for charge in charges), Decimal("0"))
         # Fallback: legacy single-renter column (pre-migration data)
         if (
             self.rental_hours_chargeable is not None
