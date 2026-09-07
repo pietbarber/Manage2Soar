@@ -428,10 +428,7 @@
                         <i class="bi bi-plus-lg me-1"></i>Add Renter
                       </button>
                     </div>
-                    {# Blank row template for "Add Renter". Hidden from view
-                       but present in the DOM so the JS can clone it. Field
-                       names use the formset's __prefix__ token which the JS
-                       replaces with the real row index. #}
+                    {# Blank-row template cloned by "Add Renter" (hidden, __prefix__ reindexed by JS) #}
                     <div class="d-none rental-row-template" aria-hidden="true">
                       <div class="rental-charge-row row g-2 align-items-end mb-2">
                         <div class="col-md-5">
