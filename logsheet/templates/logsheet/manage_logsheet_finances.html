@@ -219,7 +219,7 @@
     </thead>
   <tbody>
     {% for closeout, rental_cost in towplane_data %}
-    {% if rental_cost > 0 %}
+    {% if closeout.total_rental_hours > 0 %}
       {% for charge in closeout.rental_charges.all %}
       <tr>
         <td>{% if forloop.first %}{{ closeout.towplane }}{% endif %}</td>

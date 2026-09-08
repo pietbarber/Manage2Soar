@@ -428,6 +428,23 @@ class FinanceAttributionMultiRenterTestCase(TestCase):
         self.assertEqual(response.context["towplane_data"], [])
         self.assertEqual(response.context["total_towplane_rental"], 0)
 
+    def test_rental_hours_show_without_hourly_rate(self):
+        self.towplane.hourly_rental_rate = None
+        self.towplane.save(update_fields=["hourly_rental_rate"])
+        TowplaneRentalCharge.objects.create(
+            closeout=self.closeout,
+            member=self.member_a,
+            hours=Decimal("2.0"),
+        )
+
+        self.client.force_login(self.member_a)
+        url = reverse("logsheet:manage_logsheet_finances", args=[self.logsheet.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alice Aardvark")
+        self.assertContains(response, "2.0 hrs")
+
     def test_disabled_rental_does_not_block_finalization(self):
         TowplaneRentalCharge.objects.create(
             closeout=self.closeout,
