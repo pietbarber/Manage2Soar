@@ -50,6 +50,7 @@ from .forms import (
     MaintenanceIssueForm,
     MemberChargeForm,
     TowplaneCloseoutFormSet,
+    TowplaneRentalChargeFormSet,
 )
 from .models import (
     AircraftMeister,
@@ -71,6 +72,7 @@ from .models import (
     TowplaneChargeScheme,
     TowplaneChargeTier,
     TowplaneCloseout,
+    TowplaneRentalCharge,
 )
 from .services import finalize_logsheet_financials
 from .utils.finalization_email import enqueue_finalization_summary_email_job
@@ -1056,6 +1058,7 @@ def get_validation_message(validation_error):
 def update_flight_split(request, flight_id):
     flight = get_object_or_404(Flight, id=flight_id)
     logsheet = flight.logsheet
+    reason = ""
     if logsheet.finalized:
         if not (
             request.user.is_superuser
@@ -2451,7 +2454,11 @@ def add_flight(request, logsheet_pk):
         raw_client_token = request.POST.get("client_token", "")
         client_token = _normalize_client_token(raw_client_token)
         client_token_max_length = Flight._meta.get_field("client_token").max_length
-        if client_token and len(client_token) > client_token_max_length:
+        if (
+            client_token
+            and client_token_max_length is not None
+            and len(client_token) > client_token_max_length
+        ):
             form.add_error(
                 None,
                 (
@@ -2740,16 +2747,19 @@ def manage_logsheet_finances(request, pk):
     ]
 
     # Get towplane rental costs for this logsheet
-    # OPTIMIZATION: Already optimized with select_related
-    towplane_closeouts = logsheet.towplane_closeouts.select_related(
-        "towplane", "rental_charged_to"
-    ).all()
+    # OPTIMIZATION: select_related for FKs; prefetch per-renter charges (Issue #968)
+    towplane_closeouts = (
+        logsheet.towplane_closeouts.select_related("towplane", "rental_charged_to")
+        .prefetch_related("rental_charges__member")
+        .all()
+    )
 
     # OPTIMIZATION: Cache SiteConfiguration to avoid N+1 queries when processing retrieve flights
     # (Issue #66 - retrieve flights may query SiteConfiguration to check waiver settings)
     from siteconfig.models import SiteConfiguration
 
     site_config = SiteConfiguration.objects.first()
+    allow_towplane_rental = bool(site_config and site_config.allow_towplane_rental)
 
     # Pre-cache config on every non-commercial Flight instance (both member and
     # guest flights) to avoid a SiteConfiguration query per row, including in
@@ -2845,10 +2855,11 @@ def manage_logsheet_finances(request, pk):
 
     # Add towplane rental costs
     towplane_data = []
-    for closeout in towplane_closeouts:
-        rental_cost = closeout.rental_cost or 0
-        towplane_data.append((closeout, rental_cost))
-        total_towplane_rental += rental_cost
+    if allow_towplane_rental:
+        for closeout in towplane_closeouts:
+            rental_cost = closeout.rental_cost or 0
+            towplane_data.append((closeout, rental_cost))
+            total_towplane_rental += rental_cost
 
     total_sum += total_towplane_rental
 
@@ -2915,12 +2926,24 @@ def manage_logsheet_finances(request, pk):
             member_charges[charged_member]["rental"] += rental_split
             member_charges[charged_member]["instruction"] += instruction_split
 
-    # Add towplane rental costs to member charges
-    for closeout, rental_cost in towplane_data:
-        if closeout.rental_charged_to and rental_cost > 0:
-            member_charges[closeout.rental_charged_to]["towplane_rental"] += Decimal(
-                str(rental_cost)
-            )
+    # Add towplane rental costs to member charges (per-renter, Issue #968).
+    # Each TowplaneRentalCharge row attributes this member's share of the
+    # towplane rental to their member_charges. Falls back to the legacy
+    # single-renter closeout fields for pre-migration data.
+    if allow_towplane_rental:
+        for closeout in towplane_closeouts:
+            charges = list(closeout.rental_charges.all())
+            if charges:
+                for rc in charges:
+                    cost = rc.cost or Decimal("0.00")
+                    if cost > 0 and rc.member:
+                        member_charges[rc.member]["towplane_rental"] += cost
+            elif closeout.rental_charged_to:
+                cost = closeout.rental_cost or Decimal("0.00")
+                if cost > 0:
+                    member_charges[closeout.rental_charged_to][
+                        "towplane_rental"
+                    ] += cost
 
     # Add miscellaneous charges (Issue #66, #413)
     misc_charges_qs = MemberCharge.objects.filter(logsheet=logsheet).select_related(
@@ -3055,10 +3078,20 @@ def manage_logsheet_finances(request, pk):
                 elif pilot:
                     responsible_members.add(pilot)
 
-            # Add members responsible for towplane rental charges
-            for closeout in towplane_closeouts:
-                if closeout.rental_charged_to and closeout.rental_cost:
-                    responsible_members.add(closeout.rental_charged_to)
+            if allow_towplane_rental:
+                # Add members responsible for towplane rental charges (Issue #968).
+                # Prefer per-renter charges; fall back to legacy single renter.
+                for closeout in towplane_closeouts:
+                    rental_cost = closeout.rental_cost or Decimal("0.00")
+                    if rental_cost <= 0:
+                        continue
+                    charge_rows = list(closeout.rental_charges.all())
+                    if charge_rows:
+                        for rc in charge_rows:
+                            if rc.member and rc.hours and rc.hours > 0:
+                                responsible_members.add(rc.member)
+                    elif closeout.rental_charged_to:
+                        responsible_members.add(closeout.rental_charged_to)
 
             # Add members responsible for miscellaneous charges (Issue #66, #413)
             for charge in misc_charges_data:
@@ -3269,30 +3302,93 @@ def edit_logsheet_closeout(request, pk):
     # Build formset for towplane closeouts - include all closeouts for this logsheet
     # This keeps any existing (possibly stale) closeouts visible so they can be reviewed and adjusted
     # Run cleanup_virtual_towplane_closeouts management command to remove truly stale virtual towplane closeouts
-    queryset = TowplaneCloseout.objects.filter(logsheet=logsheet)
+    queryset = TowplaneCloseout.objects.filter(logsheet=logsheet).prefetch_related(
+        "rental_charges"
+    )
     formset_class = TowplaneCloseoutFormSet
-    formset = formset_class(queryset=queryset)
+
+    # Rental charges are enabled only when site config allows them.
+    from logsheet.forms import rental_enabled as _rental_enabled
+
+    _rental_on = _rental_enabled()
+
+    def _build_rental_formsets(target_formset, is_post):
+        """Build one rental-charge formset per closeout form in *target_formset*.
+
+        Each nested formset gets a stable, unique prefix ``rc-<index>`` so its
+        management form fields do not collide with the closeout formset's
+        ``form-TOTAL_FORMS`` etc. The prefix uses the closeout form's index
+        (not the closeout pk) so it is stable even for closeouts that have not
+        been saved yet (newly added rows). The rental formset is attached to the
+        closeout form as ``.rental_formset`` for template access.
+        """
+        built = []
+        if not _rental_on:
+            return built
+        for i, cform in enumerate(target_formset.forms):
+            rc_queryset = cform.instance.rental_charges.all()
+            kwargs = {"queryset": rc_queryset, "prefix": f"rc-{i}"}
+            if is_post:
+                kwargs["data"] = request.POST
+            rc_formset = TowplaneRentalChargeFormSet(**kwargs)
+            # ``closeout`` is not a form field, so pin each rental charge
+            # instance to its parent closeout. This matters for new/extra
+            # rows (their instance has closeout=None until set here). By the
+            # time the rental formset is saved (after the closeout formset),
+            # the closeout instance has a pk.
+            for rcf in rc_formset.forms:
+                rcf.instance.closeout = cform.instance
+            built.append(rc_formset)
+            cform.rental_formset = rc_formset
+        return built
 
     if request.method == "POST":
         form = LogsheetCloseoutForm(request.POST, instance=closeout)
         duty_form = LogsheetDutyCrewForm(request.POST, instance=logsheet)
         formset = formset_class(request.POST, queryset=queryset)
 
-        forms_valid = form.is_valid() and duty_form.is_valid() and formset.is_valid()
-        if forms_valid and logsheet.finalized:
-            billing_fields = {"rental_hours_chargeable", "rental_charged_to"}
-            for closeout_form in formset.forms:
-                if billing_fields.intersection(closeout_form.changed_data):
-                    closeout_form.add_error(
-                        None,
-                        "Towplane rental charges require an audited billing correction.",
+        form_valid = form.is_valid()
+        duty_form_valid = duty_form.is_valid()
+        closeout_formset_valid = formset.is_valid()
+        forms_valid = form_valid and duty_form_valid and closeout_formset_valid
+
+        rental_formsets = _build_rental_formsets(formset, is_post=True)
+
+        if _rental_on:
+            rental_formsets_valid = True
+            for rc_formset in rental_formsets:
+                if not rc_formset.is_valid():
+                    rental_formsets_valid = False
+            forms_valid = forms_valid and rental_formsets_valid
+
+        if forms_valid and logsheet.finalized and _rental_on:
+            # Post-finalization: only changes to rental charge rows are billing
+            # corrections. Unchanged existing rows must not block operational
+            # closeout edits such as tach, fuel, or notes updates.
+            for rc_formset in rental_formsets:
+                touched = False
+                for rcf in rc_formset.forms:
+                    if rcf.has_changed():
+                        touched = True
+                        break
+                if touched:
+                    # Surface the error on the rental formset so the
+                    # template can display it next to the charge rows.
+                    rc_formset.non_form_errors().append(
+                        "Towplane rental charges require an audited billing "
+                        "correction after finalization."
                     )
                     forms_valid = False
+                    break
 
         if forms_valid:
             form.save()
             duty_form.save()
             formset.save()
+
+            if _rental_on:
+                for rc_formset in rental_formsets:
+                    rc_formset.save()
 
             messages.success(request, "Closeout, duty crew, and towplane info updated.")
             return redirect("logsheet:manage", pk=logsheet.pk)
@@ -3300,6 +3396,9 @@ def edit_logsheet_closeout(request, pk):
     else:
         form = LogsheetCloseoutForm(instance=closeout)
         duty_form = LogsheetDutyCrewForm(instance=logsheet)
+        formset = formset_class(queryset=queryset)
+
+        _build_rental_formsets(formset, is_post=False)
 
     # Get towplanes available for manual addition (not already in closeouts)
     existing_closeout_towplanes = TowplaneCloseout.objects.filter(
@@ -3461,9 +3560,11 @@ def view_logsheet_closeout(request, pk):
         logsheet=logsheet
     ).select_related("reported_by", "glider", "towplane")
     closeout = getattr(logsheet, "closeout", None)
-    towplanes = logsheet.towplane_closeouts.select_related(
-        "towplane", "rental_charged_to"
-    ).all()
+    towplanes = (
+        logsheet.towplane_closeouts.select_related("towplane", "rental_charged_to")
+        .prefetch_related("rental_charges__member")
+        .all()
+    )
 
     # Check if towplane rentals are enabled for conditional display
     config = SiteConfiguration.objects.first()

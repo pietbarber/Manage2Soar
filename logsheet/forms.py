@@ -22,6 +22,7 @@ from .models import (
     MemberCharge,
     Towplane,
     TowplaneCloseout,
+    TowplaneRentalCharge,
 )
 
 
@@ -129,7 +130,7 @@ class FlightForm(forms.ModelForm):
     ticket_number = forms.CharField(max_length=50, required=False)
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         glider = cleaned_data.get("glider")
         launch_time = cleaned_data.get("launch_time")
         landing_time = cleaned_data.get("landing_time")
@@ -738,7 +739,7 @@ class CreateLogsheetForm(forms.ModelForm):
         }
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         log_date = cleaned_data.get("log_date")
         airfield = cleaned_data.get("airfield")
         duty_officer = cleaned_data.get("duty_officer")
@@ -937,7 +938,7 @@ class LogsheetCloseoutForm(forms.ModelForm):
 
 class LogsheetDutyCrewForm(forms.ModelForm):
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         duty_officer = cleaned_data.get("duty_officer")
         duty_instructor = cleaned_data.get("duty_instructor")
         surge_instructor = cleaned_data.get("surge_instructor")
@@ -1086,39 +1087,14 @@ class TowplaneCloseoutForm(forms.ModelForm):
             "start_tach",
             "end_tach",
             "fuel_added",
-            "rental_hours_chargeable",
-            "rental_charged_to",
             "notes",
         ]
         widgets = {
             "notes": TinyMCE(mce_attrs={"height": 300}),
         }
-        labels = {
-            "rental_hours_chargeable": "Rental Hours (Non-Towing)",
-            "rental_charged_to": "Charge Rental To",
-        }
-        help_texts = {
-            "rental_hours_chargeable": "Hours of non-towing usage to charge as rental (sightseeing, flight reviews, retrieval flights, etc.)",
-            "rental_charged_to": "Member who should be charged for the towplane rental time",
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # Check if towplane rentals are enabled
-        config = SiteConfiguration.objects.first()
-        rental_enabled = config.allow_towplane_rental if config else False
-
-        # Remove rental fields if not enabled
-        if not rental_enabled:
-            if "rental_hours_chargeable" in self.fields:
-                del self.fields["rental_hours_chargeable"]
-            if "rental_charged_to" in self.fields:
-                del self.fields["rental_charged_to"]
-        else:
-            # Set up the rental_charged_to queryset if rentals are enabled
-            if "rental_charged_to" in self.fields:
-                self.fields["rental_charged_to"].queryset = get_active_members()
 
         towplanes = [
             tp for tp in Towplane.objects.filter(is_active=True) if not tp.is_grounded
@@ -1148,6 +1124,110 @@ TowplaneCloseoutFormSet = modelformset_factory(
 )
 
 
+def rental_enabled() -> bool:
+    """Return True if the SiteConfiguration allows towplane rental charges."""
+    config = SiteConfiguration.objects.first()
+    return bool(config.allow_towplane_rental) if config else False
+
+
+class TowplaneRentalChargeForm(forms.ModelForm):
+    """One row of the per-renter rental charge table (Issue #968)."""
+
+    class Meta:
+        model = TowplaneRentalCharge
+        fields = ["member", "hours", "notes"]
+        labels = {
+            "member": "Member charged",
+            "hours": "Hours (non-towing)",
+            "notes": "Notes",
+        }
+        help_texts = {
+            "hours": "Hours of non-towing usage charged to this member.",
+        }
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["member"].queryset = get_active_members()
+        self.fields["member"].empty_label = "—"
+        self.fields["member"].required = False
+        self.fields["member"].widget.attrs["class"] = "form-select"
+        self.fields["hours"].widget.attrs.update(
+            {
+                "min": "0.0",
+                "step": "0.1",
+                "class": "form-control",
+                "style": "max-width: 8rem",
+            }
+        )
+
+
+class _TowplaneRentalChargeFormSetBase(
+    modelformset_factory(
+        TowplaneRentalCharge,
+        form=TowplaneRentalChargeForm,
+        extra=0,
+        can_delete=True,
+    )
+):
+    """Base formset generated from modelformset_factory."""
+
+
+class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
+    """Formset for per-renter towplane rental charges.
+
+    ``extra=0`` so no permanent blank row is rendered; rows are added on
+    demand via the "Add Renter" button (see edit_closeout_form.html). Blank
+    Fully blank rows are still skipped on save so an in-flight extra row never
+    fails the non-null ``member`` FK; partially filled rows are invalid.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for form in self.forms:
+            form.fields["DELETE"].widget.attrs[
+                "class"
+            ] = "d-none rental-row-delete-flag"
+
+    def _post_clean(self):
+        # Clear the "member" required error on fully blank placeholder rows.
+        for form in self.forms:
+            if (
+                form.is_bound
+                and "member" in form._errors
+                and not form.cleaned_data.get("member")
+                and not form.cleaned_data.get("hours")
+            ):
+                form._errors.pop("member", None)
+        super()._post_clean()
+
+    def clean(self):
+        super().clean()
+        members = {}
+        for form in self.forms:
+            if self._should_delete_form(form):
+                continue
+            form_data = form.cleaned_data
+            has_data = any(
+                form_data.get(field) not in (None, "")
+                for field in ("member", "hours", "notes")
+            )
+            if has_data and not form_data.get("member"):
+                raise forms.ValidationError(
+                    "Select a member for each rental charge with entered data."
+                )
+            member = form_data.get("member")
+            if member is not None:
+                if member in members:
+                    raise forms.ValidationError(
+                        "Each member can only have one rental charge per towplane."
+                    )
+                members[member] = form
+        return None
+
+
 class MaintenanceIssueForm(forms.ModelForm):
     class Meta:
         model = MaintenanceIssue
@@ -1160,7 +1240,7 @@ class MaintenanceIssueForm(forms.ModelForm):
         }
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         glider = cleaned_data.get("glider")
         towplane = cleaned_data.get("towplane")
 
@@ -1278,7 +1358,7 @@ class MemberChargeForm(forms.ModelForm):
 
     def clean(self):
         """Validate decimal quantity constraint before save."""
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         chargeable_item = cleaned_data.get("chargeable_item")
         quantity = cleaned_data.get("quantity")
 

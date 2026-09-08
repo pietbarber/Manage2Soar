@@ -375,29 +375,71 @@
                     </div>
                   </div>
                 </div>
-                <!-- Rental Section - Only show if enabled in site configuration -->
-                {% if towform.rental_hours_chargeable %}
+                <!-- Rental Section - per-renter charge rows (Issue #968) -->
+                {% if towform.rental_formset %}
                 <div class="row">
                   <div class="col-md-12">
                     <h6 class="text-muted mb-3"><i class="bi bi-cash-coin me-2"></i>Non-Towing Rental Charges</h6>
-                    <div class="row">
-                      <div class="col-md-6">
-                        <div class="mb-3">
-                          {{ towform.rental_hours_chargeable.label_tag }}
-                          <div class="input-group">
-                            {{ towform.rental_hours_chargeable }}
-                            <span class="input-group-text">hours</span>
-                          </div>
-                          <div class="form-text">{{ towform.rental_hours_chargeable.help_text }}</div>
-                          {{ towform.rental_hours_chargeable.errors }}
+                    {{ towform.rental_formset.management_form }}
+                    {% if towform.rental_formset.non_form_errors %}
+                    <div class="alert alert-danger">
+                      {{ towform.rental_formset.non_form_errors }}
+                    </div>
+                    {% endif %}
+                    <div class="rental-charges-list">
+                      {% for rent_form in towform.rental_formset %}
+                      <div class="rental-charge-row row g-2 align-items-end mb-2">
+                        {{ rent_form.id }}
+                        <div class="col-md-5">
+                          <label class="form-label small mb-0" for="{{ rent_form.member.id_for_label }}">{{ rent_form.member.label }}</label>
+                          {{ rent_form.member }}
                         </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0" for="{{ rent_form.hours.id_for_label }}">{{ rent_form.hours.label }}</label>
+                          {{ rent_form.hours }}
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0" for="{{ rent_form.notes.id_for_label }}">{{ rent_form.notes.label }}</label>
+                          {{ rent_form.notes }}
+                        </div>
+                        <div class="col-md-1 text-end">
+                          <button type="button" class="btn btn-sm btn-outline-danger rental-row-delete" title="Remove renter" aria-label="Remove renter" aria-pressed="false">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                          {% if rent_form.instance.pk %}
+                          {{ rent_form.DELETE }}
+                          {% endif %}
+                        </div>
+                        {% if rent_form.non_field_errors %}
+                        <div class="col-12"><div class="text-danger small">{{ rent_form.non_field_errors }}</div></div>
+                        {% endif %}
                       </div>
-                      <div class="col-md-6">
-                        <div class="mb-3">
-                          {{ towform.rental_charged_to.label_tag }}
-                          {{ towform.rental_charged_to }}
-                          <div class="form-text">{{ towform.rental_charged_to.help_text }}</div>
-                          {{ towform.rental_charged_to.errors }}
+                      {% endfor %}
+                    </div>
+                    <div class="mt-2">
+                      <button type="button" class="btn btn-sm btn-outline-secondary add-rental-charge" data-target=".rental-charges-list">
+                        <i class="bi bi-plus-lg me-1"></i>Add Renter
+                      </button>
+                    </div>
+                    {# Blank-row template cloned by "Add Renter" (hidden, __prefix__ reindexed by JS) #}
+                    <div class="d-none rental-row-template" aria-hidden="true">
+                      <div class="rental-charge-row row g-2 align-items-end mb-2">
+                        <div class="col-md-5">
+                          <label class="form-label small mb-0" for="{{ towform.rental_formset.empty_form.member.id_for_label }}">{{ towform.rental_formset.empty_form.member.label }}</label>
+                          {{ towform.rental_formset.empty_form.member }}
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0" for="{{ towform.rental_formset.empty_form.hours.id_for_label }}">{{ towform.rental_formset.empty_form.hours.label }}</label>
+                          {{ towform.rental_formset.empty_form.hours }}
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0" for="{{ towform.rental_formset.empty_form.notes.id_for_label }}">{{ towform.rental_formset.empty_form.notes.label }}</label>
+                          {{ towform.rental_formset.empty_form.notes }}
+                        </div>
+                        <div class="col-md-1 text-end">
+                          <button type="button" class="btn btn-sm btn-outline-danger rental-row-delete" title="Remove renter" aria-label="Remove renter" aria-pressed="false">
+                            <i class="bi bi-trash"></i>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -675,6 +717,96 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+});
+
+// --- Per-renter towplane rental charge rows (Issue #968) ---
+// Each towplane card has its own nested formset (prefix rc-<card>-<row>).
+// "Add Renter" clones the last row, re-indexes its ROW index to the current
+// TOTAL_FORMS value, and bumps TOTAL_FORMS. "Remove renter" either strips a
+// brand-new row or toggles that row's hidden DELETE checkbox for existing
+// (already-saved) rows so the formset removes it on submit.
+document.addEventListener('DOMContentLoaded', function() {
+    // Point the blank row's __prefix__ tokens at the real row index. The
+    // formset renders the empty_form with names like rc-<card>-__prefix__-field,
+    // so a single token replace yields the correctly-indexed field names.
+    function reindexRow(row, newIndex) {
+        row.querySelectorAll('input, select, textarea, label').forEach(function(el) {
+            ['name', 'id', 'for'].forEach(function(attr) {
+                const val = el.getAttribute(attr);
+                if (val) {
+                    el.setAttribute(attr, val.replace(/__prefix__/, String(newIndex)));
+                }
+            });
+            if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') el.value = '';
+            else if (el && el.type === 'checkbox') el.checked = false;
+            else if (el.tagName !== 'LABEL') el.value = '';
+        });
+    }
+
+    document.querySelectorAll('.add-rental-charge').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const card = btn.closest('.col-md-12');
+            if (!card) return;
+            const list = card.querySelector('.rental-charges-list');
+            // The blank row template is a hidden sibling inside this card.
+            const template = card.querySelector('.rental-row-template');
+            if (!list || !template) return;
+
+            // The rental management form (TOTAL_FORMS) is a sibling of the
+            // list within this per-closeout card, so resolve it here. Scoping
+            // to the card avoids the outer TowplaneCloseoutFormSet's
+            // form-TOTAL_FORMS, which lives outside this card.
+            const totalFormsInput = card.querySelector('input[name$="-TOTAL_FORMS"]');
+            const newIndex = totalFormsInput
+                ? parseInt(totalFormsInput.value, 10)
+                : list.querySelectorAll('.rental-charge-row').length;
+
+            // Clone the hidden blank row (freshly added rows have no DELETE
+            // flag, which is exactly what we want) and index it at the next
+            // position.
+            const clone = template.firstElementChild.cloneNode(true);
+            if (clone) {
+                reindexRow(clone, newIndex);
+                list.appendChild(clone);
+            }
+            if (totalFormsInput) totalFormsInput.value = String(newIndex + 1);
+        });
+    });
+
+    // "Remove renter" trashcan (event delegation handles dynamically-added rows).
+    document.addEventListener('click', function(e) {
+        const trash = e.target.closest('.rental-row-delete');
+        if (!trash) return;
+        const row = trash.closest('.rental-charge-row');
+        if (!row) return;
+        const flag = row.querySelector('.rental-row-delete-flag');
+        if (flag) {
+            // Existing (saved) row: toggle the formset DELETE checkbox.
+            flag.checked = !flag.checked;
+            row.classList.toggle('rental-row-marked-deleted', flag.checked);
+            trash.setAttribute('aria-pressed', flag.checked ? 'true' : 'false');
+        } else {
+            // New (unsaved) row: remove it and keep formset indices / TOTAL_FORMS consistent.
+            const card = trash.closest('.col-md-12');
+            const list = row.closest('.rental-charges-list');
+            row.remove();
+            if (list) {
+                const rows = Array.from(list.querySelectorAll('.rental-charge-row'));
+                rows.forEach(function(r, idx) {
+                    r.querySelectorAll('input, select, textarea, label').forEach(function(el) {
+                        ['name', 'id', 'for'].forEach(function(attr) {
+                            const val = el.getAttribute(attr);
+                            if (val) {
+                                el.setAttribute(attr, val.replace(/(rc-\d+-)\d+(-)/, `$1${idx}$2`));
+                            }
+                        });
+                    });
+                });
+                const totalFormsInput = card ? card.querySelector('input[name$="-TOTAL_FORMS"]') : null;
+                if (totalFormsInput) totalFormsInput.value = String(rows.length);
+            }
+        }
+    });
 });
 </script>
 {% endblock %}

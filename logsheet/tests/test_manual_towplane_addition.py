@@ -184,9 +184,14 @@ class ManualTowplaneAdditionTestCase(TestCase):
             "form-0-start_tach": "1250.0",
             "form-0-end_tach": "1252.3",  # 2.3 hours flight
             "form-0-fuel_added": "18.0",
-            "form-0-rental_hours_chargeable": "2.3",  # All flight time is rental
-            "form-0-rental_charged_to": self.biff.pk,
             "form-0-notes": "Personal flight to Roanoke - no club operations",
+            # Per-renter rental charges (Issue #968): all flight time is rental
+            "rc-0-TOTAL_FORMS": "1",
+            "rc-0-INITIAL_FORMS": "0",
+            "rc-0-MIN_NUM_FORMS": "0",
+            "rc-0-MAX_NUM_FORMS": "1000",
+            "rc-0-0-member": self.biff.pk,
+            "rc-0-0-hours": "2.3",
         }
 
         response = self.client.post(edit_url, form_data)
@@ -204,9 +209,13 @@ class ManualTowplaneAdditionTestCase(TestCase):
         self.assertEqual(closeout.start_tach, Decimal("1250.0"))
         self.assertEqual(closeout.end_tach, Decimal("1252.3"))
         self.assertEqual(closeout.fuel_added, Decimal("18.0"))
-        self.assertEqual(closeout.rental_hours_chargeable, Decimal("2.3"))
-        self.assertEqual(closeout.rental_charged_to, self.biff)
-        self.assertEqual(closeout.rental_cost, Decimal("218.50"))  # 2.3 * $95.00
+        from logsheet.models import TowplaneRentalCharge
+
+        charge = TowplaneRentalCharge.objects.get(closeout=closeout)
+        self.assertEqual(charge.member, self.biff)
+        self.assertEqual(charge.hours, Decimal("2.3"))
+        # Per-renter total: 2.3 * $95.00 = $218.50
+        self.assertEqual(closeout.rental_cost, Decimal("218.50"))
         self.assertIn("Personal flight to Roanoke", closeout.notes)
 
     def test_mixed_operations_scenario(self):

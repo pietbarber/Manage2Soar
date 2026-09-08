@@ -1983,9 +1983,26 @@ class TowplaneCloseout(models.Model):
         ]
 
     @property
+    def total_rental_hours(self):
+        """Sum of hours across all per-renter charge rows, falling back to the legacy column."""
+        charges = list(self.rental_charges.all())
+        if charges:
+            return sum((charge.hours for charge in charges), Decimal("0"))
+        # Fallback: legacy single-renter column (pre-migration data)
+        if (
+            self.rental_hours_chargeable is not None
+            and self.rental_hours_chargeable > 0
+        ):
+            return self.rental_hours_chargeable
+        return Decimal("0")
+
+    @property
     def rental_cost(self):
         """
         Calculate rental cost for non-towing towplane usage.
+
+        Prefers per-renter charge rows (TowplaneRentalCharge); falls back to
+        the legacy rental_hours_chargeable column for pre-migration data.
 
         Performance note:
         Accesses self.towplane.hourly_rental_rate, which will trigger a database query
@@ -1993,13 +2010,14 @@ class TowplaneCloseout(models.Model):
         financial views or loops, use select_related('towplane') when querying
         TowplaneCloseout objects.
         """
-        if (
-            self.rental_hours_chargeable is None
-            or self.rental_hours_chargeable <= 0
-            or not self.towplane.hourly_rental_rate
-        ):
+        rate = self.towplane.hourly_rental_rate if self.towplane else None
+        if not rate:
             return None
-        return self.rental_hours_chargeable * self.towplane.hourly_rental_rate
+
+        hours = self.total_rental_hours
+        if hours is None or hours <= 0:
+            return None
+        return hours * rate
 
     @property
     def rental_cost_display(self):
@@ -2033,6 +2051,74 @@ class TowplaneCloseout(models.Model):
             kwargs["update_fields"] = update_fields
 
         super().save(*args, **kwargs)
+
+
+####################################################
+# TowplaneRentalCharge model
+#
+# Tracks one rental charge row per member for a given towplane closeout.
+# Replaces the legacy single-renter ``rental_charged_to`` /
+# ``rental_hours_chargeable`` scalar pair with a proper child model so
+# multiple members can share the rental cost with their own hours.
+#
+# Fields:
+# - closeout: The TowplaneCloseout this charge belongs to (CASCADE).
+# - member:   The member being charged.
+# - hours:    This member's share of non-towing rental hours.
+# - notes:    Optional per-renter note.
+#
+# Properties:
+# - cost: hours * towplane.hourly_rental_rate (None if no rate).
+#
+
+
+class TowplaneRentalCharge(models.Model):
+    closeout = models.ForeignKey(
+        TowplaneCloseout,
+        on_delete=models.CASCADE,
+        related_name="rental_charges",
+    )
+    member = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="towplane_rental_charges",
+    )
+    hours = models.DecimalField(
+        max_digits=4,
+        decimal_places=1,
+        validators=[MinValueValidator(Decimal("0.0"))],
+        help_text="Hours of non-towing usage charged to this member.",
+    )
+    notes = HTMLField(blank=True)
+
+    class Meta:
+        ordering = ["member__last_name", "member__first_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["closeout", "member"],
+                name="unique_rental_charge_per_closeout_member",
+            ),
+        ]
+
+    @property
+    def cost(self):
+        """Per-renter cost = hours * towplane hourly rental rate (or None)."""
+        rate = (
+            self.closeout.towplane.hourly_rental_rate
+            if self.closeout.towplane
+            else None
+        )
+        if not rate:
+            return None
+        return self.hours * rate
+
+    @property
+    def cost_display(self):
+        cost = self.cost
+        return f"${cost:.2f}" if cost is not None else "—"
+
+    def __str__(self):
+        return f"{self.member} – {self.hours} h rental ({self.closeout})"
 
 
 ####################################################

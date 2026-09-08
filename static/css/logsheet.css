@@ -1,5 +1,17 @@
 /* Logsheet Module CSS - Bootstrap5 Enhanced Styling */
 
+/* Towplane rental row controls */
+.rental-row-marked-deleted {
+    opacity: 0.55;
+    text-decoration: line-through;
+}
+
+.rental-row-delete[aria-pressed="true"] {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+}
+
 /* Logsheet Card Enhancements */
 .logsheet-card {
     background: linear-gradient(145deg, var(--bs-white) 0%, var(--bs-gray-100) 100%);

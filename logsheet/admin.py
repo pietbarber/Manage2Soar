@@ -25,6 +25,7 @@ from .models import (
     TowplaneChargeScheme,
     TowplaneChargeTier,
     TowplaneCloseout,
+    TowplaneRentalCharge,
 )
 
 
@@ -44,6 +45,16 @@ class RecentLogsheetFilter(admin.SimpleListFilter):
         value = self.value()
         if value:
             return queryset.filter(logsheet_id=value)
+        return queryset
+
+
+class RecentTowplaneRentalLogsheetFilter(RecentLogsheetFilter):
+    """Filter rental charges through their closeout's logsheet relation."""
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value:
+            return queryset.filter(closeout__logsheet_id=value)
         return queryset
 
 
@@ -568,13 +579,60 @@ class LogsheetCloseoutAdmin(AdminHelperMixin, admin.ModelAdmin):
 # Tach times and fuel records are recorded here.
 
 
+class TowplaneRentalChargeInline(admin.TabularInline):
+    model = TowplaneRentalCharge
+    extra = 0
+    autocomplete_fields = ("member",)
+
+
 @admin.register(TowplaneCloseout)
 class TowplaneCloseoutAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("logsheet", "towplane")
+    inlines = [TowplaneRentalChargeInline]
+    search_fields = ("towplane__n_number", "logsheet__log_date")
+    list_select_related = ("towplane", "logsheet")
 
     admin_helper_message = (
         "Towplane closeouts: record tach times and fuel usage per logsheet."
     )
+
+
+# Admin configuration for TowplaneRentalCharge objects
+# Per-renter rows that split a towplane closeout's rental cost across
+# multiple members (Issue #968). Editable inline on the closeout; a
+# standalone changelist is also available for bulk review.
+
+
+@admin.register(TowplaneRentalCharge)
+class TowplaneRentalChargeAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "member",
+        "closeout",
+        "hours",
+        "cost_display",
+        "notes_preview",
+    )
+    list_filter = (RecentTowplaneRentalLogsheetFilter,)
+    search_fields = (
+        "member__first_name",
+        "member__last_name",
+        "closeout__towplane__n_number",
+    )
+    autocomplete_fields = ("member", "closeout")
+    list_select_related = ("member", "closeout__towplane", "closeout__logsheet")
+    readonly_fields = ("cost_display",)
+    list_per_page = 50
+
+    admin_helper_message = (
+        "Rental charges: per-member split of a towplane closeout's rental cost."
+    )
+
+    @admin.display(description="Notes")
+    def notes_preview(self, obj):
+        from django.utils.html import strip_tags
+
+        text = strip_tags(obj.notes or "")
+        return text[:80] + ("…" if len(text) > 80 else "")
 
 
 # Admin configuration for LogsheetPayment objects
