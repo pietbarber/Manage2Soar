@@ -1,0 +1,21 @@
+{% load cms_tags %}
+{# Shared CMS banner-image field partial (Issue #1047).                                  #}
+{# Included by both create_page.html and edit_page.html to guarantee create/edit parity. #}
+{#                                                                                       #}
+{# Expects: `form` bound to a form exposing `banner_image`.                              #}
+{# On the edit form the form is bound to a Page instance, so Django's default            #}
+{# ClearableFileInput renders the current-image thumbnail and a "Clear" checkbox.        #}
+
+<div class="mb-4">
+    <label for="{{ form.banner_image.id_for_label }}" class="form-label fw-bold">
+        <i class="bi bi-image text-primary me-2"></i>{{ form.banner_image.label }}
+        <span class="badge bg-light text-muted ms-1" style="font-weight: 400;">(Optional)</span>
+    </label>
+    {{ form.banner_image|add_class:"form-control" }}
+    {% if form.banner_image.help_text %}
+        <div class="form-text">{{ form.banner_image.help_text }}</div>
+    {% endif %}
+    {% if form.banner_image.errors %}
+        <div class="text-danger mt-1">{{ form.banner_image.errors }}</div>
+    {% endif %}
+</div>
