@@ -22,7 +22,7 @@ def forward_backfill(apps, schema_editor):
         rental_charged_to__isnull=False,
         rental_hours_chargeable__isnull=False,
         rental_hours_chargeable__gt=0,
-    ):
+    ).iterator():
         TowplaneRentalCharge.objects.get_or_create(
             closeout=closeout,
             member=closeout.rental_charged_to,

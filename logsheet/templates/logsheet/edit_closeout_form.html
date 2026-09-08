@@ -403,7 +403,7 @@
                           {{ rent_form.notes }}
                         </div>
                         <div class="col-md-1 text-end">
-                          <button type="button" class="btn btn-sm btn-outline-danger rental-row-delete" title="Remove renter">
+                          <button type="button" class="btn btn-sm btn-outline-danger rental-row-delete" title="Remove renter" aria-label="Remove renter" aria-pressed="false">
                             <i class="bi bi-trash"></i>
                           </button>
                           {% if rent_form.instance.pk %}
@@ -437,7 +437,7 @@
                           {{ towform.rental_formset.empty_form.notes }}
                         </div>
                         <div class="col-md-1 text-end">
-                          <button type="button" class="btn btn-sm btn-outline-danger rental-row-delete" title="Remove renter">
+                          <button type="button" class="btn btn-sm btn-outline-danger rental-row-delete" title="Remove renter" aria-label="Remove renter" aria-pressed="false">
                             <i class="bi bi-trash"></i>
                           </button>
                         </div>
