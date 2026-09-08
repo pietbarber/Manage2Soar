@@ -3341,15 +3341,19 @@ def edit_logsheet_closeout(request, pk):
         duty_form = LogsheetDutyCrewForm(request.POST, instance=logsheet)
         formset = formset_class(request.POST, queryset=queryset)
 
-        forms_valid = form.is_valid() and duty_form.is_valid() and formset.is_valid()
+        form_valid = form.is_valid()
+        duty_form_valid = duty_form.is_valid()
+        closeout_formset_valid = formset.is_valid()
+        forms_valid = form_valid and duty_form_valid and closeout_formset_valid
 
         rental_formsets = _build_rental_formsets(formset, is_post=True)
 
-        if forms_valid and _rental_on:
+        if _rental_on:
+            rental_formsets_valid = True
             for rc_formset in rental_formsets:
                 if not rc_formset.is_valid():
-                    forms_valid = False
-                    break
+                    rental_formsets_valid = False
+            forms_valid = forms_valid and rental_formsets_valid
 
         if forms_valid and logsheet.finalized and _rental_on:
             # Post-finalization: only changes to rental charge rows are billing

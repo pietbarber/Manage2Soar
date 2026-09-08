@@ -1153,6 +1153,7 @@ class TowplaneRentalChargeForm(forms.ModelForm):
         self.fields["member"].queryset = get_active_members()
         self.fields["member"].empty_label = "—"
         self.fields["member"].required = False
+        self.fields["member"].widget.attrs["class"] = "form-select"
         self.fields["hours"].widget.attrs.update(
             {
                 "min": "0.0",
