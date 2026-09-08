@@ -130,7 +130,7 @@ class FlightForm(forms.ModelForm):
     ticket_number = forms.CharField(max_length=50, required=False)
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         glider = cleaned_data.get("glider")
         launch_time = cleaned_data.get("launch_time")
         landing_time = cleaned_data.get("landing_time")
@@ -739,7 +739,7 @@ class CreateLogsheetForm(forms.ModelForm):
         }
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         log_date = cleaned_data.get("log_date")
         airfield = cleaned_data.get("airfield")
         duty_officer = cleaned_data.get("duty_officer")
@@ -938,7 +938,7 @@ class LogsheetCloseoutForm(forms.ModelForm):
 
 class LogsheetDutyCrewForm(forms.ModelForm):
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         duty_officer = cleaned_data.get("duty_officer")
         duty_instructor = cleaned_data.get("duty_instructor")
         surge_instructor = cleaned_data.get("surge_instructor")
@@ -1204,7 +1204,7 @@ class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
         super()._post_clean()
 
     def clean(self):
-        cleaned_data = super().clean()
+        super().clean()
         for form in self.forms:
             if self._should_delete_form(form):
                 continue
@@ -1217,14 +1217,7 @@ class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
                 raise forms.ValidationError(
                     "Select a member for each rental charge with entered data."
                 )
-        return cleaned_data
-
-    def save(self, commit=True):
-        for form in self.forms:
-            if form.cleaned_data is None or form.cleaned_data.get("member") is None:
-                # Fully blank placeholder row — do not create a charge.
-                form.cleaned_data = None
-        return super().save(commit=commit)
+        return None
 
 
 class MaintenanceIssueForm(forms.ModelForm):
@@ -1239,7 +1232,7 @@ class MaintenanceIssueForm(forms.ModelForm):
         }
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         glider = cleaned_data.get("glider")
         towplane = cleaned_data.get("towplane")
 
@@ -1357,7 +1350,7 @@ class MemberChargeForm(forms.ModelForm):
 
     def clean(self):
         """Validate decimal quantity constraint before save."""
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         chargeable_item = cleaned_data.get("chargeable_item")
         quantity = cleaned_data.get("quantity")
 
