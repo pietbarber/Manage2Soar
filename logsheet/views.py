@@ -2759,6 +2759,7 @@ def manage_logsheet_finances(request, pk):
     from siteconfig.models import SiteConfiguration
 
     site_config = SiteConfiguration.objects.first()
+    allow_towplane_rental = bool(site_config and site_config.allow_towplane_rental)
 
     # Pre-cache config on every non-commercial Flight instance (both member and
     # guest flights) to avoid a SiteConfiguration query per row, including in
@@ -2854,10 +2855,11 @@ def manage_logsheet_finances(request, pk):
 
     # Add towplane rental costs
     towplane_data = []
-    for closeout in towplane_closeouts:
-        rental_cost = closeout.rental_cost or 0
-        towplane_data.append((closeout, rental_cost))
-        total_towplane_rental += rental_cost
+    if allow_towplane_rental:
+        for closeout in towplane_closeouts:
+            rental_cost = closeout.rental_cost or 0
+            towplane_data.append((closeout, rental_cost))
+            total_towplane_rental += rental_cost
 
     total_sum += total_towplane_rental
 
@@ -2928,17 +2930,20 @@ def manage_logsheet_finances(request, pk):
     # Each TowplaneRentalCharge row attributes this member's share of the
     # towplane rental to their member_charges. Falls back to the legacy
     # single-renter closeout fields for pre-migration data.
-    for closeout in towplane_closeouts:
-        charges = list(closeout.rental_charges.all())
-        if charges:
-            for rc in charges:
-                cost = rc.cost or Decimal("0.00")
-                if cost > 0 and rc.member:
-                    member_charges[rc.member]["towplane_rental"] += cost
-        elif closeout.rental_charged_to:
-            cost = closeout.rental_cost or Decimal("0.00")
-            if cost > 0:
-                member_charges[closeout.rental_charged_to]["towplane_rental"] += cost
+    if allow_towplane_rental:
+        for closeout in towplane_closeouts:
+            charges = list(closeout.rental_charges.all())
+            if charges:
+                for rc in charges:
+                    cost = rc.cost or Decimal("0.00")
+                    if cost > 0 and rc.member:
+                        member_charges[rc.member]["towplane_rental"] += cost
+            elif closeout.rental_charged_to:
+                cost = closeout.rental_cost or Decimal("0.00")
+                if cost > 0:
+                    member_charges[closeout.rental_charged_to][
+                        "towplane_rental"
+                    ] += cost
 
     # Add miscellaneous charges (Issue #66, #413)
     misc_charges_qs = MemberCharge.objects.filter(logsheet=logsheet).select_related(
@@ -3073,19 +3078,20 @@ def manage_logsheet_finances(request, pk):
                 elif pilot:
                     responsible_members.add(pilot)
 
-            # Add members responsible for towplane rental charges (Issue #968).
-            # Prefer per-renter charges; fall back to legacy single renter.
-            for closeout in towplane_closeouts:
-                rental_cost = closeout.rental_cost or Decimal("0.00")
-                if rental_cost <= 0:
-                    continue
-                charge_rows = list(closeout.rental_charges.all())
-                if charge_rows:
-                    for rc in charge_rows:
-                        if rc.member and rc.hours and rc.hours > 0:
-                            responsible_members.add(rc.member)
-                elif closeout.rental_charged_to:
-                    responsible_members.add(closeout.rental_charged_to)
+            if allow_towplane_rental:
+                # Add members responsible for towplane rental charges (Issue #968).
+                # Prefer per-renter charges; fall back to legacy single renter.
+                for closeout in towplane_closeouts:
+                    rental_cost = closeout.rental_cost or Decimal("0.00")
+                    if rental_cost <= 0:
+                        continue
+                    charge_rows = list(closeout.rental_charges.all())
+                    if charge_rows:
+                        for rc in charge_rows:
+                            if rc.member and rc.hours and rc.hours > 0:
+                                responsible_members.add(rc.member)
+                    elif closeout.rental_charged_to:
+                        responsible_members.add(closeout.rental_charged_to)
 
             # Add members responsible for miscellaneous charges (Issue #66, #413)
             for charge in misc_charges_data:

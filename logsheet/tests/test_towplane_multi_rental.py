@@ -386,6 +386,42 @@ class FinanceAttributionMultiRenterTestCase(TestCase):
         )
         self.assertEqual(response.context["total_towplane_rental"], Decimal("190.00"))
 
+    def test_rental_attribution_and_totals_are_disabled(self):
+        TowplaneRentalCharge.objects.create(
+            closeout=self.closeout,
+            member=self.member_b,
+            hours=Decimal("2.0"),
+        )
+        self.config.allow_towplane_rental = False
+        self.config.save(update_fields=["allow_towplane_rental"])
+
+        self.client.force_login(self.member_a)
+        url = reverse("logsheet:manage_logsheet_finances", args=[self.logsheet.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        member_charges = self._charge_map(response)
+        self.assertNotIn(self.member_b, member_charges)
+        self.assertEqual(response.context["towplane_data"], [])
+        self.assertEqual(response.context["total_towplane_rental"], 0)
+
+    def test_disabled_rental_does_not_block_finalization(self):
+        TowplaneRentalCharge.objects.create(
+            closeout=self.closeout,
+            member=self.member_b,
+            hours=Decimal("1.0"),
+        )
+        self.config.allow_towplane_rental = False
+        self.config.save(update_fields=["allow_towplane_rental"])
+
+        self.client.force_login(self.member_a)
+        url = reverse("logsheet:manage_logsheet_finances", args=[self.logsheet.pk])
+        response = self.client.post(url, {"finalize": "1"})
+
+        self.assertEqual(response.status_code, 302)
+        self.logsheet.refresh_from_db()
+        self.assertTrue(self.logsheet.finalized)
+
     def test_responsible_members_includes_all_renters(self):
         """Both per-renter members are responsible and require a payment method."""
         TowplaneRentalCharge.objects.create(
