@@ -1205,6 +1205,7 @@ class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
 
     def clean(self):
         super().clean()
+        members = {}
         for form in self.forms:
             if self._should_delete_form(form):
                 continue
@@ -1217,6 +1218,13 @@ class TowplaneRentalChargeFormSet(_TowplaneRentalChargeFormSetBase):
                 raise forms.ValidationError(
                     "Select a member for each rental charge with entered data."
                 )
+            member = form_data.get("member")
+            if member is not None:
+                if member in members:
+                    raise forms.ValidationError(
+                        "Each member can only have one rental charge per towplane."
+                    )
+                members[member] = form
         return None
 
 

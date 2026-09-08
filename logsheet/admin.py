@@ -48,6 +48,16 @@ class RecentLogsheetFilter(admin.SimpleListFilter):
         return queryset
 
 
+class RecentTowplaneRentalLogsheetFilter(RecentLogsheetFilter):
+    """Filter rental charges through their closeout's logsheet relation."""
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value:
+            return queryset.filter(closeout__logsheet_id=value)
+        return queryset
+
+
 # Admin configuration for managing Towplane objects
 # Use this to add more club tow planes.
 # Each time we have a new tow plane, we need to add an object
@@ -602,7 +612,7 @@ class TowplaneRentalChargeAdmin(AdminHelperMixin, admin.ModelAdmin):
         "cost_display",
         "notes_preview",
     )
-    list_filter = (RecentLogsheetFilter,)
+    list_filter = (RecentTowplaneRentalLogsheetFilter,)
     search_fields = (
         "member__first_name",
         "member__last_name",

@@ -261,6 +261,29 @@ class TowplaneRentalChargeFormSetTestCase(TestCase):
         self.assertFalse(formset.is_valid())
         self.assertIn("Select a member", str(formset.non_form_errors()))
 
+    def test_formset_rejects_duplicate_renter_rows(self):
+        """A member cannot be submitted twice for the same closeout."""
+        form_data = {
+            "form-TOTAL_FORMS": "2",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-member": self.member_a.pk,
+            "form-0-hours": "1.0",
+            "form-1-member": self.member_a.pk,
+            "form-1-hours": "2.0",
+        }
+        formset = TowplaneRentalChargeFormSet(
+            data=form_data,
+            queryset=TowplaneRentalCharge.objects.filter(closeout=self.closeout),
+            prefix="form",
+        )
+        for form in formset.forms:
+            form.instance.closeout = self.closeout
+
+        self.assertFalse(formset.is_valid())
+        self.assertIn("only have one rental charge", str(formset.non_form_errors()))
+
     def test_formset_deletes_marked_rows(self):
         existing = TowplaneRentalCharge.objects.create(
             closeout=self.closeout,

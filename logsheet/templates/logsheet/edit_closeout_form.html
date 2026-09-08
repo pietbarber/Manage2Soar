@@ -391,15 +391,15 @@
                       <div class="rental-charge-row row g-2 align-items-end mb-2">
                         {{ rent_form.id }}
                         <div class="col-md-5">
-                          <label class="form-label small mb-0">{{ rent_form.member.label }}</label>
+                          <label class="form-label small mb-0" for="{{ rent_form.member.id_for_label }}">{{ rent_form.member.label }}</label>
                           {{ rent_form.member }}
                         </div>
                         <div class="col-md-3">
-                          <label class="form-label small mb-0">{{ rent_form.hours.label }}</label>
+                          <label class="form-label small mb-0" for="{{ rent_form.hours.id_for_label }}">{{ rent_form.hours.label }}</label>
                           {{ rent_form.hours }}
                         </div>
                         <div class="col-md-3">
-                          <label class="form-label small mb-0">Notes</label>
+                          <label class="form-label small mb-0" for="{{ rent_form.notes.id_for_label }}">{{ rent_form.notes.label }}</label>
                           {{ rent_form.notes }}
                         </div>
                         <div class="col-md-1 text-end">
@@ -425,15 +425,15 @@
                     <div class="d-none rental-row-template" aria-hidden="true">
                       <div class="rental-charge-row row g-2 align-items-end mb-2">
                         <div class="col-md-5">
-                          <label class="form-label small mb-0">{{ towform.rental_formset.empty_form.member.label }}</label>
+                          <label class="form-label small mb-0" for="{{ towform.rental_formset.empty_form.member.id_for_label }}">{{ towform.rental_formset.empty_form.member.label }}</label>
                           {{ towform.rental_formset.empty_form.member }}
                         </div>
                         <div class="col-md-3">
-                          <label class="form-label small mb-0">{{ towform.rental_formset.empty_form.hours.label }}</label>
+                          <label class="form-label small mb-0" for="{{ towform.rental_formset.empty_form.hours.id_for_label }}">{{ towform.rental_formset.empty_form.hours.label }}</label>
                           {{ towform.rental_formset.empty_form.hours }}
                         </div>
                         <div class="col-md-3">
-                          <label class="form-label small mb-0">Notes</label>
+                          <label class="form-label small mb-0" for="{{ towform.rental_formset.empty_form.notes.id_for_label }}">{{ towform.rental_formset.empty_form.notes.label }}</label>
                           {{ towform.rental_formset.empty_form.notes }}
                         </div>
                         <div class="col-md-1 text-end">
