@@ -1155,11 +1155,12 @@ class LogsheetTowplaneForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["towplane"].queryset = (
-            Towplane.objects.filter(is_active=True)
-            .exclude(n_number__in=Towplane.VIRTUAL_N_NUMBERS)
-            .order_by("name", "n_number")
-        )
+        towplane_queryset = Towplane.objects.filter(is_active=True)
+        for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
+            towplane_queryset = towplane_queryset.exclude(
+                n_number__iexact=virtual_n_number
+            )
+        self.fields["towplane"].queryset = towplane_queryset.order_by("name", "n_number")
         self.fields["towplane"].widget.attrs.update(
             {"class": "form-select form-select-sm"}
         )

@@ -392,6 +392,8 @@
   </div>
 </form>
 
+{{ towplane_pilot_map|json_script:"towplane_pilot_map" }}
+
 <script>
   (function () {
     const commercialToggle = document.getElementById('id_commercial_ride');
@@ -449,8 +451,6 @@
     ticketInput.addEventListener('input', syncTicketValidation);
   })();
 
-  {{ towplane_pilot_map|json_script:"towplane_pilot_map" }}
-
   // Issue #1048: When a towplane is selected, auto-fill the tow pilot from
   // the day-level LogsheetTowplane roster. The user can override it; the
   // fill only happens when the towplane changes (not on initial load).
@@ -493,7 +493,5 @@
     });
   })();
 </script>
-
-
 
 <!-- Form submit JS is now managed in logsheet_manage.html for robust modal handling. -->

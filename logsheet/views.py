@@ -393,6 +393,7 @@ def _render_flight_form_error(
     club_private=None,
     inactive_gliders=None,
     commercial_rides_enabled=None,
+    towplane_pilot_map=None,
 ):
     """Render the edit_flight_form.html with status=400 for AJAX or non-AJAX."""
     ctx = {
@@ -404,6 +405,7 @@ def _render_flight_form_error(
         "club_private": club_private,
         "inactive_gliders": inactive_gliders,
         "commercial_rides_enabled": commercial_rides_enabled,
+        "towplane_pilot_map": towplane_pilot_map or {},
     }
     return render(
         request,
@@ -1686,7 +1688,11 @@ def index(request):
 def create_logsheet(request):
     if request.method == "POST":
         form = CreateLogsheetForm(request.POST)
-        formset = LogsheetTowplaneFormSet(request.POST, prefix="towplanes")
+        formset = LogsheetTowplaneFormSet(
+            request.POST,
+            queryset=LogsheetTowplane.objects.none(),
+            prefix="towplanes",
+        )
         if form.is_valid() and formset.is_valid():
             logsheet = form.save(commit=False)
             logsheet.created_by = request.user
@@ -1717,16 +1723,27 @@ def create_logsheet(request):
         # Pre-seed one empty towplane row so the formset is usable.
         # If a duty roster exists for today and includes a tow pilot, we
         # surface a single empty row; the operator can add more as needed.
-        formset = LogsheetTowplaneFormSet(prefix="towplanes")
+        formset = LogsheetTowplaneFormSet(
+            queryset=LogsheetTowplane.objects.none(),
+            prefix="towplanes",
+        )
 
     # Build a {towplane_id: last_end_tach} map so the client can pre-fill
     # the start_tach field as soon as a towplane is picked. Only includes
     # active, non-virtual towplanes.
+    selected_log_date = date.today()
+    log_date_value = form["log_date"].value()
+    if log_date_value:
+        try:
+            selected_log_date = datetime.strptime(str(log_date_value), "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            selected_log_date = date.today()
+
     towplane_start_tach_map = {}
     for tp in Towplane.objects.filter(is_active=True).exclude(
         n_number__in=Towplane.VIRTUAL_N_NUMBERS
     ):
-        last_end = LogsheetTowplane.get_last_end_tach(tp, before_date=date.today())
+        last_end = LogsheetTowplane.get_last_end_tach(tp, before_date=selected_log_date)
         if last_end is not None:
             towplane_start_tach_map[str(tp.pk)] = f"{last_end:.2f}"
 
@@ -2211,7 +2228,10 @@ def list_logsheets(request):
     # Keep the list-page create modal in sync with /logsheet/create/
     # by providing the same day-level towplane roster formset and
     # start-tach prefill map.
-    towplane_formset = LogsheetTowplaneFormSet(prefix="towplanes")
+    towplane_formset = LogsheetTowplaneFormSet(
+        queryset=LogsheetTowplane.objects.none(),
+        prefix="towplanes",
+    )
     towplane_start_tach_map = {}
     for tp in Towplane.objects.filter(is_active=True).exclude(
         n_number__in=Towplane.VIRTUAL_N_NUMBERS
@@ -2508,6 +2528,12 @@ def add_flight(request, logsheet_pk):
     inactive_gliders = [g for g in gliders_sorted if not g.is_active]
     config = SiteConfiguration.objects.first()
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
+    towplane_pilot_map = {}
+    for row in logsheet.scheduled_towplanes.select_related("towplane", "tow_pilot"):
+        towplane_pilot_map[str(row.towplane_id)] = {
+            "pilot_id": row.tow_pilot_id,
+            "pilot_name": row.tow_pilot.full_display_name if row.tow_pilot else None,
+        }
 
     def _setup_error_response(exc, *, unexpected=False):
         # Use the already-fetched config to avoid an extra DB query and potential
@@ -2564,6 +2590,7 @@ def add_flight(request, logsheet_pk):
                 club_private=club_private,
                 inactive_gliders=inactive_gliders,
                 commercial_rides_enabled=commercial_rides_enabled,
+                towplane_pilot_map=towplane_pilot_map,
             )
         if client_token and _find_existing_flight_by_client_token(
             logsheet, client_token
@@ -2612,6 +2639,7 @@ def add_flight(request, logsheet_pk):
                     club_private=club_private,
                     inactive_gliders=inactive_gliders,
                     commercial_rides_enabled=commercial_rides_enabled,
+                    towplane_pilot_map=towplane_pilot_map,
                 )
             return _success_response()
         # Return form HTML with errors (AJAX or non-AJAX)
@@ -2624,6 +2652,7 @@ def add_flight(request, logsheet_pk):
             club_private=club_private,
             inactive_gliders=inactive_gliders,
             commercial_rides_enabled=commercial_rides_enabled,
+            towplane_pilot_map=towplane_pilot_map,
         )
     else:
         initial = {}
@@ -2631,17 +2660,6 @@ def add_flight(request, logsheet_pk):
             initial["tow_pilot"] = logsheet.tow_pilot_id
         if logsheet.default_towplane_id:
             initial["towplane"] = logsheet.default_towplane_id
-        # Expose the day-level towplane roster so the client can auto-fill
-        # the tow pilot when a towplane is selected in the modal (Issue #1048).
-        # Map: {"<towplane_id>": {"pilot_id": <int|None>, "pilot_name": <str>}}
-        towplane_pilot_map = {}
-        for row in logsheet.scheduled_towplanes.select_related("towplane", "tow_pilot"):
-            towplane_pilot_map[str(row.towplane_id)] = {
-                "pilot_id": row.tow_pilot_id,
-                "pilot_name": (
-                    row.tow_pilot.full_display_name if row.tow_pilot else None
-                ),
-            }
 
         try:
             form = FlightForm(initial=initial, logsheet=logsheet)
@@ -3519,20 +3537,11 @@ def edit_logsheet_closeout(request, pk):
             # Only when the client actually submitted the formset — otherwise
             # we leave any existing roster rows untouched.
             if roster_submitted:
-                for rfs in roster_formset.cleaned_data:
-                    if not rfs:
-                        continue
-                    tp = rfs.get("towplane")
-                    if not tp:
-                        continue
-                    LogsheetTowplane.objects.update_or_create(
-                        logsheet=logsheet,
-                        towplane=tp,
-                        defaults={
-                            "tow_pilot": rfs.get("tow_pilot"),
-                            "start_tach": rfs.get("start_tach"),
-                        },
-                    )
+                for deleted_row in roster_formset.deleted_objects:
+                    deleted_row.delete()
+                for roster_row in roster_formset.save(commit=False):
+                    roster_row.logsheet = logsheet
+                    roster_row.save()
 
             if _rental_on:
                 for rc_formset in rental_formsets:
@@ -3674,11 +3683,13 @@ def add_towplane_closeout(request, pk):
                 closeout.start_tach = last_end
                 closeout.save(update_fields=["start_tach"])
         # Seed a roster row so the operator can adjust pilot / start_tach.
-        LogsheetTowplane.objects.update_or_create(
+        roster_row, roster_created = LogsheetTowplane.objects.get_or_create(
             logsheet=logsheet,
             towplane=towplane,
-            defaults={},
         )
+        if roster_created and roster_row.start_tach is None and closeout.start_tach is not None:
+            roster_row.start_tach = closeout.start_tach
+            roster_row.save(update_fields=["start_tach"])
 
         if created:
             messages.success(

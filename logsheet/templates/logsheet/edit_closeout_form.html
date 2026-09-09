@@ -360,9 +360,10 @@
             </div>
             <div class="col-md-1">
               {% if roster_form.instance.pk %}
-                <label class="form-check-label small ms-2" for="{{ roster_form.DELETE.id_for_label }}">
-                  <input type="checkbox" class="form-check-input" {{ roster_form.DELETE }} name="{{ roster_form.DELETE.html_name }}" title="Remove row">
-                </label>
+                <div class="form-check mt-4">
+                  {{ roster_form.DELETE }}
+                  <label class="form-check-label small" for="{{ roster_form.DELETE.id_for_label }}">Remove</label>
+                </div>
               {% endif %}
             </div>
           </div>
