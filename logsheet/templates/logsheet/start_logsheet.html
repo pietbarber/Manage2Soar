@@ -372,13 +372,33 @@
       // formset index and bumping TOTAL_FORMS.
       var addBtn = document.getElementById('addTowplaneRow');
       if (addBtn && roster) {
-        addBtn.addEventListener('click', function () {
+        if (addBtn.dataset.boundTowplaneAdder === '1') {
+          return;
+        }
+        addBtn.dataset.boundTowplaneAdder = '1';
+
+        addBtn.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          // Guard against accidental double-clicks and duplicate bindings.
+          if (addBtn.dataset.addingTowplane === '1') {
+            return;
+          }
+          addBtn.dataset.addingTowplane = '1';
+
           var TOTAL = document.querySelector('input[name="towplanes-TOTAL_FORMS"]');
-          if (!TOTAL) return;
+          if (!TOTAL) {
+            addBtn.dataset.addingTowplane = '0';
+            return;
+          }
           var idx = parseInt(TOTAL.value, 10);
           var rows = roster.querySelectorAll('.towplane-row');
           var template = rows[rows.length - 1];
-          if (!template) return;
+          if (!template) {
+            addBtn.dataset.addingTowplane = '0';
+            return;
+          }
           var clone = template.cloneNode(true);
           clone.removeAttribute('id');
           // Rewrite every formset index in this row to the new index.
@@ -387,6 +407,8 @@
           roster.appendChild(clone);
           initRow(clone);
           TOTAL.value = String(idx + 1);
+
+          addBtn.dataset.addingTowplane = '0';
         });
       }
     });

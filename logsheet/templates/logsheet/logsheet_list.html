@@ -535,15 +535,32 @@
 
       var addBtn = document.getElementById('addTowplaneRow');
       if (!addBtn) return;
+      if (addBtn.dataset.boundTowplaneAdder === '1') return;
+      addBtn.dataset.boundTowplaneAdder = '1';
 
-      addBtn.addEventListener('click', function () {
+      addBtn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Guard against accidental double-clicks and duplicate bindings.
+        if (addBtn.dataset.addingTowplane === '1') {
+          return;
+        }
+        addBtn.dataset.addingTowplane = '1';
+
         var total = document.querySelector('input[name="towplanes-TOTAL_FORMS"]');
-        if (!total) return;
+        if (!total) {
+          addBtn.dataset.addingTowplane = '0';
+          return;
+        }
 
         var idx = parseInt(total.value, 10);
         var rows = roster.querySelectorAll('.towplane-row');
         var template = rows[rows.length - 1];
-        if (!template) return;
+        if (!template) {
+          addBtn.dataset.addingTowplane = '0';
+          return;
+        }
 
         var clone = template.cloneNode(true);
         clone.innerHTML = clone.innerHTML.replace(/towplanes-\d+-/g, 'towplanes-' + idx + '-');
@@ -551,6 +568,8 @@
         roster.appendChild(clone);
         initRow(clone);
         total.value = String(idx + 1);
+
+        addBtn.dataset.addingTowplane = '0';
       });
     });
   })();
