@@ -477,3 +477,59 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         self.assertIn('id="towplane_pilot_map"', content)
         # And the pilot name/id should be in it
         self.assertIn(str(self.member.pk), content)
+
+
+class TowplaneStartTachApiTests(TestCase):
+    def setUp(self):
+        self.member = _make_member("api_operator", towpilot=True)
+        self.towplane = Towplane.objects.create(
+            name="Husky", n_number="N7000S", is_active=True, club_owned=True
+        )
+        self.airfield = Airfield.objects.create(
+            name="Test Field", identifier="TST", is_active=True
+        )
+
+    def test_returns_start_tach_for_selected_towplane(self):
+        self.client.force_login(self.member)
+        prior = _make_logsheet(
+            self.airfield, self.member, date.today() - timedelta(days=2)
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=prior,
+            towplane=self.towplane,
+            end_tach=Decimal("123.45"),
+        )
+        url = reverse("logsheet:api_towplane_start_tach")
+        response = self.client.get(url, {"towplane_id": self.towplane.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["start_tach"], "123.45")
+
+    def test_respects_before_date_filter(self):
+        self.client.force_login(self.member)
+        older = _make_logsheet(
+            self.airfield, self.member, date.today() - timedelta(days=3)
+        )
+        newer = _make_logsheet(
+            self.airfield, self.member, date.today() - timedelta(days=1)
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=older,
+            towplane=self.towplane,
+            end_tach=Decimal("100.00"),
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=newer,
+            towplane=self.towplane,
+            end_tach=Decimal("200.00"),
+        )
+        cutoff = date.today() - timedelta(days=1)
+        url = reverse("logsheet:api_towplane_start_tach")
+        response = self.client.get(
+            url,
+            {
+                "towplane_id": self.towplane.pk,
+                "before_date": cutoff.isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["start_tach"], "100.00")

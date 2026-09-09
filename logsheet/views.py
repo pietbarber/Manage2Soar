@@ -1627,6 +1627,37 @@ def api_duty_assignment(request):
     return JsonResponse(result)
 
 
+@require_GET
+@active_member_required
+def api_towplane_start_tach(request):
+    towplane_id = request.GET.get("towplane_id")
+    before_date = request.GET.get("before_date")
+
+    if not towplane_id:
+        return JsonResponse({"start_tach": None})
+
+    try:
+        towplane = Towplane.objects.get(pk=towplane_id)
+    except Towplane.DoesNotExist:
+        return JsonResponse({"start_tach": None})
+
+    parsed_before_date = None
+    if before_date:
+        try:
+            parsed_before_date = datetime.strptime(before_date, "%Y-%m-%d").date()
+        except ValueError:
+            parsed_before_date = None
+
+    last_end = LogsheetTowplane.get_last_end_tach(
+        towplane,
+        before_date=parsed_before_date,
+    )
+
+    return JsonResponse(
+        {"start_tach": f"{last_end:.2f}" if last_end is not None else None}
+    )
+
+
 #################################################
 # index
 # This function might have been abandoned.  Considering updating it or deleting it.

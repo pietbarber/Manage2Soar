@@ -152,6 +152,11 @@ urlpatterns = [
     ),
     # AJAX API endpoint for duty assignment lookup
     path("api/duty-assignment/", views.api_duty_assignment, name="api_duty_assignment"),
+    path(
+        "api/towplane-start-tach/",
+        views.api_towplane_start_tach,
+        name="api_towplane_start_tach",
+    ),
     path("delete/<int:pk>/", views.delete_logsheet, name="delete"),
     # AJAX endpoint for instant launch/landing
     path(

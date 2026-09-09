@@ -449,6 +449,7 @@
 <script>
   (function () {
     "use strict";
+    var tachLookupUrl = "{% url 'logsheet:api_towplane_start_tach' %}";
 
     var tachMap = {};
     try {
@@ -458,20 +459,55 @@
       tachMap = {};
     }
 
+    function prefillTachForSelection(sel, tach) {
+      var val = sel.value;
+      if (!val) return;
+
+      if (tachMap[val] !== undefined) {
+        tach.value = tachMap[val];
+        return;
+      }
+
+      var dateInput = document.getElementById('id_log_date');
+      var query = new URLSearchParams({ towplane_id: val });
+      if (dateInput && dateInput.value) {
+        query.set('before_date', dateInput.value);
+      }
+
+      fetch(tachLookupUrl + '?' + query.toString(), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            return null;
+          }
+          return response.json();
+        })
+        .then(function (payload) {
+          if (!payload || payload.start_tach === null || payload.start_tach === undefined) {
+            return;
+          }
+          tachMap[val] = payload.start_tach;
+          tach.value = payload.start_tach;
+        })
+        .catch(function () {
+          // Keep UI responsive; failure only means no prefill hint.
+        });
+    }
+
     function initRow(row) {
       var sel = row.querySelector('select[name$="-towplane"]');
       var tach = row.querySelector('input[name$="-start_tach"]');
       if (!sel || !tach) return;
 
       sel.addEventListener('change', function () {
-        var val = sel.value;
-        if (val && tachMap[val] !== undefined && !tach.value) {
-          tach.value = tachMap[val];
-        }
+        prefillTachForSelection(sel, tach);
       });
 
       if (sel.value && tachMap[sel.value] !== undefined && !tach.value) {
         tach.value = tachMap[sel.value];
+      } else if (sel.value && !tach.value) {
+        prefillTachForSelection(sel, tach);
       }
     }
 
