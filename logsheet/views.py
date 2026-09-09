@@ -2176,6 +2176,19 @@ def list_logsheets(request):
             form = CreateLogsheetForm()
     else:
         form = CreateLogsheetForm()
+
+    # Keep the list-page create modal in sync with /logsheet/create/
+    # by providing the same day-level towplane roster formset and
+    # start-tach prefill map.
+    towplane_formset = LogsheetTowplaneFormSet(prefix="towplanes")
+    towplane_start_tach_map = {}
+    for tp in Towplane.objects.filter(is_active=True).exclude(
+        n_number__in=Towplane.VIRTUAL_N_NUMBERS
+    ):
+        last_end = LogsheetTowplane.get_last_end_tach(tp, before_date=date.today())
+        if last_end is not None:
+            towplane_start_tach_map[str(tp.pk)] = f"{last_end:.2f}"
+
     from members.utils.membership import is_active_member
 
     has_active_member_access = bool(
@@ -2193,6 +2206,8 @@ def list_logsheets(request):
             "paginator": paginator,
             "available_years": available_years,
             "form": form,
+            "towplane_formset": towplane_formset,
+            "towplane_start_tach_map": towplane_start_tach_map,
             "can_issue_commercial_ticket": has_active_member_access
             and _can_issue_commercial_ticket(request.user)
             and bool(site_config and site_config.commercial_rides_enabled),

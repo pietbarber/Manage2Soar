@@ -288,6 +288,33 @@ class CreateLogsheetRosterViewTests(TestCase):
         self.assertEqual(ctx_map[str(self.towplane.pk)], "42.42")
         self.assertNotIn(str(virtual.pk), ctx_map)
 
+    def test_logsheet_list_page_includes_roster_formset_and_prefill_map(self):
+        self.client.force_login(self.member)
+        prior_ls = _make_logsheet(
+            self.airfield, self.member, date.today() - timedelta(days=2)
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=prior_ls,
+            towplane=self.towplane,
+            end_tach=Decimal("77.70"),
+        )
+        virtual = Towplane.objects.create(
+            name="Winch", n_number="WINCH", is_active=True, club_owned=True
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=prior_ls,
+            towplane=virtual,
+            end_tach=Decimal("88.80"),
+        )
+
+        response = self.client.get(reverse("logsheet:index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("towplane_formset", response.context)
+        self.assertIn("towplane_start_tach_map", response.context)
+        ctx_map = response.context["towplane_start_tach_map"]
+        self.assertEqual(ctx_map[str(self.towplane.pk)], "77.70")
+        self.assertNotIn(str(virtual.pk), ctx_map)
+
 
 class AddTowplaneCloseoutRosterViewTests(TestCase):
     def setUp(self):
