@@ -630,7 +630,7 @@ class CmsPageForm(forms.ModelForm):
 
     class Meta:
         model = Page
-        fields = ["title", "slug", "parent", "content", "is_public"]
+        fields = ["title", "slug", "parent", "content", "is_public", "banner_image"]
         widgets = {
             "title": forms.TextInput(attrs={"class": "form-control form-control-lg"}),
             "slug": forms.TextInput(attrs={"class": "form-control"}),
@@ -742,7 +742,7 @@ def edit_cms_page(request, page_id):
         return HttpResponseForbidden("You don't have permission to edit this page.")
 
     if request.method == "POST":
-        form = CmsPageForm(request.POST, instance=page)
+        form = CmsPageForm(request.POST, request.FILES, instance=page)
         formset = DocumentFormSet(request.POST, request.FILES, instance=page)
 
         if form.is_valid() and formset.is_valid():
@@ -843,7 +843,7 @@ def create_cms_page(request):
         )
 
     if request.method == "POST":
-        form = CmsPageForm(request.POST)
+        form = CmsPageForm(request.POST, request.FILES)
         formset = DocumentFormSet(request.POST, request.FILES)
 
         # When creating a subpage, ensure the parent field cannot be manipulated
