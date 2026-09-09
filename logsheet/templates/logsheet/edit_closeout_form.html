@@ -324,6 +324,90 @@
       </div>
       {% endif %}
 
+      {% if roster_formset %}
+      <div class="form-section">
+        <h4><i class="bi bi-airplane"></i>Scheduled Towplanes <span class="text-muted small">(day-level roster)</span></h4>
+        <p class="text-muted small mb-3">
+          Set the default tow pilot for each scheduled towplane for the day, and record the
+          starting tach reading. Changing the default here affects the auto-fill in new
+          flight entries; you can always override the pilot per flight.
+        </p>
+        {{ roster_formset.management_form }}
+        {% if roster_formset.non_form_errors %}
+          <div class="alert alert-danger">
+            <strong>Roster Errors:</strong>
+            {% for error in roster_formset.non_form_errors %}
+              <p class="mb-0">{{ error }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% for roster_form in roster_formset %}
+          <div class="row g-2 mb-2 align-items-end">
+            <div class="col-md-4">
+              {{ roster_form.towplane.label_tag }}
+              {{ roster_form.towplane }}
+              {{ roster_form.towplane.errors }}
+            </div>
+            <div class="col-md-4">
+              {{ roster_form.tow_pilot.label_tag }}
+              {{ roster_form.tow_pilot }}
+              {{ roster_form.tow_pilot.errors }}
+            </div>
+            <div class="col-md-2">
+              {{ roster_form.start_tach.label_tag }}
+              {{ roster_form.start_tach }}
+              {{ roster_form.start_tach.errors }}
+            </div>
+            <div class="col-md-1">
+              {% if roster_form.instance.pk %}
+                <label class="form-check-label small ms-2" for="{{ roster_form.DELETE.id_for_label }}">
+                  <input type="checkbox" class="form-check-input" {{ roster_form.DELETE }} name="{{ roster_form.DELETE.html_name }}" title="Remove row">
+                </label>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+        <div class="text-end mt-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="add-roster-row">
+            <i class="bi bi-plus-circle me-1"></i>Add another towplane
+          </button>
+        </div>
+      </div>
+      {% endif %}
+      <script>
+      (function () {
+        "use strict";
+        document.addEventListener('DOMContentLoaded', function () {
+          var addBtn = document.getElementById('add-roster-row');
+          if (!addBtn) return;
+          var form = addBtn.closest('form');
+          var totalInput = form ? form.querySelector('input[name="roster-TOTAL_FORMS"]') : null;
+          if (!totalInput) return;
+
+          // Find a row template (last rendered row) inside the roster section.
+          var section = addBtn.closest('.form-section');
+          var rows = section ? Array.prototype.slice.call(section.querySelectorAll('.row.g-2')) : [];
+          // Exclude the empty_form row (Django renders it at the bottom of the
+          // formset, identifiable by name="__prefix__").
+          var template = rows.filter(function (r) {
+            var sel = r.querySelector('select[name^="roster-"]');
+            return sel && !/roster-__prefix__/.test(sel.name);
+          }).pop();
+          if (!template) return;
+
+          addBtn.addEventListener('click', function () {
+            var idx = parseInt(totalInput.value, 10);
+            var clone = template.cloneNode(true);
+            var re = new RegExp('roster-' + (idx - 1) + '-', 'g');
+            // Rewrite both name and id attributes in the inner HTML.
+            clone.innerHTML = clone.innerHTML.replace(re, 'roster-' + idx + '-');
+            section.appendChild(clone);
+            totalInput.value = String(idx + 1);
+          });
+        });
+      })();
+      </script>
+
       {% if formset %}
         <div class="form-section">
         <h4><i class="bi bi-airplane-engines"></i>Towplane Closeout</h4>

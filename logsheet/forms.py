@@ -19,6 +19,7 @@ from .models import (
     Flight,
     Logsheet,
     LogsheetCloseout,
+    LogsheetTowplane,
     MemberCharge,
     Towplane,
     TowplaneCloseout,
@@ -1121,6 +1122,61 @@ TowplaneCloseoutFormSet = modelformset_factory(
     TowplaneCloseout,
     form=TowplaneCloseoutForm,
     extra=0,
+)
+
+
+######################################################
+# LogsheetTowplaneForm + LogsheetTowplaneFormSet
+#
+# Day-level towplane roster captured at logsheet creation:
+# which planes are scheduled, the expected tow pilot, and
+# the starting tach reading (pre-filled from prior day's end tach).
+#
+# The formset is used in both the create-logsheet flow and the
+# closeout flow (where the pilot assignment can be adjusted mid-day).
+#
+
+
+class LogsheetTowplaneForm(forms.ModelForm):
+    class Meta:
+        model = LogsheetTowplane
+        fields = ["towplane", "tow_pilot", "start_tach"]
+        widgets = {
+            "start_tach": forms.NumberInput(
+                attrs={
+                    "type": "number",
+                    "step": "0.01",
+                    "min": "0",
+                    "class": "form-control form-control-sm",
+                    "style": "max-width: 8rem;",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["towplane"].queryset = (
+            Towplane.objects.filter(is_active=True)
+            .exclude(n_number__in=Towplane.VIRTUAL_N_NUMBERS)
+            .order_by("name", "n_number")
+        )
+        self.fields["towplane"].widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
+        self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
+        self.fields["tow_pilot"].empty_label = "—"
+        self.fields["tow_pilot"].required = False
+        self.fields["tow_pilot"].widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
+        self.fields["start_tach"].required = False
+
+
+LogsheetTowplaneFormSet = modelformset_factory(
+    LogsheetTowplane,
+    form=LogsheetTowplaneForm,
+    extra=1,
+    can_delete=True,
 )
 
 

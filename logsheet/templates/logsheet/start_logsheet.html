@@ -175,7 +175,7 @@
               </h6>
             </div>
 
-            <div class="row g-3">
+            <div class="row g-3 mb-3">
               <div class="col-md-6">
                 <label for="{{ form.default_towplane.id_for_label }}" class="form-label fw-semibold">
                   <i class="bi bi-airplane me-1 text-primary"></i>{{ form.default_towplane.label }}
@@ -186,6 +186,68 @@
                 {% endif %}
               </div>
             </div>
+
+            <!-- Scheduled Towplanes Section -->
+            <div class="section-header mb-3">
+              <h6 class="fw-bold text-primary mb-1">
+                <i class="bi bi-airplane-engage me-2"></i>Scheduled Towplanes
+              </h6>
+              <p class="text-muted small mb-0">
+                List each towplane expected to fly today with its pilot and starting tach.
+                Start tach is pre-filled from the prior flying day's end tach.
+              </p>
+            </div>
+
+            {% if towplane_formset.management_form %}
+              {{ towplane_formset.management_form }}
+            {% endif %}
+
+            {% if towplane_formset.non_form_errors %}
+              <div class="alert alert-danger">
+                {{ towplane_formset.non_form_errors }}
+              </div>
+            {% endif %}
+
+            <div class="towplane-roster mb-2">
+              {% for row in towplane_formset %}
+                <div class="card mb-2 towplane-row">
+                  <div class="card-body py-2">
+                    <div class="row g-2 align-items-end">
+                      <div class="col-md-4">
+                        <label class="form-label small text-muted mb-1">Towplane</label>
+                        {{ row.towplane }}
+                        {% if row.towplane.errors %}
+                          <div class="text-danger small mt-1">{{ row.towplane.errors }}</div>
+                        {% endif %}
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label small text-muted mb-1">Tow Pilot</label>
+                        {{ row.tow_pilot }}
+                        {% if row.tow_pilot.errors %}
+                          <div class="text-danger small mt-1">{{ row.tow_pilot.errors }}</div>
+                        {% endif %}
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Start Tach</label>
+                        {{ row.start_tach }}
+                        {% if row.start_tach.errors %}
+                          <div class="text-danger small mt-1">{{ row.start_tach.errors }}</div>
+                        {% endif %}
+                      </div>
+                      <div class="col-md-2">
+                        {% if row.instance.pk %}
+                          {{ row.DELETE }}
+                          <label class="form-check-label small ms-1">Remove</label>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="addTowplaneRow">
+              <i class="bi bi-plus-lg me-1"></i>Add another towplane
+            </button>
 
             <!-- Warnings Display -->
             {% if form.warnings %}
@@ -221,6 +283,63 @@
 
 {% block extra_scripts %}
 <script src="{% static 'js/duty-assignment-autopopulate.js' %}"></script>
+{{ towplane_start_tach_map|json_script:"towplane_start_tach_map" }}
+<script>
+  (function () {
+    "use strict";
+    // Map of towplane_id -> last end tach (from prior flying day).
+    var tachMap = {};
+    try {
+      var el = document.getElementById('towplane_start_tach_map');
+      tachMap = el ? JSON.parse(el.textContent || '{}') : {};
+    } catch (e) { tachMap = {}; }
+
+    function initRow(row) {
+      // Re-wire the towplane select on this row for the start-tach prefill.
+      var sel = row.querySelector('select[name$="-towplane"]');
+      var tach = row.querySelector('input[name$="-start_tach"]');
+      if (!sel || !tach) return;
+      sel.addEventListener('change', function () {
+        var val = sel.value;
+        if (val && tachMap[val] !== undefined && !tach.value) {
+          tach.value = tachMap[val];
+        }
+      });
+      // Initial prefill if the select already has a value.
+      if (sel.value && tachMap[sel.value] !== undefined && !tach.value) {
+        tach.value = tachMap[sel.value];
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var roster = document.querySelector('.towplane-roster');
+      if (!roster) return;
+      roster.querySelectorAll('.towplane-row').forEach(initRow);
+
+      // "Add another towplane" clones the last rendered row, rewriting the
+      // formset index and bumping TOTAL_FORMS.
+      var addBtn = document.getElementById('addTowplaneRow');
+      if (addBtn && roster) {
+        addBtn.addEventListener('click', function () {
+          var TOTAL = document.querySelector('input[name="towplanes-TOTAL_FORMS"]');
+          if (!TOTAL) return;
+          var idx = parseInt(TOTAL.value, 10);
+          var rows = roster.querySelectorAll('.towplane-row');
+          var template = rows[rows.length - 1];
+          if (!template) return;
+          var clone = template.cloneNode(true);
+          clone.removeAttribute('id');
+          // Rewrite every formset index in this row to the new index.
+          var re = new RegExp('towplanes-' + (idx - 1) + '-', 'g');
+          clone.innerHTML = clone.innerHTML.replace(re, 'towplanes-' + idx + '-');
+          roster.appendChild(clone);
+          initRow(clone);
+          TOTAL.value = String(idx + 1);
+        });
+      }
+    });
+  })();
+</script>
 {% endblock %}
 
 {% endblock %}

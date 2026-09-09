@@ -19,6 +19,7 @@ from .models import (
     Logsheet,
     LogsheetCloseout,
     LogsheetPayment,
+    LogsheetTowplane,
     MemberCharge,
     RevisionLog,
     Towplane,
@@ -448,14 +449,44 @@ class AirfieldAdmin(AdminHelperMixin, admin.ModelAdmin):
 # table with this admin interface.  This isn't ideal.
 
 
+class LogsheetTowplaneInline(admin.TabularInline):
+    model = LogsheetTowplane
+    extra = 1
+    fields = ("towplane", "tow_pilot", "start_tach")
+    autocomplete_fields = ("tow_pilot",)
+
+
 @admin.register(Logsheet)
 class LogsheetAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("log_date", "airfield", "created_by", "finalized", "created_at")
     list_filter = ("airfield", "finalized")
     search_fields = ("airfield__name", "created_by__username")
+    inlines = [LogsheetTowplaneInline]
 
     admin_helper_message = (
         "Logsheets: daily operation records. Finalizing a log locks it from edits."
+    )
+
+
+# Admin configuration for LogsheetTowplane objects
+# Day-level towplane roster: which planes are scheduled to fly,
+# the expected tow pilot, and the starting tach reading.
+@admin.register(LogsheetTowplane)
+class LogsheetTowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = ("logsheet", "towplane", "tow_pilot", "start_tach", "updated_at")
+    list_select_related = ("logsheet", "towplane", "tow_pilot")
+    list_filter = ("logsheet__airfield", "logsheet__finalized")
+    search_fields = (
+        "towplane__n_number",
+        "tow_pilot__last_name",
+        "tow_pilot__first_name",
+        "logsheet__log_date",
+    )
+    autocomplete_fields = ("tow_pilot",)
+
+    admin_helper_message = (
+        "Towplane roster per day: expected tow pilot and starting tach. "
+        "Edit here if the logsheet creation flow missed a plane."
     )
 
 

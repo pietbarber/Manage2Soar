@@ -2054,6 +2054,93 @@ class TowplaneCloseout(models.Model):
 
 
 ####################################################
+# LogsheetTowplane model
+#
+# Tracks the day-level towplane roster for a logsheet: which towplanes
+# are expected to fly, the pilot scheduled on each, and the starting
+# tach reading at the beginning of the day.
+#
+# This is the "start of operations" record — distinct from
+# ``TowplaneCloseout`` which captures end-of-day readings (end tach,
+# fuel, notes, rental charges).
+#
+# Fields:
+# - logsheet: The associated logsheet (flying day).
+# - towplane: The towplane scheduled to fly.
+# - tow_pilot: The member scheduled to tow this plane (FK to Member,
+#   limited to members with ``towpilot=True``).
+# - start_tach: Tach reading at the start of the day. Pre-populated
+#   from the most recent prior day's ``TowplaneCloseout.end_tach``
+#   when a new row is created.
+#
+# Methods:
+# - __str__: Returns "<towplane> @ <logsheet>" for display.
+# - static get_last_end_tach(towplane, before_date): Returns the most
+#   recent non-null ``end_tach`` from prior days' closeouts, or None.
+#
+
+
+class LogsheetTowplane(models.Model):
+    logsheet = models.ForeignKey(
+        Logsheet,
+        on_delete=models.CASCADE,
+        related_name="scheduled_towplanes",
+    )
+    towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
+    tow_pilot = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="logsheet_towplane_assignments",
+        limit_choices_to={"towpilot": True},
+        help_text="Tow pilot scheduled on this towplane for the day.",
+    )
+    start_tach = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Starting tach reading for the day. Pre-populated from the "
+        "prior flying day's ending tach when the row is first created.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("logsheet", "towplane")
+        ordering = ["towplane__n_number"]
+        indexes = [
+            models.Index(fields=["towplane", "logsheet"]),
+        ]
+
+    def __str__(self):
+        return f"{self.towplane.n_number} @ {self.logsheet}"
+
+    @staticmethod
+    def get_last_end_tach(towplane, before_date=None):
+        """Return the most recent non-null ``end_tach`` from prior closeouts.
+
+        ``before_date`` is exclusive: rows with
+        ``logsheet.log_date >= before_date`` are ignored. If ``before_date``
+        is ``None``, all prior closeouts are considered.
+
+        Returns a ``Decimal`` (or ``None`` if no prior end-tach exists).
+        """
+        qs = TowplaneCloseout.objects.filter(towplane=towplane).exclude(
+            end_tach__isnull=True
+        )
+        if before_date is not None:
+            qs = qs.filter(logsheet__log_date__lt=before_date)
+        value = (
+            qs.order_by("-logsheet__log_date")
+            .values_list("end_tach", flat=True)
+            .first()
+        )
+        return value
+
+
+####################################################
 # TowplaneRentalCharge model
 #
 # Tracks one rental charge row per member for a given towplane closeout.
