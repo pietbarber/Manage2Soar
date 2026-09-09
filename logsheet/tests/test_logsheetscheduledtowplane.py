@@ -315,6 +315,34 @@ class CreateLogsheetRosterViewTests(TestCase):
         self.assertEqual(ctx_map[str(self.towplane.pk)], "77.70")
         self.assertNotIn(str(virtual.pk), ctx_map)
 
+    def test_logsheet_list_prefill_map_respects_requested_log_date(self):
+        self.client.force_login(self.member)
+        older_ls = _make_logsheet(
+            self.airfield, self.member, date.today() - timedelta(days=3)
+        )
+        newer_ls = _make_logsheet(
+            self.airfield, self.member, date.today() - timedelta(days=1)
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=older_ls,
+            towplane=self.towplane,
+            end_tach=Decimal("111.10"),
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=newer_ls,
+            towplane=self.towplane,
+            end_tach=Decimal("222.20"),
+        )
+
+        selected_day = (date.today() - timedelta(days=1)).isoformat()
+        response = self.client.get(
+            reverse("logsheet:index"), {"log_date": selected_day}
+        )
+        self.assertEqual(response.status_code, 200)
+        ctx_map = response.context["towplane_start_tach_map"]
+        # before_date is exclusive, so selected day should use only prior rows.
+        self.assertEqual(ctx_map[str(self.towplane.pk)], "111.10")
+
 
 class AddTowplaneCloseoutRosterViewTests(TestCase):
     def setUp(self):
@@ -405,6 +433,7 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         self.assertGreaterEqual(len(forms), 1)
         # First form should have our seeded row.
         self.assertEqual(forms[0].instance.towplane, self.towplane)
+        self.assertContains(response, 'name="roster-0-id"')
 
     def test_roster_save_creates_and_updates_rows(self):
         self.client.force_login(self.member)
@@ -477,6 +506,49 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         self.assertIn('id="towplane_pilot_map"', content)
         # And the pilot name/id should be in it
         self.assertIn(str(self.member.pk), content)
+
+    def test_roster_delete_existing_row(self):
+        row = LogsheetTowplane.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            tow_pilot=self.member,
+            start_tach=Decimal("90.00"),
+        )
+        self.client.force_login(self.member)
+        url = reverse(
+            "logsheet:edit_logsheet_closeout", kwargs={"pk": self.logsheet.pk}
+        )
+        data = {
+            "safety_issues": "None",
+            "equipment_issues": "None",
+            "operations_summary": "Delete roster row",
+            "duty_officer": "",
+            "assistant_duty_officer": "",
+            "duty_instructor": "",
+            "surge_instructor": "",
+            "tow_pilot": "",
+            "surge_tow_pilot": "",
+            "form-TOTAL_FORMS": "0",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "roster-TOTAL_FORMS": "2",
+            "roster-INITIAL_FORMS": "1",
+            "roster-MIN_NUM_FORMS": "0",
+            "roster-MAX_NUM_FORMS": "1000",
+            "roster-0-id": str(row.pk),
+            "roster-0-towplane": str(self.towplane.pk),
+            "roster-0-tow_pilot": str(self.member.pk),
+            "roster-0-start_tach": "90.00",
+            "roster-0-DELETE": "on",
+            "roster-1-id": "",
+            "roster-1-towplane": "",
+            "roster-1-tow_pilot": "",
+            "roster-1-start_tach": "",
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(LogsheetTowplane.objects.filter(pk=row.pk).exists())
 
 
 class TowplaneStartTachApiTests(TestCase):

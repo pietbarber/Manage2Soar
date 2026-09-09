@@ -450,48 +450,6 @@
     ticketSelect.addEventListener('change', syncTicketValidation);
     ticketInput.addEventListener('input', syncTicketValidation);
   })();
-
-  // Issue #1048: When a towplane is selected, auto-fill the tow pilot from
-  // the day-level LogsheetTowplane roster. The user can override it; the
-  // fill only happens when the towplane changes (not on initial load).
-  (function () {
-    var towplaneSelect = document.getElementById('id_towplane');
-    var towPilotSelect = document.getElementById('id_tow_pilot');
-    if (!towplaneSelect || !towPilotSelect) return;
-
-    var map = {};
-    try {
-      var el = document.getElementById('towplane_pilot_map');
-      map = el ? JSON.parse(el.textContent || '{}') : {};
-    } catch (e) { map = {}; }
-    if (!Object.keys(map).length) return;
-
-    var lastTouchedTowplane = null;
-    var userEditedPilot = false;
-
-    towPilotSelect.addEventListener('change', function () {
-      // Track manual edits so we don't overwrite user choices.
-      userEditedPilot = true;
-      lastTouchedTowplane = towplaneSelect.value;
-    });
-
-    towplaneSelect.addEventListener('change', function () {
-      var planeId = towplaneSelect.value;
-      // Only auto-fill when the user did not just pick a different pilot
-      // for the same plane (e.g., they are overriding the default).
-      if (userEditedPilot && lastTouchedTowplane === planeId) {
-        return;
-      }
-      userEditedPilot = false;
-      lastTouchedTowplane = planeId;
-      var entry = map[planeId];
-      if (entry && entry.pilot_id) {
-        towPilotSelect.value = String(entry.pilot_id);
-        // Re-run any handlers attached to the pilot select (promote, etc.).
-        towPilotSelect.dispatchEvent(new Event('change', {bubbles: true}));
-      }
-    });
-  })();
 </script>
-
+{{ towplane_pilot_map|json_script:"towplane_pilot_map" }}
 <!-- Form submit JS is now managed in logsheet_manage.html for robust modal handling. -->

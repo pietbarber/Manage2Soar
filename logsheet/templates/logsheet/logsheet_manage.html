@@ -2034,12 +2034,61 @@ document.addEventListener("click", async function(e) {
     };
   }
 
+  // Issue #1048: initialize towplane->tow pilot auto-fill after modal HTML
+  // is injected, since inline scripts in fetched fragments do not execute.
+  window.initTowplanePilotAutofill = function(modalContentEl) {
+    const root = modalContentEl || document.getElementById('flightModalContent');
+    if (!root) return;
+
+    const towplaneSelect = root.querySelector('#id_towplane');
+    const towPilotSelect = root.querySelector('#id_tow_pilot');
+    const mapEl = root.querySelector('#towplane_pilot_map');
+    if (!towplaneSelect || !towPilotSelect || !mapEl) return;
+    if (towplaneSelect.dataset.boundRosterAutofill === '1') return;
+
+    let map = {};
+    try {
+      map = JSON.parse(mapEl.textContent || '{}');
+    } catch (e) {
+      map = {};
+    }
+    if (!Object.keys(map).length) return;
+
+    let lastTouchedTowplane = null;
+    let userEditedPilot = false;
+
+    towPilotSelect.addEventListener('change', function () {
+      userEditedPilot = true;
+      lastTouchedTowplane = towplaneSelect.value;
+    });
+
+    towplaneSelect.addEventListener('change', function () {
+      const planeId = towplaneSelect.value;
+      if (userEditedPilot && lastTouchedTowplane === planeId) {
+        return;
+      }
+      userEditedPilot = false;
+      lastTouchedTowplane = planeId;
+      const entry = map[planeId];
+      if (entry && entry.pilot_id) {
+        towPilotSelect.value = String(entry.pilot_id);
+        towPilotSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+
+    towplaneSelect.dataset.boundRosterAutofill = '1';
+  };
+
   // Global function to wire up the flight form's AJAX submit handler (shared between add and edit flows)
   window.attachFlightFormHandler = function(modalContentEl) {
     const el = modalContentEl || document.getElementById('flightModalContent');
     if (!el) return;
     const form = el.querySelector('#edit-flight-form') || el.querySelector('form[method="post"]');
     if (!form) return;
+
+    if (window.initTowplanePilotAutofill) {
+      window.initTowplanePilotAutofill(el);
+    }
 
     // Remove existing handler to prevent duplicates on re-attach
     form.removeEventListener('submit', window._flightFormSubmitHandler);

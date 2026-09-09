@@ -342,6 +342,9 @@
           </div>
         {% endif %}
         {% for roster_form in roster_formset %}
+          {% for hidden in roster_form.hidden_fields %}
+            {{ hidden }}
+          {% endfor %}
           <div class="row g-2 mb-2 align-items-end">
             <div class="col-md-4">
               {{ roster_form.towplane.label_tag }}

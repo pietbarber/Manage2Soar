@@ -90,6 +90,17 @@ from .utils.tow_logbook import (
     get_tow_logbook_data,
 )
 
+
+def _parse_log_date_value(raw_value, fallback_date):
+    """Parse YYYY-MM-DD safely and return *fallback_date* on failure."""
+    if not raw_value:
+        return fallback_date
+    try:
+        return datetime.strptime(str(raw_value), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return fallback_date
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -2218,7 +2229,10 @@ def list_logsheets(request):
             from datetime import datetime
 
             parsed_date = datetime.strptime(log_date, "%Y-%m-%d").date()
-            form = CreateLogsheetForm(duty_assignment_date=parsed_date)
+            form = CreateLogsheetForm(
+                duty_assignment_date=parsed_date,
+                initial={"log_date": parsed_date},
+            )
         except (ValueError, TypeError) as e:
             logging.warning(f"Invalid date format provided: {log_date}, error: {e}")
             form = CreateLogsheetForm()
@@ -2232,11 +2246,18 @@ def list_logsheets(request):
         queryset=LogsheetTowplane.objects.none(),
         prefix="towplanes",
     )
+    selected_log_date = _parse_log_date_value(
+        form["log_date"].value(),
+        fallback_date=date.today(),
+    )
     towplane_start_tach_map = {}
     for tp in Towplane.objects.filter(is_active=True).exclude(
         n_number__in=Towplane.VIRTUAL_N_NUMBERS
     ):
-        last_end = LogsheetTowplane.get_last_end_tach(tp, before_date=date.today())
+        last_end = LogsheetTowplane.get_last_end_tach(
+            tp,
+            before_date=selected_log_date,
+        )
         if last_end is not None:
             towplane_start_tach_map[str(tp.pk)] = f"{last_end:.2f}"
 
@@ -3537,11 +3558,12 @@ def edit_logsheet_closeout(request, pk):
             # Only when the client actually submitted the formset — otherwise
             # we leave any existing roster rows untouched.
             if roster_submitted:
-                for deleted_row in roster_formset.deleted_objects:
-                    deleted_row.delete()
-                for roster_row in roster_formset.save(commit=False):
-                    roster_row.logsheet = logsheet
-                    roster_row.save()
+                roster_rows = roster_formset.save(commit=False)
+                for obj in roster_formset.deleted_objects:
+                    obj.delete()
+                for row in roster_rows:
+                    row.logsheet = logsheet
+                    row.save()
 
             if _rental_on:
                 for rc_formset in rental_formsets:

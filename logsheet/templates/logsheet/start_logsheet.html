@@ -288,26 +288,45 @@
   (function () {
     "use strict";
     var tachLookupUrl = "{% url 'logsheet:api_towplane_start_tach' %}";
-    // Map of towplane_id -> last end tach (from prior flying day).
-    var tachMap = {};
+    var dateInput = null;
+    var tachCacheByDate = {};
+    var initialTachMap = {};
     try {
       var el = document.getElementById('towplane_start_tach_map');
-      tachMap = el ? JSON.parse(el.textContent || '{}') : {};
-    } catch (e) { tachMap = {}; }
+      initialTachMap = el ? JSON.parse(el.textContent || '{}') : {};
+    } catch (e) { initialTachMap = {}; }
+
+    function currentDateKey() {
+      return (dateInput && dateInput.value) ? dateInput.value : '';
+    }
+
+    function cacheForCurrentDate() {
+      var key = currentDateKey();
+      if (!tachCacheByDate[key]) {
+        tachCacheByDate[key] = {};
+      }
+      return tachCacheByDate[key];
+    }
+
+    function setAutoPrefill(tach, value) {
+      tach.value = value;
+      tach.dataset.prefilled = '1';
+    }
 
     function prefillTachForSelection(sel, tach) {
       var val = sel.value;
       if (!val) return;
 
-      if (tachMap[val] !== undefined) {
-        tach.value = tachMap[val];
+      var dayCache = cacheForCurrentDate();
+      if (dayCache[val] !== undefined) {
+        setAutoPrefill(tach, dayCache[val]);
         return;
       }
 
-      var dateInput = document.getElementById('id_log_date');
       var query = new URLSearchParams({ towplane_id: val });
-      if (dateInput && dateInput.value) {
-        query.set('before_date', dateInput.value);
+      var dayKey = currentDateKey();
+      if (dayKey) {
+        query.set('before_date', dayKey);
       }
 
       fetch(tachLookupUrl + '?' + query.toString(), {
@@ -323,8 +342,8 @@
           if (!payload || payload.start_tach === null || payload.start_tach === undefined) {
             return;
           }
-          tachMap[val] = payload.start_tach;
-          tach.value = payload.start_tach;
+          dayCache[val] = payload.start_tach;
+          setAutoPrefill(tach, payload.start_tach);
         })
         .catch(function () {
           // Keep UI responsive; failure only means no prefill hint.
@@ -336,12 +355,18 @@
       var sel = row.querySelector('select[name$="-towplane"]');
       var tach = row.querySelector('input[name$="-start_tach"]');
       if (!sel || !tach) return;
+
+      tach.addEventListener('input', function () {
+        tach.dataset.prefilled = '0';
+      });
+
       sel.addEventListener('change', function () {
         prefillTachForSelection(sel, tach);
       });
       // Initial prefill if the select already has a value.
-      if (sel.value && tachMap[sel.value] !== undefined && !tach.value) {
-        tach.value = tachMap[sel.value];
+      var cache = cacheForCurrentDate();
+      if (sel.value && cache[sel.value] !== undefined && !tach.value) {
+        setAutoPrefill(tach, cache[sel.value]);
       } else if (sel.value && !tach.value) {
         prefillTachForSelection(sel, tach);
       }
@@ -364,9 +389,26 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+      dateInput = document.getElementById('id_log_date');
+      tachCacheByDate[currentDateKey()] = Object.assign({}, initialTachMap);
+
       var roster = document.querySelector('.towplane-roster');
       if (!roster) return;
       roster.querySelectorAll('.towplane-row').forEach(initRow);
+
+      if (dateInput) {
+        dateInput.addEventListener('change', function () {
+          roster.querySelectorAll('.towplane-row').forEach(function (row) {
+            var sel = row.querySelector('select[name$="-towplane"]');
+            var tach = row.querySelector('input[name$="-start_tach"]');
+            if (!sel || !tach || !sel.value) return;
+            if (!tach.value || tach.dataset.prefilled === '1') {
+              tach.value = '';
+              prefillTachForSelection(sel, tach);
+            }
+          });
+        });
+      }
 
       // "Add another towplane" clones the last rendered row, rewriting the
       // formset index and bumping TOTAL_FORMS.
