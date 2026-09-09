@@ -475,6 +475,22 @@
       }
     }
 
+    function resetClonedRowValues(row) {
+      // New rows should start blank so per-towplane prefill can run correctly.
+      row.querySelectorAll('select, input, textarea').forEach(function (field) {
+        var name = field.getAttribute('name') || '';
+        if (!name) return;
+        if (name.endsWith('-id')) return;
+
+        if (field.type === 'checkbox' || field.type === 'radio') {
+          field.checked = false;
+          return;
+        }
+
+        field.value = '';
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       var roster = document.querySelector('.towplane-roster');
       if (!roster) return;
@@ -494,8 +510,8 @@
         if (!template) return;
 
         var clone = template.cloneNode(true);
-        var re = new RegExp('towplanes-' + (idx - 1) + '-', 'g');
-        clone.innerHTML = clone.innerHTML.replace(re, 'towplanes-' + idx + '-');
+        clone.innerHTML = clone.innerHTML.replace(/towplanes-\d+-/g, 'towplanes-' + idx + '-');
+        resetClonedRowValues(clone);
         roster.appendChild(clone);
         initRow(clone);
         total.value = String(idx + 1);
