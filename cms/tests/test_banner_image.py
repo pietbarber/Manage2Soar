@@ -6,6 +6,7 @@ forms (not just Django admin), with parity between the two.
 """
 
 import io
+import shutil
 import tempfile
 
 from django.contrib.auth import get_user_model
@@ -19,6 +20,12 @@ from cms.views import CmsPageForm
 User = get_user_model()
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="test_media_cms_banner_")
+
+
+def tearDownModule():
+    """Remove uploaded banner files created during this test module."""
+    shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
 
 def _make_banner_upload(name="banner.png", size=(400, 60), color=(20, 40, 80)):
     """Build a valid PNG SimpleUploadedFile (PIL-verified for ImageField)."""
@@ -46,6 +53,7 @@ def _base_form_data(page_id=None, parent_id=None):
     return data
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class CmsPageFormBannerFieldTests(TestCase):
     """Direct ModelForm tests: banner_image is exposed and optional."""
 
@@ -85,6 +93,7 @@ class CmsPageFormBannerFieldTests(TestCase):
         self.assertTrue(saved.banner_image)
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class CreatePageBannerFormTests(TestCase):
     """Create page view: banner field present on GET and persisted on POST."""
 
@@ -128,6 +137,7 @@ class CreatePageBannerFormTests(TestCase):
         self.assertFalse(page.banner_image)
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class EditPageBannerFormTests(TestCase):
     """Edit page view: banner field present on GET, persists on POST."""
 
@@ -193,6 +203,7 @@ class EditPageBannerFormTests(TestCase):
         self.assertFalse(self.page.banner_image)
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class CreateEditBannerParityTests(TestCase):
     """Create and edit forms expose the banner field identically (Issue #1047)."""
 
@@ -208,5 +219,3 @@ class CreateEditBannerParityTests(TestCase):
         self.assertIn("banner_image", edit_form.fields)
         # Both use the same Meta, so the field ordering is identical
         self.assertEqual(list(create_form.fields.keys()), list(edit_form.fields.keys()))
-
-
