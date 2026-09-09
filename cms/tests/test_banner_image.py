@@ -6,11 +6,11 @@ forms (not just Django admin), with parity between the two.
 """
 
 import io
-import unittest
+import tempfile
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from cms.models import Page
@@ -18,6 +18,7 @@ from cms.views import CmsPageForm
 
 User = get_user_model()
 
+TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="test_media_cms_banner_")
 
 def _make_banner_upload(name="banner.png", size=(400, 60), color=(20, 40, 80)):
     """Build a valid PNG SimpleUploadedFile (PIL-verified for ImageField)."""
@@ -209,5 +210,3 @@ class CreateEditBannerParityTests(TestCase):
         self.assertEqual(list(create_form.fields.keys()), list(edit_form.fields.keys()))
 
 
-if __name__ == "__main__":
-    unittest.main()

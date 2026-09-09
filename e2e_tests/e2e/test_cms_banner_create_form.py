@@ -9,7 +9,6 @@ form (parity with the edit form). This test verifies that:
      banner element after creation).
 """
 
-import io
 import os
 import shutil
 import tempfile
