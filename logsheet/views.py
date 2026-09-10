@@ -2366,6 +2366,13 @@ def edit_flight(request, logsheet_pk, flight_pk):
     inactive_gliders = [g for g in gliders_sorted if not g.is_active]
     config = SiteConfiguration.objects.first()
     commercial_rides_enabled = bool(config and config.commercial_rides_enabled)
+    towplane_pilot_map = {
+        str(row.towplane_id): {
+            "pilot_id": row.tow_pilot_id,
+            "pilot_name": row.tow_pilot.full_display_name if row.tow_pilot else None,
+        }
+        for row in logsheet.scheduled_towplanes.select_related("towplane", "tow_pilot")
+    }
 
     def _setup_error_response(exc, *, unexpected=False):
         # Use the already-fetched config to avoid an extra DB query and potential
@@ -2457,6 +2464,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
                     club_private=club_private,
                     inactive_gliders=inactive_gliders,
                     commercial_rides_enabled=commercial_rides_enabled,
+                    towplane_pilot_map=towplane_pilot_map,
                 )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"success": True})
@@ -2472,6 +2480,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
             club_private=club_private,
             inactive_gliders=inactive_gliders,
             commercial_rides_enabled=commercial_rides_enabled,
+            towplane_pilot_map=towplane_pilot_map,
         )
     else:
         try:
@@ -2490,6 +2499,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
         club_private=club_private,
         inactive_gliders=inactive_gliders,
         commercial_rides_enabled=commercial_rides_enabled,
+        towplane_pilot_map=towplane_pilot_map,
     )
 
 
@@ -3602,34 +3612,46 @@ def edit_logsheet_closeout(request, pk):
             # we leave any existing roster rows untouched.
             if roster_submitted:
                 roster_rows = roster_formset.save(commit=False)
-                for obj in roster_formset.deleted_objects:
-                    obj.delete()
-                for row in roster_rows:
-                    row.logsheet = logsheet
-                    row.save()
-                    towplane_closeout = TowplaneCloseout.objects.filter(
-                        logsheet=logsheet,
-                        towplane=row.towplane,
-                    ).first()
-                    if towplane_closeout and row.start_tach is not None:
-                        prior_roster_tach = prior_roster_start_tach.get(row.towplane_id)
-                        prior_closeout_tach = prior_closeout_start_tach.get(
-                            row.towplane_id
-                        )
-                        posted_closeout_tach = posted_closeout_start_tach.get(
-                            row.towplane_id
-                        )
-                        closeout_was_auto_derived = (
-                            towplane_closeout.start_tach is None
-                            or (
-                                prior_roster_tach is not None
-                                and prior_closeout_tach == prior_roster_tach
-                                and posted_closeout_tach == prior_closeout_tach
+                deleted_ids = {obj.pk for obj in roster_formset.deleted_objects}
+                final_roster_rows = [
+                    row for row in roster_rows if row.pk not in deleted_ids
+                ]
+                with transaction.atomic():
+                    LogsheetTowplane.objects.filter(logsheet=logsheet).delete()
+                    for row in final_roster_rows:
+                        row.pk = None
+                        row.logsheet = logsheet
+                        row.save()
+
+                        towplane_closeout = TowplaneCloseout.objects.filter(
+                            logsheet=logsheet,
+                            towplane=row.towplane,
+                        ).first()
+                        if towplane_closeout and row.start_tach is not None:
+                            prior_roster_tach = prior_roster_start_tach.get(
+                                row.towplane_id
                             )
-                        )
-                        if closeout_was_auto_derived:
-                            towplane_closeout.start_tach = row.start_tach
-                            towplane_closeout.save(update_fields=["start_tach"])
+                            prior_closeout_tach = prior_closeout_start_tach.get(
+                                row.towplane_id
+                            )
+                            posted_closeout_tach = posted_closeout_start_tach.get(
+                                row.towplane_id
+                            )
+                            closeout_was_auto_derived = (
+                                towplane_closeout.start_tach is None
+                                or (
+                                    prior_roster_tach is not None
+                                    and prior_closeout_tach == prior_roster_tach
+                                    and posted_closeout_tach == prior_closeout_tach
+                                )
+                            )
+                            if closeout_was_auto_derived:
+                                towplane_closeout.start_tach = row.start_tach
+                                if towplane_closeout.end_tach is not None:
+                                    towplane_closeout.tach_time = None
+                                towplane_closeout.save(
+                                    update_fields=["start_tach", "tach_time"]
+                                )
 
             if _rental_on:
                 for rc_formset in rental_formsets:

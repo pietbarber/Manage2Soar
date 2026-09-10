@@ -2047,14 +2047,17 @@ document.addEventListener("click", async function(e) {
     const towplaneSelect = root.querySelector('#id_towplane');
     const towPilotSelect = root.querySelector('#id_tow_pilot');
     const flightForm = root.querySelector('#edit-flight-form, #offline-flight-form');
-    const mapEl = root.querySelector('#towplane_pilot_map')
-      || document.getElementById('manage_towplane_pilot_map');
-    if (!towplaneSelect || !towPilotSelect || !mapEl) return;
+    const localMapEl = root.querySelector('#towplane_pilot_map');
+    const pageMapEl = document.getElementById('manage_towplane_pilot_map');
+    if (!towplaneSelect || !towPilotSelect || (!localMapEl && !pageMapEl)) return;
     if (towplaneSelect.dataset.boundRosterAutofill === '1') return;
 
     let map = {};
     try {
-      map = JSON.parse(mapEl.textContent || '{}');
+      map = JSON.parse((localMapEl || pageMapEl).textContent || '{}');
+      if (!Object.keys(map).length && pageMapEl && pageMapEl !== localMapEl) {
+        map = JSON.parse(pageMapEl.textContent || '{}');
+      }
     } catch (e) {
       map = {};
     }
