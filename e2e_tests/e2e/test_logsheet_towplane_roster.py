@@ -13,6 +13,7 @@ from logsheet.models import (
     Towplane,
     TowplaneCloseout,
 )
+from siteconfig.models import SiteConfiguration
 
 
 class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
@@ -24,6 +25,15 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
             username="rosterbrowser",
             is_superuser=True,
             towpilot=True,
+        )
+        self.member_b = self.create_test_member(
+            username="rosterbrowserb",
+            towpilot=True,
+        )
+        SiteConfiguration.objects.create(
+            club_name="Browser Club",
+            domain_name="browser.example.com",
+            club_abbreviation="BRC",
         )
         self.airfield = Airfield.objects.create(
             identifier="KWEB",
@@ -63,6 +73,14 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
             tow_pilot=self.member,
             start_tach=Decimal("111.00"),
         )
+        LogsheetTowplane.objects.create(
+            logsheet=self.current_logsheet,
+            towplane=self.towplane_b,
+            tow_pilot=self.member_b,
+            start_tach=Decimal("325.00"),
+        )
+        self.current_logsheet.default_towplane = self.towplane_a
+        self.current_logsheet.save(update_fields=["default_towplane"])
         self.login(username="rosterbrowser")
 
     def test_create_roster_adds_one_blank_row_and_prefills_tach(self):
@@ -147,3 +165,25 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
             ).input_value(),
             "",
         )
+
+    def test_flight_modal_applies_roster_pilot_and_preserves_override(self):
+        self.page.goto(
+            f"{self.live_server_url}{reverse('logsheet:manage', kwargs={'pk': self.current_logsheet.pk})}"
+        )
+        self.page.locator('a[data-url*="/add-flight/"]').first.click()
+
+        towplane = self.page.locator("#flightModalContent #id_towplane")
+        tow_pilot = self.page.locator("#flightModalContent #id_tow_pilot")
+        towplane.wait_for(state="visible")
+
+        # The default towplane is already selected, so no user plane change
+        # occurs; the initializer must still apply the roster pilot.
+        self.assertEqual(towplane.input_value(), str(self.towplane_a.pk))
+        self.assertEqual(tow_pilot.input_value(), str(self.member.pk))
+
+        # Override plane A's pilot, switch to B, and switch back to A.
+        tow_pilot.select_option(str(self.member_b.pk))
+        towplane.select_option(str(self.towplane_b.pk))
+        self.assertEqual(tow_pilot.input_value(), str(self.member_b.pk))
+        towplane.select_option(str(self.towplane_a.pk))
+        self.assertEqual(tow_pilot.input_value(), str(self.member_b.pk))
