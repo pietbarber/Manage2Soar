@@ -3442,12 +3442,15 @@ def edit_logsheet_closeout(request, pk):
     relevant_towplanes = get_relevant_towplanes(logsheet)
     # Materialize towplane IDs once to avoid redundant DB queries
     relevant_towplane_ids = list(relevant_towplanes.values_list("pk", flat=True))
+    roster_submitted = request.method == "POST" and (
+        "roster-TOTAL_FORMS" in request.POST
+    )
 
     for towplane_id in relevant_towplane_ids:
         towplane_closeout, _ = TowplaneCloseout.objects.get_or_create(
             logsheet=logsheet, towplane_id=towplane_id
         )
-        if towplane_closeout.start_tach is None:
+        if not roster_submitted and towplane_closeout.start_tach is None:
             roster_start_tach = (
                 LogsheetTowplane.objects.filter(
                     logsheet=logsheet,
@@ -3511,9 +3514,6 @@ def edit_logsheet_closeout(request, pk):
         "towplane", "tow_pilot"
     )
     roster_prefix = "roster"
-    roster_submitted = request.method == "POST" and (
-        "roster-TOTAL_FORMS" in request.POST
-    )
 
     if request.method == "POST":
         form = LogsheetCloseoutForm(request.POST, instance=closeout)

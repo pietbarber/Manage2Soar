@@ -608,6 +608,59 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         self.assertEqual(row.tow_pilot, self.other)
         self.assertEqual(row.start_tach, Decimal("100.00"))
 
+    def test_roster_tach_correction_updates_auto_seeded_closeout(self):
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.00"),
+        )
+        roster_row = LogsheetTowplane.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.00"),
+        )
+        self.client.force_login(self.member)
+        url = reverse(
+            "logsheet:edit_logsheet_closeout", kwargs={"pk": self.logsheet.pk}
+        )
+        data = {
+            "safety_issues": "None",
+            "equipment_issues": "None",
+            "operations_summary": "Correct roster tach",
+            "duty_officer": "",
+            "assistant_duty_officer": "",
+            "duty_instructor": "",
+            "surge_instructor": "",
+            "tow_pilot": "",
+            "surge_tow_pilot": "",
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-id": str(closeout.pk),
+            "form-0-towplane": str(self.towplane.pk),
+            "form-0-start_tach": "",
+            "form-0-end_tach": "",
+            "form-0-fuel_added": "",
+            "form-0-notes": "",
+            "roster-TOTAL_FORMS": "2",
+            "roster-INITIAL_FORMS": "1",
+            "roster-MIN_NUM_FORMS": "0",
+            "roster-MAX_NUM_FORMS": "1000",
+            "roster-0-id": str(roster_row.pk),
+            "roster-0-towplane": str(self.towplane.pk),
+            "roster-0-tow_pilot": "",
+            "roster-0-start_tach": "110.00",
+            "roster-1-id": "",
+            "roster-1-towplane": "",
+            "roster-1-tow_pilot": "",
+            "roster-1-start_tach": "",
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+        closeout.refresh_from_db()
+        self.assertEqual(closeout.start_tach, Decimal("110.00"))
+
     def test_add_flight_returns_towplane_pilot_map(self):
         # Ensure the auto-fill map is exposed when rendering the add-flight form.
         LogsheetTowplane.objects.create(
