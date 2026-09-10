@@ -31,6 +31,17 @@ erDiagram
         int duty_instructor_id FK
     }
 
+    LogsheetTowplane {
+        int id PK
+        int logsheet_id FK
+        int towplane_id FK
+        int tow_pilot_id FK "nullable"
+        decimal start_tach "nullable"
+        datetime created_at
+        datetime updated_at
+        string unique_logsheet_towplane "unique constraint"
+    }
+
     Flight {
         int id PK
         int logsheet_id FK

@@ -1659,7 +1659,7 @@ def api_towplane_start_tach(request):
         try:
             parsed_before_date = datetime.strptime(before_date, "%Y-%m-%d").date()
         except ValueError:
-            parsed_before_date = None
+            return JsonResponse({"start_tach": None}, status=400)
 
     last_end = LogsheetTowplane.get_last_end_tach(
         towplane,
@@ -1710,7 +1710,7 @@ def create_logsheet(request):
             logsheet.save()
             # Attach the day-level towplane roster.
             for fs in formset.cleaned_data:
-                if not fs:
+                if not fs or fs.get("DELETE"):
                     continue
                 tp = fs.get("towplane")
                 if not tp:
@@ -2133,6 +2133,13 @@ def manage_logsheet(request, pk):
     context["commercial_rides_enabled"] = bool(
         config and config.commercial_rides_enabled
     )
+    context["towplane_pilot_map"] = {
+        str(row.towplane_id): {
+            "pilot_id": row.tow_pilot_id,
+            "pilot_name": row.tow_pilot.full_display_name if row.tow_pilot else None,
+        }
+        for row in logsheet.scheduled_towplanes.select_related("towplane", "tow_pilot")
+    }
 
     return render(request, "logsheet/logsheet_manage.html", context)
 
@@ -3516,6 +3523,10 @@ def edit_logsheet_closeout(request, pk):
     roster_queryset = LogsheetTowplane.objects.filter(logsheet=logsheet).select_related(
         "towplane", "tow_pilot"
     )
+    prior_roster_start_tach = dict(
+        roster_queryset.values_list("towplane_id", "start_tach")
+    )
+    prior_closeout_start_tach = dict(queryset.values_list("towplane_id", "start_tach"))
     roster_prefix = "roster"
 
     if request.method == "POST":
@@ -3574,6 +3585,15 @@ def edit_logsheet_closeout(request, pk):
                     break
 
         if forms_valid:
+            posted_closeout_start_tach = {}
+            if roster_submitted:
+                posted_closeout_start_tach = {
+                    closeout_form.instance.towplane_id: closeout_form.cleaned_data.get(
+                        "start_tach"
+                    )
+                    for closeout_form in formset.forms
+                    if closeout_form.instance.pk
+                }
             form.save()
             duty_form.save()
             formset.save()
@@ -3591,13 +3611,25 @@ def edit_logsheet_closeout(request, pk):
                         logsheet=logsheet,
                         towplane=row.towplane,
                     ).first()
-                    if (
-                        towplane_closeout
-                        and towplane_closeout.start_tach is None
-                        and row.start_tach is not None
-                    ):
-                        towplane_closeout.start_tach = row.start_tach
-                        towplane_closeout.save(update_fields=["start_tach"])
+                    if towplane_closeout and row.start_tach is not None:
+                        prior_roster_tach = prior_roster_start_tach.get(row.towplane_id)
+                        prior_closeout_tach = prior_closeout_start_tach.get(
+                            row.towplane_id
+                        )
+                        posted_closeout_tach = posted_closeout_start_tach.get(
+                            row.towplane_id
+                        )
+                        closeout_was_auto_derived = (
+                            towplane_closeout.start_tach is None
+                            or (
+                                prior_roster_tach is not None
+                                and prior_closeout_tach == prior_roster_tach
+                                and posted_closeout_tach == prior_closeout_tach
+                            )
+                        )
+                        if closeout_was_auto_derived:
+                            towplane_closeout.start_tach = row.start_tach
+                            towplane_closeout.save(update_fields=["start_tach"])
 
             if _rental_on:
                 for rc_formset in rental_formsets:

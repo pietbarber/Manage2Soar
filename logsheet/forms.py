@@ -4,7 +4,7 @@ from typing import Optional
 from django import forms
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
-from django.db.models import Case, IntegerField, Q, When
+from django.db.models import Case, Exists, IntegerField, OuterRef, Q, When
 from django.forms import BaseModelFormSet, modelformset_factory
 from tinymce.widgets import TinyMCE
 
@@ -1155,10 +1155,32 @@ class LogsheetTowplaneForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        towplane_queryset = Towplane.objects.filter(is_active=True)
+        towplane_queryset = (
+            Towplane.objects.filter(is_active=True)
+            .annotate(
+                has_unresolved_grounding=Exists(
+                    MaintenanceIssue.objects.filter(
+                        towplane=OuterRef("pk"), grounded=True, resolved=False
+                    )
+                )
+            )
+            .filter(has_unresolved_grounding=False)
+        )
         if self.instance.pk and self.instance.towplane_id:
-            towplane_queryset = Towplane.objects.filter(
-                Q(is_active=True) | Q(pk=self.instance.towplane_id)
+            towplane_queryset = (
+                Towplane.objects.filter(
+                    Q(is_active=True) | Q(pk=self.instance.towplane_id)
+                )
+                .annotate(
+                    has_unresolved_grounding=Exists(
+                        MaintenanceIssue.objects.filter(
+                            towplane=OuterRef("pk"), grounded=True, resolved=False
+                        )
+                    )
+                )
+                .filter(
+                    Q(has_unresolved_grounding=False) | Q(pk=self.instance.towplane_id)
+                )
             )
         for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
             towplane_queryset = towplane_queryset.exclude(

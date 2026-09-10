@@ -705,6 +705,7 @@
   </div>
 </div>
 
+{{ towplane_pilot_map|json_script:"manage_towplane_pilot_map" }}
 <script>
 // Global toast function for offline notifications (defined early so it's available everywhere)
 window.showOfflineToast = window.showOfflineToast || function(message) {
@@ -1206,6 +1207,9 @@ document.addEventListener("click", async function(e) {
                 commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
               });
               document.getElementById('flightModalContent').innerHTML = html;
+              window.initTowplanePilotAutofill(
+                document.getElementById('flightModalContent')
+              );
 
               // Add visual indication that this is a cloned flight
               const modalElement = document.getElementById('flightModal');
@@ -2042,8 +2046,9 @@ document.addEventListener("click", async function(e) {
 
     const towplaneSelect = root.querySelector('#id_towplane');
     const towPilotSelect = root.querySelector('#id_tow_pilot');
-    const flightForm = root.querySelector('#edit-flight-form');
-    const mapEl = root.querySelector('#towplane_pilot_map');
+    const flightForm = root.querySelector('#edit-flight-form, #offline-flight-form');
+    const mapEl = root.querySelector('#towplane_pilot_map')
+      || document.getElementById('manage_towplane_pilot_map');
     if (!towplaneSelect || !towPilotSelect || !mapEl) return;
     if (towplaneSelect.dataset.boundRosterAutofill === '1') return;
 
@@ -2068,6 +2073,9 @@ document.addEventListener("click", async function(e) {
       const planeId = towplaneSelect.value;
       if (Object.prototype.hasOwnProperty.call(manualPilotOverrides, planeId)) {
         towPilotSelect.value = manualPilotOverrides[planeId];
+        return;
+      }
+      if (!Object.prototype.hasOwnProperty.call(map, planeId)) {
         return;
       }
       const entry = map[planeId];
@@ -2357,6 +2365,9 @@ document.addEventListener("click", async function(e) {
               commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
             });
             document.getElementById("flightModalContent").innerHTML = html;
+            window.initTowplanePilotAutofill(
+              document.getElementById("flightModalContent")
+            );
             window.M2SOffline.initOfflineFormHandlers(() => {
               // Callback after save - update UI
               window.M2SOffline.updatePendingIndicator();
@@ -2569,6 +2580,7 @@ document.addEventListener("click", async function(e) {
                 commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
               });
               modalContent.innerHTML = html;
+              window.initTowplanePilotAutofill(modalContent);
               window.M2SOffline.initOfflineFormHandlers(() => {
                 window.M2SOffline.updatePendingIndicator();
               });

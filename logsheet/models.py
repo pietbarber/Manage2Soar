@@ -2133,7 +2133,7 @@ class LogsheetTowplane(models.Model):
         if before_date is not None:
             qs = qs.filter(logsheet__log_date__lt=before_date)
         value = (
-            qs.order_by("-logsheet__log_date")
+            qs.order_by("-logsheet__log_date", "-pk")
             .values_list("end_tach", flat=True)
             .first()
         )
