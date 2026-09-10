@@ -264,6 +264,31 @@ class CreateLogsheetRosterViewTests(TestCase):
         logsheet = Logsheet.objects.get(log_date=date.today(), airfield=self.airfield)
         self.assertEqual(LogsheetTowplane.objects.filter(logsheet=logsheet).count(), 0)
 
+    def test_create_logsheet_rejects_duplicate_roster_towplanes(self):
+        self.client.force_login(self.member)
+        url = reverse("logsheet:create")
+        data = self._valid_form_data(
+            extra={
+                "towplanes-TOTAL_FORMS": "2",
+                "towplanes-INITIAL_FORMS": "0",
+                "towplanes-MIN_NUM_FORMS": "0",
+                "towplanes-MAX_NUM_FORMS": "1000",
+                "towplanes-0-towplane": self.towplane.pk,
+                "towplanes-0-tow_pilot": "",
+                "towplanes-0-start_tach": "100.00",
+                "towplanes-1-towplane": self.towplane.pk,
+                "towplanes-1-tow_pilot": "",
+                "towplanes-1-start_tach": "101.00",
+            }
+        )
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            Logsheet.objects.filter(
+                log_date=date.today(), airfield=self.airfield
+            ).exists()
+        )
+
     def test_start_tach_prefill_map_excludes_virtual(self):
         self.client.force_login(self.member)
         # Seed a closeout with end_tach so the prefill map has an entry.

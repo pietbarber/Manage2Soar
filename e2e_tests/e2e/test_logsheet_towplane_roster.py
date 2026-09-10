@@ -52,6 +52,12 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
             is_active=True,
             club_owned=True,
         )
+        self.towplane_c = Towplane.objects.create(
+            name="Browser Glider Tug",
+            n_number="N3WEB",
+            is_active=True,
+            club_owned=True,
+        )
         prior_logsheet = Logsheet.objects.create(
             log_date=date.today() - timedelta(days=1),
             airfield=self.airfield,
@@ -187,3 +193,21 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
         self.assertEqual(tow_pilot.input_value(), str(self.member_b.pk))
         towplane.select_option(str(self.towplane_a.pk))
         self.assertEqual(tow_pilot.input_value(), str(self.member_b.pk))
+
+    def test_switching_to_towplane_without_history_clears_auto_tach(self):
+        self.page.goto(f"{self.live_server_url}{reverse('logsheet:create')}")
+        self.page.get_by_role("button", name="Create New Logsheet").first.click()
+
+        row = self.page.locator(".towplane-row").first
+        towplane = row.locator('select[name$="-towplane"]')
+        tach = row.locator('input[name$="-start_tach"]')
+        towplane.select_option(str(self.towplane_b.pk))
+        self.page.wait_for_function(
+            "() => document.querySelector('input[name=\"towplanes-0-start_tach\"]').value === '325.00'"
+        )
+
+        towplane.select_option(str(self.towplane_c.pk))
+        self.page.wait_for_function(
+            "() => document.querySelector('input[name=\"towplanes-0-start_tach\"]').value === ''"
+        )
+        self.assertEqual(tach.input_value(), "")

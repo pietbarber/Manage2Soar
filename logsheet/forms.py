@@ -5,7 +5,7 @@ from django import forms
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.db.models import Case, IntegerField, Q, When
-from django.forms import modelformset_factory
+from django.forms import BaseModelFormSet, modelformset_factory
 from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue, Towplane
@@ -1160,7 +1160,9 @@ class LogsheetTowplaneForm(forms.ModelForm):
             towplane_queryset = towplane_queryset.exclude(
                 n_number__iexact=virtual_n_number
             )
-        self.fields["towplane"].queryset = towplane_queryset.order_by("name", "n_number")
+        self.fields["towplane"].queryset = towplane_queryset.order_by(
+            "name", "n_number"
+        )
         self.fields["towplane"].widget.attrs.update(
             {"class": "form-select form-select-sm"}
         )
@@ -1173,9 +1175,30 @@ class LogsheetTowplaneForm(forms.ModelForm):
         self.fields["start_tach"].required = False
 
 
+class LogsheetTowplaneBaseFormSet(BaseModelFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        seen_towplanes = set()
+        for form in self.forms:
+            if form.cleaned_data.get("DELETE"):
+                continue
+            towplane = form.cleaned_data.get("towplane")
+            if not towplane:
+                continue
+            if towplane.pk in seen_towplanes:
+                raise forms.ValidationError(
+                    "Each towplane may appear only once in the roster."
+                )
+            seen_towplanes.add(towplane.pk)
+
+
 LogsheetTowplaneFormSet = modelformset_factory(
     LogsheetTowplane,
     form=LogsheetTowplaneForm,
+    formset=LogsheetTowplaneBaseFormSet,
     extra=1,
     can_delete=True,
 )
