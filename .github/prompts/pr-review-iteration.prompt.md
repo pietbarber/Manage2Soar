@@ -22,17 +22,22 @@ Workflow:
    - Use the explicit PR number if provided.
    - Otherwise use the active PR context.
 2. Fresh-thread fetch (mandatory, do not skip).
-   - Fetch PR data with refresh enabled.
+   - Fetch the PR context with refresh enabled to confirm the repository and PR number.
+   - Then call the dedicated pull-request review-comments endpoint (`get_review_comments`, `perPage=100`). This endpoint is authoritative for review state; do not rely on `currentActivePullRequest.reviewThreads` alone because that summary can be stale or omit newly published Copilot comments.
+   - Normalize either response shape (`review_threads`/`is_resolved`/`is_outdated` or `reviewThreads`/`isResolved`/`isOutdated`) before filtering.
    - Extract review threads and keep only actionable threads:
-     - isResolved == false
+     - unresolved (`is_resolved == false` or `isResolved == false`)
      - non-outdated thread/comment state
      - has a concrete requested change (not summary-only)
-   - Record actionable thread IDs before editing.
-   - Record, for each actionable thread: thread ID, file path, and the first sentence of the reviewer request.
+   - Record every actionable thread ID, file path, and the first sentence of the reviewer request.
+   - Record the individual review comment IDs and URLs too, so comments visible in GitHub but absent from the PR summary cannot be missed.
+   - If the PR summary and dedicated review-comments endpoint disagree, treat that as a stale-data condition and use the dedicated review-comments result.
 3. Stale-data guard (mandatory).
-   - Immediately fetch PR data again with refresh enabled.
-   - Recompute actionable thread IDs.
+   - Immediately call the dedicated `get_review_comments` endpoint again with `perPage=100` and fresh data.
+   - Recompute actionable thread IDs, comment IDs, file paths, and comment URLs from the second response.
    - If the second list differs from the first, discard the first list and use the second list.
+   - If the summary endpoint says zero but the dedicated endpoint returns actionable threads, use the dedicated endpoint and explicitly report the discrepancy.
+   - If a newly requested Copilot review may still be publishing comments, perform one additional dedicated review-comments fetch before concluding that none exist.
    - Never implement fixes from an older/cached thread list.
 4. Implement minimal code changes for each actionable thread.
    - Keep changes scoped to requested behavior only.
@@ -45,8 +50,8 @@ Workflow:
 8. Resolve each addressed review thread.
 9. Request a new GitHub Copilot review on the PR using reviewer request flow (equivalent to clicking Request in the Reviewers panel), not by posting @copilot in a comment.
 10. Final refresh-check (mandatory).
-   - Fetch PR data with refresh enabled again.
-   - Recompute unresolved, non-outdated actionable threads.
+   - Fetch the PR context with refresh enabled and call the dedicated `get_review_comments` endpoint again with `perPage=100`.
+   - Recompute unresolved, non-outdated actionable threads from the dedicated review-comments response, including comments not present in the PR summary.
    - Report exact remaining thread IDs (or none).
 
 Hard completion gates (must all pass before claiming completion):
@@ -57,9 +62,10 @@ Hard completion gates (must all pass before claiming completion):
 5. If you cannot fetch fresh thread data, stop and report blocked.
 
 Anti-stale safeguards:
-- Do not trust cached PR state from earlier tool output.
+- Do not trust cached PR state from earlier tool output or `currentActivePullRequest.reviewThreads` when it conflicts with `get_review_comments`.
+- The dedicated `get_review_comments` response is authoritative for unresolved review work.
 - If no actionable threads are found on first refresh, perform a second refresh immediately and compare.
-- If second refresh has actionable threads, continue with second refresh results.
+- If the second dedicated review-comments refresh has actionable threads, continue with those results even if the PR summary reports zero.
 - Before final answer, perform one more refresh and recompute unresolved actionable threads.
 
 Strict no-shortcut rule:
