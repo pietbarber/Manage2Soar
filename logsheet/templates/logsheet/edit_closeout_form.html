@@ -328,9 +328,9 @@
       <div class="form-section">
         <h4><i class="bi bi-airplane"></i>Scheduled Towplanes <span class="text-muted small">(day-level roster)</span></h4>
         <p class="text-muted small mb-3">
-          Set the default tow pilot for each scheduled towplane for the day, and record the
-          starting tach reading. Changing the default here affects the auto-fill in new
-          flight entries; you can always override the pilot per flight.
+          Set the default tow pilot for each scheduled towplane for the day. Changing the
+          default here affects the auto-fill in new flight entries; you can always override
+          the pilot per flight. Start tach is recorded in the towplane closeout below.
         </p>
         {{ roster_formset.management_form }}
         {% if roster_formset.non_form_errors %}
@@ -357,9 +357,7 @@
               {{ roster_form.tow_pilot.errors }}
             </div>
             <div class="col-md-2">
-              {{ roster_form.start_tach.label_tag }}
-              {{ roster_form.start_tach }}
-              {{ roster_form.start_tach.errors }}
+              {{ roster_form.start_tach.as_hidden }}
             </div>
             <div class="col-md-1">
               {% if roster_form.instance.pk %}

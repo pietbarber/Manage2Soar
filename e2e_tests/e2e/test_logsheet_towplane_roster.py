@@ -149,6 +149,12 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
         rows = section.locator(".row.g-2")
         total = self.page.locator('input[name="roster-TOTAL_FORMS"]')
         initial_total = int(total.input_value())
+        self.assertEqual(
+            section.locator(
+                'input[name^="roster-"][name$="-start_tach"]:visible'
+            ).count(),
+            0,
+        )
 
         self.page.locator("#add-roster-row").click()
         self.page.locator("#add-roster-row").click()
