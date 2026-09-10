@@ -484,6 +484,7 @@
 
       var dayCache = cacheForCurrentDate();
       if (dayCache[val] !== undefined) {
+        if (tach.dataset.prefilled === '0') return;
         setAutoPrefill(tach, dayCache[val]);
         return;
       }
@@ -509,6 +510,9 @@
             return;
           }
           if (sel.value !== requestedTowplane || currentDateKey() !== requestedDate) {
+            return;
+          }
+          if (tach.dataset.prefilled === '0') {
             return;
           }
           dayCache[requestedTowplane] = payload.start_tach;
@@ -553,6 +557,9 @@
         }
 
         field.value = '';
+        if (name.endsWith('-start_tach')) {
+          field.dataset.prefilled = '1';
+        }
       });
     }
 

@@ -417,6 +417,7 @@
             clone.innerHTML = clone.innerHTML.replace(re, 'roster-' + idx + '-');
             resetClonedRowValues(clone);
             section.appendChild(clone);
+            template = clone;
             totalInput.value = String(idx + 1);
           });
         });

@@ -2082,6 +2082,9 @@ document.addEventListener("click", async function(e) {
     });
 
     towplaneSelect.dataset.boundRosterAutofill = '1';
+    if (towplaneSelect.value) {
+      towplaneSelect.dispatchEvent(new Event('change'));
+    }
   };
 
   // Global function to wire up the flight form's AJAX submit handler (shared between add and edit flows)
