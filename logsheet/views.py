@@ -1651,7 +1651,7 @@ def api_towplane_start_tach(request):
 
     try:
         towplane = Towplane.objects.get(pk=towplane_id)
-    except Towplane.DoesNotExist:
+    except (Towplane.DoesNotExist, TypeError, ValueError):
         return JsonResponse({"start_tach": None})
 
     parsed_before_date = None
@@ -1752,16 +1752,19 @@ def create_logsheet(request):
         except (TypeError, ValueError):
             selected_log_date = date.today()
 
-    towplane_start_tach_map = {}
     towplanes_for_prefill = Towplane.objects.filter(is_active=True)
     for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
         towplanes_for_prefill = towplanes_for_prefill.exclude(
             n_number__iexact=virtual_n_number
         )
-    for tp in towplanes_for_prefill:
-        last_end = LogsheetTowplane.get_last_end_tach(tp, before_date=selected_log_date)
-        if last_end is not None:
-            towplane_start_tach_map[str(tp.pk)] = f"{last_end:.2f}"
+    towplane_start_tach_map = {
+        str(towplane_id): f"{last_end:.2f}"
+        for towplane_id, last_end in LogsheetTowplane.get_last_end_tach_map(
+            towplanes_for_prefill,
+            before_date=selected_log_date,
+        ).items()
+        if last_end is not None
+    }
 
     return render(
         request,
@@ -2255,19 +2258,19 @@ def list_logsheets(request):
         form["log_date"].value(),
         fallback_date=date.today(),
     )
-    towplane_start_tach_map = {}
     towplanes_for_prefill = Towplane.objects.filter(is_active=True)
     for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
         towplanes_for_prefill = towplanes_for_prefill.exclude(
             n_number__iexact=virtual_n_number
         )
-    for tp in towplanes_for_prefill:
-        last_end = LogsheetTowplane.get_last_end_tach(
-            tp,
+    towplane_start_tach_map = {
+        str(towplane_id): f"{last_end:.2f}"
+        for towplane_id, last_end in LogsheetTowplane.get_last_end_tach_map(
+            towplanes_for_prefill,
             before_date=selected_log_date,
-        )
-        if last_end is not None:
-            towplane_start_tach_map[str(tp.pk)] = f"{last_end:.2f}"
+        ).items()
+        if last_end is not None
+    }
 
     from members.utils.membership import is_active_member
 

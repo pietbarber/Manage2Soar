@@ -2139,6 +2139,32 @@ class LogsheetTowplane(models.Model):
         )
         return value
 
+    @staticmethod
+    def get_last_end_tach_map(towplanes, before_date=None):
+        """Return the latest prior end tach keyed by towplane primary key.
+
+        The correlated subquery keeps the create pages to one database query
+        instead of issuing one closeout query per towplane.
+        """
+        from django.db.models import OuterRef, Subquery
+
+        closeout_qs = TowplaneCloseout.objects.filter(
+            towplane=OuterRef("pk"),
+            end_tach__isnull=False,
+        )
+        if before_date is not None:
+            closeout_qs = closeout_qs.filter(logsheet__log_date__lt=before_date)
+
+        return dict(
+            towplanes.annotate(
+                last_end_tach=Subquery(
+                    closeout_qs.order_by("-logsheet__log_date", "-pk").values(
+                        "end_tach"
+                    )[:1]
+                )
+            ).values_list("pk", "last_end_tach")
+        )
+
 
 ####################################################
 # TowplaneRentalCharge model

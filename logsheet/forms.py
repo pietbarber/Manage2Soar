@@ -1156,6 +1156,10 @@ class LogsheetTowplaneForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         towplane_queryset = Towplane.objects.filter(is_active=True)
+        if self.instance.pk and self.instance.towplane_id:
+            towplane_queryset = Towplane.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.towplane_id)
+            )
         for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
             towplane_queryset = towplane_queryset.exclude(
                 n_number__iexact=virtual_n_number
@@ -1166,7 +1170,15 @@ class LogsheetTowplaneForm(forms.ModelForm):
         self.fields["towplane"].widget.attrs.update(
             {"class": "form-select form-select-sm"}
         )
-        self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
+        tow_pilot_queryset = get_active_members_with_role("towpilot")
+        if self.instance.pk and self.instance.tow_pilot_id:
+            tow_pilot_queryset = (
+                tow_pilot_queryset
+                | Member.objects.filter(pk=self.instance.tow_pilot_id)
+            ).distinct()
+        self.fields["tow_pilot"].queryset = tow_pilot_queryset.order_by(
+            "last_name", "first_name"
+        )
         self.fields["tow_pilot"].empty_label = "—"
         self.fields["tow_pilot"].required = False
         self.fields["tow_pilot"].widget.attrs.update(

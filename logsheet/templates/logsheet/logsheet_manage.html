@@ -2042,6 +2042,7 @@ document.addEventListener("click", async function(e) {
 
     const towplaneSelect = root.querySelector('#id_towplane');
     const towPilotSelect = root.querySelector('#id_tow_pilot');
+    const flightForm = root.querySelector('#edit-flight-form');
     const mapEl = root.querySelector('#towplane_pilot_map');
     if (!towplaneSelect || !towPilotSelect || !mapEl) return;
     if (towplaneSelect.dataset.boundRosterAutofill === '1') return;
@@ -2082,7 +2083,7 @@ document.addEventListener("click", async function(e) {
     });
 
     towplaneSelect.dataset.boundRosterAutofill = '1';
-    if (towplaneSelect.value) {
+    if (towplaneSelect.value && flightForm?.dataset.bound !== '1') {
       towplaneSelect.dispatchEvent(new Event('change'));
     }
   };

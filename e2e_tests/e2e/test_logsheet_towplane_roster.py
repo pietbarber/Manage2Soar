@@ -98,6 +98,12 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
         rows = self.page.locator(".towplane-row")
         self.assertEqual(int(total.input_value()), 1)
         self.assertEqual(rows.count(), 1)
+        for field_id in (
+            "id_towplanes-0-towplane",
+            "id_towplanes-0-tow_pilot",
+            "id_towplanes-0-start_tach",
+        ):
+            self.assertEqual(self.page.locator(f'label[for="{field_id}"]').count(), 1)
 
         rows.nth(0).locator('select[name$="-towplane"]').select_option(
             str(self.towplane_a.pk)
@@ -217,3 +223,25 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
             "() => document.querySelector('input[name=\"towplanes-0-start_tach\"]').value === ''"
         )
         self.assertEqual(tach.input_value(), "")
+
+    def test_list_page_roster_prefill_and_clone_script(self):
+        self.page.goto(f"{self.live_server_url}{reverse('logsheet:index')}")
+        self.page.get_by_role("button", name="Create New Logsheet").first.click()
+
+        total = self.page.locator('input[name="towplanes-TOTAL_FORMS"]')
+        rows = self.page.locator(".towplane-row")
+        rows.first.locator('select[name$="-towplane"]').select_option(
+            str(self.towplane_b.pk)
+        )
+        self.page.wait_for_function(
+            "() => document.querySelector('input[name=\"towplanes-0-start_tach\"]').value === '325.00'"
+        )
+
+        self.page.locator("#addTowplaneRow").click()
+        self.assertEqual(int(total.input_value()), 2)
+        rows.nth(1).locator('select[name$="-towplane"]').select_option(
+            str(self.towplane_c.pk)
+        )
+        self.page.wait_for_function(
+            "() => document.querySelector('input[name=\"towplanes-1-start_tach\"]').value === ''"
+        )

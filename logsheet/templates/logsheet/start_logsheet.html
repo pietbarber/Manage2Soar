@@ -214,21 +214,21 @@
                   <div class="card-body py-2">
                     <div class="row g-2 align-items-end">
                       <div class="col-md-4">
-                        <label class="form-label small text-muted mb-1">Towplane</label>
+                        <label for="{{ row.towplane.id_for_label }}" class="form-label small text-muted mb-1">Towplane</label>
                         {{ row.towplane }}
                         {% if row.towplane.errors %}
                           <div class="text-danger small mt-1">{{ row.towplane.errors }}</div>
                         {% endif %}
                       </div>
                       <div class="col-md-4">
-                        <label class="form-label small text-muted mb-1">Tow Pilot</label>
+                        <label for="{{ row.tow_pilot.id_for_label }}" class="form-label small text-muted mb-1">Tow Pilot</label>
                         {{ row.tow_pilot }}
                         {% if row.tow_pilot.errors %}
                           <div class="text-danger small mt-1">{{ row.tow_pilot.errors }}</div>
                         {% endif %}
                       </div>
                       <div class="col-md-2">
-                        <label class="form-label small text-muted mb-1">Start Tach</label>
+                        <label for="{{ row.start_tach.id_for_label }}" class="form-label small text-muted mb-1">Start Tach</label>
                         {{ row.start_tach }}
                         {% if row.start_tach.errors %}
                           <div class="text-danger small mt-1">{{ row.start_tach.errors }}</div>

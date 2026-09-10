@@ -9,6 +9,7 @@ from logsheet.models import AircraftMeister, MaintenanceDeadline, MaintenanceIss
 from logsheet.utils.image_processing import generate_equipment_thumbnails
 from utils.admin_helpers import AdminHelperMixin
 
+from .forms import LogsheetTowplaneForm
 from .models import (
     Airfield,
     CommercialPassenger,
@@ -451,6 +452,7 @@ class AirfieldAdmin(AdminHelperMixin, admin.ModelAdmin):
 
 class LogsheetTowplaneInline(admin.TabularInline):
     model = LogsheetTowplane
+    form = LogsheetTowplaneForm
     extra = 1
     fields = ("towplane", "tow_pilot", "start_tach")
     autocomplete_fields = ("tow_pilot",)
@@ -473,6 +475,7 @@ class LogsheetAdmin(AdminHelperMixin, admin.ModelAdmin):
 # the expected tow pilot, and the starting tach reading.
 @admin.register(LogsheetTowplane)
 class LogsheetTowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
+    form = LogsheetTowplaneForm
     list_display = ("logsheet", "towplane", "tow_pilot", "start_tach", "updated_at")
     list_select_related = ("logsheet", "towplane", "tow_pilot")
     list_filter = ("logsheet__airfield", "logsheet__finalized")

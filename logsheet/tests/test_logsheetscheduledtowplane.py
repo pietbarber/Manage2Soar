@@ -148,6 +148,19 @@ class LogsheetTowplaneModelTests(TestCase):
             LogsheetTowplane.get_last_end_tach(self.towplane), Decimal("100.00")
         )
 
+    def test_get_last_end_tach_map_uses_one_query(self):
+        TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            end_tach=Decimal("123.45"),
+        )
+        with self.assertNumQueries(1):
+            tach_map = LogsheetTowplane.get_last_end_tach_map(
+                Towplane.objects.filter(pk=self.towplane.pk),
+                before_date=date.today() + timedelta(days=1),
+            )
+        self.assertEqual(tach_map[self.towplane.pk], Decimal("123.45"))
+
     def test_set_null_on_member_delete(self):
         other = _make_member("other_pilot", towpilot=True)
         row = LogsheetTowplane.objects.create(
@@ -201,6 +214,36 @@ class LogsheetTowplaneFormTests(TestCase):
         not_pilot = Member.objects.get(username="not_pilot")
         self.assertIn(real_pilot.pk, pilot_ids)
         self.assertNotIn(not_pilot.pk, pilot_ids)
+
+    def test_existing_inactive_towplane_and_pilot_remain_selectable(self):
+        from logsheet.forms import LogsheetTowplaneForm
+
+        member = _make_member("inactive_roster_pilot", towpilot=True)
+        member.membership_status = "Inactive"
+        member.towpilot = False
+        member.save(update_fields=["membership_status", "towpilot"])
+        airfield = Airfield.objects.create(
+            name="Inactive Field", identifier="INA", is_active=True
+        )
+        logsheet = _make_logsheet(airfield, member)
+        row = LogsheetTowplane.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            tow_pilot=member,
+        )
+        self.towplane.is_active = False
+        self.towplane.save(update_fields=["is_active"])
+
+        form = LogsheetTowplaneForm(instance=row)
+        self.assertIn(self.towplane, form.fields["towplane"].queryset)
+        self.assertIn(member, form.fields["tow_pilot"].queryset)
+
+    def test_admin_roster_surfaces_use_constrained_form(self):
+        from logsheet.admin import LogsheetTowplaneAdmin, LogsheetTowplaneInline
+        from logsheet.forms import LogsheetTowplaneForm
+
+        self.assertIs(LogsheetTowplaneInline.form, LogsheetTowplaneForm)
+        self.assertIs(LogsheetTowplaneAdmin.form, LogsheetTowplaneForm)
 
 
 class CreateLogsheetRosterViewTests(TestCase):
@@ -746,6 +789,13 @@ class TowplaneStartTachApiTests(TestCase):
         response = self.client.get(url, {"towplane_id": self.towplane.pk})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["start_tach"], "123.45")
+
+    def test_malformed_towplane_id_returns_empty_prefill(self):
+        self.client.force_login(self.member)
+        url = reverse("logsheet:api_towplane_start_tach")
+        response = self.client.get(url, {"towplane_id": "abc"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["start_tach"])
 
     def test_respects_before_date_filter(self):
         self.client.force_login(self.member)

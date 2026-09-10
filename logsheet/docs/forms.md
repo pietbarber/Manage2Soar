@@ -25,6 +25,13 @@ This document describes all forms in `logsheet/forms.py`.
 - **Clean UI**: Towplane selector hidden in closeout edit context (shown in card header)
 - **Member Filtering**: Rental charge assignment limited to active members
 
+## LogsheetTowplaneForm and LogsheetTowplaneFormSet
+- `LogsheetTowplaneForm` edits the day-level roster fields: `towplane`, `tow_pilot`, and `start_tach`.
+- New-row towplane choices include active, non-virtual towplanes; an existing inactive non-virtual towplane remains selectable during closeout edits.
+- New-row tow-pilot choices include active members with the `towpilot` role; an existing assigned pilot remains selectable during closeout edits even if no longer active.
+- `LogsheetTowplaneFormSet` supports one extra row and deletion, and rejects duplicate towplane selections before persistence.
+- Create-logsheet rows use the formset to assign each plane's pilot and starting tach; closeout rows use it to adjust the day-level pilot roster.
+
 ## MaintenanceIssueForm
 - ModelForm for reporting maintenance issues.
 
