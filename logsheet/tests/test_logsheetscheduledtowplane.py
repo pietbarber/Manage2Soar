@@ -16,6 +16,7 @@ from django.urls import reverse
 from logsheet.models import (
     Airfield,
     Logsheet,
+    LogsheetCloseout,
     LogsheetTowplane,
     Towplane,
     TowplaneCloseout,
@@ -421,6 +422,43 @@ class AddTowplaneCloseoutRosterViewTests(TestCase):
         )
         self.assertEqual(closeout.start_tach, Decimal("77.70"))
 
+    def test_roster_start_tach_precedes_historical_closeout_tach(self):
+        prior_ls = _make_logsheet(
+            self.airfield, self.member, self.logsheet.log_date - timedelta(days=1)
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=prior_ls,
+            towplane=self.towplane,
+            end_tach=Decimal("100.00"),
+        )
+        LogsheetTowplane.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("88.80"),
+        )
+        self.client.force_login(self.member)
+        url = reverse("logsheet:add_towplane_closeout", kwargs={"pk": self.logsheet.pk})
+        self.client.post(url, {"towplane": self.towplane.pk}, follow=True)
+
+        closeout = TowplaneCloseout.objects.get(
+            logsheet=self.logsheet, towplane=self.towplane
+        )
+        self.assertEqual(closeout.start_tach, Decimal("88.80"))
+
+    def test_virtual_towplane_closeout_does_not_seed_roster_row(self):
+        virtual = Towplane.objects.create(
+            name="Winch", n_number="WINCH", is_active=True, club_owned=True
+        )
+        self.client.force_login(self.member)
+        url = reverse("logsheet:add_towplane_closeout", kwargs={"pk": self.logsheet.pk})
+        self.client.post(url, {"towplane": virtual.pk}, follow=True)
+
+        self.assertFalse(
+            LogsheetTowplane.objects.filter(
+                logsheet=self.logsheet, towplane=virtual
+            ).exists()
+        )
+
     def test_add_towplane_closeout_no_towplane_returns_message(self):
         self.client.force_login(self.member)
         url = reverse("logsheet:add_towplane_closeout", kwargs={"pk": self.logsheet.pk})
@@ -469,6 +507,19 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         # First form should have our seeded row.
         self.assertEqual(forms[0].instance.towplane, self.towplane)
         self.assertContains(response, 'name="roster-0-id"')
+
+    def test_closeout_form_remains_logsheet_closeout_with_towplane_closeout(self):
+        TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+        )
+        self.client.force_login(self.member)
+        url = reverse(
+            "logsheet:edit_logsheet_closeout", kwargs={"pk": self.logsheet.pk}
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.context["form"].instance, LogsheetCloseout)
 
     def test_roster_save_creates_and_updates_rows(self):
         self.client.force_login(self.member)

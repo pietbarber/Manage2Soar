@@ -3438,10 +3438,10 @@ def edit_logsheet_closeout(request, pk):
     relevant_towplane_ids = list(relevant_towplanes.values_list("pk", flat=True))
 
     for towplane_id in relevant_towplane_ids:
-        closeout, _ = TowplaneCloseout.objects.get_or_create(
+        towplane_closeout, _ = TowplaneCloseout.objects.get_or_create(
             logsheet=logsheet, towplane_id=towplane_id
         )
-        if closeout.start_tach is None:
+        if towplane_closeout.start_tach is None:
             roster_start_tach = (
                 LogsheetTowplane.objects.filter(
                     logsheet=logsheet,
@@ -3451,8 +3451,8 @@ def edit_logsheet_closeout(request, pk):
                 .first()
             )
             if roster_start_tach is not None:
-                closeout.start_tach = roster_start_tach
-                closeout.save(update_fields=["start_tach"])
+                towplane_closeout.start_tach = roster_start_tach
+                towplane_closeout.save(update_fields=["start_tach"])
 
     # Build formset for towplane closeouts - include all closeouts for this logsheet
     # This keeps any existing (possibly stale) closeouts visible so they can be reviewed and adjusted
@@ -3578,17 +3578,17 @@ def edit_logsheet_closeout(request, pk):
                 for row in roster_rows:
                     row.logsheet = logsheet
                     row.save()
-                    closeout = TowplaneCloseout.objects.filter(
+                    towplane_closeout = TowplaneCloseout.objects.filter(
                         logsheet=logsheet,
                         towplane=row.towplane,
                     ).first()
                     if (
-                        closeout
-                        and closeout.start_tach is None
+                        towplane_closeout
+                        and towplane_closeout.start_tach is None
                         and row.start_tach is not None
                     ):
-                        closeout.start_tach = row.start_tach
-                        closeout.save(update_fields=["start_tach"])
+                        towplane_closeout.start_tach = row.start_tach
+                        towplane_closeout.save(update_fields=["start_tach"])
 
             if _rental_on:
                 for rc_formset in rental_formsets:
@@ -3721,29 +3721,37 @@ def add_towplane_closeout(request, pk):
         closeout, created = TowplaneCloseout.objects.get_or_create(
             logsheet=logsheet, towplane=towplane
         )
-        # If no start_tach is set yet, seed from the last known end_tach.
-        if closeout.start_tach is None:
-            last_end = LogsheetTowplane.get_last_end_tach(
-                towplane, before_date=logsheet.log_date
+        roster_row = None
+        roster_created = False
+        if not towplane.is_virtual:
+            # Seed a roster row so the operator can adjust pilot / start_tach.
+            roster_row, roster_created = LogsheetTowplane.objects.get_or_create(
+                logsheet=logsheet,
+                towplane=towplane,
             )
-            if last_end is not None:
-                closeout.start_tach = last_end
+
+        # Prefer a manually entered roster tach over historical fallback data.
+        if closeout.start_tach is None:
+            roster_start_tach = roster_row.start_tach if roster_row else None
+            if roster_start_tach is not None:
+                closeout.start_tach = roster_start_tach
                 closeout.save(update_fields=["start_tach"])
-        # Seed a roster row so the operator can adjust pilot / start_tach.
-        roster_row, roster_created = LogsheetTowplane.objects.get_or_create(
-            logsheet=logsheet,
-            towplane=towplane,
-        )
+            else:
+                last_end = LogsheetTowplane.get_last_end_tach(
+                    towplane, before_date=logsheet.log_date
+                )
+                if last_end is not None:
+                    closeout.start_tach = last_end
+                    closeout.save(update_fields=["start_tach"])
+
         if (
             roster_created
+            and roster_row is not None
             and roster_row.start_tach is None
             and closeout.start_tach is not None
         ):
             roster_row.start_tach = closeout.start_tach
             roster_row.save(update_fields=["start_tach"])
-        elif closeout.start_tach is None and roster_row.start_tach is not None:
-            closeout.start_tach = roster_row.start_tach
-            closeout.save(update_fields=["start_tach"])
 
         if created:
             messages.success(
