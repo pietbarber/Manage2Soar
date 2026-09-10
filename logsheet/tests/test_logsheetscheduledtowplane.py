@@ -304,8 +304,14 @@ class CreateLogsheetRosterViewTests(TestCase):
         virtual = Towplane.objects.create(
             name="Self", n_number="SELF", is_active=True, club_owned=True
         )
+        lowercase_virtual = Towplane.objects.create(
+            name="Lowercase Self", n_number="self", is_active=True, club_owned=True
+        )
         TowplaneCloseout.objects.create(
             logsheet=prior_ls, towplane=virtual, end_tach=Decimal("99.99")
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=prior_ls, towplane=lowercase_virtual, end_tach=Decimal("98.98")
         )
         url = reverse("logsheet:create")
         response = self.client.get(url)
@@ -313,6 +319,7 @@ class CreateLogsheetRosterViewTests(TestCase):
         ctx_map = response.context["towplane_start_tach_map"]
         self.assertEqual(ctx_map[str(self.towplane.pk)], "42.42")
         self.assertNotIn(str(virtual.pk), ctx_map)
+        self.assertNotIn(str(lowercase_virtual.pk), ctx_map)
 
     def test_logsheet_list_page_includes_roster_formset_and_prefill_map(self):
         self.client.force_login(self.member)

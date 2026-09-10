@@ -1753,9 +1753,12 @@ def create_logsheet(request):
             selected_log_date = date.today()
 
     towplane_start_tach_map = {}
-    for tp in Towplane.objects.filter(is_active=True).exclude(
-        n_number__in=Towplane.VIRTUAL_N_NUMBERS
-    ):
+    towplanes_for_prefill = Towplane.objects.filter(is_active=True)
+    for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
+        towplanes_for_prefill = towplanes_for_prefill.exclude(
+            n_number__iexact=virtual_n_number
+        )
+    for tp in towplanes_for_prefill:
         last_end = LogsheetTowplane.get_last_end_tach(tp, before_date=selected_log_date)
         if last_end is not None:
             towplane_start_tach_map[str(tp.pk)] = f"{last_end:.2f}"
@@ -2253,9 +2256,12 @@ def list_logsheets(request):
         fallback_date=date.today(),
     )
     towplane_start_tach_map = {}
-    for tp in Towplane.objects.filter(is_active=True).exclude(
-        n_number__in=Towplane.VIRTUAL_N_NUMBERS
-    ):
+    towplanes_for_prefill = Towplane.objects.filter(is_active=True)
+    for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
+        towplanes_for_prefill = towplanes_for_prefill.exclude(
+            n_number__iexact=virtual_n_number
+        )
+    for tp in towplanes_for_prefill:
         last_end = LogsheetTowplane.get_last_end_tach(
             tp,
             before_date=selected_log_date,
