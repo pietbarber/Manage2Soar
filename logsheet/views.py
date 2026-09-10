@@ -1746,7 +1746,9 @@ def create_logsheet(request):
     log_date_value = form["log_date"].value()
     if log_date_value:
         try:
-            selected_log_date = datetime.strptime(str(log_date_value), "%Y-%m-%d").date()
+            selected_log_date = datetime.strptime(
+                str(log_date_value), "%Y-%m-%d"
+            ).date()
         except (TypeError, ValueError):
             selected_log_date = date.today()
 
@@ -3436,9 +3438,21 @@ def edit_logsheet_closeout(request, pk):
     relevant_towplane_ids = list(relevant_towplanes.values_list("pk", flat=True))
 
     for towplane_id in relevant_towplane_ids:
-        TowplaneCloseout.objects.get_or_create(
+        closeout, _ = TowplaneCloseout.objects.get_or_create(
             logsheet=logsheet, towplane_id=towplane_id
         )
+        if closeout.start_tach is None:
+            roster_start_tach = (
+                LogsheetTowplane.objects.filter(
+                    logsheet=logsheet,
+                    towplane_id=towplane_id,
+                )
+                .values_list("start_tach", flat=True)
+                .first()
+            )
+            if roster_start_tach is not None:
+                closeout.start_tach = roster_start_tach
+                closeout.save(update_fields=["start_tach"])
 
     # Build formset for towplane closeouts - include all closeouts for this logsheet
     # This keeps any existing (possibly stale) closeouts visible so they can be reviewed and adjusted
@@ -3564,6 +3578,17 @@ def edit_logsheet_closeout(request, pk):
                 for row in roster_rows:
                     row.logsheet = logsheet
                     row.save()
+                    closeout = TowplaneCloseout.objects.filter(
+                        logsheet=logsheet,
+                        towplane=row.towplane,
+                    ).first()
+                    if (
+                        closeout
+                        and closeout.start_tach is None
+                        and row.start_tach is not None
+                    ):
+                        closeout.start_tach = row.start_tach
+                        closeout.save(update_fields=["start_tach"])
 
             if _rental_on:
                 for rc_formset in rental_formsets:
@@ -3709,9 +3734,16 @@ def add_towplane_closeout(request, pk):
             logsheet=logsheet,
             towplane=towplane,
         )
-        if roster_created and roster_row.start_tach is None and closeout.start_tach is not None:
+        if (
+            roster_created
+            and roster_row.start_tach is None
+            and closeout.start_tach is not None
+        ):
             roster_row.start_tach = closeout.start_tach
             roster_row.save(update_fields=["start_tach"])
+        elif closeout.start_tach is None and roster_row.start_tach is not None:
+            closeout.start_tach = roster_row.start_tach
+            closeout.save(update_fields=["start_tach"])
 
         if created:
             messages.success(

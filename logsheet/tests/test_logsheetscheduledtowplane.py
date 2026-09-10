@@ -386,6 +386,41 @@ class AddTowplaneCloseoutRosterViewTests(TestCase):
         )
         self.assertEqual(closeout.start_tach, Decimal("100.55"))
 
+    def test_add_towplane_closeout_uses_roster_start_tach(self):
+        LogsheetTowplane.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("88.80"),
+        )
+        self.client.force_login(self.member)
+        url = reverse("logsheet:add_towplane_closeout", kwargs={"pk": self.logsheet.pk})
+        self.client.post(url, {"towplane": self.towplane.pk}, follow=True)
+
+        closeout = TowplaneCloseout.objects.get(
+            logsheet=self.logsheet, towplane=self.towplane
+        )
+        self.assertEqual(closeout.start_tach, Decimal("88.80"))
+
+    def test_roster_start_tach_does_not_overwrite_closeout_start_tach(self):
+        TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("77.70"),
+        )
+        LogsheetTowplane.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("88.80"),
+        )
+        self.client.force_login(self.member)
+        url = reverse("logsheet:add_towplane_closeout", kwargs={"pk": self.logsheet.pk})
+        self.client.post(url, {"towplane": self.towplane.pk}, follow=True)
+
+        closeout = TowplaneCloseout.objects.get(
+            logsheet=self.logsheet, towplane=self.towplane
+        )
+        self.assertEqual(closeout.start_tach, Decimal("77.70"))
+
     def test_add_towplane_closeout_no_towplane_returns_message(self):
         self.client.force_login(self.member)
         url = reverse("logsheet:add_towplane_closeout", kwargs={"pk": self.logsheet.pk})
