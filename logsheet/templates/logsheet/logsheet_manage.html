@@ -2054,25 +2054,30 @@ document.addEventListener("click", async function(e) {
     }
     if (!Object.keys(map).length) return;
 
-    let lastTouchedTowplane = null;
-    let userEditedPilot = false;
+    const manualPilotOverrides = Object.create(null);
+    let applyingRosterPilot = false;
 
     towPilotSelect.addEventListener('change', function () {
-      userEditedPilot = true;
-      lastTouchedTowplane = towplaneSelect.value;
+      if (!applyingRosterPilot) {
+        manualPilotOverrides[towplaneSelect.value] = towPilotSelect.value;
+      }
     });
 
     towplaneSelect.addEventListener('change', function () {
       const planeId = towplaneSelect.value;
-      if (userEditedPilot && lastTouchedTowplane === planeId) {
+      if (Object.prototype.hasOwnProperty.call(manualPilotOverrides, planeId)) {
+        towPilotSelect.value = manualPilotOverrides[planeId];
         return;
       }
-      userEditedPilot = false;
-      lastTouchedTowplane = planeId;
       const entry = map[planeId];
-      if (entry && entry.pilot_id) {
-        towPilotSelect.value = String(entry.pilot_id);
-        towPilotSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      applyingRosterPilot = true;
+      towPilotSelect.value = entry && entry.pilot_id ? String(entry.pilot_id) : '';
+      applyingRosterPilot = false;
+    });
+
+    towPilotSelect.addEventListener('input', function () {
+      if (!applyingRosterPilot) {
+        manualPilotOverrides[towplaneSelect.value] = towPilotSelect.value;
       }
     });
 

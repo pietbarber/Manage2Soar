@@ -399,12 +399,23 @@
           }).pop();
           if (!template) return;
 
+          function resetClonedRowValues(row) {
+            row.querySelectorAll('select, input, textarea').forEach(function (field) {
+              if (field.type === 'checkbox' || field.type === 'radio') {
+                field.checked = false;
+              } else {
+                field.value = '';
+              }
+            });
+          }
+
           addBtn.addEventListener('click', function () {
             var idx = parseInt(totalInput.value, 10);
             var clone = template.cloneNode(true);
             var re = new RegExp('roster-' + (idx - 1) + '-', 'g');
             // Rewrite both name and id attributes in the inner HTML.
             clone.innerHTML = clone.innerHTML.replace(re, 'roster-' + idx + '-');
+            resetClonedRowValues(clone);
             section.appendChild(clone);
             totalInput.value = String(idx + 1);
           });

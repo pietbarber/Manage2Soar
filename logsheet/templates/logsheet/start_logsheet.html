@@ -323,10 +323,11 @@
         return;
       }
 
+      var requestedTowplane = val;
+      var requestedDate = currentDateKey();
       var query = new URLSearchParams({ towplane_id: val });
-      var dayKey = currentDateKey();
-      if (dayKey) {
-        query.set('before_date', dayKey);
+      if (requestedDate) {
+        query.set('before_date', requestedDate);
       }
 
       fetch(tachLookupUrl + '?' + query.toString(), {
@@ -342,7 +343,10 @@
           if (!payload || payload.start_tach === null || payload.start_tach === undefined) {
             return;
           }
-          dayCache[val] = payload.start_tach;
+          if (sel.value !== requestedTowplane || currentDateKey() !== requestedDate) {
+            return;
+          }
+          dayCache[requestedTowplane] = payload.start_tach;
           setAutoPrefill(tach, payload.start_tach);
         })
         .catch(function () {
