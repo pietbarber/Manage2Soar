@@ -2094,7 +2094,9 @@ document.addEventListener("click", async function(e) {
     });
 
     towplaneSelect.dataset.boundRosterAutofill = '1';
-    if (towplaneSelect.value && flightForm?.dataset.bound !== '1') {
+    const isExistingFlight = flightForm?.dataset.existing === '1'
+      || Boolean(flightForm?.dataset.flightId);
+    if (towplaneSelect.value && flightForm?.dataset.bound !== '1' && !isExistingFlight) {
       towplaneSelect.dispatchEvent(new Event('change'));
     }
   };

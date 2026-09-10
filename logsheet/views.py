@@ -3611,10 +3611,11 @@ def edit_logsheet_closeout(request, pk):
             # Only when the client actually submitted the formset — otherwise
             # we leave any existing roster rows untouched.
             if roster_submitted:
-                roster_rows = roster_formset.save(commit=False)
-                deleted_ids = {obj.pk for obj in roster_formset.deleted_objects}
                 final_roster_rows = [
-                    row for row in roster_rows if row.pk not in deleted_ids
+                    roster_form.instance
+                    for roster_form in roster_formset.forms
+                    if not roster_form.cleaned_data.get("DELETE")
+                    and roster_form.cleaned_data.get("towplane")
                 ]
                 with transaction.atomic():
                     LogsheetTowplane.objects.filter(logsheet=logsheet).delete()
