@@ -3628,7 +3628,7 @@ def edit_logsheet_closeout(request, pk):
                             logsheet=logsheet,
                             towplane=row.towplane,
                         ).first()
-                        if towplane_closeout and row.start_tach is not None:
+                        if towplane_closeout:
                             prior_roster_tach = prior_roster_start_tach.get(
                                 row.towplane_id
                             )
@@ -3638,18 +3638,38 @@ def edit_logsheet_closeout(request, pk):
                             posted_closeout_tach = posted_closeout_start_tach.get(
                                 row.towplane_id
                             )
-                            closeout_was_auto_derived = (
-                                towplane_closeout.start_tach is None
-                                or (
+                            # The operator explicitly edited the closeout's
+                            # start tach on this POST when the posted value
+                            # differs from the value persisted before the
+                            # save. An explicit set or an explicit clear both
+                            # must be respected, so we never overwrite them
+                            # with the roster value.
+                            operator_touched_closeout = (
+                                posted_closeout_tach != prior_closeout_tach
+                            )
+                            if operator_touched_closeout:
+                                closeout_was_auto_derived = False
+                            elif prior_closeout_tach is None:
+                                # Closeout was empty before this save and the
+                                # operator left it untouched: safe to seed it
+                                # from the roster, or clear it if the roster
+                                # value was itself cleared.
+                                closeout_was_auto_derived = True
+                            else:
+                                # Closeout already held a value; only follow
+                                # the roster if it had previously mirrored
+                                # that roster (auto-derived).
+                                closeout_was_auto_derived = (
                                     prior_roster_tach is not None
                                     and prior_closeout_tach == prior_roster_tach
-                                    and posted_closeout_tach == prior_closeout_tach
                                 )
-                            )
                             if closeout_was_auto_derived:
                                 towplane_closeout.start_tach = row.start_tach
-                                if towplane_closeout.end_tach is not None:
-                                    towplane_closeout.tach_time = None
+                                # Reset the derived duration unconditionally;
+                                # TowplaneCloseout.save() recomputes it only
+                                # when both readings are present, so a stale
+                                # duration does not survive a cleared reading.
+                                towplane_closeout.tach_time = None
                                 towplane_closeout.save(
                                     update_fields=["start_tach", "tach_time"]
                                 )
@@ -3780,6 +3800,19 @@ def add_towplane_closeout(request, pk):
     towplane_id = request.POST.get("towplane")
     if towplane_id:
         towplane = get_object_or_404(Towplane, pk=towplane_id, is_active=True)
+
+        # Reject grounded towplanes before creating any records. They are
+        # excluded from TowplaneCloseoutForm's choices, so a manually-added
+        # grounded ID would create a closeout/roster row that cannot pass the
+        # next closeout POST.
+        if towplane.is_grounded:
+            messages.error(
+                request,
+                f"{towplane.name} ({towplane.n_number}) is grounded and cannot "
+                "be added to the closeout. Resolve its outstanding maintenance "
+                "issue first.",
+            )
+            return redirect("logsheet:edit_logsheet_closeout", pk=logsheet.pk)
 
         # Create the towplane closeout if it doesn't exist
         closeout, created = TowplaneCloseout.objects.get_or_create(

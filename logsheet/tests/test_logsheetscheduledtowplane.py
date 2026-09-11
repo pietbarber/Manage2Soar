@@ -10,6 +10,7 @@ Covers:
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -18,6 +19,7 @@ from logsheet.models import (
     Logsheet,
     LogsheetCloseout,
     LogsheetTowplane,
+    MaintenanceIssue,
     Towplane,
     TowplaneCloseout,
 )
@@ -244,6 +246,63 @@ class LogsheetTowplaneFormTests(TestCase):
 
         self.assertIs(LogsheetTowplaneInline.form, LogsheetTowplaneForm)
         self.assertIs(LogsheetTowplaneAdmin.form, LogsheetTowplaneForm)
+
+    def test_start_tach_rejects_negative(self):
+        from logsheet.forms import LogsheetTowplaneForm
+
+        form = LogsheetTowplaneForm(
+            {"start_tach": "-1.00", "towplane": self.towplane.pk}
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("start_tach", form.errors)
+
+    def test_model_full_clean_rejects_negative_start_tach(self):
+        row = LogsheetTowplane(
+            logsheet=_make_logsheet(
+                Airfield.objects.create(name="V", identifier="VAL", is_active=True),
+                _make_member("fullclean_pilot"),
+            ),
+            towplane=self.towplane,
+            start_tach=Decimal("-5"),
+        )
+        with self.assertRaises(ValidationError):
+            row.full_clean()
+
+    def test_grounding_filter_excludes_grounded_instance(self):
+        # An existing roster row must not remain selectable after its towplane
+        # becomes grounded, even though the current-instance exception exists
+        # for inactive planes.
+        from logsheet.forms import LogsheetTowplaneForm
+
+        airfield = Airfield.objects.create(
+            name="Grounded Field", identifier="GRD", is_active=True
+        )
+        member = _make_member("ground_roster_pilot", towpilot=True)
+        logsheet = _make_logsheet(airfield, member)
+        row = LogsheetTowplane.objects.create(logsheet=logsheet, towplane=self.towplane)
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Hydraulic leak",
+            grounded=True,
+            resolved=False,
+            report_date=date.today(),
+        )
+        self.assertTrue(self.towplane.is_grounded)
+
+        form = LogsheetTowplaneForm(instance=row)
+        self.assertNotIn(self.towplane, form.fields["towplane"].queryset)
+
+    def test_tow_pilot_label_uses_siteconfig_title(self):
+        from logsheet.forms import LogsheetTowplaneForm
+
+        SiteConfiguration.objects.create(
+            club_name="Custom Club",
+            domain_name="custom.com",
+            club_abbreviation="CCU",
+            towpilot_title="Lead Tow Pilot",
+        )
+        form = LogsheetTowplaneForm()
+        self.assertEqual(form.fields["tow_pilot"].label, "Lead Tow Pilot")
 
 
 class CreateLogsheetRosterViewTests(TestCase):
@@ -652,6 +711,8 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         self.assertEqual(row.start_tach, Decimal("100.00"))
 
     def test_roster_tach_correction_updates_auto_seeded_closeout(self):
+        # The closeout start was auto-seeded from the roster and the operator
+        # leaves it untouched on this POST, so it still follows the roster.
         closeout = TowplaneCloseout.objects.create(
             logsheet=self.logsheet,
             towplane=self.towplane,
@@ -682,7 +743,7 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
             "form-MAX_NUM_FORMS": "1000",
             "form-0-id": str(closeout.pk),
             "form-0-towplane": str(self.towplane.pk),
-            "form-0-start_tach": "",
+            "form-0-start_tach": "100.00",
             "form-0-end_tach": "",
             "form-0-fuel_added": "",
             "form-0-notes": "",
@@ -703,6 +764,88 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         closeout.refresh_from_db()
         self.assertEqual(closeout.start_tach, Decimal("110.00"))
+
+    def test_roster_start_tach_does_not_overwrite_explicit_closeout_edit(self):
+        # The operator intentionally cleared the auto-seeded closeout start
+        # tach while the roster still holds a value: that explicit clear must
+        # be respected, not overwritten with the roster value.
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.00"),
+        )
+        roster_row = LogsheetTowplane.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.00"),
+        )
+        self.client.force_login(self.member)
+        url = reverse(
+            "logsheet:edit_logsheet_closeout", kwargs={"pk": self.logsheet.pk}
+        )
+        data = {
+            "safety_issues": "None",
+            "equipment_issues": "None",
+            "operations_summary": "Clear closeout start explicitly",
+            "duty_officer": "",
+            "assistant_duty_officer": "",
+            "duty_instructor": "",
+            "surge_instructor": "",
+            "tow_pilot": "",
+            "surge_tow_pilot": "",
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-id": str(closeout.pk),
+            "form-0-towplane": str(self.towplane.pk),
+            "form-0-start_tach": "",
+            "form-0-end_tach": "",
+            "form-0-fuel_added": "",
+            "form-0-notes": "",
+            "roster-TOTAL_FORMS": "2",
+            "roster-INITIAL_FORMS": "1",
+            "roster-MIN_NUM_FORMS": "0",
+            "roster-MAX_NUM_FORMS": "1000",
+            "roster-0-id": str(roster_row.pk),
+            "roster-0-towplane": str(self.towplane.pk),
+            "roster-0-tow_pilot": "",
+            "roster-0-start_tach": "100.00",
+            "roster-1-id": "",
+            "roster-1-towplane": "",
+            "roster-1-tow_pilot": "",
+            "roster-1-start_tach": "",
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+        closeout.refresh_from_db()
+        self.assertIsNone(closeout.start_tach)
+
+    def test_add_towplane_closeout_rejects_grounded_towplane(self):
+        """A grounded towplane must not create a closeout/roster row."""
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Hydraulic leak",
+            grounded=True,
+            resolved=False,
+            report_date=date.today(),
+        )
+        self.assertTrue(self.towplane.is_grounded)
+        self.client.force_login(self.member)
+        url = reverse("logsheet:add_towplane_closeout", kwargs={"pk": self.logsheet.pk})
+        response = self.client.post(url, {"towplane": self.towplane.pk}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            TowplaneCloseout.objects.filter(
+                logsheet=self.logsheet, towplane=self.towplane
+            ).exists()
+        )
+        self.assertFalse(
+            LogsheetTowplane.objects.filter(
+                logsheet=self.logsheet, towplane=self.towplane
+            ).exists()
+        )
+        self.assertContains(response, "grounded")
 
     def test_roster_swap_persists_without_unique_constraint_failure(self):
         second_towplane = Towplane.objects.create(

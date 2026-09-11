@@ -2101,6 +2101,7 @@ class LogsheetTowplane(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
         help_text="Starting tach reading for the day. Pre-populated from the "
         "prior flying day's ending tach when the row is first created.",
     )

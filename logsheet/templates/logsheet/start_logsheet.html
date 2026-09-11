@@ -221,7 +221,7 @@
                         {% endif %}
                       </div>
                       <div class="col-md-4">
-                        <label for="{{ row.tow_pilot.id_for_label }}" class="form-label small text-muted mb-1">Tow Pilot</label>
+                        <label for="{{ row.tow_pilot.id_for_label }}" class="form-label small text-muted mb-1">{{ row.tow_pilot.label }}</label>
                         {{ row.tow_pilot }}
                         {% if row.tow_pilot.errors %}
                           <div class="text-danger small mt-1">{{ row.tow_pilot.errors }}</div>
@@ -237,7 +237,7 @@
                       <div class="col-md-2">
                         {% if row.instance.pk %}
                           {{ row.DELETE }}
-                          <label class="form-check-label small ms-1">Remove</label>
+                          <label class="form-check-label small ms-1" for="{{ row.DELETE.id_for_label }}">Remove</label>
                         {% endif %}
                       </div>
                     </div>
