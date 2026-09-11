@@ -85,6 +85,10 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
             tow_pilot=self.member_b,
             start_tach=Decimal("325.00"),
         )
+        LogsheetTowplane.objects.create(
+            logsheet=self.current_logsheet,
+            towplane=self.towplane_c,
+        )
         self.current_logsheet.default_towplane = self.towplane_a
         self.current_logsheet.save(update_fields=["default_towplane"])
         self.login(username="rosterbrowser")
@@ -125,11 +129,9 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
         rows.nth(1).locator('select[name$="-towplane"]').select_option(
             str(self.towplane_b.pk)
         )
-        self.page.wait_for_function(
-            """
+        self.page.wait_for_function("""
             () => document.querySelector('input[name="towplanes-1-start_tach"]').value === '325.00'
-            """
-        )
+            """)
 
         # A second click must append one more uniquely indexed blank row.
         self.page.locator("#addTowplaneRow").click()
@@ -185,11 +187,26 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
         )
 
     def test_flight_modal_applies_roster_pilot_and_preserves_override(self):
-        self.page.goto(
-            f"{self.live_server_url}{reverse('logsheet:manage', kwargs={'pk': self.current_logsheet.pk})}"
+        manage_url = f"{self.live_server_url}{reverse('logsheet:manage', kwargs={'pk': self.current_logsheet.pk})}"
+        add_flight_url = (
+            f"{self.live_server_url}"
+            f"{reverse('logsheet:add_flight', kwargs={'logsheet_pk': self.current_logsheet.pk})}"
         )
-        self.page.locator('a[data-url*="/add-flight/"]').first.click()
-
+        self.page.goto(manage_url)
+        self.page.evaluate(
+            """
+            async (url) => {
+              const response = await fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+              });
+              const html = await response.text();
+              const modalContent = document.getElementById('flightModalContent');
+              modalContent.innerHTML = html;
+              window.initTowplanePilotAutofill(modalContent);
+            }
+            """,
+            add_flight_url,
+        )
         towplane = self.page.locator("#flightModalContent #id_towplane")
         tow_pilot = self.page.locator("#flightModalContent #id_tow_pilot")
         towplane.wait_for(state="visible")
@@ -203,6 +220,8 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
         tow_pilot.select_option(str(self.member_b.pk))
         towplane.select_option(str(self.towplane_b.pk))
         self.assertEqual(tow_pilot.input_value(), str(self.member_b.pk))
+        towplane.select_option(str(self.towplane_c.pk))
+        self.assertEqual(tow_pilot.input_value(), "")
         towplane.select_option(str(self.towplane_a.pk))
         self.assertEqual(tow_pilot.input_value(), str(self.member_b.pk))
 

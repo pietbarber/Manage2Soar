@@ -1948,6 +1948,7 @@ class TowplaneCloseout(models.Model):
         Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts"
     )
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
+    start_tach_auto_derived_from_roster = models.BooleanField(default=False)
     start_tach = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True
     )

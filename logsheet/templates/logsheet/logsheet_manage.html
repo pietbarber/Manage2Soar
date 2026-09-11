@@ -2099,8 +2099,12 @@ document.addEventListener("click", async function(e) {
       }
       const entry = map[planeId];
       if (!entry || !entry.pilot_id) {
-        // Roster row exists but has no pilot assigned: leave the current
-        // selection (e.g. the logsheet-level default) unchanged.
+        // Roster row exists but has no pilot assigned: clear any stale pilot
+        // from the previously selected plane unless this plane already has an
+        // explicit per-plane override stored above.
+        applyingRosterPilot = true;
+        towPilotSelect.value = '';
+        applyingRosterPilot = false;
         return;
       }
       applyingRosterPilot = true;

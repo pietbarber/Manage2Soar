@@ -717,6 +717,7 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
             logsheet=self.logsheet,
             towplane=self.towplane,
             start_tach=Decimal("100.00"),
+            start_tach_auto_derived_from_roster=True,
         )
         roster_row = LogsheetTowplane.objects.create(
             logsheet=self.logsheet,
@@ -821,6 +822,59 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         closeout.refresh_from_db()
         self.assertIsNone(closeout.start_tach)
 
+    def test_roster_tach_correction_does_not_overwrite_matching_manual_closeout(self):
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.00"),
+        )
+        roster_row = LogsheetTowplane.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.00"),
+        )
+        self.client.force_login(self.member)
+        url = reverse(
+            "logsheet:edit_logsheet_closeout", kwargs={"pk": self.logsheet.pk}
+        )
+        data = {
+            "safety_issues": "None",
+            "equipment_issues": "None",
+            "operations_summary": "Leave matching manual closeout alone",
+            "duty_officer": "",
+            "assistant_duty_officer": "",
+            "duty_instructor": "",
+            "surge_instructor": "",
+            "tow_pilot": "",
+            "surge_tow_pilot": "",
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-id": str(closeout.pk),
+            "form-0-towplane": str(self.towplane.pk),
+            "form-0-start_tach": "100.00",
+            "form-0-end_tach": "",
+            "form-0-fuel_added": "",
+            "form-0-notes": "",
+            "roster-TOTAL_FORMS": "2",
+            "roster-INITIAL_FORMS": "1",
+            "roster-MIN_NUM_FORMS": "0",
+            "roster-MAX_NUM_FORMS": "1000",
+            "roster-0-id": str(roster_row.pk),
+            "roster-0-towplane": str(self.towplane.pk),
+            "roster-0-tow_pilot": "",
+            "roster-0-start_tach": "110.00",
+            "roster-1-id": "",
+            "roster-1-towplane": "",
+            "roster-1-tow_pilot": "",
+            "roster-1-start_tach": "",
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+        closeout.refresh_from_db()
+        self.assertEqual(closeout.start_tach, Decimal("100.00"))
+
     def test_add_towplane_closeout_rejects_grounded_towplane(self):
         """A grounded towplane must not create a closeout/roster row."""
         MaintenanceIssue.objects.create(
@@ -846,6 +900,27 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
             ).exists()
         )
         self.assertContains(response, "grounded")
+
+    def test_edit_closeout_available_towplanes_excludes_grounded_planes(self):
+        second_towplane = Towplane.objects.create(
+            name="Second Husky", n_number="N6086S", is_active=True, club_owned=True
+        )
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Hydraulic leak",
+            grounded=True,
+            resolved=False,
+            report_date=date.today(),
+        )
+        self.client.force_login(self.member)
+        url = reverse(
+            "logsheet:edit_logsheet_closeout", kwargs={"pk": self.logsheet.pk}
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        available_towplanes = list(response.context["available_towplanes"])
+        self.assertNotIn(self.towplane, available_towplanes)
+        self.assertIn(second_towplane, available_towplanes)
 
     def test_roster_swap_persists_without_unique_constraint_failure(self):
         second_towplane = Towplane.objects.create(
@@ -959,6 +1034,7 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
             start_tach=Decimal("100.00"),
             end_tach=Decimal("110.00"),
             tach_time=Decimal("10.00"),
+            start_tach_auto_derived_from_roster=True,
         )
         roster_row = LogsheetTowplane.objects.create(
             logsheet=self.logsheet,
