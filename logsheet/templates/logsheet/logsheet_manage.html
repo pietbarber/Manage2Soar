@@ -705,6 +705,7 @@
   </div>
 </div>
 
+{{ towplane_pilot_map|json_script:"manage_towplane_pilot_map" }}
 <script>
 // Global toast function for offline notifications (defined early so it's available everywhere)
 window.showOfflineToast = window.showOfflineToast || function(message) {
@@ -1206,6 +1207,9 @@ document.addEventListener("click", async function(e) {
                 commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
               });
               document.getElementById('flightModalContent').innerHTML = html;
+              window.initTowplanePilotAutofill(
+                document.getElementById('flightModalContent')
+              );
 
               // Add visual indication that this is a cloned flight
               const modalElement = document.getElementById('flightModal');
@@ -2034,12 +2038,106 @@ document.addEventListener("click", async function(e) {
     };
   }
 
+  // Issue #1048: initialize towplane->tow pilot auto-fill after modal HTML
+  // is injected, since inline scripts in fetched fragments do not execute.
+  window.initTowplanePilotAutofill = function(modalContentEl) {
+    const root = modalContentEl || document.getElementById('flightModalContent');
+    if (!root) return;
+
+    const towplaneSelect = root.querySelector('#id_towplane');
+    const towPilotSelect = root.querySelector('#id_tow_pilot');
+    const flightForm = root.querySelector('#edit-flight-form, #offline-flight-form');
+    const localMapEl = root.querySelector('#towplane_pilot_map');
+    const pageMapEl = document.getElementById('manage_towplane_pilot_map');
+    if (!towplaneSelect || !towPilotSelect || (!localMapEl && !pageMapEl)) return;
+    if (towplaneSelect.dataset.boundRosterAutofill === '1') return;
+
+    let map = {};
+    try {
+      map = JSON.parse((localMapEl || pageMapEl).textContent || '{}');
+      if (!Object.keys(map).length && pageMapEl && pageMapEl !== localMapEl) {
+        map = JSON.parse(pageMapEl.textContent || '{}');
+      }
+    } catch (e) {
+      map = {};
+    }
+    if (!Object.keys(map).length) return;
+
+    const manualPilotOverrides = Object.create(null);
+    let applyingRosterPilot = false;
+
+    // For an existing flight, record the currently saved tow pilot as a
+    // per-plane override so switching to another plane and back does not
+    // discard the value already saved on the flight (the roster default
+    // would otherwise overwrite it).
+    const isExistingFlight =
+      flightForm?.dataset.existing === '1' || Boolean(flightForm?.dataset.flightId);
+    if (isExistingFlight && towplaneSelect.value) {
+      manualPilotOverrides[towplaneSelect.value] = towPilotSelect.value;
+    }
+
+    towPilotSelect.addEventListener('change', function () {
+      if (!applyingRosterPilot) {
+        manualPilotOverrides[towplaneSelect.value] = towPilotSelect.value;
+      }
+    });
+
+    towplaneSelect.addEventListener('change', function () {
+      const planeId = towplaneSelect.value;
+      if (Object.prototype.hasOwnProperty.call(manualPilotOverrides, planeId)) {
+        towPilotSelect.value = manualPilotOverrides[planeId];
+        return;
+      }
+      if (!Object.prototype.hasOwnProperty.call(map, planeId)) {
+        // No roster entry (or the selection was cleared) and no manual
+        // override for this plane: clear the stale pilot left over from the
+        // previously selected plane instead of submitting it for this one.
+        applyingRosterPilot = true;
+        towPilotSelect.value = '';
+        applyingRosterPilot = false;
+        return;
+      }
+      const entry = map[planeId];
+      if (!entry || !entry.pilot_id) {
+        // Roster row exists but has no pilot assigned: clear any stale pilot
+        // from the previously selected plane unless this plane already has an
+        // explicit per-plane override stored above.
+        applyingRosterPilot = true;
+        towPilotSelect.value = '';
+        applyingRosterPilot = false;
+        return;
+      }
+      applyingRosterPilot = true;
+      towPilotSelect.value = String(entry.pilot_id);
+      applyingRosterPilot = false;
+    });
+
+    towPilotSelect.addEventListener('input', function () {
+      if (!applyingRosterPilot) {
+        manualPilotOverrides[towplaneSelect.value] = towPilotSelect.value;
+      }
+    });
+
+    towplaneSelect.dataset.boundRosterAutofill = '1';
+    if (
+      towplaneSelect.value &&
+      flightForm?.dataset.bound !== '1' &&
+      !isExistingFlight
+    ) {
+      towplaneSelect.dispatchEvent(new Event('change'));
+    }
+  };
+
   // Global function to wire up the flight form's AJAX submit handler (shared between add and edit flows)
   window.attachFlightFormHandler = function(modalContentEl) {
     const el = modalContentEl || document.getElementById('flightModalContent');
     if (!el) return;
     const form = el.querySelector('#edit-flight-form') || el.querySelector('form[method="post"]');
     if (!form) return;
+
+    if (window.initTowplanePilotAutofill) {
+      window.initTowplanePilotAutofill(el);
+    }
 
     // Remove existing handler to prevent duplicates on re-attach
     form.removeEventListener('submit', window._flightFormSubmitHandler);
@@ -2299,6 +2397,9 @@ document.addEventListener("click", async function(e) {
               commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
             });
             document.getElementById("flightModalContent").innerHTML = html;
+            window.initTowplanePilotAutofill(
+              document.getElementById("flightModalContent")
+            );
             window.M2SOffline.initOfflineFormHandlers(() => {
               // Callback after save - update UI
               window.M2SOffline.updatePendingIndicator();
@@ -2511,6 +2612,7 @@ document.addEventListener("click", async function(e) {
                 commercialRidesEnabled: COMMERCIAL_RIDES_ENABLED
               });
               modalContent.innerHTML = html;
+              window.initTowplanePilotAutofill(modalContent);
               window.M2SOffline.initOfflineFormHandlers(() => {
                 window.M2SOffline.updatePendingIndicator();
               });

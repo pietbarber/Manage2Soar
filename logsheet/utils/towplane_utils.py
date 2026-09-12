@@ -37,7 +37,9 @@ def get_relevant_towplanes(logsheet):
 
     # Get all towplanes used in flights or with existing closeouts
     towplanes = Towplane.objects.filter(
-        Q(flight__logsheet=logsheet) | Q(towplanecloseout__logsheet=logsheet)
+        Q(flight__logsheet=logsheet)
+        | Q(towplanecloseout__logsheet=logsheet)
+        | Q(logsheettowplane__logsheet=logsheet)
     ).distinct()
 
     # Exclude WINCH and OTHER (always)

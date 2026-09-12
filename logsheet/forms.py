@@ -4,8 +4,8 @@ from typing import Optional
 from django import forms
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
-from django.db.models import Case, IntegerField, Q, When
-from django.forms import modelformset_factory
+from django.db.models import Case, Exists, IntegerField, OuterRef, Q, When
+from django.forms import BaseModelFormSet, modelformset_factory
 from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue, Towplane
@@ -19,6 +19,7 @@ from .models import (
     Flight,
     Logsheet,
     LogsheetCloseout,
+    LogsheetTowplane,
     MemberCharge,
     Towplane,
     TowplaneCloseout,
@@ -1121,6 +1122,134 @@ TowplaneCloseoutFormSet = modelformset_factory(
     TowplaneCloseout,
     form=TowplaneCloseoutForm,
     extra=0,
+)
+
+
+######################################################
+# LogsheetTowplaneForm + LogsheetTowplaneFormSet
+#
+# Day-level towplane roster captured at logsheet creation:
+# which planes are scheduled, the expected tow pilot, and
+# the starting tach reading (pre-filled from prior day's end tach).
+#
+# The formset is used in both the create-logsheet flow and the
+# closeout flow (where the pilot assignment can be adjusted mid-day).
+#
+
+
+class LogsheetTowplaneForm(forms.ModelForm):
+    class Meta:
+        model = LogsheetTowplane
+        fields = ["towplane", "tow_pilot", "start_tach"]
+        widgets = {
+            "start_tach": forms.NumberInput(
+                attrs={
+                    "type": "number",
+                    "step": "0.01",
+                    "min": "0",
+                    "class": "form-control form-control-sm",
+                    "style": "max-width: 8rem;",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        allow_grounded_instance = kwargs.pop("allow_grounded_instance", False)
+        super().__init__(*args, **kwargs)
+        towplane_queryset = (
+            Towplane.objects.filter(is_active=True)
+            .annotate(
+                has_unresolved_grounding=Exists(
+                    MaintenanceIssue.objects.filter(
+                        towplane=OuterRef("pk"), grounded=True, resolved=False
+                    )
+                )
+            )
+            .filter(has_unresolved_grounding=False)
+        )
+        if self.instance.pk and self.instance.towplane_id:
+            towplane_queryset = (
+                Towplane.objects.filter(
+                    Q(is_active=True) | Q(pk=self.instance.towplane_id)
+                )
+                .annotate(
+                    has_unresolved_grounding=Exists(
+                        MaintenanceIssue.objects.filter(
+                            towplane=OuterRef("pk"), grounded=True, resolved=False
+                        )
+                    )
+                )
+                .filter(
+                    Q(has_unresolved_grounding=False)
+                    | (
+                        Q(pk=self.instance.towplane_id)
+                        if allow_grounded_instance
+                        else Q(pk=None)
+                    )
+                )
+            )
+        for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
+            towplane_queryset = towplane_queryset.exclude(
+                n_number__iexact=virtual_n_number
+            )
+        self.fields["towplane"].queryset = towplane_queryset.order_by(
+            "name", "n_number"
+        )
+        self.fields["towplane"].widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
+        tow_pilot_queryset = get_active_members_with_role("towpilot")
+        if self.instance.pk and self.instance.tow_pilot_id:
+            tow_pilot_queryset = (
+                tow_pilot_queryset
+                | Member.objects.filter(pk=self.instance.tow_pilot_id)
+            ).distinct()
+        self.fields["tow_pilot"].queryset = tow_pilot_queryset.order_by(
+            "last_name", "first_name"
+        )
+        # Use the configurable tow-pilot role title (SiteConfiguration) so the
+        # roster label stays consistent with the duty crew form.
+        try:
+            config = SiteConfiguration.objects.first()
+        except Exception:
+            config = None
+        self.fields["tow_pilot"].label = (
+            config.towpilot_title if config else None
+        ) or "Tow Pilot"
+        self.fields["tow_pilot"].empty_label = "—"
+        self.fields["tow_pilot"].required = False
+        self.fields["tow_pilot"].widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
+        self.fields["start_tach"].required = False
+
+
+class LogsheetTowplaneBaseFormSet(BaseModelFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        seen_towplanes = set()
+        for form in self.forms:
+            if form.cleaned_data.get("DELETE"):
+                continue
+            towplane = form.cleaned_data.get("towplane")
+            if not towplane:
+                continue
+            if towplane.pk in seen_towplanes:
+                raise forms.ValidationError(
+                    "Each towplane may appear only once in the roster."
+                )
+            seen_towplanes.add(towplane.pk)
+
+
+LogsheetTowplaneFormSet = modelformset_factory(
+    LogsheetTowplane,
+    form=LogsheetTowplaneForm,
+    formset=LogsheetTowplaneBaseFormSet,
+    extra=1,
+    can_delete=True,
 )
 
 

@@ -1948,6 +1948,10 @@ class TowplaneCloseout(models.Model):
         Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts"
     )
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
+    start_tach_auto_derived_from_roster = models.BooleanField(
+        default=False, editable=False
+    )
+    start_tach_manually_cleared = models.BooleanField(default=False, editable=False)
     start_tach = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True
     )
@@ -2029,6 +2033,31 @@ class TowplaneCloseout(models.Model):
         return f"{self.towplane.n_number} on {self.logsheet.log_date}"
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if (
+            self.pk
+            and (update_fields is None or "start_tach" in update_fields)
+            and "start_tach_auto_derived_from_roster" not in (update_fields or ())
+        ):
+            previous_start_tach = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values_list("start_tach", flat=True)
+                .first()
+            )
+            if previous_start_tach != self.start_tach:
+                self.start_tach_auto_derived_from_roster = False
+                self.start_tach_manually_cleared = self.start_tach is None
+                if update_fields is not None:
+                    update_fields = set(update_fields)
+                    update_fields.update(
+                        {
+                            "start_tach_auto_derived_from_roster",
+                            "start_tach_manually_cleared",
+                        }
+                    )
+                    kwargs["update_fields"] = update_fields
+
         # Auto-compute elapsed tach when start/end readings are present.
         derived_tach_time = False
         if (
@@ -2051,6 +2080,120 @@ class TowplaneCloseout(models.Model):
             kwargs["update_fields"] = update_fields
 
         super().save(*args, **kwargs)
+
+
+####################################################
+# LogsheetTowplane model
+#
+# Tracks the day-level towplane roster for a logsheet: which towplanes
+# are expected to fly, the pilot scheduled on each, and the starting
+# tach reading at the beginning of the day.
+#
+# This is the "start of operations" record — distinct from
+# ``TowplaneCloseout`` which captures end-of-day readings (end tach,
+# fuel, notes, rental charges).
+#
+# Fields:
+# - logsheet: The associated logsheet (flying day).
+# - towplane: The towplane scheduled to fly.
+# - tow_pilot: The member scheduled to tow this plane (FK to Member,
+#   limited to members with ``towpilot=True``).
+# - start_tach: Tach reading at the start of the day. Pre-populated
+#   from the most recent prior day's ``TowplaneCloseout.end_tach``
+#   when a new row is created.
+#
+# Methods:
+# - __str__: Returns "<towplane> @ <logsheet>" for display.
+# - static get_last_end_tach(towplane, before_date): Returns the most
+#   recent non-null ``end_tach`` from prior days' closeouts, or None.
+#
+
+
+class LogsheetTowplane(models.Model):
+    logsheet = models.ForeignKey(
+        Logsheet,
+        on_delete=models.CASCADE,
+        related_name="scheduled_towplanes",
+    )
+    towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
+    tow_pilot = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="logsheet_towplane_assignments",
+        limit_choices_to={"towpilot": True},
+        help_text="Tow pilot scheduled on this towplane for the day.",
+    )
+    start_tach = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text="Starting tach reading for the day. Pre-populated from the "
+        "prior flying day's ending tach when the row is first created.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("logsheet", "towplane")
+        ordering = ["towplane__n_number"]
+        indexes = [
+            models.Index(fields=["towplane", "logsheet"]),
+        ]
+
+    def __str__(self):
+        return f"{self.towplane.n_number} @ {self.logsheet}"
+
+    @staticmethod
+    def get_last_end_tach(towplane, before_date=None):
+        """Return the most recent non-null ``end_tach`` from prior closeouts.
+
+        ``before_date`` is exclusive: rows with
+        ``logsheet.log_date >= before_date`` are ignored. If ``before_date``
+        is ``None``, all prior closeouts are considered.
+
+        Returns a ``Decimal`` (or ``None`` if no prior end-tach exists).
+        """
+        qs = TowplaneCloseout.objects.filter(towplane=towplane).exclude(
+            end_tach__isnull=True
+        )
+        if before_date is not None:
+            qs = qs.filter(logsheet__log_date__lt=before_date)
+        value = (
+            qs.order_by("-logsheet__log_date", "-pk")
+            .values_list("end_tach", flat=True)
+            .first()
+        )
+        return value
+
+    @staticmethod
+    def get_last_end_tach_map(towplanes, before_date=None):
+        """Return the latest prior end tach keyed by towplane primary key.
+
+        The correlated subquery keeps the create pages to one database query
+        instead of issuing one closeout query per towplane.
+        """
+        from django.db.models import OuterRef, Subquery
+
+        closeout_qs = TowplaneCloseout.objects.filter(
+            towplane=OuterRef("pk"),
+            end_tach__isnull=False,
+        )
+        if before_date is not None:
+            closeout_qs = closeout_qs.filter(logsheet__log_date__lt=before_date)
+
+        return dict(
+            towplanes.annotate(
+                last_end_tach=Subquery(
+                    closeout_qs.order_by("-logsheet__log_date", "-pk").values(
+                        "end_tach"
+                    )[:1]
+                )
+            ).values_list("pk", "last_end_tach")
+        )
 
 
 ####################################################

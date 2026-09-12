@@ -163,6 +163,69 @@
               </div>
             </div>
           </div>
+
+          <!-- Scheduled Towplanes Section -->
+          <div class="section-header mt-4 mb-3">
+            <h6 class="text-primary fw-bold mb-1">
+              <i class="bi bi-airplane-engines me-2"></i>Scheduled Towplanes
+            </h6>
+            <p class="text-muted small mb-0">
+              Add each towplane expected to fly today with assigned tow pilot and start tach.
+              Start tach is auto-suggested from the previous flying day.
+            </p>
+          </div>
+
+          {% if towplane_formset.management_form %}
+            {{ towplane_formset.management_form }}
+          {% endif %}
+
+          {% if towplane_formset.non_form_errors %}
+            <div class="alert alert-danger mt-2">
+              {{ towplane_formset.non_form_errors }}
+            </div>
+          {% endif %}
+
+          <div class="towplane-roster mt-2 mb-2">
+            {% for row in towplane_formset %}
+              <div class="card mb-2 towplane-row">
+                <div class="card-body py-2">
+                  <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                      <label for="{{ row.towplane.id_for_label }}" class="form-label small text-muted mb-1">Towplane</label>
+                      {{ row.towplane }}
+                      {% if row.towplane.errors %}
+                        <div class="text-danger small mt-1">{{ row.towplane.errors }}</div>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                      <label for="{{ row.tow_pilot.id_for_label }}" class="form-label small text-muted mb-1">{{ row.tow_pilot.label }}</label>
+                      {{ row.tow_pilot }}
+                      {% if row.tow_pilot.errors %}
+                        <div class="text-danger small mt-1">{{ row.tow_pilot.errors }}</div>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-2">
+                      <label for="{{ row.start_tach.id_for_label }}" class="form-label small text-muted mb-1">Start Tach</label>
+                      {{ row.start_tach }}
+                      {% if row.start_tach.errors %}
+                        <div class="text-danger small mt-1">{{ row.start_tach.errors }}</div>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-2">
+                      {% if row.instance.pk %}
+                        {{ row.DELETE }}
+                        <label class="form-check-label small ms-1" for="{{ row.DELETE.id_for_label }}">Remove</label>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+
+          <button type="button" class="btn btn-outline-primary btn-sm" id="addTowplaneRow">
+            <i class="bi bi-plus-lg me-1"></i>Add another towplane
+          </button>
         </div>
 
         <div class="modal-footer bg-light">
@@ -382,6 +445,190 @@
 
 {% block extra_scripts %}
 <script src="{% static 'js/duty-assignment-autopopulate.js' %}"></script>
+{{ towplane_start_tach_map|json_script:"towplane_start_tach_map" }}
+<script>
+  (function () {
+    "use strict";
+    var tachLookupUrl = "{% url 'logsheet:api_towplane_start_tach' %}";
+    var dateInput = null;
+    var tachCacheByDate = {};
+
+    var initialTachMap = {};
+    try {
+      var el = document.getElementById('towplane_start_tach_map');
+      initialTachMap = el ? JSON.parse(el.textContent || '{}') : {};
+    } catch (e) {
+      initialTachMap = {};
+    }
+
+    function currentDateKey() {
+      return (dateInput && dateInput.value) ? dateInput.value : '';
+    }
+
+    function cacheForCurrentDate() {
+      var key = currentDateKey();
+      if (!tachCacheByDate[key]) {
+        tachCacheByDate[key] = {};
+      }
+      return tachCacheByDate[key];
+    }
+
+    function setAutoPrefill(tach, value) {
+      tach.value = value;
+      tach.dataset.prefilled = '1';
+    }
+
+    function prefillTachForSelection(sel, tach) {
+      var val = sel.value;
+      tach.value = '';
+      tach.dataset.prefilled = '1';
+      if (!val) return;
+
+      var dayCache = cacheForCurrentDate();
+      if (dayCache[val] !== undefined) {
+        if (tach.dataset.prefilled === '0') return;
+        setAutoPrefill(tach, dayCache[val]);
+        return;
+      }
+
+      var requestedTowplane = val;
+      var requestedDate = currentDateKey();
+      var query = new URLSearchParams({ towplane_id: val });
+      if (requestedDate) {
+        query.set('before_date', requestedDate);
+      }
+
+      fetch(tachLookupUrl + '?' + query.toString(), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            return null;
+          }
+          return response.json();
+        })
+        .then(function (payload) {
+          if (!payload || payload.start_tach === null || payload.start_tach === undefined) {
+            return;
+          }
+          if (sel.value !== requestedTowplane || currentDateKey() !== requestedDate) {
+            return;
+          }
+          if (tach.dataset.prefilled === '0') {
+            return;
+          }
+          dayCache[requestedTowplane] = payload.start_tach;
+          setAutoPrefill(tach, payload.start_tach);
+        })
+        .catch(function () {
+          // Keep UI responsive; failure only means no prefill hint.
+        });
+    }
+
+    function initRow(row) {
+      var sel = row.querySelector('select[name$="-towplane"]');
+      var tach = row.querySelector('input[name$="-start_tach"]');
+      if (!sel || !tach) return;
+
+      tach.addEventListener('input', function () {
+        tach.dataset.prefilled = '0';
+      });
+
+      sel.addEventListener('change', function () {
+        prefillTachForSelection(sel, tach);
+      });
+
+      var cache = cacheForCurrentDate();
+      if (sel.value && cache[sel.value] !== undefined && !tach.value) {
+        setAutoPrefill(tach, cache[sel.value]);
+      } else if (sel.value && !tach.value) {
+        prefillTachForSelection(sel, tach);
+      }
+    }
+
+    function resetClonedRowValues(row) {
+      // New rows should start blank so per-towplane prefill can run correctly.
+      row.querySelectorAll('select, input, textarea').forEach(function (field) {
+        var name = field.getAttribute('name') || '';
+        if (!name) return;
+        if (name.endsWith('-id')) return;
+
+        if (field.type === 'checkbox' || field.type === 'radio') {
+          field.checked = false;
+          return;
+        }
+
+        field.value = '';
+        if (name.endsWith('-start_tach')) {
+          field.dataset.prefilled = '1';
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      dateInput = document.getElementById('id_log_date');
+      tachCacheByDate[currentDateKey()] = Object.assign({}, initialTachMap);
+
+      var roster = document.querySelector('.towplane-roster');
+      if (!roster) return;
+
+      roster.querySelectorAll('.towplane-row').forEach(initRow);
+
+      if (dateInput) {
+        dateInput.addEventListener('change', function () {
+          roster.querySelectorAll('.towplane-row').forEach(function (row) {
+            var sel = row.querySelector('select[name$="-towplane"]');
+            var tach = row.querySelector('input[name$="-start_tach"]');
+            if (!sel || !tach || !sel.value) return;
+            if (!tach.value || tach.dataset.prefilled === '1') {
+              tach.value = '';
+              prefillTachForSelection(sel, tach);
+            }
+          });
+        });
+      }
+
+      var addBtn = document.getElementById('addTowplaneRow');
+      if (!addBtn) return;
+      if (addBtn.dataset.boundTowplaneAdder === '1') return;
+      addBtn.dataset.boundTowplaneAdder = '1';
+
+      addBtn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Guard against accidental double-clicks and duplicate bindings.
+        if (addBtn.dataset.addingTowplane === '1') {
+          return;
+        }
+        addBtn.dataset.addingTowplane = '1';
+
+        var total = document.querySelector('input[name="towplanes-TOTAL_FORMS"]');
+        if (!total) {
+          addBtn.dataset.addingTowplane = '0';
+          return;
+        }
+
+        var idx = parseInt(total.value, 10);
+        var rows = roster.querySelectorAll('.towplane-row');
+        var template = rows[rows.length - 1];
+        if (!template) {
+          addBtn.dataset.addingTowplane = '0';
+          return;
+        }
+
+        var clone = template.cloneNode(true);
+        clone.innerHTML = clone.innerHTML.replace(/towplanes-\d+-/g, 'towplanes-' + idx + '-');
+        resetClonedRowValues(clone);
+        roster.appendChild(clone);
+        initRow(clone);
+        total.value = String(idx + 1);
+
+        addBtn.dataset.addingTowplane = '0';
+      });
+    });
+  })();
+</script>
 {% endblock %}
 
 

@@ -17,6 +17,7 @@ erDiagram
     Member ||--o{ MaintenanceIssue : reported_by
     Member ||--o{ AircraftMeister : member
     Member ||--o{ TowplaneCloseout : rental_charged_to
+    Member ||--o{ LogsheetTowplane : tow_pilot
 
     Logsheet {
         int id PK
@@ -28,6 +29,17 @@ erDiagram
         int duty_officer_id FK
         int assistant_duty_officer_id FK
         int duty_instructor_id FK
+    }
+
+    LogsheetTowplane {
+        int id PK
+        int logsheet_id FK
+        int towplane_id FK
+        int tow_pilot_id FK "nullable"
+        decimal start_tach "nullable"
+        datetime created_at
+        datetime updated_at
+        string unique_logsheet_towplane "unique constraint"
     }
 
     Flight {
@@ -208,11 +220,13 @@ erDiagram
     Member ||--o{ LogsheetGuestPayment : guest_flight_payment_responsibilities
     Logsheet ||--o{ LogsheetCloseout : closeout
     Logsheet ||--o{ TowplaneCloseout : towplane_closeouts
+    Logsheet ||--o{ LogsheetTowplane : scheduled_towplanes
     Logsheet ||--|| FinalizationEmailOutbox : finalization_email_outbox
     Airfield ||--o{ Logsheet : location
     Glider ||--o{ Flight : aircraft
     Towplane ||--o{ Flight : tow_aircraft
     Towplane ||--o{ TowplaneCloseout : closeout_data
+    Towplane ||--o{ LogsheetTowplane : scheduled_roster
     Glider ||--o{ MaintenanceIssue : maintenance
     Towplane ||--o{ MaintenanceIssue : maintenance
     Glider ||--o{ MaintenanceDeadline : deadlines
@@ -315,6 +329,14 @@ This document describes all models in `logsheet/models.py`.
 - **New in Issue 123**: Includes `rental_hours_chargeable` field and `rental_charged_to` field to track non-towing towplane usage (sightseeing, flight reviews, retrieval flights).
 - **Rental Cost Calculation**: The `rental_cost` property automatically calculates charges based on `rental_hours_chargeable * towplane.hourly_rental_rate`.
 - **Site Configuration**: Rental fields are only shown when `SiteConfiguration.allow_towplane_rental` is enabled.
+
+## LogsheetTowplane
+- Records the day-level towplane roster for a logsheet.
+- `logsheet` links the assignment to one operating day.
+- `towplane` identifies the physical towplane scheduled for that day.
+- `tow_pilot` optionally identifies the member assigned to tow that plane.
+- `start_tach` stores the beginning-of-day tach reading, prefilled from the prior closeout when available.
+- Each logsheet/towplane pair is unique; virtual towplanes (`SELF`, `WINCH`, `OTHER`) are excluded from normal roster forms.
 
 ## MaintenanceIssue
 - Tracks maintenance issues for aircraft.

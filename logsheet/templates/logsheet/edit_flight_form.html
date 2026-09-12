@@ -24,6 +24,8 @@
 </div>
 
 <form method="post" enctype="multipart/form-data" id="edit-flight-form"
+  data-bound="{% if form.is_bound %}1{% else %}0{% endif %}"
+  data-existing="{% if flight.pk %}1{% else %}0{% endif %}"
     action="{% if flight.pk %}
             {% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}
             {% else %}
@@ -392,6 +394,8 @@
   </div>
 </form>
 
+{{ towplane_pilot_map|json_script:"towplane_pilot_map" }}
+
 <script>
   (function () {
     const commercialToggle = document.getElementById('id_commercial_ride');
@@ -449,7 +453,4 @@
     ticketInput.addEventListener('input', syncTicketValidation);
   })();
 </script>
-
-
-
 <!-- Form submit JS is now managed in logsheet_manage.html for robust modal handling. -->
