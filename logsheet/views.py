@@ -3723,7 +3723,9 @@ def edit_logsheet_closeout(request, pk):
         duty_form = LogsheetDutyCrewForm(instance=logsheet)
         formset = formset_class(queryset=queryset)
         roster_formset = LogsheetTowplaneFormSet(
-            queryset=roster_queryset, prefix=roster_prefix
+            queryset=roster_queryset,
+            prefix=roster_prefix,
+            form_kwargs={"allow_grounded_instance": True},
         )
 
         _build_rental_formsets(formset, is_post=False)
