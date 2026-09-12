@@ -3556,11 +3556,16 @@ def edit_logsheet_closeout(request, pk):
         formset = formset_class(request.POST, queryset=queryset)
         if roster_submitted:
             roster_formset = LogsheetTowplaneFormSet(
-                request.POST, queryset=roster_queryset, prefix=roster_prefix
+                request.POST,
+                queryset=roster_queryset,
+                prefix=roster_prefix,
+                form_kwargs={"allow_grounded_instance": True},
             )
         else:
             roster_formset = LogsheetTowplaneFormSet(
-                queryset=roster_queryset, prefix=roster_prefix
+                queryset=roster_queryset,
+                prefix=roster_prefix,
+                form_kwargs={"allow_grounded_instance": True},
             )
 
         form_valid = form.is_valid()
@@ -3655,10 +3660,10 @@ def edit_logsheet_closeout(request, pk):
                         row.logsheet = logsheet
                         row.save()
 
-                        towplane_closeout = TowplaneCloseout.objects.filter(
+                        towplane_closeout, _ = TowplaneCloseout.objects.get_or_create(
                             logsheet=logsheet,
                             towplane=row.towplane,
-                        ).first()
+                        )
                         if towplane_closeout:
                             prior_closeout_tach = prior_closeout_start_tach.get(
                                 row.towplane_id
@@ -3675,7 +3680,10 @@ def edit_logsheet_closeout(request, pk):
                             )
                             if operator_touched_closeout:
                                 closeout_was_auto_derived = False
-                            elif prior_closeout_tach is None:
+                            elif (
+                                prior_closeout_tach is None
+                                and not towplane_closeout.start_tach_manually_cleared
+                            ):
                                 # Closeout was empty before this save and the
                                 # operator left it untouched: safe to seed it
                                 # from the roster, or clear it if the roster

@@ -240,6 +240,26 @@ class LogsheetTowplaneFormTests(TestCase):
         self.assertIn(self.towplane, form.fields["towplane"].queryset)
         self.assertIn(member, form.fields["tow_pilot"].queryset)
 
+    def test_grounded_existing_row_can_be_bound_for_closeout_edits(self):
+        from logsheet.forms import LogsheetTowplaneForm
+
+        airfield = Airfield.objects.create(
+            name="Grounded Closeout Field", identifier="GCF", is_active=True
+        )
+        member = _make_member("grounded_closeout_pilot", towpilot=True)
+        logsheet = _make_logsheet(airfield, member)
+        row = LogsheetTowplane.objects.create(logsheet=logsheet, towplane=self.towplane)
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Grounded for closeout test",
+            grounded=True,
+            resolved=False,
+            report_date=date.today(),
+        )
+
+        form = LogsheetTowplaneForm(instance=row, allow_grounded_instance=True)
+        self.assertIn(self.towplane, form.fields["towplane"].queryset)
+
     def test_admin_roster_surfaces_use_constrained_form(self):
         from logsheet.admin import LogsheetTowplaneAdmin, LogsheetTowplaneInline
         from logsheet.forms import LogsheetTowplaneForm
@@ -770,6 +790,11 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         )
         self.assertEqual(row.tow_pilot, self.other)
         self.assertEqual(row.start_tach, Decimal("100.00"))
+        self.assertTrue(
+            TowplaneCloseout.objects.filter(
+                logsheet=self.logsheet, towplane=self.towplane
+            ).exists()
+        )
 
     def test_roster_tach_correction_updates_auto_seeded_closeout(self):
         # The closeout start was auto-seeded from the roster and the operator
@@ -890,6 +915,15 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.context["formset"].forms[0].instance.start_tach)
+        data["roster-0-id"] = str(
+            LogsheetTowplane.objects.get(
+                logsheet=self.logsheet, towplane=self.towplane
+            ).pk
+        )
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+        closeout.refresh_from_db()
+        self.assertIsNone(closeout.start_tach)
 
     def test_roster_tach_correction_does_not_overwrite_matching_manual_closeout(self):
         closeout = TowplaneCloseout.objects.create(

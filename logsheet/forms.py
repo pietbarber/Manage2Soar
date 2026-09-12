@@ -1154,6 +1154,7 @@ class LogsheetTowplaneForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        allow_grounded_instance = kwargs.pop("allow_grounded_instance", False)
         super().__init__(*args, **kwargs)
         towplane_queryset = (
             Towplane.objects.filter(is_active=True)
@@ -1170,19 +1171,22 @@ class LogsheetTowplaneForm(forms.ModelForm):
             towplane_queryset = (
                 Towplane.objects.filter(
                     Q(is_active=True) | Q(pk=self.instance.towplane_id)
-                ).annotate(
+                )
+                .annotate(
                     has_unresolved_grounding=Exists(
                         MaintenanceIssue.objects.filter(
                             towplane=OuterRef("pk"), grounded=True, resolved=False
                         )
                     )
                 )
-                # Keep the grounding filter unconditional: the current-instance
-                # exception is only for inactive planes, not grounded ones. A
-                # grounded towplane must stay excluded in admin and closeout
-                # edits so an existing row cannot be re-selected after its
-                # towplane becomes grounded.
-                .filter(has_unresolved_grounding=False)
+                .filter(
+                    Q(has_unresolved_grounding=False)
+                    | (
+                        Q(pk=self.instance.towplane_id)
+                        if allow_grounded_instance
+                        else Q(pk=None)
+                    )
+                )
             )
         for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
             towplane_queryset = towplane_queryset.exclude(
