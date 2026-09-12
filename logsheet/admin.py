@@ -473,9 +473,15 @@ class LogsheetAdmin(AdminHelperMixin, admin.ModelAdmin):
 # Admin configuration for LogsheetTowplane objects
 # Day-level towplane roster: which planes are scheduled to fly,
 # the expected tow pilot, and the starting tach reading.
+class LogsheetTowplaneAdminForm(LogsheetTowplaneForm):
+    class Meta:
+        model = LogsheetTowplane
+        fields = ("logsheet", "towplane", "tow_pilot", "start_tach")
+
+
 @admin.register(LogsheetTowplane)
 class LogsheetTowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
-    form = LogsheetTowplaneForm
+    form = LogsheetTowplaneAdminForm
     list_display = ("logsheet", "towplane", "tow_pilot", "start_tach", "updated_at")
     list_select_related = ("logsheet", "towplane", "tow_pilot")
     list_filter = ("logsheet__airfield", "logsheet__finalized")

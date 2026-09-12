@@ -315,10 +315,8 @@
 
     function prefillTachForSelection(sel, tach) {
       var val = sel.value;
-      if (tach.dataset.prefilled !== '0') {
-        tach.value = '';
-        tach.dataset.prefilled = '1';
-      }
+      tach.value = '';
+      tach.dataset.prefilled = '1';
       if (!val) return;
 
       var dayCache = cacheForCurrentDate();

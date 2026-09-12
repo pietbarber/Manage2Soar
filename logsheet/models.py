@@ -1948,7 +1948,10 @@ class TowplaneCloseout(models.Model):
         Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts"
     )
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
-    start_tach_auto_derived_from_roster = models.BooleanField(default=False)
+    start_tach_auto_derived_from_roster = models.BooleanField(
+        default=False, editable=False
+    )
+    start_tach_manually_cleared = models.BooleanField(default=False, editable=False)
     start_tach = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True
     )
@@ -2030,6 +2033,31 @@ class TowplaneCloseout(models.Model):
         return f"{self.towplane.n_number} on {self.logsheet.log_date}"
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if (
+            self.pk
+            and (update_fields is None or "start_tach" in update_fields)
+            and "start_tach_auto_derived_from_roster" not in (update_fields or ())
+        ):
+            previous_start_tach = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values_list("start_tach", flat=True)
+                .first()
+            )
+            if previous_start_tach != self.start_tach:
+                self.start_tach_auto_derived_from_roster = False
+                self.start_tach_manually_cleared = self.start_tach is None
+                if update_fields is not None:
+                    update_fields = set(update_fields)
+                    update_fields.update(
+                        {
+                            "start_tach_auto_derived_from_roster",
+                            "start_tach_manually_cleared",
+                        }
+                    )
+                    kwargs["update_fields"] = update_fields
+
         # Auto-compute elapsed tach when start/end readings are present.
         derived_tach_time = False
         if (

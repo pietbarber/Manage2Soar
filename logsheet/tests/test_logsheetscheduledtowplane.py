@@ -245,7 +245,14 @@ class LogsheetTowplaneFormTests(TestCase):
         from logsheet.forms import LogsheetTowplaneForm
 
         self.assertIs(LogsheetTowplaneInline.form, LogsheetTowplaneForm)
-        self.assertIs(LogsheetTowplaneAdmin.form, LogsheetTowplaneForm)
+        self.assertIsNot(LogsheetTowplaneAdmin.form, LogsheetTowplaneForm)
+        self.assertIn("logsheet", LogsheetTowplaneAdmin.form.base_fields)
+
+    def test_admin_roster_form_exposes_parent_logsheet(self):
+        from logsheet.admin import LogsheetTowplaneAdmin
+
+        form = LogsheetTowplaneAdmin.form()
+        self.assertIn("logsheet", form.fields)
 
     def test_start_tach_rejects_negative(self):
         from logsheet.forms import LogsheetTowplaneForm
@@ -303,6 +310,53 @@ class LogsheetTowplaneFormTests(TestCase):
         )
         form = LogsheetTowplaneForm()
         self.assertEqual(form.fields["tow_pilot"].label, "Lead Tow Pilot")
+
+    def test_towplane_queryset_excludes_virtual_case_insensitively(self):
+        from logsheet.forms import LogsheetTowplaneForm
+
+        virtual = Towplane.objects.create(
+            name="Winch Lowercase", n_number="winch", is_active=True, club_owned=True
+        )
+        form = LogsheetTowplaneForm()
+        self.assertNotIn(virtual, form.fields["towplane"].queryset)
+
+
+class TowplaneCloseoutModelTests(TestCase):
+    def setUp(self):
+        self.member = _make_member("closeout_model_operator")
+        self.airfield = Airfield.objects.create(
+            name="Closeout Field", identifier="CLS", is_active=True
+        )
+        self.logsheet = _make_logsheet(self.airfield, self.member)
+        self.towplane = Towplane.objects.create(
+            name="Closeout Husky", n_number="NCLS", is_active=True, club_owned=True
+        )
+
+    def test_authoritative_start_tach_edit_clears_roster_provenance(self):
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.00"),
+            start_tach_auto_derived_from_roster=True,
+        )
+        closeout.start_tach = Decimal("101.00")
+        closeout.save()
+        closeout.refresh_from_db()
+        self.assertFalse(closeout.start_tach_auto_derived_from_roster)
+        self.assertFalse(closeout.start_tach_manually_cleared)
+
+    def test_authoritative_clear_marks_closeout_as_manually_cleared(self):
+        closeout = TowplaneCloseout.objects.create(
+            logsheet=self.logsheet,
+            towplane=self.towplane,
+            start_tach=Decimal("100.00"),
+            start_tach_auto_derived_from_roster=True,
+        )
+        closeout.start_tach = None
+        closeout.save()
+        closeout.refresh_from_db()
+        self.assertFalse(closeout.start_tach_auto_derived_from_roster)
+        self.assertTrue(closeout.start_tach_manually_cleared)
 
 
 class CreateLogsheetRosterViewTests(TestCase):
@@ -641,6 +695,13 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         # First form should have our seeded row.
         self.assertEqual(forms[0].instance.towplane, self.towplane)
         self.assertContains(response, 'name="roster-0-id"')
+        self.assertIn(
+            self.towplane,
+            [
+                closeout_form.instance.towplane
+                for closeout_form in response.context["formset"]
+            ],
+        )
 
     def test_closeout_form_remains_logsheet_closeout_with_towplane_closeout(self):
         TowplaneCloseout.objects.create(
@@ -717,6 +778,7 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
             logsheet=self.logsheet,
             towplane=self.towplane,
             start_tach=Decimal("100.00"),
+            end_tach=Decimal("120.00"),
             start_tach_auto_derived_from_roster=True,
         )
         roster_row = LogsheetTowplane.objects.create(
@@ -745,7 +807,7 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
             "form-0-id": str(closeout.pk),
             "form-0-towplane": str(self.towplane.pk),
             "form-0-start_tach": "100.00",
-            "form-0-end_tach": "",
+            "form-0-end_tach": "120.00",
             "form-0-fuel_added": "",
             "form-0-notes": "",
             "roster-TOTAL_FORMS": "2",
@@ -765,6 +827,7 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         closeout.refresh_from_db()
         self.assertEqual(closeout.start_tach, Decimal("110.00"))
+        self.assertEqual(closeout.tach_time, Decimal("10.00"))
 
     def test_roster_start_tach_does_not_overwrite_explicit_closeout_edit(self):
         # The operator intentionally cleared the auto-seeded closeout start
@@ -774,6 +837,7 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
             logsheet=self.logsheet,
             towplane=self.towplane,
             start_tach=Decimal("100.00"),
+            end_tach=Decimal("120.00"),
         )
         roster_row = LogsheetTowplane.objects.create(
             logsheet=self.logsheet,
@@ -821,6 +885,11 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         closeout.refresh_from_db()
         self.assertIsNone(closeout.start_tach)
+        self.assertIsNone(closeout.tach_time)
+        self.assertTrue(closeout.start_tach_manually_cleared)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["formset"].forms[0].instance.start_tach)
 
     def test_roster_tach_correction_does_not_overwrite_matching_manual_closeout(self):
         closeout = TowplaneCloseout.objects.create(
@@ -921,6 +990,12 @@ class EditLogsheetCloseoutRosterViewTests(TestCase):
         available_towplanes = list(response.context["available_towplanes"])
         self.assertNotIn(self.towplane, available_towplanes)
         self.assertIn(second_towplane, available_towplanes)
+
+        virtual = Towplane.objects.create(
+            name="Winch", n_number="winch", is_active=True, club_owned=True
+        )
+        response = self.client.get(url)
+        self.assertNotIn(virtual, response.context["available_towplanes"])
 
     def test_roster_swap_persists_without_unique_constraint_failure(self):
         second_towplane = Towplane.objects.create(

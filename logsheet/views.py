@@ -3470,7 +3470,11 @@ def edit_logsheet_closeout(request, pk):
         towplane_closeout, _ = TowplaneCloseout.objects.get_or_create(
             logsheet=logsheet, towplane_id=towplane_id
         )
-        if not roster_submitted and towplane_closeout.start_tach is None:
+        if (
+            not roster_submitted
+            and towplane_closeout.start_tach is None
+            and not towplane_closeout.start_tach_manually_cleared
+        ):
             roster_start_tach = (
                 LogsheetTowplane.objects.filter(
                     logsheet=logsheet,
@@ -3482,10 +3486,14 @@ def edit_logsheet_closeout(request, pk):
             if roster_start_tach is not None:
                 towplane_closeout.start_tach = roster_start_tach
                 towplane_closeout.start_tach_auto_derived_from_roster = True
+                towplane_closeout.start_tach_manually_cleared = False
+                towplane_closeout.tach_time = None
                 towplane_closeout.save(
                     update_fields=[
                         "start_tach",
                         "start_tach_auto_derived_from_roster",
+                        "start_tach_manually_cleared",
+                        "tach_time",
                     ]
                 )
 
@@ -3613,10 +3621,23 @@ def edit_logsheet_closeout(request, pk):
             duty_form.save()
             formset.save()
             if roster_submitted and operator_touched_closeout_towplane_ids:
-                TowplaneCloseout.objects.filter(
+                touched_closeouts = TowplaneCloseout.objects.filter(
                     logsheet=logsheet,
                     towplane_id__in=operator_touched_closeout_towplane_ids,
-                ).update(start_tach_auto_derived_from_roster=False)
+                )
+                for touched_closeout in touched_closeouts:
+                    touched_closeout.start_tach_auto_derived_from_roster = False
+                    touched_closeout.start_tach_manually_cleared = (
+                        touched_closeout.start_tach is None
+                    )
+                    touched_closeout.tach_time = None
+                    touched_closeout.save(
+                        update_fields=[
+                            "start_tach_auto_derived_from_roster",
+                            "start_tach_manually_cleared",
+                            "tach_time",
+                        ]
+                    )
             # Save the per-day towplane roster (towplane → pilot, start tach).
             # Only when the client actually submitted the formset — otherwise
             # we leave any existing roster rows untouched.
@@ -3714,8 +3735,12 @@ def edit_logsheet_closeout(request, pk):
         )
         .filter(has_unresolved_grounding=False)
         .exclude(id__in=existing_closeout_towplanes)
-        .order_by("n_number")
     )
+    for virtual_n_number in Towplane.VIRTUAL_N_NUMBERS:
+        available_towplanes = available_towplanes.exclude(
+            n_number__iexact=virtual_n_number
+        )
+    available_towplanes = available_towplanes.order_by("n_number")
 
     # Check if towplane rentals are enabled for UI display
     config = SiteConfiguration.objects.first()
@@ -3849,10 +3874,14 @@ def add_towplane_closeout(request, pk):
             if roster_start_tach is not None:
                 closeout.start_tach = roster_start_tach
                 closeout.start_tach_auto_derived_from_roster = True
+                closeout.start_tach_manually_cleared = False
+                closeout.tach_time = None
                 closeout.save(
                     update_fields=[
                         "start_tach",
                         "start_tach_auto_derived_from_roster",
+                        "start_tach_manually_cleared",
+                        "tach_time",
                     ]
                 )
             else:
@@ -3862,10 +3891,14 @@ def add_towplane_closeout(request, pk):
                 if last_end is not None:
                     closeout.start_tach = last_end
                     closeout.start_tach_auto_derived_from_roster = False
+                    closeout.start_tach_manually_cleared = False
+                    closeout.tach_time = None
                     closeout.save(
                         update_fields=[
                             "start_tach",
                             "start_tach_auto_derived_from_roster",
+                            "start_tach_manually_cleared",
+                            "tach_time",
                         ]
                     )
 
