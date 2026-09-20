@@ -2878,7 +2878,7 @@ def export_member_logbook_csv(request, member_id=None):
                 if f.instructor_id:
                     titles = report_lookup.get((f.instructor_id, date), [])
                 if titles:
-comments = _sanitize_csv_cell(", ".join(titles))
+                    comments = _sanitize_csv_cell(", ".join(titles))
                 else:
                     fallback_instructor_name = (
                         f.guest_instructor_name or ""
