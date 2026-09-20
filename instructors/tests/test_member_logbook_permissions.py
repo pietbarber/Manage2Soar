@@ -507,15 +507,28 @@ def test_csv_export_shows_lesson_title_not_code(client):
     )
     LessonScore.objects.create(report=report, lesson=lesson, score="2")
 
+    # Copilot review: ground sessions must also emit the lesson title (not
+    # the bare code) in their CSV Comments column.
+    ground = GroundInstruction.objects.create(
+        student=pilot,
+        instructor=instructor,
+        date=flight_day,
+        duration=timedelta(minutes=30),
+        location="Briefing room",
+    )
+    GroundLessonScore.objects.create(session=ground, lesson=lesson, score="2")
+
     client.force_login(pilot)
     response = client.get(reverse("instructors:member_logbook_export_csv"))
 
     assert response.status_code == 200
     rows = list(csv.DictReader(io.StringIO(response.content.decode())))
-    assert len(rows) == 1
-    # Title is present; the bare code "1c" must not be rendered on its own.
-    assert rows[0]["Comments"].startswith("Cockpit Familiarization")
-    assert "1c" not in rows[0]["Comments"]
+    assert len(rows) == 2
+    # Title is present; the bare code "1c" must not be rendered on its own —
+    # for both the flight and ground entries.
+    for row in rows:
+        assert row["Comments"].startswith("Cockpit Familiarization")
+        assert "1c" not in row["Comments"]
 
 
 @pytest.mark.django_db
@@ -688,6 +701,9 @@ def test_logbook_signature_renders_on_new_line_for_flight_and_ground(client):
     assert "Cockpit Familiarization" in ground_row["signature_html"]
     assert flight_row["comments"].startswith("Cockpit Familiarization")
     assert ground_row["comments"].startswith("Cockpit Familiarization")
+    # Copilot review: the bare code "1c" must be absent from both comments.
+    assert "1c" not in flight_row["comments"]
+    assert "1c" not in ground_row["comments"]
 
 
 @pytest.mark.django_db
@@ -884,14 +900,31 @@ def test_foreflight_csv_shows_lesson_title_not_code(client):
     )
     LessonScore.objects.create(report=report, lesson=lesson, score="2")
 
+    # Copilot review: ground sessions must also emit the lesson title (not the
+    # bare code) in their ForeFlight InstructorComments.
+    ground = GroundInstruction.objects.create(
+        student=pilot,
+        instructor=instructor,
+        date=flight_day,
+        duration=timedelta(minutes=30),
+        location="Briefing room",
+    )
+    GroundLessonScore.objects.create(session=ground, lesson=lesson, score="2")
+
     client.force_login(pilot)
     response = client.get(reverse("instructors:member_logbook_export_foreflight"))
 
     assert response.status_code == 200
-    flight_rows = _parse_foreflight_flights_rows(response.content.decode())
-    assert len(flight_rows) >= 1
-    assert flight_rows[0]["InstructorComments"].startswith("Cockpit Familiarization")
-    assert "1c" not in flight_rows[0]["InstructorComments"]
+    rows = _parse_foreflight_flights_rows(response.content.decode())
+    # Flight row has an AircraftID set; the ground row has GroundTraining > 0
+    # and no AircraftID. Both must show the title, not the bare code "1c".
+    flight_row = next(r for r in rows if r["AircraftID"])
+    ground_row = next(r for r in rows if float(r["GroundTraining"]) > 0)
+    assert flight_row is not None
+    assert ground_row is not None
+    for row in (flight_row, ground_row):
+        assert row["InstructorComments"].startswith("Cockpit Familiarization")
+        assert "1c" not in row["InstructorComments"]
 
 
 @pytest.mark.django_db
