@@ -1877,13 +1877,15 @@ def member_logbook(request, member_id=None):
         .select_related("instructor")
         .prefetch_related("lesson_scores__lesson")
     )
-    # Build lookup: (instructor_id, date) -> report with pre-loaded lesson codes
+    # Build lookup: (instructor_id, date) -> report with pre-loaded lesson titles
+    # (logbook entries must describe the training given per 14 CFR 61.51(h), so we
+    # store the lesson title rather than the syllabus lesson code)
     report_lookup = {}
     for rpt in instruction_reports:
-        codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
+        titles = [ls.lesson.title for ls in rpt.lesson_scores.all()]
         report_lookup[(rpt.instructor_id, rpt.report_date)] = {
             "report": rpt,
-            "codes": codes,
+            "titles": titles,
         }
 
     # 3) Use actual private_glider_checkride_date if available
@@ -1962,9 +1964,9 @@ def member_logbook(request, member_id=None):
 
                     if report_data:
                         rpt = report_data["report"]
-                        codes = report_data["codes"]
+                        titles = report_data["titles"]
                         comments = (
-                            f"{', '.join(codes)} /s/ {f.instructor.full_display_name}"
+                            f"{', '.join(titles)} /s/ {f.instructor.full_display_name}"
                         )
                         report_id = rpt.id
                     else:
@@ -2063,8 +2065,10 @@ def member_logbook(request, member_id=None):
             ground_date = ev["date"]
             gm = int(g.duration.total_seconds() // 60) if g.duration else 0
             # build the lesson list + instructor tag
-            codes = [ls.lesson.code for ls in g.lesson_scores.all()]
-            comments = ", ".join(codes)
+            # (use lesson titles so the entry describes the training given,
+            # per 14 CFR 61.51(h), rather than only the syllabus lesson code)
+            titles = [ls.lesson.title for ls in g.lesson_scores.all()]
+            comments = ", ".join(titles)
             instructor_cert = ""
             if g.instructor and hasattr(g.instructor, "pilot_certificate_number"):
                 instructor_cert = g.instructor.pilot_certificate_number or ""
@@ -2073,7 +2077,7 @@ def member_logbook(request, member_id=None):
                 comments += f" /s/ {g.instructor.full_display_name}"
                 cert_part = f" {instructor_cert}CFI" if instructor_cert else ""
                 signature_html = build_signature_html(
-                    ", ".join(codes),
+                    ", ".join(titles),
                     g.instructor.full_display_name,
                     cert_part,
                 )
@@ -2770,8 +2774,9 @@ def _build_logbook_events(member):
 
     * **events** – list of dicts sorted by ``(date, time)``; each has keys
       ``type`` ("flight" or "ground"), ``obj``, ``date``, and ``time``.
-    * **report_lookup** – ``{(instructor_id, date): [lesson_codes]}`` for the
-      member's instruction reports.
+    * **report_lookup** – ``{(instructor_id, date): [lesson_titles]}`` for the
+      member's instruction reports. Titles (not codes) are stored because a logbook
+      entry must describe the training given per 14 CFR 61.51(h).
     * **rating_date** – the member's ``private_glider_checkride_date`` (or
       ``None`` if not set), used for logbook classification.
     """
@@ -2804,8 +2809,10 @@ def _build_logbook_events(member):
     )
     report_lookup = {}
     for rpt in instruction_reports:
+        # Store lesson titles (not codes) so exported logbook entries describe the
+        # training given, per 14 CFR 61.51(h).
         report_lookup[(rpt.instructor_id, rpt.report_date)] = [
-            ls.lesson.code for ls in rpt.lesson_scores.all()
+            ls.lesson.title for ls in rpt.lesson_scores.all()
         ]
 
     events = []
@@ -2865,13 +2872,13 @@ def export_member_logbook_csv(request, member_id=None):
             pic_m = classification["pic_m"]
             inst_m = classification["inst_m"]
             comments = ""
-            # Construct comments as in logbook.html: lesson codes for instruction, otherwise blank
+            # Construct comments as in logbook.html: lesson titles for instruction, otherwise blank
             if is_pilot and has_logbook_instructor_context(f):
-                codes = []
+                titles = []
                 if f.instructor_id:
-                    codes = report_lookup.get((f.instructor_id, date), [])
-                if codes:
-                    comments = ", ".join(codes)
+                    titles = report_lookup.get((f.instructor_id, date), [])
+                if titles:
+                    comments = _sanitize_csv_cell(", ".join(titles))
                 else:
                     fallback_instructor_name = (
                         f.guest_instructor_name or ""
@@ -2912,8 +2919,8 @@ def export_member_logbook_csv(request, member_id=None):
         else:
             g = ev["obj"]
             gm = int(g.duration.total_seconds() // 60) if g.duration else 0
-            codes = [ls.lesson.code for ls in g.lesson_scores.all()]
-            comments = ", ".join(codes)
+            titles = [ls.lesson.title for ls in g.lesson_scores.all()]
+            comments = _sanitize_csv_cell(", ".join(titles))
             if g.instructor and hasattr(g.instructor, "full_display_name"):
                 instructor_name = g.instructor.full_display_name
             else:
@@ -3389,11 +3396,11 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             instructor_name = _sanitize_csv_cell(raw_instructor_name)
             instructor_comments = ""
             if is_pilot and has_logbook_instructor_context(f):
-                codes = []
+                titles = []
                 if f.instructor_id:
-                    codes = report_lookup.get((f.instructor_id, date_val), [])
-                if codes:
-                    instructor_comments = _sanitize_csv_cell(", ".join(codes))
+                    titles = report_lookup.get((f.instructor_id, date_val), [])
+                if titles:
+                    instructor_comments = _sanitize_csv_cell(", ".join(titles))
 
             aircraft_id = _sanitize_csv_cell(
                 f.glider.n_number if f.glider else _UNKNOWN_AIRCRAFT_ID
@@ -3462,8 +3469,10 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
             g = ev["obj"]
             gm = int(g.duration.total_seconds() // 60) if g.duration else 0
             ground_hours = decimal_hours(timedelta(minutes=gm))
-            codes = [ls.lesson.code for ls in g.lesson_scores.all()]
-            instructor_comments = _sanitize_csv_cell(", ".join(codes)) if codes else ""
+            titles = [ls.lesson.title for ls in g.lesson_scores.all()]
+            instructor_comments = (
+                _sanitize_csv_cell(", ".join(titles)) if titles else ""
+            )
             instructor_name = _sanitize_csv_cell(
                 g.instructor.full_display_name
                 if g.instructor and hasattr(g.instructor, "full_display_name")
