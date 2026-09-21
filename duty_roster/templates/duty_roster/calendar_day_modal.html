@@ -30,7 +30,7 @@
               {% elif scheduled_holes.instructor %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
                 {% if volunteerable_holes.instructor %}
-                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='instructor' %}"
+                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='instructor' %}?next={{ request.get_full_path|urlencode }}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>
@@ -54,7 +54,7 @@
               {% elif scheduled_holes.tow_pilot %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
                 {% if volunteerable_holes.tow_pilot %}
-                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='tow_pilot' %}"
+                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='tow_pilot' %}?next={{ request.get_full_path|urlencode }}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>
@@ -78,7 +78,7 @@
               {% elif scheduled_holes.duty_officer %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
                 {% if volunteerable_holes.duty_officer %}
-                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='duty_officer' %}"
+                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='duty_officer' %}?next={{ request.get_full_path|urlencode }}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>
@@ -102,7 +102,7 @@
               {% elif scheduled_holes.assistant_duty_officer %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
                 {% if volunteerable_holes.assistant_duty_officer %}
-                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='assistant_duty_officer' %}"
+                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='assistant_duty_officer' %}?next={{ request.get_full_path|urlencode }}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>
@@ -126,7 +126,7 @@
               {% elif scheduled_holes.commercial_pilot %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
                 {% if volunteerable_holes.commercial_pilot %}
-                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='commercial_pilot' %}"
+                <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='commercial_pilot' %}?next={{ request.get_full_path|urlencode }}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>

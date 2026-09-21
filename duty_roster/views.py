@@ -5444,6 +5444,31 @@ def edit_roster_message(request):
 # Volunteer to fill a roster hole (Issue #679)
 # ---------------------------------------------------------------------------
 
+
+def _volunteer_fill_back_url(request, assignment):
+    """
+    Build a safe redirect target for the volunteer-fill flow (Issue #1053).
+
+    Prefer the ``next`` query parameter when it is a safe same-site URL (the
+    calendar day detail page that the modal was opened from).  Fall back to
+    the duty calendar so a direct URL or a forged parameter never produces an
+    open-redirect.  ``calendar_day_detail`` has no auth requirement, so no
+    login loop is possible for the fallback.
+    """
+    from django.utils.http import url_has_allowed_host_and_scheme
+
+    next_url = request.GET.get("next", "")
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}
+    ):
+        return next_url
+    d = assignment.date
+    return reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={"year": d.year, "month": d.month, "day": d.day},
+    )
+
+
 # Maps URL role slug →
 #   (member qual attr, assignment FK attr, config title attr, default title, config schedule attr)
 _HOLE_FILL_ROLE_MAP = {
@@ -5515,6 +5540,8 @@ def volunteer_fill_role(request, assignment_id, role):
     )
 
     assignment = get_object_or_404(DutyAssignment, id=assignment_id)
+    back_url = _volunteer_fill_back_url(request, assignment)
+
     member = request.user
 
     # Fetch config once; derive the human-readable role label from it.
@@ -5526,7 +5553,7 @@ def volunteer_fill_role(request, assignment_id, role):
     # Past days are not fillable.
     if assignment.date < date.today():
         messages.error(request, "You cannot fill roles on past duty days.")
-        return redirect("duty_roster:duty_calendar")
+        return redirect(back_url)
 
     # Reject if this role is not enabled for scheduling.
     if not (config and getattr(config, schedule_attr, False)):
@@ -5534,7 +5561,7 @@ def volunteer_fill_role(request, assignment_id, role):
             request,
             f"The {role_label} role is not currently enabled for scheduling.",
         )
-        return redirect("duty_roster:duty_calendar")
+        return redirect(back_url)
 
     # Check qualification.
     is_qualified = (
@@ -5547,7 +5574,7 @@ def volunteer_fill_role(request, assignment_id, role):
             request,
             f"You are not qualified to fill the {role_label} role.",
         )
-        return redirect("duty_roster:duty_calendar")
+        return redirect(back_url)
 
     if request.method == "POST":
         # Atomically claim the slot with a conditional UPDATE so concurrent
@@ -5564,7 +5591,7 @@ def volunteer_fill_role(request, assignment_id, role):
                 f"{assignment.date.strftime('%B %d, %Y')} ahead of you. "
                 "Thank you for offering!",
             )
-            return redirect("duty_roster:duty_calendar")
+            return redirect(back_url)
 
         # For ad-hoc days: refresh from DB so notify_ops_status sees the
         # latest state and can fire the collecting-volunteers → confirmed-ops
@@ -5580,7 +5607,7 @@ def volunteer_fill_role(request, assignment_id, role):
             f"You have been assigned as {role_label} for "
             f"{assignment.date.strftime('%B %d, %Y')}. Thank you for volunteering!",
         )
-        return redirect("duty_roster:duty_calendar")
+        return redirect(back_url)
 
     # GET – stale-navigation guard: if the slot was already filled before the
     # user loaded this page, give a friendly message rather than a blank confirm.
@@ -5590,7 +5617,7 @@ def volunteer_fill_role(request, assignment_id, role):
             f"The {role_label} slot for {assignment.date.strftime('%B %d, %Y')} "
             "has already been filled. Thank you for your willingness!",
         )
-        return redirect("duty_roster:duty_calendar")
+        return redirect(back_url)
 
     # GET – render confirmation page
     return render(
@@ -5600,5 +5627,6 @@ def volunteer_fill_role(request, assignment_id, role):
             "assignment": assignment,
             "role": role,
             "role_label": role_label,
+            "back_url": back_url,
         },
     )
