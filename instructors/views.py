@@ -2920,7 +2920,7 @@ def export_member_logbook_csv(request, member_id=None):
             g = ev["obj"]
             gm = int(g.duration.total_seconds() // 60) if g.duration else 0
             titles = [ls.lesson.title for ls in g.lesson_scores.all()]
-            comments = ", ".join(titles)
+            comments = _sanitize_csv_cell(", ".join(titles))
             if g.instructor and hasattr(g.instructor, "full_display_name"):
                 instructor_name = g.instructor.full_display_name
             else:

@@ -530,6 +530,16 @@ def test_csv_export_shows_lesson_title_not_code(client):
         assert row["Comments"].startswith("Cockpit Familiarization")
         assert "1c" not in row["Comments"]
 
+    lesson.title = '=HYPERLINK("https://example.com","Lesson")'
+    lesson.save(update_fields=["title"])
+    response = client.get(reverse("instructors:member_logbook_export_csv"))
+
+    assert response.status_code == 200
+    rows = list(csv.DictReader(io.StringIO(response.content.decode())))
+    assert len(rows) == 2
+    for row in rows:
+        assert row["Comments"].startswith("'=HYPERLINK(")
+
 
 @pytest.mark.django_db
 def test_instruction_record_shows_logbook_link(client):
