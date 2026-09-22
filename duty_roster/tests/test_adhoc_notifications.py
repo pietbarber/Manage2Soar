@@ -240,7 +240,7 @@ class TestExpireAdHocDaysDeadline(TestCase):
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
     def test_before_local_deadline_does_not_cancel(self, mock_send):
-        """An hourly run before 23:00 local must leave tomorrow untouched."""
+        """A 15-minute run before 23:00 local must leave tomorrow untouched."""
         self.mock_club_now.return_value = datetime.combine(
             self.today, datetime.min.time().replace(hour=22), tzinfo=dt_timezone.utc
         )
@@ -277,7 +277,7 @@ class TestExpireAdHocDaysDeadline(TestCase):
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
     def test_after_local_deadline_does_not_cancel(self, mock_send):
-        """The second quarter-hour run must not repeat the deadline action."""
+        """A delayed 23:15 run still retries the missed deadline action."""
         self.mock_club_now.return_value = datetime.combine(
             self.today,
             datetime.min.time().replace(hour=23, minute=15),
@@ -291,8 +291,8 @@ class TestExpireAdHocDaysDeadline(TestCase):
 
         ExpireCommand().execute_job(dry_run=False)
 
-        self.assertTrue(DutyAssignment.objects.filter(pk=assignment.pk).exists())
-        mock_send.assert_not_called()
+        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        mock_send.assert_called_once()
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
     def test_uses_club_local_tomorrow_for_expiration(self, mock_send):

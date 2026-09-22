@@ -19,12 +19,11 @@ class Command(BaseCronJobCommand):
 
     def execute_job(self, *args, **options):
         # The CronJob runs every 15 minutes because the club timezone is
-        # configurable, including fractional-hour offsets. Only the first
-        # local quarter-hour of 23:00 is the night-before deadline; using a
-        # fixed UTC run would be too early for UTC/east-of-UTC clubs or too
-        # late for west-of-UTC clubs.
+        # configurable, including fractional-hour offsets. The local 23:00
+        # hour is the night-before deadline; keeping the full hour as a retry
+        # window handles delayed or skipped CronJob runs.
         club_now = get_club_now()
-        if club_now.hour != 23 or club_now.minute >= 15:
+        if club_now.hour != 23:
             self.log_info(
                 f"No expiration required at {club_now:%H:%M} club-local time; "
                 "deadline is 23:00"
