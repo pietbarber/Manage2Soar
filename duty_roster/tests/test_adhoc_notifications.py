@@ -276,7 +276,7 @@ class TestExpireAdHocDaysDeadline(TestCase):
         mock_send.assert_called_once()
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
-    def test_after_local_deadline_does_not_cancel(self, mock_send):
+    def test_delayed_local_deadline_run_retries_cancellation(self, mock_send):
         """A delayed 23:15 run still retries the missed deadline action."""
         self.mock_club_now.return_value = datetime.combine(
             self.today,
