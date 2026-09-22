@@ -37,15 +37,21 @@
             Please confirm this commitment below.
           </p>
 
-          <form method="post">
+          <form method="post" action="{{ request.get_full_path }}">
             {% csrf_token %}
             <div class="d-flex gap-2 flex-wrap">
               <button type="submit" class="btn btn-warning px-4">
                 <i class="bi bi-check-circle-fill me-2"></i>Yes, I'll fill this role
               </button>
+              {% if back_url %}
+              <a href="{{ back_url }}" class="btn btn-outline-secondary px-4">
+                <i class="bi bi-x-circle me-2"></i>Cancel
+              </a>
+              {% else %}
               <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-outline-secondary px-4">
                 <i class="bi bi-x-circle me-2"></i>Cancel
               </a>
+              {% endif %}
             </div>
           </form>
 

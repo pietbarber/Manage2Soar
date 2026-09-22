@@ -6,6 +6,7 @@ scheduled duty day. The view accepts five role slugs:
     instructor, tow_pilot, duty_officer, assistant_duty_officer, commercial_pilot
 """
 
+import urllib.parse
 from datetime import date, timedelta
 
 import pytest
@@ -109,6 +110,21 @@ def test_get_redirects_for_unknown_role(client, django_user_model):
     response = client.get(_url(assignment.id, "head_chef"))
 
     assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_unknown_role_redirects_to_next_param(client, django_user_model):
+    """An invalid role preserves the day context supplied by the modal."""
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+    day_url = _day_detail_url(assignment)
+
+    client.force_login(user)
+    response = client.get(_url(assignment.id, "head_chef") + f"?next={day_url}")
+
+    assert response.status_code == 302
+    assert response["Location"] == day_url
 
 
 @pytest.mark.django_db
@@ -427,3 +443,157 @@ def test_post_does_not_fire_notify_when_concurrent_fill(client, django_user_mode
 
     assert response.status_code == 302
     mock_notify.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Redirect target – return to the day the member was looking at (Issue #1053)
+# ---------------------------------------------------------------------------
+
+
+def _day_detail_url(assignment):
+    return reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+
+
+@pytest.mark.django_db
+def test_post_redirects_to_next_param_when_same_host(client, django_user_model):
+    """
+    Issue #1053: after volunteering, the member should land back on the page
+    they were viewing (passed via ``next``), not the current-month calendar.
+    """
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+    day_url = _day_detail_url(assignment)
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "instructor") + f"?next={day_url}")
+
+    assert response.status_code == 302
+    assert response["Location"] == day_url
+
+
+@pytest.mark.django_db
+def test_post_redirects_to_day_detail_when_no_next(client, django_user_model):
+    """
+    Issue #1053: with no ``next`` param (e.g. direct URL), fall back to the
+    duty day detail page for that assignment's date, not the calendar month.
+    """
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "instructor"))
+
+    assert response.status_code == 302
+    assert response["Location"] == _day_detail_url(assignment)
+
+
+@pytest.mark.django_db
+def test_post_rejects_external_next_param(client, django_user_model):
+    """
+    A ``next`` param pointing at an external host must be ignored (open-redirect
+    guard); the member is sent to the day detail page instead.
+    """
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.post(
+        _url(assignment.id, "instructor") + "?next=https://evil.example/phish"
+    )
+
+    assert response.status_code == 302
+    assert response["Location"] == _day_detail_url(assignment)
+    assert "evil.example" not in response["Location"]
+
+
+@pytest.mark.django_db
+def test_post_race_guard_redirects_to_next(client, django_user_model):
+    """
+    The 'someone got there first' path must respect ``next`` as well, so the
+    member still lands on the day they were viewing.
+    """
+    _make_config()
+    first = _make_user(django_user_model, username="first", instructor=True)
+    second = _make_user(django_user_model, username="second", instructor=True)
+    assignment = _future_assignment()
+    assignment.instructor = first
+    assignment.save(update_fields=["instructor"])
+
+    client.force_login(second)
+    day_url = _day_detail_url(assignment)
+    response = client.post(_url(assignment.id, "instructor") + f"?next={day_url}")
+
+    assert response.status_code == 302
+    assert response["Location"] == day_url
+    assignment.refresh_from_db()
+    assert assignment.instructor == first
+
+
+@pytest.mark.django_db
+def test_get_confirmation_context_includes_back_url(client, django_user_model):
+    """
+    The confirmation page exposes ``back_url`` so its cancel link returns the
+    member to the page they came from (Issue #1053).
+    """
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+    day_url = _day_detail_url(assignment)
+
+    client.force_login(user)
+    response = client.get(_url(assignment.id, "instructor") + f"?next={day_url}")
+
+    assert response.status_code == 200
+    assert response.context["back_url"] == day_url
+    # The cancel link on the confirmation page points back at the day detail.
+    assert day_url.encode() in response.content
+
+
+@pytest.mark.django_db
+def test_get_confirmation_back_url_fallback_without_next(client, django_user_model):
+    """
+    Without a ``next`` param the confirm page still has a safe cancel target:
+    the duty day detail page for the assignment's date.
+    """
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.get(_url(assignment.id, "instructor"))
+
+    assert response.status_code == 200
+    assert response.context["back_url"] == _day_detail_url(assignment)
+
+
+@pytest.mark.django_db
+def test_calendar_day_modal_volunteer_link_passes_next(client, django_user_model):
+    """
+    The "Volunteer to fill" buttons in the day detail page carry a ``next``
+    query param pointing back to that same day detail page, so the whole
+    flow (confirm -> assign) returns the member to the day they were viewing.
+    """
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+    day_url = _day_detail_url(assignment)
+
+    client.force_login(user)
+    response = client.get(day_url)
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Volunteer to fill" in html
+    # The template uses `|urlencode`, which keeps "/" unescaped.
+    encoded = urllib.parse.quote(day_url, safe="/")
+    assert f"next={encoded}" in html
