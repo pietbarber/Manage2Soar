@@ -366,7 +366,7 @@ metadata:
   name: expire-ad-hoc-days
   namespace: default
 spec:
-  schedule: "0 3 * * *" # Daily at 3:00 AM UTC (10 PM EST / 11 PM EDT)
+  schedule: "0 * * * *" # Hourly; command expires only at club-local 11 PM
   timeZone: "UTC"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3

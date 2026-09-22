@@ -4,36 +4,34 @@ from django.template.loader import render_to_string
 
 from duty_roster.models import DutyAssignment
 from duty_roster.utils.email import get_email_config, get_mailing_list
-from siteconfig.timezone_utils import get_club_today
+from siteconfig.timezone_utils import get_club_now
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
 class Command(BaseCronJobCommand):
-    help = "Cancel unconfirmed ad-hoc ops days whose deadline has passed (runs at 3 AM UTC = 10 PM EST / 11 PM EDT)"
+    help = "Cancel unconfirmed ad-hoc ops days at the club-local 11 PM deadline"
     job_name = "expire_ad_hoc_days"
     max_execution_time = timedelta(
         minutes=5
     )  # Matches K8s CronJob activeDeadlineSeconds=300
 
     def execute_job(self, *args, **options):
-        # Run at 3 AM UTC (10 PM EST / 11 PM EDT), which is the "night before"
-        # the upcoming ops day in club-local time.  At that moment
-        # get_club_today() is the CURRENT local evening and the ops day is the
-        # NEXT local day (TOMORROW), so we expire ad-hoc days scheduled for
-        # tomorrow — the night-before deadline has passed and there is no
-        # longer time to assemble minimum crew before flying begins in the
-        # morning (issue #1056).
-        #
-        # Historically this ran at 6 PM UTC (1-2 PM EST) and checked
-        # `tomorrow`, cancelling days mid-afternoon before members could
-        # respond (issue #654).  Moving the schedule to 3 AM UTC made
-        # "today" the night-before date, which shifted the cancellation to
-        # the evening AFTER the ops day flew instead of the evening before —
-        # an off-by-one regression introduced when club-local timezone
-        # support was added (issue #1056).
-        tomorrow = get_club_today() + timedelta(days=1)
+        # The CronJob runs hourly because the club timezone is configurable.
+        # Only the local 23:00 run is the night-before deadline; using a fixed
+        # UTC run would be too early for UTC/east-of-UTC clubs or too late for
+        # west-of-UTC clubs.
+        club_now = get_club_now()
+        if club_now.hour != 23:
+            self.log_info(
+                f"No expiration required at {club_now:%H:%M} club-local time; "
+                "deadline is 23:00"
+            )
+            return
+
+        # At the local 23:00 deadline, the ops day is tomorrow.
+        tomorrow = club_now.date() + timedelta(days=1)
 
         assignments = DutyAssignment.objects.filter(
             is_scheduled=False, is_confirmed=False, date=tomorrow
@@ -57,7 +55,7 @@ class Command(BaseCronJobCommand):
             if options.get("dry_run"):
                 self.log_info(
                     f"[DRY RUN] Would cancel unconfirmed ad-hoc ops day for {assignment.date} "
-                    "(night-before deadline, 03:00 UTC)"
+                    "(club-local 23:00 night-before deadline)"
                 )
                 cancelled_count += 1
             else:
@@ -87,7 +85,7 @@ class Command(BaseCronJobCommand):
                 assignment.delete()
                 self.log_warning(
                     f"Cancelled unconfirmed ad-hoc ops day for {assignment.date} "
-                    "(night-before deadline passed, 03:00 UTC)"
+                    "(club-local 23:00 night-before deadline passed)"
                 )
                 cancelled_count += 1
 
