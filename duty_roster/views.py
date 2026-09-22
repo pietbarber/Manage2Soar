@@ -5518,8 +5518,8 @@ def volunteer_fill_role(request, assignment_id, role):
     on a scheduled duty day (Issue #679).
 
     GET  – Shows a confirmation page so the member can confirm before committing.
-    POST – Assigns the current user to the role if it is still empty, then
-           redirects to the duty calendar with a success message.
+        POST – Assigns the current user to the role if it is still empty, then
+            redirects to the safe ``back_url`` target with a success message.
 
     Accepts ``role`` as one of: instructor, tow_pilot, duty_officer,
     assistant_duty_officer, commercial_pilot.
