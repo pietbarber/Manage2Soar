@@ -256,6 +256,45 @@ class TestExpireAdHocDaysDeadline(TestCase):
         mock_send.assert_not_called()
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    def test_fractional_timezone_runs_at_local_deadline(self, mock_send):
+        """A 15-minute UTC schedule reaches 23:00 in Asia/Kathmandu."""
+        config = SiteConfiguration.objects.first()
+        config.club_timezone = "Asia/Kathmandu"
+        config.save(update_fields=["club_timezone"])
+        self.mock_club_now.return_value = datetime(
+            2026, 1, 1, 23, 0, 0, tzinfo=ZoneInfo("Asia/Kathmandu")
+        )
+        assignment = DutyAssignment.objects.create(
+            date=datetime(2026, 1, 2).date(),
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+
+        ExpireCommand().execute_job(dry_run=False)
+
+        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        mock_send.assert_called_once()
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    def test_after_local_deadline_does_not_cancel(self, mock_send):
+        """The second quarter-hour run must not repeat the deadline action."""
+        self.mock_club_now.return_value = datetime.combine(
+            self.today,
+            datetime.min.time().replace(hour=23, minute=15),
+            tzinfo=dt_timezone.utc,
+        )
+        assignment = DutyAssignment.objects.create(
+            date=self.tomorrow,
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+
+        ExpireCommand().execute_job(dry_run=False)
+
+        self.assertTrue(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        mock_send.assert_not_called()
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
     def test_uses_club_local_tomorrow_for_expiration(self, mock_send):
         """Command should use the next day in a non-US club timezone."""
         config = SiteConfiguration.objects.first()

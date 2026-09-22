@@ -45,10 +45,10 @@ All CronJob commands inherit from `BaseCronJobCommand` which provides:
 - **Timeout**: 10 minutes
 - **Note**: UTC-first schedule until tenant-specific timezone support exists; by default the command looks back only within its `--max-days` bound
 
-#### `expire_ad_hoc_days` (hourly; acts at club-local 11 PM)
+#### `expire_ad_hoc_days` (every 15 minutes; acts at club-local 11 PM)
 - **Purpose**: Expire unconfirmed ad-hoc duty assignments for tomorrow at the night-before deadline
 - **Target**: Ad-hoc duty slots
-- **Frequency**: Hourly (the command acts only during the club-local 23:00 hour)
+- **Frequency**: Every 15 minutes (the command acts only during the club-local 23:00-23:14 window)
 - **Timeout**: 5 minutes
 - **Note**: Existing command, converted to use new framework
 
