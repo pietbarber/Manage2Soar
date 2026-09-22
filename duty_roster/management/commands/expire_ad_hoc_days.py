@@ -18,21 +18,29 @@ class Command(BaseCronJobCommand):
     )  # Matches K8s CronJob activeDeadlineSeconds=300
 
     def execute_job(self, *args, **options):
-        # Run at 3 AM UTC (10 PM EST / 11 PM EDT).  We expire ad-hoc days
-        # scheduled for TODAY — by the time this job fires at ~10 PM local time
-        # the "night before" deadline has passed and there is no longer enough
-        # time to assemble minimum crew before flying begins in the morning.
-        # Previously this checked `tomorrow` and ran at 6 PM UTC (1-2 PM EST),
-        # which cancelled days mid-afternoon before members had a chance to
-        # respond (issue #654).
-        today = get_club_today()
+        # Run at 3 AM UTC (10 PM EST / 11 PM EDT), which is the "night before"
+        # the upcoming ops day in club-local time.  At that moment
+        # get_club_today() is the CURRENT local evening and the ops day is the
+        # NEXT local day (TOMORROW), so we expire ad-hoc days scheduled for
+        # tomorrow — the night-before deadline has passed and there is no
+        # longer time to assemble minimum crew before flying begins in the
+        # morning (issue #1056).
+        #
+        # Historically this ran at 6 PM UTC (1-2 PM EST) and checked
+        # `tomorrow`, cancelling days mid-afternoon before members could
+        # respond (issue #654).  Moving the schedule to 3 AM UTC made
+        # "today" the night-before date, which shifted the cancellation to
+        # the evening AFTER the ops day flew instead of the evening before —
+        # an off-by-one regression introduced when club-local timezone
+        # support was added (issue #1056).
+        tomorrow = get_club_today() + timedelta(days=1)
 
         assignments = DutyAssignment.objects.filter(
-            is_scheduled=False, is_confirmed=False, date=today
+            is_scheduled=False, is_confirmed=False, date=tomorrow
         )
 
         if not assignments.exists():
-            self.log_info("No unconfirmed ad-hoc ops days found for today")
+            self.log_info("No unconfirmed ad-hoc ops days found for tomorrow")
             return
 
         cancelled_count = 0
