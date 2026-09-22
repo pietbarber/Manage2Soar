@@ -113,6 +113,21 @@ def test_get_redirects_for_unknown_role(client, django_user_model):
 
 
 @pytest.mark.django_db
+def test_unknown_role_redirects_to_next_param(client, django_user_model):
+    """An invalid role preserves the day context supplied by the modal."""
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+    day_url = _day_detail_url(assignment)
+
+    client.force_login(user)
+    response = client.get(_url(assignment.id, "head_chef") + f"?next={day_url}")
+
+    assert response.status_code == 302
+    assert response["Location"] == day_url
+
+
+@pytest.mark.django_db
 def test_get_redirects_for_unqualified_member(client, django_user_model):
     """A member without the relevant qualification is redirected."""
     _make_config()

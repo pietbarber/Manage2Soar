@@ -5451,9 +5451,9 @@ def _volunteer_fill_back_url(request, assignment):
 
     Prefer the ``next`` query parameter when it is a safe same-site URL (the
     calendar day detail page that the modal was opened from).  Fall back to
-    the duty calendar so a direct URL or a forged parameter never produces an
-    open-redirect.  ``calendar_day_detail`` has no auth requirement, so no
-    login loop is possible for the fallback.
+    the assignment's duty day detail page so a direct URL or a forged
+    parameter never produces an open-redirect.  ``calendar_day_detail`` has
+    no auth requirement, so no login loop is possible for the fallback.
     """
     from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -5531,16 +5531,16 @@ def volunteer_fill_role(request, assignment_id, role):
     * The role must still be empty (race-condition guard via conditional UPDATE query).
     * The day must be today or in the future.
     """
+    assignment = get_object_or_404(DutyAssignment, id=assignment_id)
+    back_url = _volunteer_fill_back_url(request, assignment)
+
     if role not in _HOLE_FILL_ROLE_MAP:
         messages.error(request, "Unknown role specified.")
-        return redirect("duty_roster:duty_calendar")
+        return redirect(back_url)
 
     qual_attr, assign_attr, config_title_attr, default_title, schedule_attr = (
         _HOLE_FILL_ROLE_MAP[role]
     )
-
-    assignment = get_object_or_404(DutyAssignment, id=assignment_id)
-    back_url = _volunteer_fill_back_url(request, assignment)
 
     member = request.user
 
