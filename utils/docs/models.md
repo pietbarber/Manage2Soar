@@ -147,7 +147,7 @@ The following commands use `CronJobLock` for coordination:
 - **`report_duty_delinquents`**: Monthly duty participation reports
 - **`send_duty_preop_emails`**: Daily pre-operation notifications
 - **`send_maintenance_digest`**: Weekly maintenance summaries
-- **`expire_ad_hoc_days`**: Daily duty slot cleanup
+- **`expire_ad_hoc_days`**: Every-15-minute duty slot cleanup during the club-local 23:00 hour
 
 ### Kubernetes Integration
 

@@ -99,7 +99,7 @@ Uses PostgreSQL's atomic operations:
 1. ✅ Converted existing commands to use base class:
    - ✅ `send_duty_preop_emails.py` - **SCHEDULED DAILY**
    - ✅ `send_maintenance_digest.py` - **SCHEDULED WEEKLY**
-   - ✅ `expire_ad_hoc_days.py` - **SCHEDULED DAILY**
+    - ✅ `expire_ad_hoc_days.py` - **SCHEDULED EVERY 15 MINUTES; RUNS DURING CLUB-LOCAL 23:00 HOUR**
    - ✅ `expire_past_swap_requests.py` - **SCHEDULED DAILY** (Issue #933 stale swap request expiry)
 2. ✅ Created new notification commands:
    - ✅ `notify_aging_logsheets.py` - **FINDING REAL ISSUES**
@@ -124,7 +124,7 @@ Uses PostgreSQL's atomic operations:
 - **Weekly Monday 10:00 AM UTC**: Late SPR notifications ✅ **DEPLOYED**
 - **Monthly 1st @ 7:00 AM UTC**: Duty delinquent reports ✅ **DEPLOYED**
 - **Monthly 28th @ 11:59 PM UTC**: Cleanup old notifications (60+ days) ✅ **READY FOR DEPLOYMENT**
-- **Daily 3:00 AM UTC** (10 PM EST / 11 PM EDT): Expire ad-hoc days (night-before deadline, expires today's unconfirmed days) ✅ **DEPLOYED**
+- **Every 15 minutes** (acts during the club-local 11:00 PM hour): Expire ad-hoc days for tomorrow at the night-before deadline ✅ **DEPLOYED**
 - **Daily 3:10 AM UTC**: Expire past-dated open duty swap requests and auto-decline pending offers ✅ **DEPLOYED**
 
 ### 📊 Recent Production Metrics

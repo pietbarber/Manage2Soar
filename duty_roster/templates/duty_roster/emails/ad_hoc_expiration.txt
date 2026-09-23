@@ -10,7 +10,8 @@ cancelled because the confirmation deadline has passed without achieving
 minimum crew requirements (at least one tow pilot and one duty officer).
 
 To schedule future ad-hoc operations, please ensure minimum crew commits
-before the deadline (03:00 UTC — 10 PM EST / 11 PM EDT the night before the scheduled date).
+before the deadline (23:00 / 11 PM in the club's configured local timezone,
+the night before the scheduled date).
 
 View Duty Roster: {{ roster_url }}
 

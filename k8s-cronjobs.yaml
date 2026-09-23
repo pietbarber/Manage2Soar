@@ -359,14 +359,14 @@ spec:
                 secretName: gcp-sa-key
 
 ---
-# Daily: Expire Ad-hoc Days (3:00 AM UTC = 10 PM EST / 11 PM EDT, night-before deadline)
+# Every 15 minutes: expire ad-hoc days during the club-local 23:00 deadline
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: expire-ad-hoc-days
   namespace: default
 spec:
-  schedule: "0 3 * * *" # Daily at 3:00 AM UTC (10 PM EST / 11 PM EDT)
+  schedule: "*/15 * * * *" # Command retries throughout the club-local 23:00 hour
   timeZone: "UTC"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3

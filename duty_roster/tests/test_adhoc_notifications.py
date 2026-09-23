@@ -2,13 +2,15 @@
 
 Covers:
 - notify_ops_status() sends proposal to MEMBERS_MAILING_LIST, not role-specific lists
-- expire_ad_hoc_days command expires today's unconfirmed days (not tomorrow's)
-- Confirmed and future unconfirmed days are left untouched
+- expire_ad_hoc_days command expires the next club-local day's (tomorrow's)
+  unconfirmed ad-hoc days at the night-before deadline (issue #1056)
+- Confirmed and scheduled days are left untouched
 """
 
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from django.test import TestCase, override_settings
 from django.utils.timezone import now
@@ -131,34 +133,28 @@ class TestProposeAdHocDayDeduplication(TestCase):
 
 
 class TestExpireAdHocDaysDeadline(TestCase):
-    """expire_ad_hoc_days should expire TODAY's unconfirmed ad-hoc days (runs
-    at 3 AM UTC = 10 PM EST / 11 PM EDT), not tomorrow's."""
+    """expire_ad_hoc_days should expire tomorrow's day at 23:00 club-local."""
 
     def setUp(self):
         _make_site_config()
         self.today = now().date()
         self.tomorrow = self.today + timedelta(days=1)
+        self.club_now_patcher = patch(
+            "duty_roster.management.commands.expire_ad_hoc_days.get_club_now"
+        )
+        self.mock_club_now = self.club_now_patcher.start()
+        self.mock_club_now.return_value = datetime.combine(
+            self.today, datetime.min.time().replace(hour=23), tzinfo=dt_timezone.utc
+        )
+
+    def tearDown(self):
+        self.club_now_patcher.stop()
+        super().tearDown()
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
-    def test_todays_unconfirmed_adhoc_is_cancelled(self, mock_send):
-        """An unconfirmed ad-hoc day for today must be deleted."""
-        assignment = DutyAssignment.objects.create(
-            date=self.today,
-            is_scheduled=False,
-            is_confirmed=False,
-        )
-        cmd = ExpireCommand()
-        cmd.execute_job(dry_run=False)
-
-        self.assertFalse(
-            DutyAssignment.objects.filter(pk=assignment.pk).exists(),
-            "Today's unconfirmed ad-hoc assignment should have been deleted.",
-        )
-        mock_send.assert_called_once()
-
-    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
-    def test_tomorrows_unconfirmed_adhoc_is_left_alone(self, mock_send):
-        """An unconfirmed ad-hoc day for tomorrow must NOT be cancelled yet."""
+    def test_tomorrows_unconfirmed_adhoc_is_cancelled(self, mock_send):
+        """An unconfirmed ad-hoc day for tomorrow (the night-before ops day)
+        must be deleted and a cancellation email sent."""
         assignment = DutyAssignment.objects.create(
             date=self.tomorrow,
             is_scheduled=False,
@@ -167,17 +163,45 @@ class TestExpireAdHocDaysDeadline(TestCase):
         cmd = ExpireCommand()
         cmd.execute_job(dry_run=False)
 
+        self.assertFalse(
+            DutyAssignment.objects.filter(pk=assignment.pk).exists(),
+            "Tomorrow's unconfirmed ad-hoc assignment should have been deleted.",
+        )
+        mock_send.assert_called_once()
+        email_args = mock_send.call_args.kwargs
+        self.assertIn(
+            "23:00 / 11 PM in the club's configured local timezone",
+            email_args["message"],
+        )
+        self.assertNotIn("03:00 UTC", email_args["message"])
+        self.assertIn(
+            "23:00 / 11 PM in the club's configured local timezone",
+            email_args["html_message"],
+        )
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    def test_todays_unconfirmed_adhoc_is_left_alone(self, mock_send):
+        """An unconfirmed ad-hoc day for today (the current club-local day)
+        must NOT be cancelled — that is the off-by-one fixed in issue #1056."""
+        assignment = DutyAssignment.objects.create(
+            date=self.today,
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+        cmd = ExpireCommand()
+        cmd.execute_job(dry_run=False)
+
         self.assertTrue(
             DutyAssignment.objects.filter(pk=assignment.pk).exists(),
-            "Tomorrow's unconfirmed ad-hoc assignment should NOT be cancelled yet.",
+            "Today's unconfirmed ad-hoc assignment should NOT be cancelled.",
         )
         mock_send.assert_not_called()
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
-    def test_confirmed_adhoc_today_is_not_cancelled(self, mock_send):
-        """A confirmed ad-hoc day for today must not be touched."""
+    def test_confirmed_adhoc_tomorrow_is_not_cancelled(self, mock_send):
+        """A confirmed ad-hoc day for tomorrow must not be touched."""
         assignment = DutyAssignment.objects.create(
-            date=self.today,
+            date=self.tomorrow,
             is_scheduled=False,
             is_confirmed=True,
         )
@@ -191,10 +215,10 @@ class TestExpireAdHocDaysDeadline(TestCase):
         mock_send.assert_not_called()
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
-    def test_scheduled_day_today_is_not_cancelled(self, mock_send):
-        """A scheduled (non-ad-hoc) day for today must not be touched."""
+    def test_scheduled_day_tomorrow_is_not_cancelled(self, mock_send):
+        """A scheduled (non-ad-hoc) day for tomorrow must not be touched."""
         assignment = DutyAssignment.objects.create(
-            date=self.today,
+            date=self.tomorrow,
             is_scheduled=True,
             is_confirmed=False,
         )
@@ -211,7 +235,7 @@ class TestExpireAdHocDaysDeadline(TestCase):
     def test_dry_run_does_not_delete_or_email(self, mock_send):
         """Dry run must not delete assignments or send any emails."""
         assignment = DutyAssignment.objects.create(
-            date=self.today,
+            date=self.tomorrow,
             is_scheduled=False,
             is_confirmed=False,
         )
@@ -224,24 +248,102 @@ class TestExpireAdHocDaysDeadline(TestCase):
         )
         mock_send.assert_not_called()
 
-    @patch("siteconfig.timezone_utils.timezone.now")
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
-    def test_uses_club_local_today_for_expiration(self, mock_send, mock_now):
-        """Command should expire based on club-local date, not UTC date."""
-        config = SiteConfiguration.objects.first()
-        config.club_timezone = "America/Los_Angeles"
-        config.save(update_fields=["club_timezone"])
-
-        # 01:30 UTC on Jan 2 is still Jan 1 in America/Los_Angeles.
-        mock_now.return_value = datetime(2026, 1, 2, 1, 30, 0, tzinfo=dt_timezone.utc)
-
-        local_today_assignment = DutyAssignment.objects.create(
-            date=datetime(2026, 1, 1).date(),
+    def test_before_local_deadline_does_not_cancel(self, mock_send):
+        """A 15-minute run before 23:00 local must leave tomorrow untouched."""
+        self.mock_club_now.return_value = datetime.combine(
+            self.today, datetime.min.time().replace(hour=22), tzinfo=dt_timezone.utc
+        )
+        assignment = DutyAssignment.objects.create(
+            date=self.tomorrow,
             is_scheduled=False,
             is_confirmed=False,
         )
-        utc_today_assignment = DutyAssignment.objects.create(
+
+        ExpireCommand().execute_job(dry_run=False)
+
+        self.assertTrue(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        mock_send.assert_not_called()
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    def test_fractional_timezone_runs_at_local_deadline(self, mock_send):
+        """A 15-minute UTC schedule reaches 23:00 in Asia/Kathmandu."""
+        config = SiteConfiguration.objects.first()
+        config.club_timezone = "Asia/Kathmandu"
+        config.save(update_fields=["club_timezone"])
+        self.mock_club_now.return_value = datetime(
+            2026, 1, 1, 23, 0, 0, tzinfo=ZoneInfo("Asia/Kathmandu")
+        )
+        assignment = DutyAssignment.objects.create(
             date=datetime(2026, 1, 2).date(),
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+
+        ExpireCommand().execute_job(dry_run=False)
+
+        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        mock_send.assert_called_once()
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    def test_delayed_local_deadline_run_retries_cancellation(self, mock_send):
+        """A delayed 23:15 run still retries the missed deadline action."""
+        self.mock_club_now.return_value = datetime.combine(
+            self.today,
+            datetime.min.time().replace(hour=23, minute=15),
+            tzinfo=dt_timezone.utc,
+        )
+        assignment = DutyAssignment.objects.create(
+            date=self.tomorrow,
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+
+        ExpireCommand().execute_job(dry_run=False)
+
+        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        mock_send.assert_called_once()
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    def test_failed_email_preserves_assignment_for_retry(self, mock_send):
+        """A failed send must leave the assignment for the next retry."""
+        assignment = DutyAssignment.objects.create(
+            date=self.tomorrow,
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+        mock_send.side_effect = RuntimeError("mail transport failed")
+
+        with self.assertRaises(RuntimeError):
+            ExpireCommand().execute_job(dry_run=False)
+
+        self.assertTrue(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+
+        mock_send.side_effect = None
+        ExpireCommand().execute_job(dry_run=False)
+        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        self.assertEqual(mock_send.call_count, 2)
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    def test_uses_club_local_tomorrow_for_expiration(self, mock_send):
+        """Command should use the next day in a non-US club timezone."""
+        config = SiteConfiguration.objects.first()
+        config.club_timezone = "Asia/Tokyo"
+        config.save(update_fields=["club_timezone"])
+
+        # 14:00 UTC on Jan 1 is 23:00 in Tokyo, the night-before deadline for
+        # the Jan 2 operations day.
+        self.mock_club_now.return_value = datetime(
+            2026, 1, 1, 23, 0, 0, tzinfo=ZoneInfo("Asia/Tokyo")
+        )
+
+        local_tomorrow_assignment = DutyAssignment.objects.create(
+            date=datetime(2026, 1, 2).date(),
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+        local_today_assignment = DutyAssignment.objects.create(
+            date=datetime(2026, 1, 1).date(),
             is_scheduled=False,
             is_confirmed=False,
         )
@@ -250,11 +352,39 @@ class TestExpireAdHocDaysDeadline(TestCase):
         cmd.execute_job(dry_run=False)
 
         self.assertFalse(
-            DutyAssignment.objects.filter(pk=local_today_assignment.pk).exists(),
-            "Club-local today's unconfirmed ad-hoc day should be cancelled.",
+            DutyAssignment.objects.filter(pk=local_tomorrow_assignment.pk).exists(),
+            "Club-local tomorrow's unconfirmed ad-hoc day should be cancelled.",
         )
         self.assertTrue(
-            DutyAssignment.objects.filter(pk=utc_today_assignment.pk).exists(),
-            "UTC-today assignment should remain when it is not yet club-local today.",
+            DutyAssignment.objects.filter(pk=local_today_assignment.pk).exists(),
+            "Club-local today's assignment should remain (it is not the night-before day).",
         )
+        mock_send.assert_called_once()
+
+
+class TestExpireAdHocDaysConfiguredTimezone(TestCase):
+    """The expiration command must use the configured IANA timezone."""
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    @patch("siteconfig.timezone_utils.timezone.now")
+    def test_deadline_uses_configured_los_angeles_time(self, mock_now, mock_send):
+        config = _make_site_config()
+        config.club_timezone = "America/Los_Angeles"
+        config.save(update_fields=["club_timezone"])
+        assignment = DutyAssignment.objects.create(
+            date=datetime(2026, 1, 2).date(),
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+
+        # 01:30 UTC is 17:30 on Jan 1 in Los Angeles, before the deadline.
+        mock_now.return_value = datetime(2026, 1, 2, 1, 30, tzinfo=dt_timezone.utc)
+        ExpireCommand().execute_job(dry_run=False)
+        self.assertTrue(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        mock_send.assert_not_called()
+
+        # 07:00 UTC is 23:00 on Jan 1 in Los Angeles, at the deadline.
+        mock_now.return_value = datetime(2026, 1, 2, 7, 0, tzinfo=dt_timezone.utc)
+        ExpireCommand().execute_job(dry_run=False)
+        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
         mock_send.assert_called_once()
