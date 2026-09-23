@@ -75,6 +75,9 @@ class Command(BaseCronJobCommand):
                     "duty_roster/emails/ad_hoc_expiration.txt", context
                 )
 
+                # Remove the assignment before sending so a retry cannot send
+                # a duplicate cancellation email if delivery fails afterward.
+                assignment.delete()
                 send_mail(
                     subject=f"[{email_config['club_name']}] Ad-Hoc Ops Expired - {ops_date}",
                     message=text_message,
@@ -82,7 +85,6 @@ class Command(BaseCronJobCommand):
                     recipient_list=recipient_list,
                     html_message=html_message,
                 )
-                assignment.delete()
                 self.log_warning(
                     f"Cancelled unconfirmed ad-hoc ops day for {assignment.date} "
                     "(club-local 23:00 night-before deadline passed)"
