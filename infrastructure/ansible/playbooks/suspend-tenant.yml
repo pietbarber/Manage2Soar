@@ -1,0 +1,122 @@
+---
+# Suspend one tenant's application workload while preserving its namespace and
+# all non-Kubernetes data. This playbook does not access PostgreSQL, Cloud
+# Storage, Ansible Vault, DNS, or mail-server configuration.
+#
+# Usage:
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/suspend-tenant.yml \
+#     -e suspend_tenant_prefix=svs \
+#     -e suspend_confirmation=SUSPEND_TENANT_WORKLOAD
+
+- name: Suspend a Tenant Workload
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars_files:
+    - ../group_vars/gcp_app/vars.yml
+    - ../group_vars/gcp_app/vault.yml
+
+  vars:
+    suspend_tenant_prefix: ""
+    suspend_confirmation: ""
+
+  pre_tasks:
+    - name: Require a tenant prefix
+      ansible.builtin.assert:
+        that:
+          - suspend_tenant_prefix | length > 0
+          - suspend_tenant_prefix is match('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+        fail_msg: "Set suspend_tenant_prefix to a lowercase tenant prefix."
+
+    - name: Require explicit workload suspension confirmation
+      ansible.builtin.assert:
+        that:
+          - suspend_confirmation == 'SUSPEND_TENANT_WORKLOAD'
+        fail_msg: >-
+          Refusing to suspend a tenant without
+          suspend_confirmation=SUSPEND_TENANT_WORKLOAD.
+
+    - name: Select requested tenant
+      ansible.builtin.set_fact:
+        suspend_tenant: >-
+          {{ gke_tenants | default([]) | selectattr('prefix', 'equalto', suspend_tenant_prefix) | list }}
+
+    - name: Require an explicitly suspended tenant
+      ansible.builtin.assert:
+        that:
+          - suspend_tenant | length == 1
+          - suspend_tenant[0].status | default('active') == 'suspended'
+        fail_msg: >-
+          Tenant {{ suspend_tenant_prefix }} must exist in gke_tenants with
+          status: suspended before its workload can be suspended.
+
+    - name: Get GKE cluster credentials
+      ansible.builtin.command:
+        cmd: >-
+          gcloud container clusters get-credentials {{ gke_cluster_name }}
+          --zone {{ gke_cluster_zone }}
+          --project {{ gcp_project }}
+      changed_when: false
+      when: not ansible_check_mode
+
+  tasks:
+    - name: Scale tenant deployment to zero replicas
+      ansible.builtin.command:
+        cmd: >-
+          kubectl scale deployment/django-app-{{ suspend_tenant_prefix }}
+          --namespace=tenant-{{ suspend_tenant_prefix }}
+          --replicas=0
+      when: not ansible_check_mode
+      changed_when: true
+
+    - name: List tenant CronJobs
+      ansible.builtin.command:
+        cmd: >-
+          kubectl get cronjobs
+          --namespace=tenant-{{ suspend_tenant_prefix }}
+          --selector=app=django-app-{{ suspend_tenant_prefix }}
+          --output=name
+      register: suspend_cronjobs
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Suspend tenant CronJobs
+      ansible.builtin.command:
+        cmd: >-
+          kubectl patch {{ item }}
+          --namespace=tenant-{{ suspend_tenant_prefix }}
+          --type=merge
+          --patch '{"spec":{"suspend":true}}'
+      loop: "{{ suspend_cronjobs.stdout_lines }}"
+      when:
+        - not ansible_check_mode
+        - suspend_cronjobs.stdout_lines | length > 0
+      changed_when: true
+
+    - name: Remove tenant HTTPS route
+      ansible.builtin.command:
+        cmd: >-
+          kubectl delete httproute {{ gke_app_name }}-{{ suspend_tenant_prefix }}-route
+          --namespace=tenant-{{ suspend_tenant_prefix }}
+          --ignore-not-found=true
+      when: not ansible_check_mode
+      changed_when: true
+
+    - name: Remove tenant HTTP redirect route
+      ansible.builtin.command:
+        cmd: >-
+          kubectl delete httproute {{ gke_app_name }}-{{ suspend_tenant_prefix }}-redirect
+          --namespace=tenant-{{ suspend_tenant_prefix }}
+          --ignore-not-found=true
+      when: not ansible_check_mode
+      changed_when: true
+
+    - name: Report check-mode behavior
+      ansible.builtin.debug:
+        msg: >-
+          Check mode validated the suspension guards. No Kubernetes resources
+          were changed.
+      when: ansible_check_mode

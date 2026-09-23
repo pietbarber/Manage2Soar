@@ -156,14 +156,19 @@
             ansible-vault encrypt group_vars/gcp_app/vault.yml
       no_log: true
 
-    - name: Validate multi-tenant vault secrets early
+    - name: Validate active multi-tenant vault secrets early
       ansible.builtin.assert:
         that:
           - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
         fail_msg: |
           Missing vault secret for tenant: {{ item.prefix }}
           Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
-      loop: "{{ gke_tenants | default([]) }}"
+      loop: >-
+        {{
+          (gke_tenants | default([]) | rejectattr('status', 'defined') | list)
+          +
+          (gke_tenants | default([]) | selectattr('status', 'equalto', 'active') | list)
+        }}
       when: gke_multi_tenant | default(false)
       no_log: true
 
@@ -211,10 +216,29 @@
           Multi-tenant mode is enabled but no tenants configured.
           Please configure gke_tenants in group_vars/gcp_app/vars.yml
 
+    - name: Select active tenants
+      ansible.builtin.set_fact:
+        gke_active_tenants: >-
+          {{
+            (gke_tenants | rejectattr('status', 'defined') | list)
+            +
+            (gke_tenants | selectattr('status', 'equalto', 'active') | list)
+          }}
+      tags: [always]
+
     - name: Filter tenants if specific tenant requested
       ansible.builtin.set_fact:
         gke_deploy_tenants: >-
-          {{ gke_tenants | selectattr('prefix', 'equalto', gke_deploy_tenant) | list if gke_deploy_tenant is defined else gke_tenants }}
+          {{ gke_active_tenants | selectattr('prefix', 'equalto', gke_deploy_tenant) | list if gke_deploy_tenant is defined else gke_active_tenants }}
+      tags: [always]
+
+    - name: Require at least one active selected tenant
+      ansible.builtin.assert:
+        that:
+          - gke_deploy_tenants | length > 0
+        fail_msg: >-
+          No active tenant matches the requested deployment target.
+          Set the tenant status to active before deploying it.
       tags: [always]
 
     - name: Validate tenant namespace follows tenant-<prefix> convention
@@ -249,11 +273,10 @@
         label: "{{ item.prefix }}"
       tags: [always]
 
-    - name: Pre-create all tenant namespaces
-      # Loops over ALL gke_tenants (not just gke_deploy_tenants) because the ingress
-      # role iterates over the full tenant list when generating HTTPRoutes and
-      # HealthCheckPolicies. A subset deploy must not leave any referenced namespace
-      # missing. Skipped in check mode to keep --check side-effect-free.
+    - name: Pre-create active tenant namespaces
+      # The ingress role receives gke_active_tenants and only creates routes and
+      # health checks for active tenants. Skipped in check mode to keep --check
+      # side-effect-free.
       ansible.builtin.command:
         cmd: kubectl create namespace tenant-{{ item.prefix }}
       register: ns_precreate
@@ -264,7 +287,7 @@
         (ns_precreate.rc == 1 and 'AlreadyExists' not in ns_precreate.stderr)
       changed_when: "ns_precreate.rc == 0 and 'created' in ns_precreate.stdout"
       when: not ansible_check_mode
-      loop: "{{ gke_tenants }}"
+      loop: "{{ gke_active_tenants }}"
       loop_control:
         label: "{{ item.prefix }}"
       tags: [always]
@@ -368,6 +391,12 @@
       ansible.builtin.include_role:
         name: gke-deploy
       vars:
+        # The shared ingress role must only create routes, health checks, and TLS
+        # certificate domains for active tenants.
+        gke_tenants: "{{ gke_active_tenants }}"
+        # Apply CronJobs even when suspended so an existing tenant's work is
+        # stopped immediately rather than left running from an earlier deploy.
+        gke_cronjobs_suspended: "{{ not (tenant.cronjobs_enabled | default(true) | bool) }}"
         gke_club_prefix: "{{ tenant.prefix }}"
         gke_namespace: "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}"
         gke_deployment_name: "django-app-{{ tenant.prefix }}"
