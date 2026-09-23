@@ -1,0 +1,102 @@
+---
+# Retire one tenant's Kubernetes application namespace.
+#
+# This playbook intentionally does not access PostgreSQL, Cloud Storage, Ansible
+# Vault, DNS, or mail-server configuration. It deletes only the named Kubernetes
+# namespace after explicit lifecycle and operator-confirmation checks.
+#
+# Usage:
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     playbooks/retire-tenant-namespace.yml \
+#     -e retire_tenant_prefix=svs \
+#     -e retire_confirmation=DELETE_KUBERNETES_NAMESPACE
+
+- name: Retire a Tenant Kubernetes Namespace
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars_files:
+    - ../group_vars/gcp_app/vars.yml
+
+  vars:
+    retire_tenant_prefix: ""
+    retire_confirmation: ""
+    gke_retirement_namespace_delete_timeout: "10m"
+
+  pre_tasks:
+    - name: Require a tenant prefix
+      ansible.builtin.assert:
+        that:
+          - retire_tenant_prefix | length > 0
+          - retire_tenant_prefix is match('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+        fail_msg: "Set retire_tenant_prefix to a lowercase tenant prefix."
+
+    - name: Require explicit namespace deletion confirmation
+      ansible.builtin.assert:
+        that:
+          - retire_confirmation == 'DELETE_KUBERNETES_NAMESPACE'
+        fail_msg: >-
+          Refusing to delete a namespace without
+          retire_confirmation=DELETE_KUBERNETES_NAMESPACE.
+
+    - name: Select requested tenant
+      ansible.builtin.set_fact:
+        retire_tenant: >-
+          {{ gke_tenants | default([]) | selectattr('prefix', 'equalto', retire_tenant_prefix) | list }}
+
+    - name: Require an explicitly retired tenant
+      ansible.builtin.assert:
+        that:
+          - retire_tenant | length == 1
+          - retire_tenant[0].status | default('active') == 'retired'
+        fail_msg: >-
+          Tenant {{ retire_tenant_prefix }} must exist in gke_tenants with
+          status: retired before its namespace can be deleted.
+
+    - name: Get GKE cluster credentials
+      ansible.builtin.command:
+        cmd: >-
+          gcloud container clusters get-credentials {{ gke_cluster_name }}
+          --zone {{ gke_cluster_zone }}
+          --project {{ gcp_project }}
+      changed_when: false
+      when: not ansible_check_mode
+
+  tasks:
+    - name: Check retired tenant namespace
+      ansible.builtin.command:
+        cmd: >-
+          kubectl get namespace tenant-{{ retire_tenant_prefix }}
+          --ignore-not-found=true
+          --output=name
+      register: retire_namespace
+      changed_when: false
+      failed_when: retire_namespace.rc != 0
+      when: not ansible_check_mode
+
+    - name: Delete retired tenant namespace
+      ansible.builtin.command:
+        cmd: >-
+          kubectl delete namespace tenant-{{ retire_tenant_prefix }}
+          --wait=true
+          --timeout={{ gke_retirement_namespace_delete_timeout }}
+      when:
+        - not ansible_check_mode
+        - retire_namespace.stdout | trim | length > 0
+      register: retire_namespace_delete
+      changed_when: retire_namespace_delete.rc == 0
+
+    - name: Report namespace already absent
+      ansible.builtin.debug:
+        msg: "Namespace tenant-{{ retire_tenant_prefix }} is already absent."
+      when:
+        - not ansible_check_mode
+        - retire_namespace.stdout | trim | length == 0
+
+    - name: Report check-mode behavior
+      ansible.builtin.debug:
+        msg: >-
+          Check mode validated the retirement guards. No Kubernetes resources
+          were changed.
+      when: ansible_check_mode

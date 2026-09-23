@@ -383,7 +383,9 @@
       changed_when: false
       failed_when: false
       no_log: true
-      when: postgresql_multi_tenant | default(false)
+      when:
+        - postgresql_multi_tenant | default(false)
+        - item.login_enabled | default(true) | bool
       tags: [verify]
 
     - name: Display verification results
@@ -400,7 +402,9 @@
           Database Connections (TCP):
           {% if db_test_multi is defined %}
           {% for result in (db_test_multi.results | default([])) %}
-          {% if not (result.skipped | default(false)) %}
+          {% if not (result.item.login_enabled | default(true) | bool) %}
+            - m2s_{{ result.item.prefix }}: SKIPPED (NOLOGIN expected)
+          {% elif not (result.skipped | default(false)) %}
             - m2s_{{ result.item.prefix }}: {{ 'SUCCESS' if (result.rc | default(1)) == 0 else 'FAILED' }}
           {% else %}
             - m2s_{{ result.item.prefix }}: SKIPPED

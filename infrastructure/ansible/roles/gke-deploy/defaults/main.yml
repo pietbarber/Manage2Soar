@@ -306,6 +306,9 @@ gke_ssl_cert_name: "{{ gke_app_name }}-ssl-cert"
 # Enable CronJob deployment
 gke_deploy_cronjobs: true
 
+# Suspend all managed CronJobs for this deployment without deleting them.
+gke_cronjobs_suspended: false
+
 # CronJob image (defaults to same as deployment)
 gke_cronjob_image: "{{ gke_image_name }}:{{ gke_computed_image_tag }}"
 
