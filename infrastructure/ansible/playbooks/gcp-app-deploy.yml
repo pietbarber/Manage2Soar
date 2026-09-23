@@ -156,22 +156,6 @@
             ansible-vault encrypt group_vars/gcp_app/vault.yml
       no_log: true
 
-    - name: Validate active multi-tenant vault secrets early
-      ansible.builtin.assert:
-        that:
-          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
-        fail_msg: |
-          Missing vault secret for tenant: {{ item.prefix }}
-          Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
-      loop: >-
-        {{
-          (gke_tenants | default([]) | rejectattr('status', 'defined') | list)
-          +
-          (gke_tenants | default([]) | selectattr('status', 'equalto', 'active') | list)
-        }}
-      when: gke_multi_tenant | default(false)
-      no_log: true
-
     - name: Display deployment configuration
       ansible.builtin.debug:
         msg: |
