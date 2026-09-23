@@ -41,8 +41,8 @@ python manage.py backfill_duty_preferences
 
 ### 4. `expire_ad_hoc_days`
 Runs every 15 minutes and expires tomorrow's unconfirmed ad-hoc duty day during
-the club-local 23:00 hour. The assignment is removed before the cancellation
-email is sent so a retry cannot send a duplicate email.
+the club-local 23:00 hour. The assignment is removed only after the cancellation
+email is sent successfully, so a failed delivery remains eligible for retry.
 
 **Usage:**
 ```bash

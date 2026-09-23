@@ -295,8 +295,8 @@ class TestExpireAdHocDaysDeadline(TestCase):
         mock_send.assert_called_once()
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
-    def test_failed_email_cannot_be_resent_on_retry(self, mock_send):
-        """A failed send must not leave the assignment eligible for a duplicate retry."""
+    def test_failed_email_preserves_assignment_for_retry(self, mock_send):
+        """A failed send must leave the assignment for the next retry."""
         assignment = DutyAssignment.objects.create(
             date=self.tomorrow,
             is_scheduled=False,
@@ -307,11 +307,12 @@ class TestExpireAdHocDaysDeadline(TestCase):
         with self.assertRaises(RuntimeError):
             ExpireCommand().execute_job(dry_run=False)
 
-        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        self.assertTrue(DutyAssignment.objects.filter(pk=assignment.pk).exists())
 
         mock_send.side_effect = None
         ExpireCommand().execute_job(dry_run=False)
-        mock_send.assert_called_once()
+        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        self.assertEqual(mock_send.call_count, 2)
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
     def test_uses_club_local_tomorrow_for_expiration(self, mock_send):
