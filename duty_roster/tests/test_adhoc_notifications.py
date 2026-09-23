@@ -168,6 +168,16 @@ class TestExpireAdHocDaysDeadline(TestCase):
             "Tomorrow's unconfirmed ad-hoc assignment should have been deleted.",
         )
         mock_send.assert_called_once()
+        email_args = mock_send.call_args.kwargs
+        self.assertIn(
+            "23:00 / 11 PM in the club's configured local timezone",
+            email_args["message"],
+        )
+        self.assertNotIn("03:00 UTC", email_args["message"])
+        self.assertIn(
+            "23:00 / 11 PM in the club's configured local timezone",
+            email_args["html_message"],
+        )
 
     @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
     def test_todays_unconfirmed_adhoc_is_left_alone(self, mock_send):
@@ -349,4 +359,32 @@ class TestExpireAdHocDaysDeadline(TestCase):
             DutyAssignment.objects.filter(pk=local_today_assignment.pk).exists(),
             "Club-local today's assignment should remain (it is not the night-before day).",
         )
+        mock_send.assert_called_once()
+
+
+class TestExpireAdHocDaysConfiguredTimezone(TestCase):
+    """The expiration command must use the configured IANA timezone."""
+
+    @patch("duty_roster.management.commands.expire_ad_hoc_days.send_mail")
+    @patch("siteconfig.timezone_utils.timezone.now")
+    def test_deadline_uses_configured_los_angeles_time(self, mock_now, mock_send):
+        config = _make_site_config()
+        config.club_timezone = "America/Los_Angeles"
+        config.save(update_fields=["club_timezone"])
+        assignment = DutyAssignment.objects.create(
+            date=datetime(2026, 1, 2).date(),
+            is_scheduled=False,
+            is_confirmed=False,
+        )
+
+        # 01:30 UTC is 17:30 on Jan 1 in Los Angeles, before the deadline.
+        mock_now.return_value = datetime(2026, 1, 2, 1, 30, tzinfo=dt_timezone.utc)
+        ExpireCommand().execute_job(dry_run=False)
+        self.assertTrue(DutyAssignment.objects.filter(pk=assignment.pk).exists())
+        mock_send.assert_not_called()
+
+        # 07:00 UTC is 23:00 on Jan 1 in Los Angeles, at the deadline.
+        mock_now.return_value = datetime(2026, 1, 2, 7, 0, tzinfo=dt_timezone.utc)
+        ExpireCommand().execute_job(dry_run=False)
+        self.assertFalse(DutyAssignment.objects.filter(pk=assignment.pk).exists())
         mock_send.assert_called_once()
