@@ -66,10 +66,13 @@
   tasks:
     - name: Check retired tenant namespace
       ansible.builtin.command:
-        cmd: kubectl get namespace tenant-{{ retire_tenant_prefix }}
+        cmd: >-
+          kubectl get namespace tenant-{{ retire_tenant_prefix }}
+          --ignore-not-found=true
+          --output=name
       register: retire_namespace
       changed_when: false
-      failed_when: false
+      failed_when: retire_namespace.rc != 0
       when: not ansible_check_mode
 
     - name: Delete retired tenant namespace
@@ -80,7 +83,7 @@
           --timeout={{ gke_retirement_namespace_delete_timeout }}
       when:
         - not ansible_check_mode
-        - retire_namespace.rc == 0
+        - retire_namespace.stdout | trim | length > 0
       register: retire_namespace_delete
       changed_when: retire_namespace_delete.rc == 0
 
@@ -89,7 +92,7 @@
         msg: "Namespace tenant-{{ retire_tenant_prefix }} is already absent."
       when:
         - not ansible_check_mode
-        - retire_namespace.rc != 0
+        - retire_namespace.stdout | trim | length == 0
 
     - name: Report check-mode behavior
       ansible.builtin.debug:
