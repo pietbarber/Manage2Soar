@@ -45,7 +45,6 @@ Rerun the PostgreSQL playbook after changing this value.
 cd infrastructure/ansible
 source ../../.venv/bin/activate
 ansible-playbook -i inventory/gcp_app.yml \
-  --vault-password-file ~/.ansible_vault_pass \
   playbooks/suspend-tenant.yml \
   -e suspend_tenant_prefix=svs \
   -e suspend_confirmation=SUSPEND_TENANT_WORKLOAD
@@ -63,7 +62,6 @@ After the approved rollback window, set `status: "retired"` and run:
 cd infrastructure/ansible
 source ../../.venv/bin/activate
 ansible-playbook -i inventory/gcp_app.yml \
-  --vault-password-file ~/.ansible_vault_pass \
   playbooks/retire-tenant-namespace.yml \
   -e retire_tenant_prefix=svs \
   -e retire_confirmation=DELETE_KUBERNETES_NAMESPACE
@@ -77,5 +75,8 @@ mail, or Vault modules.
 
 Use `nfss.manage2soar.com` as the tenant hostname. Add NFSS initially with
 `status: "active"`, `cronjobs_enabled: false`, and outbound email development
-mode enabled. Add its Vault secrets and PostgreSQL tenant separately, then
-enable mail and CronJobs only after acceptance testing.
+mode enabled only in a staging/development deployment with a safe redirect
+mailbox. Production defaults to `gke_environment: "production"` and rejects
+per-tenant `email_dev_mode: true`. Add its Vault secrets and PostgreSQL tenant
+separately, then enable production mail and CronJobs only after acceptance
+testing.

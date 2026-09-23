@@ -202,6 +202,8 @@
         name: gke-deploy
         tasks_from: ingress
       vars:
+        # Keep imported ingress loops aligned with the active-only domain set.
+        gke_tenants: "{{ gke_active_tenants }}"
         # Rotate to target cert name while preserving existing cert references.
         gke_ssl_cert_name: "{{ target_ssl_cert_name }}"
         # Skip unnecessary tasks - only run TLS and Gateway

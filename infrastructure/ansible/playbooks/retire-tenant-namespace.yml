@@ -7,7 +7,6 @@
 #
 # Usage:
 #   ansible-playbook -i inventory/gcp_app.yml \
-#     --vault-password-file ~/.ansible_vault_pass \
 #     playbooks/retire-tenant-namespace.yml \
 #     -e retire_tenant_prefix=svs \
 #     -e retire_confirmation=DELETE_KUBERNETES_NAMESPACE
@@ -19,7 +18,6 @@
   gather_facts: false
   vars_files:
     - ../group_vars/gcp_app/vars.yml
-    - ../group_vars/gcp_app/vault.yml
 
   vars:
     retire_tenant_prefix: ""

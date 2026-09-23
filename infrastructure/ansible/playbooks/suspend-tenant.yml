@@ -5,7 +5,6 @@
 #
 # Usage:
 #   ansible-playbook -i inventory/gcp_app.yml \
-#     --vault-password-file ~/.ansible_vault_pass \
 #     playbooks/suspend-tenant.yml \
 #     -e suspend_tenant_prefix=svs \
 #     -e suspend_confirmation=SUSPEND_TENANT_WORKLOAD
@@ -17,7 +16,6 @@
   gather_facts: false
   vars_files:
     - ../group_vars/gcp_app/vars.yml
-    - ../group_vars/gcp_app/vault.yml
 
   vars:
     suspend_tenant_prefix: ""
