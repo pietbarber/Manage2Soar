@@ -23,7 +23,7 @@
   become: true
   become_user: postgres
   no_log: true
-  when: not user_exists_check.query_result[0].user_exists or postgresql_update_existing_passwords | default(false)
+  when: not user_exists_check.query_result[0].user_exists or (postgresql_update_existing_passwords | default(false) | bool)
 
 - name: "Set database login state for tenant: {{ tenant.prefix }}"
   community.postgresql.postgresql_user:
