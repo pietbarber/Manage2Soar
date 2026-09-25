@@ -55,12 +55,10 @@ US_STATE_CHOICES_SNAPSHOT = [
     ("WI", "Wisconsin"),
     ("WY", "Wyoming"),
     ("DC", "District of Columbia"),
-    # Military APO/FPO/DPO regions (USPS special service)
+    # Military APO regions (USPS special service)
     ("AA", "APO (Armed Forces Americas)"),
     ("AE", "APO (Armed Forces Europe)"),
     ("AP", "APO (Armed Forces Pacific)"),
-    ("PO", "FPO (Fleet Postal Service)"),
-    ("PP", "DPO (Diplomatic Postal Service)"),
 ]
 
 

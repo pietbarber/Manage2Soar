@@ -1,12 +1,14 @@
 """
-Tests for issue #1062: "DC" (and APO/FPO/DPO) missing from state choices.
+Tests for issue #1062: "DC" (and APO) missing from state choices.
 
 Covers:
-1. US_STATE_CHOICES includes DC and the USPS military regions.
+1. US_STATE_CHOICES includes DC and the USPS APO regions.
 2. Member.state_code accepts DC (model-level validation).
 3. VisitingPilotReturningUpdateForm exposes DC.
 4. Data migration 0028 promotes valid 2-letter codes stored in
-   state_freeform into state_code.
+   state_freeform into state_code (both NULL and empty-string state_code).
+5. Legacy importer accepts DC and APO codes.
+6. Issue #1065: Sport Pilot glider rating present.
 """
 
 import importlib.util
@@ -21,7 +23,7 @@ from members.models_applications import MembershipApplication
 from siteconfig.forms import VisitingPilotReturningUpdateForm
 
 DC = "DC"
-MILITARY_REGIONS = {"AA", "AE", "AP", "PO", "PP"}
+APO_REGIONS = {"AA", "AE", "AP"}
 ALL_FIFTY_STATES = {
     "AL",
     "AK",
@@ -90,9 +92,9 @@ def _load_migration_0028():
     return module
 
 
-@pytest.mark.parametrize("code", [DC] + sorted(MILITARY_REGIONS))
-def test_state_choices_include_dc_and_military_regions(code):
-    """DC and every USPS military region must be valid state choices."""
+@pytest.mark.parametrize("code", [DC] + sorted(APO_REGIONS))
+def test_state_choices_include_dc_and_apo_regions(code):
+    """DC and every USPS APO region must be a valid state choice."""
     codes = {choice for choice, _label in US_STATE_CHOICES}
     assert code in codes, f"{code} missing from US_STATE_CHOICES"
 
@@ -183,6 +185,44 @@ def test_migration_0028_promotes_state_freeform_into_state_code():
     already_correct.refresh_from_db()
     assert already_correct.state_code == DC
     assert already_correct.state_freeform in ("", None)
+
+
+@pytest.mark.django_db
+def test_migration_0028_promotes_empty_string_state_code():
+    """The legacy importer writes state_code='' (not NULL) for unsupported
+    states and stores the raw value in state_freeform.  Migration 0028 must
+    promote those rows too."""
+    module = _load_migration_0028()
+
+    importer_row = Member.objects.create(
+        username="importer_dc_member",
+        membership_status="Full Member",
+        state_code="",
+        state_freeform="DC",
+    )
+
+    apps_stub = type(
+        "Apps",
+        (),
+        {"get_model": lambda self, app_label, model: Member},
+    )
+    module.promote_state_codes(apps_stub(), None)
+
+    importer_row.refresh_from_db()
+    assert importer_row.state_code == DC
+    assert importer_row.state_freeform in ("", None)
+
+
+def test_legacy_importer_accepts_dc_and_apo():
+    """The legacy importer's US_STATE_ABBREVIATIONS must include DC and APO."""
+    from members.management.commands.import_members_only import (
+        US_STATE_ABBREVIATIONS,
+    )
+
+    for code in [DC] + sorted(APO_REGIONS):
+        assert (
+            code in US_STATE_ABBREVIATIONS
+        ), f"{code} missing from legacy importer US_STATE_ABBREVIATIONS"
 
 
 def test_glider_rating_includes_sport_pilot():

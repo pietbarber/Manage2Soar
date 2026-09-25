@@ -1,15 +1,16 @@
 """Promote 2-letter state codes stored in state_freeform into state_code.
 
-Members residing in the District of Columbia (or APO/FPO/DPO regions) had
+Members residing in the District of Columbia (or APO regions) had
 "DC" (or similar) stored in ``state_freeform`` because the value was not a
 valid choice for ``state_code`` (issue #1062).  Now that the choices include
-DC and the military regions, normalize such rows so the code lives in the
+DC and the APO regions, normalize such rows so the code lives in the
 ``state_code`` column and display code remains consistent.
 """
 
 from django.db import migrations
+from django.db.models import Q
 
-# Valid 2-letter state codes, including DC and the USPS military regions.
+# Valid 2-letter state codes, including DC and the USPS APO regions.
 # Kept inline (like 0027) so the migration never depends on app code.
 VALID_STATE_CODES = {
     "AL",
@@ -66,15 +67,16 @@ VALID_STATE_CODES = {
     "AA",
     "AE",
     "AP",
-    "PO",
-    "PP",
 }
 
 
 def promote_state_codes(apps, schema_editor):
     Member = apps.get_model("members", "Member")
+    # Match rows where state_code is NULL or empty string — the legacy
+    # importer (import_members_only) writes state_code="" for unsupported
+    # states and stores the raw value in state_freeform.
     qs = Member.objects.filter(
-        state_code__isnull=True,
+        Q(state_code__isnull=True) | Q(state_code=""),
         state_freeform__isnull=False,
     ).exclude(state_freeform="")
     for member in qs.iterator():
