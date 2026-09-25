@@ -87,17 +87,13 @@ def promote_state_codes(apps, schema_editor):
             )
 
 
-def revert_state_codes(apps, schema_editor):
-    # Data migration rollback: keep state_code as-is.  Members can manually
-    # move the value back if needed; nothing destructive to undo.
-    pass
-
-
 class Migration(migrations.Migration):
     dependencies = [
         ("members", "0027_alter_member_state_code"),
     ]
 
     operations = [
-        migrations.RunPython(promote_state_codes, revert_state_codes),
+        # The original freeform value's casing and whitespace are discarded,
+        # so this data transformation cannot be reversed safely.
+        migrations.RunPython(promote_state_codes),
     ]
