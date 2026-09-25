@@ -3,6 +3,8 @@ Tests for cms.context_processors — specifically the google_oauth_configured fl
 and its effect on the login page template.
 """
 
+import re
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -54,6 +56,33 @@ def test_login_page_hides_google_button_when_not_configured(client):
     with override_settings(SOCIAL_AUTH_GOOGLE_OAUTH2_KEY=None):
         response = client.get(reverse("login"))
     assert b"Sign in with Google" not in response.content
+
+
+@pytest.mark.django_db
+def test_login_page_renders_post_form_for_google_oauth(client):
+    """social-auth-app-django 6.0+ requires POST for social:begin, so the login
+    page must render a POST form (with CSRF token) instead of a GET link."""
+    action = reverse("social:begin", args=["google-oauth2"])
+    with override_settings(SOCIAL_AUTH_GOOGLE_OAUTH2_KEY="fake-key"):
+        response = client.get(reverse("login"), {"next": "/members/"})
+    page = response.content.decode()
+    form_match = re.search(
+        rf'<form method="post" action="{re.escape(action)}"[^>]*>(.*?)</form>',
+        page,
+        flags=re.DOTALL,
+    )
+    assert form_match is not None
+    google_form = form_match.group(1)
+    assert 'name="csrfmiddlewaretoken"' in google_form
+    assert 'name="next" value="/members/"' in google_form
+
+
+@pytest.mark.django_db
+def test_social_begin_rejects_get_request(client):
+    """GET to the social:begin endpoint must be rejected with 405 (POST-only since 6.0)."""
+    with override_settings(SOCIAL_AUTH_GOOGLE_OAUTH2_KEY="fake-key"):
+        response = client.get(reverse("social:begin", args=["google-oauth2"]))
+    assert response.status_code == 405
 
 
 @pytest.mark.django_db

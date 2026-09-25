@@ -129,9 +129,11 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
         rows.nth(1).locator('select[name$="-towplane"]').select_option(
             str(self.towplane_b.pk)
         )
-        self.page.wait_for_function("""
+        self.page.wait_for_function(
+            """
             () => document.querySelector('input[name="towplanes-1-start_tach"]').value === '325.00'
-            """)
+            """
+        )
 
         # A second click must append one more uniquely indexed blank row.
         self.page.locator("#addTowplaneRow").click()
@@ -203,6 +205,9 @@ class TestLogsheetTowplaneRoster(DjangoPlaywrightTestCase):
               const modalContent = document.getElementById('flightModalContent');
               modalContent.innerHTML = html;
               window.initTowplanePilotAutofill(modalContent);
+                            bootstrap.Modal.getOrCreateInstance(
+                                document.getElementById('flightModal')
+                            ).show();
             }
             """,
             add_flight_url,
