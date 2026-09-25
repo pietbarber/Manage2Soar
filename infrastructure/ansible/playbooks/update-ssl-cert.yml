@@ -26,6 +26,11 @@
   connection: local
   gather_facts: false
   become: false
+  # Inventory only defines the "all" group, so group_vars/gcp_app/vars.yml is
+  # never auto-loaded; without this, gke_tenants falls back to the stale
+  # inline list in inventory/gcp_app.yml.
+  vars_files:
+    - ../group_vars/gcp_app/vars.yml
 
   tasks:
     - name: Select active tenants
