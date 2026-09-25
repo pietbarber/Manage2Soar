@@ -17,6 +17,7 @@ from django.core.exceptions import ValidationError
 
 from members.constants.membership import US_STATE_CHOICES
 from members.models import Member
+from members.models_applications import MembershipApplication
 from siteconfig.forms import VisitingPilotReturningUpdateForm
 
 DC = "DC"
@@ -182,3 +183,23 @@ def test_migration_0028_promotes_state_freeform_into_state_code():
     already_correct.refresh_from_db()
     assert already_correct.state_code == DC
     assert already_correct.state_freeform in ("", None)
+
+
+def test_glider_rating_includes_sport_pilot():
+    """Issue #1065: 'sport' must be a valid glider rating on Member."""
+    codes = {choice for choice, _label in Member.GLIDER_RATING_CHOICES}
+    assert "sport" in codes, "Sport Pilot missing from Member.GLIDER_RATING_CHOICES"
+
+
+def test_application_glider_rating_includes_sport_pilot():
+    """Issue #1065: 'sport' must be a valid rating on the application too."""
+    codes = {choice for choice, _label in MembershipApplication.GLIDER_RATING_CHOICES}
+    assert "sport" in codes
+
+
+@pytest.mark.django_db
+def test_member_sport_pilot_rating_valid():
+    """A member with glider_rating='sport' passes model validation."""
+    member = Member(username="sport_pilot_member", membership_status="Full Member")
+    member.glider_rating = "sport"
+    member.full_clean(exclude={"password"})

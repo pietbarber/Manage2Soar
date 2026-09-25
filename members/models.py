@@ -75,7 +75,7 @@ class Biography(models.Model):
 # - address, city, state_code/state_freeform, zip_code, country: mailing address
 # - membership_status: current member status (active, student, etc.)
 # - SSA_member_number: Soaring Society of America ID
-# - glider_rating: pilot certification level (student, private, commercial)
+# - glider_rating: pilot certification level (student, sport, private, commercial)
 # - public_notes: viewable by all logged-in users
 # - private_notes: visible only to officers/managers
 # - profile_photo: optional image used in member directory
@@ -197,6 +197,7 @@ class Member(AbstractUser):
     GLIDER_RATING_CHOICES = [
         ("none", "None"),
         ("student", "Student"),
+        ("sport", "Sport Pilot"),
         ("transition", "Transition"),
         ("private", "Private"),
         ("commercial", "Commercial"),

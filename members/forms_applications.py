@@ -15,6 +15,7 @@ class MembershipApplicationForm(forms.ModelForm):
     GLIDER_RATING_WIDGET_CHOICES = [
         ("none", "None / Not a pilot"),
         ("student", "Student pilot"),
+        ("sport", "Sport pilot"),
         ("transition", "Transition training"),
         ("private", "Private pilot - Glider"),
         ("commercial", "Commercial pilot - Glider"),
