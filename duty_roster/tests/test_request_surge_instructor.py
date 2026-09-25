@@ -361,7 +361,13 @@ def test_template_shows_static_text_to_non_primary_instructor(
     """When the logged-in instructor is the surge instructor (not primary), the
     block shows static advisory text, not a request button."""
     primary = _make_member(django_user_model, "tmpl_primary4", instructor=True)
-    surge = _make_member(django_user_model, "tmpl_surge4", instructor=True)
+    surge = _make_member(
+        django_user_model,
+        "tmpl_surge4",
+        instructor=True,
+        first_name="Surge",
+        last_name="Pilot",
+    )
     assignment = DutyAssignment.objects.create(
         date=date.today() + timedelta(days=43),
         instructor=primary,
@@ -378,11 +384,9 @@ def test_template_shows_static_text_to_non_primary_instructor(
     content = response.content.decode()
     # Since surge is assigned and accepted students exist, this day appears in the
     # allocation_by_date section (Issue #664). The surge instructor appears there
-    # as a column header. The template renders the member's display name, and
-    # this fixture intentionally does not provide names, so assert on the
-    # allocation section and its surge marker instead.
+    # as a column header using the member's display name.
     assert "Student Allocation" in content
-    assert "Surge" in content
+    assert "Surge Pilot" in content
     assert "Request Surge Instructor" not in content
 
 
