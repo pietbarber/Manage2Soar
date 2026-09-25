@@ -57,6 +57,25 @@ def test_login_page_hides_google_button_when_not_configured(client):
 
 
 @pytest.mark.django_db
+def test_login_page_renders_post_form_for_google_oauth(client):
+    """social-auth-app-django 6.0+ requires POST for social:begin, so the login
+    page must render a POST form (with CSRF token) instead of a GET link."""
+    action = reverse("social:begin", args=["google-oauth2"])
+    with override_settings(SOCIAL_AUTH_GOOGLE_OAUTH2_KEY="fake-key"):
+        response = client.get(reverse("login"))
+    assert f'<form method="post" action="{action}"'.encode() in response.content
+    assert b'name="csrfmiddlewaretoken"' in response.content
+
+
+@pytest.mark.django_db
+def test_social_begin_rejects_get_request(client):
+    """GET to the social:begin endpoint must be rejected with 405 (POST-only since 6.0)."""
+    with override_settings(SOCIAL_AUTH_GOOGLE_OAUTH2_KEY="fake-key"):
+        response = client.get(reverse("social:begin", args=["google-oauth2"]))
+    assert response.status_code == 405
+
+
+@pytest.mark.django_db
 def test_resources_nav_includes_document_root_for_anonymous():
     request = RequestFactory().get("/")
     request.user = AnonymousUser()

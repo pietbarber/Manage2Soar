@@ -45,13 +45,17 @@
         <div class="text-center mb-2">
             <span class="fw-semibold">Or sign in with</span>
         </div>
-        <a href="{% url 'social:begin' 'google-oauth2' %}?next={{ next|urlencode }}"
-            class="btn btn-outline-light border w-100 d-flex align-items-center justify-content-center"
-            style="background: #fff;">
-            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google"
-                style="height: 20px; margin-right: 8px;">
-            <span class="text-dark">Sign in with Google</span>
-        </a>
+        <form method="post" action="{% url 'social:begin' 'google-oauth2' %}" style="width: 100%;">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+            <button type="submit"
+                class="btn btn-outline-light border w-100 d-flex align-items-center justify-content-center"
+                style="background: #fff;">
+                <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google"
+                    style="height: 20px; margin-right: 8px;">
+                <span class="text-dark">Sign in with Google</span>
+            </button>
+        </form>
         {% endif %}
         <div class="mt-3 text-center text-muted small">
             {{ now|date:'Y' }}
