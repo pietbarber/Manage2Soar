@@ -42,7 +42,7 @@
       WARNING: This will break Django apps until K8s secrets are updated!
   when:
     - user_exists_check.query_result[0].user_exists
-    - not (postgresql_update_existing_passwords | default(false))
+    - not (postgresql_update_existing_passwords | default(false) | bool)
 
 - name: "Create database for tenant: {{ tenant.prefix }}"
   community.postgresql.postgresql_db:
