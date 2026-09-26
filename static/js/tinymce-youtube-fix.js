@@ -58,8 +58,10 @@
 
     function isTrustedPdfUrl(url, trustedHosts) {
         try {
-            var parsedUrl = new URL(url);
-            return isTrustedPdfHost(url, trustedHosts) &&
+            var normalizedUrl = url.trim();
+            if (!isValidPdfUrl(normalizedUrl)) return false;
+            var parsedUrl = new URL(normalizedUrl);
+            return isTrustedPdfHost(normalizedUrl, trustedHosts) &&
                 parsedUrl.pathname.toLowerCase().endsWith('.pdf');
         } catch (e) {
             return false;

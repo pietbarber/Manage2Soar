@@ -96,6 +96,10 @@ m2s_csrf_trusted_origins: "{{ m2s_site_url }}"
 m2s_django_static_root: "/var/www/m2s/static"
 m2s_django_media_root: "/var/www/m2s/media"
 
+# Trusted PDF origins used by the TinyMCE embed allowlist.
+m2s_extra_env_vars:
+  TINYMCE_PDF_TRUSTED_HOSTS: "{{ m2s_domain }}"
+
 # Logging
 m2s_log_dir: "/var/log/m2s"
 m2s_django_log_file: "{{ m2s_log_dir }}/django.log"

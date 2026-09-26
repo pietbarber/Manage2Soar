@@ -229,3 +229,4 @@ gke_tenants:
 # gke_extra_env:
 #   FEATURE_FLAG_NEW_UI: "true"
 #   SENTRY_DSN: "https://..."
+#   TINYMCE_PDF_TRUSTED_HOSTS: "pdf.example.com,cdn.example.com"
