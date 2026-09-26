@@ -41,3 +41,14 @@ class TinyMCEConfigurationTest(TestCase):
                 tinymce_js_url.startswith(settings.STATIC_URL),
                 f"TinyMCE JS should be served from local static files (expected to start with {settings.STATIC_URL}, got {tinymce_js_url})",
             )
+
+    def test_pdf_iframe_sandboxing_is_scoped_to_trusted_embeds(self):
+        """Keep iframe sandboxing enabled outside trusted PDF insertion."""
+        valid_elements = settings.TINYMCE_DEFAULT_CONFIG["extended_valid_elements"]
+
+        self.assertIn("sandbox", valid_elements)
+        self.assertTrue(settings.TINYMCE_DEFAULT_CONFIG["sandbox_iframes"])
+        self.assertIn(
+            "https://example.com/",
+            settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"],
+        )

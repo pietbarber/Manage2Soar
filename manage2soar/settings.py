@@ -574,6 +574,15 @@ LOGGING = {
 
 handler403 = "members.views.custom_permission_denied_view"
 
+TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
+    prefix.strip()
+    for prefix in os.getenv(
+        "TINYMCE_PDF_TRUSTED_URL_PREFIXES",
+        "https://example.com/" if DEBUG else "",
+    ).split(",")
+    if prefix.strip()
+]
+
 TINYMCE_DEFAULT_CONFIG = {
     "relative_urls": False,  # prevent ugly ../../../ paths
     "remove_script_host": True,  # strip protocol+host from URLs
@@ -590,6 +599,9 @@ TINYMCE_DEFAULT_CONFIG = {
     "automatic_uploads": True,
     "file_picker_types": "image media",
     "media_live_embeds": True,
+    # Keep sandboxing enabled except for validated, trusted PDF embeds.
+    "sandbox_iframes": True,
+    "pdf_trusted_url_prefixes": TINYMCE_PDF_TRUSTED_URL_PREFIXES,
     # FIX FOR ISSUE #277 - YOUTUBE ERROR 153: Multiple approaches to ensure proper referrer policy
     # YouTube Error 153 occurs when referrer policy is too restrictive (e.g., 'no-referrer')
     # Using 'strict-origin-when-cross-origin' allows YouTube to verify the embedding domain
