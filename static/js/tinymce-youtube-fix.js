@@ -47,21 +47,16 @@
         }
     }
 
-    function isTrustedPdfHost(url, trustedHosts) {
-        try {
-            var hostname = new URL(url).hostname.toLowerCase();
-            return trustedHosts.indexOf(hostname) !== -1;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    function isTrustedPdfUrl(url, trustedHosts) {
+    function isTrustedPdfUrl(url, trustedUrlPrefixes) {
         try {
             var normalizedUrl = url.trim();
             if (!isValidPdfUrl(normalizedUrl)) return false;
             var parsedUrl = new URL(normalizedUrl);
-            return isTrustedPdfHost(normalizedUrl, trustedHosts) &&
+            var normalizedPrefix = parsedUrl.origin + parsedUrl.pathname;
+            var hasTrustedPrefix = trustedUrlPrefixes.some(function (prefix) {
+                return normalizedPrefix.indexOf(prefix) === 0;
+            });
+            return hasTrustedPrefix &&
                 parsedUrl.pathname.toLowerCase().endsWith('.pdf');
         } catch (e) {
             return false;
@@ -218,14 +213,14 @@
                 originalSetup(editor);
             }
 
-            var trustedPdfHosts = config.pdf_trusted_hosts || [];
+            var trustedPdfUrlPrefixes = config.pdf_trusted_url_prefixes || [];
             editor.on('GetContent', function (event) {
                 var container = document.createElement('div');
                 container.innerHTML = event.content || '';
                 var iframes = container.querySelectorAll('iframe');
                 for (var index = 0; index < iframes.length; index++) {
                     var source = iframes[index].getAttribute('src');
-                    if (source && isTrustedPdfUrl(source, trustedPdfHosts)) {
+                    if (source && isTrustedPdfUrl(source, trustedPdfUrlPrefixes)) {
                         iframes[index].removeAttribute('sandbox');
                     }
                 }
@@ -251,7 +246,7 @@
                                 if (!proceed) return;
                             }
                             var html = generatePdfEmbedHtml(url);
-                            var trustedHost = isTrustedPdfUrl(url, config.pdf_trusted_hosts || []);
+                            var trustedHost = isTrustedPdfUrl(url, trustedPdfUrlPrefixes);
                             insertPdfEmbed(editor, html, url, trustedHost);
                         } else {
                             alert('Invalid URL. Please enter a valid http:// or https:// URL.');
