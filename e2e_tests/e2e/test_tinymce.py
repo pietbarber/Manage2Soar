@@ -730,7 +730,6 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
 
                 const testUrl = 'https://example.com/test-document.pdf';
 
-                // Generate the PDF HTML (same logic as the button)
                 const html = '<div class="pdf-container">' +
                     '<iframe src="' + testUrl + '" ' +
                     'width="100%" height="600" ' +
@@ -742,8 +741,10 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
                     'Open PDF in new tab</a></small></p>' +
                     '</div>';
 
-                // Insert with format:'raw' to bypass content filtering (critical!)
-                editor.insertContent(html, { format: 'raw' });
+                const originalPrompt = window.prompt;
+                window.prompt = () => testUrl;
+                editor.ui.registry.getAll().buttons.insertpdf.onAction();
+                window.prompt = originalPrompt;
 
                 // Get content immediately after insertion
                 const content = editor.getContent();

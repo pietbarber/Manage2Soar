@@ -47,6 +47,38 @@
         }
     }
 
+    function isTrustedPdfHost(url, trustedHosts) {
+        try {
+            var hostname = new URL(url).hostname.toLowerCase();
+            return trustedHosts.indexOf(hostname) !== -1;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function isTrustedPdfUrl(url, trustedHosts) {
+        try {
+            var parsedUrl = new URL(url);
+            return isTrustedPdfHost(url, trustedHosts) &&
+                parsedUrl.pathname.toLowerCase().endsWith('.pdf');
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function insertPdfEmbed(editor, html, url, trustedHost) {
+        editor.insertContent(html, { format: 'raw' });
+
+        if (trustedHost) {
+            var iframes = editor.getBody().querySelectorAll('iframe');
+            for (var index = 0; index < iframes.length; index++) {
+                if (iframes[index].getAttribute('src') === url) {
+                    iframes[index].removeAttribute('sandbox');
+                }
+            }
+        }
+    }
+
     /**
      * Generate PDF embed HTML with proper iframe attributes
      * Note: We don't use sandbox for PDFs because Chrome's built-in PDF viewer
@@ -184,6 +216,20 @@
                 originalSetup(editor);
             }
 
+            var trustedPdfHosts = config.pdf_trusted_hosts || [];
+            editor.on('GetContent', function (event) {
+                var container = document.createElement('div');
+                container.innerHTML = event.content || '';
+                var iframes = container.querySelectorAll('iframe');
+                for (var index = 0; index < iframes.length; index++) {
+                    var source = iframes[index].getAttribute('src');
+                    if (source && isTrustedPdfUrl(source, trustedPdfHosts)) {
+                        iframes[index].removeAttribute('sandbox');
+                    }
+                }
+                event.content = container.innerHTML;
+            });
+
             // Register PDF insert button (Issue #273, #341)
             editor.ui.registry.addButton('insertpdf', {
                 text: '📄 Insert PDF',
@@ -203,9 +249,8 @@
                                 if (!proceed) return;
                             }
                             var html = generatePdfEmbedHtml(url);
-                            // Use insertContent with format:'raw' to bypass content filtering
-                            // This is critical - without it, TinyMCE strips the iframe
-                            editor.insertContent(html, { format: 'raw' });
+                            var trustedHost = isTrustedPdfUrl(url, config.pdf_trusted_hosts || []);
+                            insertPdfEmbed(editor, html, url, trustedHost);
                         } else {
                             alert('Invalid URL. Please enter a valid http:// or https:// URL.');
                         }
