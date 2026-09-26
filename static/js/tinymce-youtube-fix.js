@@ -52,9 +52,14 @@
             var normalizedUrl = url.trim();
             if (!isValidPdfUrl(normalizedUrl)) return false;
             var parsedUrl = new URL(normalizedUrl);
-            var normalizedPrefix = parsedUrl.origin + parsedUrl.pathname;
             var hasTrustedPrefix = trustedUrlPrefixes.some(function (prefix) {
-                return normalizedPrefix.indexOf(prefix) === 0;
+                try {
+                    var parsedPrefix = new URL(prefix);
+                    return parsedPrefix.origin === parsedUrl.origin &&
+                        parsedUrl.pathname.indexOf(parsedPrefix.pathname) === 0;
+                } catch (e) {
+                    return false;
+                }
             });
             return hasTrustedPrefix &&
                 parsedUrl.pathname.toLowerCase().endsWith('.pdf');

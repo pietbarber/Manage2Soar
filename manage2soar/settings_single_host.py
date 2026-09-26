@@ -239,7 +239,7 @@ if not DEBUG:
 
 # TinyMCE configuration
 TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
-    prefix.strip().lower()
+    prefix.strip()
     for prefix in os.getenv(
         "TINYMCE_PDF_TRUSTED_URL_PREFIXES",
         "https://example.com/" if DEBUG else "",
