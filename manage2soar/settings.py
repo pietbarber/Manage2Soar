@@ -590,6 +590,9 @@ TINYMCE_DEFAULT_CONFIG = {
     "automatic_uploads": True,
     "file_picker_types": "image media",
     "media_live_embeds": True,
+    # TinyMCE otherwise adds an empty sandbox to inserted iframes, which
+    # prevents the browser PDF viewer from rendering embedded documents.
+    "sandbox_iframes": False,
     # FIX FOR ISSUE #277 - YOUTUBE ERROR 153: Multiple approaches to ensure proper referrer policy
     # YouTube Error 153 occurs when referrer policy is too restrictive (e.g., 'no-referrer')
     # Using 'strict-origin-when-cross-origin' allows YouTube to verify the embedding domain
@@ -622,7 +625,7 @@ TINYMCE_DEFAULT_CONFIG = {
     # Issue #341: Extended valid elements to allow PDF embedding iframes
     # This ensures TinyMCE doesn't strip the iframe when saving
     "extended_valid_elements": (
-        "iframe[src|width|height|frameborder|sandbox|referrerpolicy|loading|title|allow|allowfullscreen],"
+        "iframe[src|width|height|frameborder|referrerpolicy|loading|title|allow|allowfullscreen],"
         "div[class|style]"
     ),
     # Allow iframes inside div.pdf-container and p inside div
