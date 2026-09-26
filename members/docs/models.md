@@ -21,6 +21,7 @@ erDiagram
         string address
         string city
         string state_code
+        string state_freeform
         string zip_code
         string country
         string membership_status
@@ -182,6 +183,11 @@ erDiagram
         datetime updated_at
     }
 ```
+
+`Member.state_code` stores a two-letter US state or territory code, including
+District of Columbia (`DC`) and USPS APO regions (`AA`, `AE`, and `AP`).
+Values that do not fit the controlled choices are retained in
+`Member.state_freeform`.
 
 ## Models
 

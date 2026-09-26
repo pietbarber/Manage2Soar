@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.messages.storage.fallback import FallbackStorage
-from django.test import RequestFactory
+from django.test import Client, RequestFactory
 from django.urls import reverse
 
 from members.models import Member
@@ -95,6 +95,14 @@ def test_visiting_pilot_form_valid_complete(visiting_pilot_config_strict):
 
 
 @pytest.mark.django_db
+def test_visiting_pilot_form_offers_sport_pilot(visiting_pilot_config):
+    """The visiting pilot form exposes Sport Pilot as a rating choice."""
+    form = VisitingPilotSignupForm()
+
+    assert ("sport", "Sport Pilot") in list(form.fields["glider_rating"].choices)
+
+
+@pytest.mark.django_db
 def test_visiting_pilot_form_requires_fields_when_configured(
     visiting_pilot_config_strict,
 ):
@@ -109,6 +117,19 @@ def test_visiting_pilot_form_requires_fields_when_configured(
     assert not form.is_valid()
     assert "SSA membership number is required" in str(form.errors)
     assert "Glider rating is required" in str(form.errors)
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_signup_page_renders_sport_pilot(visiting_pilot_config):
+    """The rendered signup page includes the Sport Pilot option."""
+    client = Client()
+    token = visiting_pilot_config.get_or_create_daily_token()
+
+    response = client.get(reverse("members:visiting_pilot_signup", args=[token]))
+
+    assert response.status_code == 200
+    assert '<option value="sport"' in response.content.decode()
+    assert ">Sport Pilot</option>" in response.content.decode()
 
 
 @pytest.mark.django_db

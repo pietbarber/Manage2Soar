@@ -157,6 +157,7 @@ class MembershipApplication(models.Model):
     GLIDER_RATING_CHOICES = [
         ("none", "None"),
         ("student", "Student"),
+        ("sport", "Sport Pilot"),
         ("transition", "Transition"),
         ("private", "Private Glider"),
         ("commercial", "Commercial Glider"),

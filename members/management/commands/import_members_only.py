@@ -89,6 +89,10 @@ US_STATE_ABBREVIATIONS = {
     "WV",
     "WI",
     "WY",
+    "DC",
+    "AA",
+    "AE",
+    "AP",
 }
 
 
