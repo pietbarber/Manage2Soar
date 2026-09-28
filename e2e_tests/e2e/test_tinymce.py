@@ -13,6 +13,7 @@ These tests verify TinyMCE editor functionality, particularly:
 import unittest
 
 import pytest
+from django.conf import settings
 
 from .conftest import DjangoPlaywrightTestCase
 
@@ -818,6 +819,15 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
 
     def test_pdf_sandbox_exception_is_limited_to_trusted_pdf_prefixes(self):
         """Keep sandboxing for untrusted and non-PDF iframe content."""
+        trusted_prefixes = settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"]
+        settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"] = [
+            "https://example.com/media"
+        ]
+        self.addCleanup(
+            settings.TINYMCE_DEFAULT_CONFIG.__setitem__,
+            "pdf_trusted_url_prefixes",
+            trusted_prefixes,
+        )
         self.create_test_member(username="pdf_sandbox_scope_admin", is_superuser=True)
         self.login(username="pdf_sandbox_scope_admin")
 
@@ -829,7 +839,8 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
             () => {
                 const editor = tinymce.activeEditor;
                 const content = [
-                    '<iframe src="https://example.com/trusted.pdf"></iframe>',
+                    '<iframe src="https://example.com/media/trusted.pdf"></iframe>',
+                    '<iframe src="https://example.com/media-evil.pdf"></iframe>',
                     '<iframe src="https://example.com/not-a-pdf.html"></iframe>',
                     '<iframe src="https://untrusted.example/trusted.pdf"></iframe>'
                 ].join('');
@@ -848,6 +859,7 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         )
 
         sandbox_by_url = {item["src"]: item["sandboxed"] for item in result}
-        assert sandbox_by_url["https://example.com/trusted.pdf"] is False
+        assert sandbox_by_url["https://example.com/media/trusted.pdf"] is False
+        assert sandbox_by_url["https://example.com/media-evil.pdf"] is True
         assert sandbox_by_url["https://example.com/not-a-pdf.html"] is True
         assert sandbox_by_url["https://untrusted.example/trusted.pdf"] is True

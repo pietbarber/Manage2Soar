@@ -55,8 +55,13 @@
             var hasTrustedPrefix = trustedUrlPrefixes.some(function (prefix) {
                 try {
                     var parsedPrefix = new URL(prefix);
+                    var prefixPath = parsedPrefix.pathname;
+                    var isPrefixPath = parsedUrl.pathname === prefixPath ||
+                        parsedUrl.pathname.indexOf(
+                            prefixPath.endsWith('/') ? prefixPath : prefixPath + '/'
+                        ) === 0;
                     return parsedPrefix.origin === parsedUrl.origin &&
-                        parsedUrl.pathname.indexOf(parsedPrefix.pathname) === 0;
+                        isPrefixPath;
                 } catch (e) {
                     return false;
                 }
