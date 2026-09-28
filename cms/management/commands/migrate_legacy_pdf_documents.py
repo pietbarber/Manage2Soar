@@ -1,20 +1,22 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.urls import reverse
+from django.utils import timezone
 
-from cms.models import Document, upload_document_to
+from cms.models import Document, HomePageContent, Page
 
 
 class Command(BaseCommand):
     help = (
-        "Audit public legacy PDF documents and optionally move valid files to "
-        "the dedicated cms-pdfs/ path."
+        "Audit public PDF documents and optionally rewrite CMS content to use "
+        "the controlled PDF endpoint."
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--apply",
             action="store_true",
-            help="Move valid PDFs and update embedded document URLs.",
+            help="Rewrite valid PDF references to the controlled endpoint.",
         )
 
     def handle(self, *args, **options):
@@ -22,8 +24,8 @@ class Command(BaseCommand):
         documents = Document.objects.filter(
             page__is_public=True,
             file__iendswith=".pdf",
-        ).exclude(file__startswith="cms-pdfs/")
-        inspected = migrated = invalid = 0
+        )
+        inspected = rewritten = invalid = 0
 
         for document in documents.select_related("page").iterator():
             inspected += 1
@@ -35,7 +37,6 @@ class Command(BaseCommand):
                     )
                 )
                 continue
-            legacy_name = old_name
             old_url = document.file.url
             try:
                 with document.file.open("rb") as stored_file:
@@ -48,39 +49,40 @@ class Command(BaseCommand):
                         )
                         continue
 
-                    new_name = upload_document_to(document, old_name.rsplit("/", 1)[-1])
-                    if not apply_changes:
-                        migrated += 1
-                        continue
-
-                    stored_file.seek(0)
-                    saved_name = document.file.storage.save(new_name, stored_file)
+                endpoint_url = reverse(
+                    "cms:document_pdf", kwargs={"document_id": document.id}
+                )
+                page_rewrites = list(
+                    Page.objects.filter(content__contains=old_url).only("id", "content")
+                )
+                homepage_rewrites = list(
+                    HomePageContent.objects.filter(content__contains=old_url).only(
+                        "id", "content"
+                    )
+                )
+                reference_count = sum(
+                    item.content.count(old_url)
+                    for item in [*page_rewrites, *homepage_rewrites]
+                )
+                if not reference_count:
+                    continue
+                if not apply_changes:
+                    rewritten += reference_count
+                    continue
 
                 with transaction.atomic():
-                    document.file.name = saved_name
-                    document.save()
-
-                    new_url = document.file.url
-                    if old_url in document.page.content:
-                        document.page.content = document.page.content.replace(
-                            old_url, new_url
+                    now = timezone.now()
+                    for page in page_rewrites:
+                        Page.objects.filter(pk=page.pk).update(
+                            content=page.content.replace(old_url, endpoint_url),
+                            updated_at=now,
                         )
-                        document.page.save(update_fields=["content", "updated_at"])
-
-                    storage = document.file.storage
-
-                    def delete_legacy_file():
-                        try:
-                            storage.delete(legacy_name)
-                        except Exception as exc:
-                            self.stdout.write(
-                                self.style.WARNING(
-                                    f"Could not delete legacy file {old_name}: {exc}"
-                                )
-                            )
-
-                    transaction.on_commit(delete_legacy_file)
-                migrated += 1
+                    for homepage in homepage_rewrites:
+                        HomePageContent.objects.filter(pk=homepage.pk).update(
+                            content=homepage.content.replace(old_url, endpoint_url),
+                            updated_at=now,
+                        )
+                rewritten += reference_count
             except Exception as exc:
                 self.stdout.write(
                     self.style.ERROR(
@@ -88,10 +90,10 @@ class Command(BaseCommand):
                     )
                 )
 
-        action = "migrated" if apply_changes else "ready to migrate"
+        action = "rewritten" if apply_changes else "ready to rewrite"
         self.stdout.write(
             self.style.SUCCESS(
                 f"Legacy PDF audit complete. Inspected: {inspected}; "
-                f"{action}: {migrated}; invalid: {invalid}."
+                f"references {action}: {rewritten}; invalid: {invalid}."
             )
         )

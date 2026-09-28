@@ -7,6 +7,11 @@ app_name = "cms"
 urlpatterns = [
     # CMS Resources index page at /cms/
     path("", views.cms_resources_index, name="resources"),
+    path(
+        "document-pdf/<int:document_id>/",
+        views.document_pdf,
+        name="document_pdf",
+    ),
     # CMS Edit pages
     path("edit/page/<int:page_id>/", views.edit_cms_page, name="edit_page"),
     path(

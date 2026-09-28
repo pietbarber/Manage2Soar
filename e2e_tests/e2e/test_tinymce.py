@@ -15,6 +15,8 @@ import unittest
 import pytest
 from django.conf import settings
 
+from cms.models import Document, Page
+
 from .conftest import DjangoPlaywrightTestCase
 
 
@@ -561,6 +563,21 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         )
         assert has_pdf_button, "Insert PDF button should be registered in TinyMCE"
 
+    def test_published_document_uses_controlled_pdf_endpoint(self):
+        """Published CMS PDFs use the controlled endpoint before browser rendering."""
+        page = Page.objects.create(title="PDF documents", slug="pdf-documents")
+        document = Document.objects.create(
+            page=page,
+            title="Club handbook",
+            file="cms/pdf-documents/handbook.pdf",
+        )
+
+        self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
+        self.page.click("#heading1 button")
+        embed = self.page.wait_for_selector("#pdfEmbed_1", timeout=5000)
+
+        assert embed.get_attribute("src").endswith(f"/cms/document-pdf/{document.id}/")
+
     @unittest.skip(
         "Button is registered and works functionally, but may be in toolbar overflow menu"
     )
@@ -818,10 +835,10 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         assert 'target="_blank"' in content, "PDF embed should have fallback link"
 
     def test_pdf_sandbox_exception_is_limited_to_trusted_pdf_prefixes(self):
-        """Keep sandboxing for untrusted and non-PDF iframe content."""
+        """Trust only the controlled PDF endpoint, including relative URLs."""
         trusted_prefixes = settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"]
         settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"] = [
-            "https://example.com/media"
+            f"{self.live_server_url}/cms/document-pdf/"
         ]
         self.addCleanup(
             settings.TINYMCE_DEFAULT_CONFIG.__setitem__,
@@ -839,9 +856,9 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
             () => {
                 const editor = tinymce.activeEditor;
                 const content = [
-                    '<iframe src="https://example.com/media/trusted.pdf"></iframe>',
-                    '<iframe src="https://example.com/media-evil.pdf"></iframe>',
-                    '<iframe src="https://example.com/not-a-pdf.html"></iframe>',
+                    '<div class="pdf-container"><iframe src="' + window.location.origin + '/cms/document-pdf/1/"></iframe></div>',
+                    '<div class="pdf-container"><iframe src="/cms/document-pdf/2/"></iframe></div>',
+                    '<div class="pdf-container"><iframe src="' + window.location.origin + '/cms/document-pdf-evil/3/"></iframe></div>',
                     '<iframe src="https://untrusted.example/trusted.pdf"></iframe>'
                 ].join('');
 
@@ -859,7 +876,10 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         )
 
         sandbox_by_url = {item["src"]: item["sandboxed"] for item in result}
-        assert sandbox_by_url["https://example.com/media/trusted.pdf"] is False
-        assert sandbox_by_url["https://example.com/media-evil.pdf"] is True
-        assert sandbox_by_url["https://example.com/not-a-pdf.html"] is True
+        trusted_absolute = f"{self.live_server_url}/cms/document-pdf/1/"
+        assert sandbox_by_url[trusted_absolute] is False
+        assert sandbox_by_url["/cms/document-pdf/2/"] is False
+        assert (
+            sandbox_by_url[f"{self.live_server_url}/cms/document-pdf-evil/3/"] is True
+        )
         assert sandbox_by_url["https://untrusted.example/trusted.pdf"] is True

@@ -31,30 +31,28 @@
      * Validate URL for PDF embedding (security check)
      * Only allows HTTP/HTTPS URLs to prevent XSS via javascript: or data: URIs
      */
-    function isValidPdfUrl(url) {
+    function parsePdfUrl(url) {
         if (!url || typeof url !== 'string') return false;
-        url = url.trim();
         try {
-            var urlObj = new URL(url);
-            // Only allow http and https protocols
-            if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
-                return false;
-            }
-            // Check if it looks like a PDF URL (optional but helpful)
-            return true;
+            return new URL(url.trim(), window.location.origin);
         } catch (e) {
-            return false;
+            return null;
         }
+    }
+
+    function isValidPdfUrl(url) {
+        var parsedUrl = parsePdfUrl(url);
+        return parsedUrl !== null &&
+            (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:');
     }
 
     function isTrustedPdfUrl(url, trustedUrlPrefixes) {
         try {
-            var normalizedUrl = url.trim();
-            if (!isValidPdfUrl(normalizedUrl)) return false;
-            var parsedUrl = new URL(normalizedUrl);
+            var parsedUrl = parsePdfUrl(url);
+            if (!parsedUrl || !isValidPdfUrl(url)) return false;
             var hasTrustedPrefix = trustedUrlPrefixes.some(function (prefix) {
                 try {
-                    var parsedPrefix = new URL(prefix);
+                    var parsedPrefix = new URL(prefix, window.location.origin);
                     var prefixPath = parsedPrefix.pathname;
                     var isPrefixPath = parsedUrl.pathname === prefixPath ||
                         parsedUrl.pathname.indexOf(
@@ -66,8 +64,7 @@
                     return false;
                 }
             });
-            return hasTrustedPrefix &&
-                parsedUrl.pathname.toLowerCase().endsWith('.pdf');
+            return hasTrustedPrefix;
         } catch (e) {
             return false;
         }
@@ -76,18 +73,13 @@
     function insertPdfEmbed(editor, html, url, trustedHost) {
         editor.insertContent(html, { format: 'raw' });
 
-        if (trustedHost) {
-            var iframes = editor.getBody().querySelectorAll('iframe');
-            for (var index = 0; index < iframes.length; index++) {
-                if (iframes[index].getAttribute('src') === url) {
+        var iframes = editor.getBody().querySelectorAll('iframe');
+        for (var index = 0; index < iframes.length; index++) {
+            if (iframes[index].getAttribute('src') === url) {
+                if (trustedHost) {
                     iframes[index].removeAttribute('sandbox');
-                }
-            }
-        } else {
-            var untrustedIframes = editor.getBody().querySelectorAll('iframe');
-            for (var untrustedIndex = 0; untrustedIndex < untrustedIframes.length; untrustedIndex++) {
-                if (untrustedIframes[untrustedIndex].getAttribute('src') === url) {
-                    untrustedIframes[untrustedIndex].setAttribute('sandbox', '');
+                } else {
+                    iframes[index].setAttribute('sandbox', '');
                 }
             }
         }
@@ -239,6 +231,8 @@
                     var source = iframes[index].getAttribute('src');
                     if (source && isTrustedPdfUrl(source, trustedPdfUrlPrefixes)) {
                         iframes[index].removeAttribute('sandbox');
+                    } else if (iframes[index].closest('.pdf-container')) {
+                        iframes[index].setAttribute('sandbox', '');
                     }
                 }
                 event.content = container.innerHTML;
@@ -253,8 +247,9 @@
                     if (url) {
                         url = url.trim();
                         if (isValidPdfUrl(url)) {
+                            var trustedPdfUrl = isTrustedPdfUrl(url, trustedPdfUrlPrefixes);
                             // Check if URL ends with .pdf and warn if not
-                            if (!url.toLowerCase().endsWith('.pdf')) {
+                            if (!trustedPdfUrl && !url.toLowerCase().endsWith('.pdf')) {
                                 var proceed = confirm(
                                     'This URL does not end with .pdf\n\n' +
                                     'If this is not a PDF file, it may not display correctly.\n\n' +
@@ -263,8 +258,7 @@
                                 if (!proceed) return;
                             }
                             var html = generatePdfEmbedHtml(url);
-                            var trustedHost = isTrustedPdfUrl(url, trustedPdfUrlPrefixes);
-                            insertPdfEmbed(editor, html, url, trustedHost);
+                            insertPdfEmbed(editor, html, url, trustedPdfUrl);
                         } else {
                             alert('Invalid URL. Please enter a valid http:// or https:// URL.');
                         }

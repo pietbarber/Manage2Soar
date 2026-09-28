@@ -166,7 +166,7 @@
           </h2>
           <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#pdfAccordion">
             <div class="accordion-body">
-              <a href="{{ doc.file.url }}" target="_blank" rel="noopener" title="Open PDF in new tab" style="display:inline-block;vertical-align:middle;margin-bottom:4px;">
+              <a href="{% url 'cms:document_pdf' doc.pk %}" target="_blank" rel="noopener" title="Open PDF in new tab" style="display:inline-block;vertical-align:middle;margin-bottom:4px;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;">
                   <path d="M14 3H17V6" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                   <path d="M10 10L17 3" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -176,7 +176,7 @@
               </a>
               <div id="pdfContainer{{ forloop.counter }}"></div>
               <div id="pdfFallback_{{ forloop.counter }}" style="display:none;">
-                <p>PDF viewer is not working. <a href="{{ doc.file.url }}">Download PDF</a> or <a href="https://support.google.com/chrome/answer/6213030?hl=en">see instructions to enable PDF viewing</a>.</p>
+                <p>PDF viewer is not working. <a href="{% url 'cms:document_pdf' doc.pk %}">Download PDF</a> or <a href="https://support.google.com/chrome/answer/6213030?hl=en">see instructions to enable PDF viewing</a>.</p>
               </div>
             </div>
           </div>

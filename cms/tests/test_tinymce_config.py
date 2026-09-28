@@ -49,6 +49,6 @@ class TinyMCEConfigurationTest(TestCase):
         self.assertIn("sandbox", valid_elements)
         self.assertTrue(settings.TINYMCE_DEFAULT_CONFIG["sandbox_iframes"])
         self.assertIn(
-            "https://example.com/media/cms-pdfs/",
+            "https://example.com/cms/document-pdf/",
             settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"],
         )
