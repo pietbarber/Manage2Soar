@@ -128,7 +128,7 @@ erDiagram
 
 ### `Document`
 - File attachments linked to CMS pages
-- Smart upload paths: public files go to `cms/<page-slug>/`, private files are obfuscated
+- Smart upload paths: validated public PDFs go to `cms-pdfs/<page-slug>/`, other public files go to `cms/<page-slug>/`, and private files are obfuscated. Inline PDF references use the controlled `cms:document_pdf` endpoint rather than raw storage URLs.
 - Tracks uploader and upload timestamp
 - Helper methods for file type detection (`is_pdf`, `extension`)
 - **Default ordering**: Documents are sorted by title first, then filename (ensures consistent ordering in admin and public views)

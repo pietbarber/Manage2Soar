@@ -238,11 +238,30 @@ if not DEBUG:
     X_FRAME_OPTIONS = "DENY"
 
 # TinyMCE configuration
+TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
+    prefix.strip()
+    for prefix in os.getenv(
+        "TINYMCE_PDF_TRUSTED_URL_PREFIXES",
+        "https://example.com/cms/document-pdf/" if DEBUG else "",
+    ).split(",")
+    if prefix.strip()
+]
+
 TINYMCE_DEFAULT_CONFIG = {
+    "relative_urls": False,
+    "remove_script_host": True,
+    "convert_urls": False,
     "height": 400,
     "menubar": "file edit view insert format tools table help",
     "plugins": "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table paste code help wordcount",
-    "toolbar": "undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help",
+    "toolbar": "undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | insertpdf | help",
+    "sandbox_iframes": True,
+    "pdf_trusted_url_prefixes": TINYMCE_PDF_TRUSTED_URL_PREFIXES,
+    "extended_valid_elements": (
+        "iframe[src|width|height|frameborder|sandbox|referrerpolicy|loading|title|allow|allowfullscreen],"
+        "div[class|style]"
+    ),
+    "valid_children": "+div[iframe|p],+body[div]",
 }
 
 # Logging

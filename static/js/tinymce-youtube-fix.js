@@ -31,19 +31,57 @@
      * Validate URL for PDF embedding (security check)
      * Only allows HTTP/HTTPS URLs to prevent XSS via javascript: or data: URIs
      */
-    function isValidPdfUrl(url) {
+    function parsePdfUrl(url) {
         if (!url || typeof url !== 'string') return false;
-        url = url.trim();
         try {
-            var urlObj = new URL(url);
-            // Only allow http and https protocols
-            if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
-                return false;
-            }
-            // Check if it looks like a PDF URL (optional but helpful)
-            return true;
+            return new URL(url.trim(), window.location.origin);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function isValidPdfUrl(url) {
+        var parsedUrl = parsePdfUrl(url);
+        return parsedUrl !== null &&
+            (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:');
+    }
+
+    function isTrustedPdfUrl(url, trustedUrlPrefixes) {
+        try {
+            var parsedUrl = parsePdfUrl(url);
+            if (!parsedUrl || !isValidPdfUrl(url)) return false;
+            var hasTrustedPrefix = trustedUrlPrefixes.some(function (prefix) {
+                try {
+                    var parsedPrefix = new URL(prefix, window.location.origin);
+                    var prefixPath = parsedPrefix.pathname;
+                    var isPrefixPath = parsedUrl.pathname === prefixPath ||
+                        parsedUrl.pathname.indexOf(
+                            prefixPath.endsWith('/') ? prefixPath : prefixPath + '/'
+                        ) === 0;
+                    return parsedPrefix.origin === parsedUrl.origin &&
+                        isPrefixPath;
+                } catch (e) {
+                    return false;
+                }
+            });
+            return hasTrustedPrefix;
         } catch (e) {
             return false;
+        }
+    }
+
+    function insertPdfEmbed(editor, html, url, trustedHost) {
+        editor.insertContent(html, { format: 'raw' });
+
+        var iframes = editor.getBody().querySelectorAll('iframe');
+        for (var index = 0; index < iframes.length; index++) {
+            if (iframes[index].getAttribute('src') === url) {
+                if (trustedHost) {
+                    iframes[index].removeAttribute('sandbox');
+                } else {
+                    iframes[index].setAttribute('sandbox', '');
+                }
+            }
         }
     }
 
@@ -184,6 +222,22 @@
                 originalSetup(editor);
             }
 
+            var trustedPdfUrlPrefixes = config.pdf_trusted_url_prefixes || [];
+            editor.on('GetContent', function (event) {
+                var container = document.createElement('div');
+                container.innerHTML = event.content || '';
+                var iframes = container.querySelectorAll('iframe');
+                for (var index = 0; index < iframes.length; index++) {
+                    var source = iframes[index].getAttribute('src');
+                    if (source && isTrustedPdfUrl(source, trustedPdfUrlPrefixes)) {
+                        iframes[index].removeAttribute('sandbox');
+                    } else if (iframes[index].closest('.pdf-container')) {
+                        iframes[index].setAttribute('sandbox', '');
+                    }
+                }
+                event.content = container.innerHTML;
+            });
+
             // Register PDF insert button (Issue #273, #341)
             editor.ui.registry.addButton('insertpdf', {
                 text: '📄 Insert PDF',
@@ -193,8 +247,9 @@
                     if (url) {
                         url = url.trim();
                         if (isValidPdfUrl(url)) {
+                            var trustedPdfUrl = isTrustedPdfUrl(url, trustedPdfUrlPrefixes);
                             // Check if URL ends with .pdf and warn if not
-                            if (!url.toLowerCase().endsWith('.pdf')) {
+                            if (!trustedPdfUrl && !url.toLowerCase().endsWith('.pdf')) {
                                 var proceed = confirm(
                                     'This URL does not end with .pdf\n\n' +
                                     'If this is not a PDF file, it may not display correctly.\n\n' +
@@ -203,9 +258,7 @@
                                 if (!proceed) return;
                             }
                             var html = generatePdfEmbedHtml(url);
-                            // Use insertContent with format:'raw' to bypass content filtering
-                            // This is critical - without it, TinyMCE strips the iframe
-                            editor.insertContent(html, { format: 'raw' });
+                            insertPdfEmbed(editor, html, url, trustedPdfUrl);
                         } else {
                             alert('Invalid URL. Please enter a valid http:// or https:// URL.');
                         }

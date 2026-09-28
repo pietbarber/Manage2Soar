@@ -8,7 +8,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
-from django.http import HttpResponseForbidden
+from django.http import FileResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -239,6 +239,48 @@ def cms_page(request, **kwargs):
         "cms/page.html",
         context,
     )
+
+
+@require_http_methods(["GET"])
+def document_pdf(request, document_id):
+    """Serve a CMS document with a fixed PDF response policy for inline embeds."""
+    document = get_object_or_404(
+        Document.objects.select_related("page"),
+        pk=document_id,
+    )
+    if not document.is_pdf or not document.file:
+        return HttpResponseForbidden("This document is not available as a PDF.")
+
+    page_chain = []
+    page = document.page
+    while page is not None:
+        page_chain.append(page)
+        page = page.parent
+    for ancestor in reversed(page_chain):
+        if not ancestor.can_user_access(request.user, request):
+            return redirect_to_login(
+                request.get_full_path(), login_url=settings.LOGIN_URL
+            )
+
+    try:
+        stored_file = document.file.open("rb")
+        if stored_file.read(5) != b"%PDF-":
+            stored_file.close()
+            return HttpResponseForbidden("This document is not a valid PDF.")
+        stored_file.seek(0)
+        response = FileResponse(
+            stored_file,
+            as_attachment=False,
+            filename=document.file.name.rsplit("/", 1)[-1],
+            content_type="application/pdf",
+        )
+    except OSError:
+        return HttpResponseForbidden("The requested document is unavailable.")
+
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-Frame-Options"] = "SAMEORIGIN"
+    response["Content-Security-Policy"] = "frame-ancestors 'self'"
+    return response
 
 
 def homepage(request):

@@ -2,6 +2,8 @@ import logging
 import threading
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import UploadedFile
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.text import slugify
@@ -635,6 +637,8 @@ def upload_document_to(instance, filename):
     if instance.page and not instance.page.is_public:
         # Use obfuscated filename for restricted/private documents
         return upload_document_obfuscated(instance, filename)
+    if filename.lower().endswith(".pdf"):
+        return f"cms-pdfs/{page_slug}/{filename}"
     return f"cms/{page_slug}/{filename}"
 
 
@@ -659,7 +663,25 @@ class Document(models.Model):
         ordering = ["title", "file"]  # Sort by title first, then filename
 
     def __str__(self):
-        return self.title or self.file.name
+        return self.title or self.file.name or ""
+
+    def clean(self):
+        super().clean()
+        filename = self.file.name or ""
+        if not filename.lower().endswith(".pdf"):
+            return
+
+        uploaded_file = getattr(self.file, "_file", None)
+        if not isinstance(uploaded_file, UploadedFile):
+            return
+
+        position = uploaded_file.tell()
+        try:
+            header = uploaded_file.read(5)
+        finally:
+            uploaded_file.seek(position)
+        if header != b"%PDF-":
+            raise ValidationError({"file": "PDF uploads must contain a PDF file."})
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
@@ -708,11 +730,11 @@ class Document(models.Model):
 
     @property
     def is_pdf(self):
-        return self.file.name.lower().endswith(".pdf")
+        return (self.file.name or "").lower().endswith(".pdf")
 
     @property
     def extension(self):
-        return self.file.name.split(".")[-1].lower()
+        return (self.file.name or "").split(".")[-1].lower()
 
 
 # Create your models here.

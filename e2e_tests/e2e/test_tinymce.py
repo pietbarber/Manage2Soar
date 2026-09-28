@@ -13,6 +13,9 @@ These tests verify TinyMCE editor functionality, particularly:
 import unittest
 
 import pytest
+from django.conf import settings
+
+from cms.models import Document, Page
 
 from .conftest import DjangoPlaywrightTestCase
 
@@ -560,6 +563,21 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         )
         assert has_pdf_button, "Insert PDF button should be registered in TinyMCE"
 
+    def test_published_document_uses_controlled_pdf_endpoint(self):
+        """Published CMS PDFs use the controlled endpoint before browser rendering."""
+        page = Page.objects.create(title="PDF documents", slug="pdf-documents")
+        document = Document.objects.create(
+            page=page,
+            title="Club handbook",
+            file="cms/pdf-documents/handbook.pdf",
+        )
+
+        self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
+        self.page.click("#heading1 button")
+        embed = self.page.wait_for_selector("#pdfEmbed_1", timeout=5000)
+
+        assert embed.get_attribute("src").endswith(f"/cms/document-pdf/{document.id}/")
+
     @unittest.skip(
         "Button is registered and works functionally, but may be in toolbar overflow menu"
     )
@@ -730,7 +748,6 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
 
                 const testUrl = 'https://example.com/test-document.pdf';
 
-                // Generate the PDF HTML (same logic as the button)
                 const html = '<div class="pdf-container">' +
                     '<iframe src="' + testUrl + '" ' +
                     'width="100%" height="600" ' +
@@ -742,8 +759,10 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
                     'Open PDF in new tab</a></small></p>' +
                     '</div>';
 
-                // Insert with format:'raw' to bypass content filtering (critical!)
-                editor.insertContent(html, { format: 'raw' });
+                const originalPrompt = window.prompt;
+                window.prompt = () => testUrl;
+                editor.ui.registry.getAll().buttons.insertpdf.onAction();
+                window.prompt = originalPrompt;
 
                 // Get content immediately after insertion
                 const content = editor.getContent();
@@ -807,10 +826,60 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
             f"Content after: '{content[:300]}...'"
         )
 
-        # Verify no sandbox attribute (Chrome compatibility)
+        # Untrusted raw insertion must retain sandboxing.
         assert (
-            "sandbox=" not in content.lower()
-        ), "PDF iframe should NOT have sandbox attribute for Chrome compatibility"
+            "sandbox=" in content.lower()
+        ), "Untrusted PDF iframe should retain sandboxing"
 
         # Verify the fallback link is present
         assert 'target="_blank"' in content, "PDF embed should have fallback link"
+
+    def test_pdf_sandbox_exception_is_limited_to_trusted_pdf_prefixes(self):
+        """Trust only the controlled PDF endpoint, including relative URLs."""
+        trusted_prefixes = settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"]
+        settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"] = [
+            f"{self.live_server_url}/cms/document-pdf/"
+        ]
+        self.addCleanup(
+            settings.TINYMCE_DEFAULT_CONFIG.__setitem__,
+            "pdf_trusted_url_prefixes",
+            trusted_prefixes,
+        )
+        self.create_test_member(username="pdf_sandbox_scope_admin", is_superuser=True)
+        self.login(username="pdf_sandbox_scope_admin")
+
+        self.page.goto(f"{self.live_server_url}/cms/create/page/")
+        self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
+
+        result = self.page.evaluate(
+            """
+            () => {
+                const editor = tinymce.activeEditor;
+                const content = [
+                    '<div class="pdf-container"><iframe src="' + window.location.origin + '/cms/document-pdf/1/"></iframe></div>',
+                    '<div class="pdf-container"><iframe src="/cms/document-pdf/2/"></iframe></div>',
+                    '<div class="pdf-container"><iframe src="' + window.location.origin + '/cms/document-pdf-evil/3/"></iframe></div>',
+                    '<iframe src="https://untrusted.example/trusted.pdf"></iframe>'
+                ].join('');
+
+                editor.setContent(content, { format: 'raw' });
+                const serialized = editor.getContent();
+                const container = document.createElement('div');
+                container.innerHTML = serialized;
+
+                return Array.from(container.querySelectorAll('iframe')).map((iframe) => ({
+                    src: iframe.getAttribute('src'),
+                    sandboxed: iframe.hasAttribute('sandbox')
+                }));
+            }
+            """
+        )
+
+        sandbox_by_url = {item["src"]: item["sandboxed"] for item in result}
+        trusted_absolute = f"{self.live_server_url}/cms/document-pdf/1/"
+        assert sandbox_by_url[trusted_absolute] is False
+        assert sandbox_by_url["/cms/document-pdf/2/"] is False
+        assert (
+            sandbox_by_url[f"{self.live_server_url}/cms/document-pdf-evil/3/"] is True
+        )
+        assert sandbox_by_url["https://untrusted.example/trusted.pdf"] is True
