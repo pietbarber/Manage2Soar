@@ -51,8 +51,6 @@ google-resumable-media
 googleapis-common-protos
 greenlet
 gunicorn
-h11
-httpcore
 httplib2
 httpx
 icalendar
@@ -66,7 +64,6 @@ license-expression
 markdown-it-py
 MarkupSafe
 marshmallow
-mccabe
 mdurl
 msgpack
 mypy_extensions
