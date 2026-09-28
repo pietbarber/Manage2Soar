@@ -184,12 +184,13 @@ def test_legacy_pdf_command_skips_invalid_signature(tmp_path):
         page.save(update_fields=["content", "updated_at"])
         output = StringIO()
 
-        call_command("migrate_legacy_pdf_documents", stdout=output)
+        call_command("migrate_legacy_pdf_documents", "--apply", stdout=output)
 
         document.refresh_from_db()
         page.refresh_from_db()
         assert document.file.name == "cms/legacy-pdfs/legacy.pdf"
-        assert old_url in page.content
+        assert old_url not in page.content
+        assert reverse("cms:document_pdf", args=[document.id]) in page.content
         assert "invalid: 1" in output.getvalue()
 
 

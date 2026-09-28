@@ -46,7 +46,6 @@ class Command(BaseCommand):
                                 f"Skipping non-PDF document id={document.id}: {old_name}"
                             )
                         )
-                        continue
 
                 endpoint_url = reverse(
                     "cms:document_pdf", kwargs={"document_id": document.id}
