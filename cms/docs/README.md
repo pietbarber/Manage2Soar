@@ -126,6 +126,7 @@ URLs and views (current)
 Developer notes
 
 - The CMS uses `tinymce`'s `HTMLField` for page and homepage content. Validated public PDFs are stored under `cms-pdfs/<page-slug>/`; other public documents remain under `cms/<page-slug>/`, and private documents use obfuscated paths (see `upload_document_to`). The TinyMCE trusted PDF allowlist must target only the `.../media/cms-pdfs/` prefix.
+- After deploying this storage split, run `python manage.py migrate_legacy_pdf_documents` to audit existing public PDFs, then rerun with `--apply` to move valid files and update embedded URLs. Invalid legacy files remain sandboxed and must be reviewed manually.
 - The `Page.get_absolute_url()` implements a simple two-level slug URL scheme; nested pages route via `cms.urls`.
 - **Site Feedback System (Issue #117)**: Provides comprehensive feedback collection accessible via site footer. Features include form validation, referring URL capture, webmaster notifications, and full admin management with bulk actions.
 - **Footer Integration**: Site footer content is managed via HomePageContent with slug 'footer', includes feedback link with referring URL parameter.

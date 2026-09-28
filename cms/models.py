@@ -3,6 +3,7 @@ import threading
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import UploadedFile
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.text import slugify
@@ -671,7 +672,7 @@ class Document(models.Model):
             return
 
         uploaded_file = getattr(self.file, "file", None)
-        if uploaded_file is None:
+        if not isinstance(uploaded_file, UploadedFile):
             return
         content_type = getattr(uploaded_file, "content_type", None)
         if content_type is not None and content_type != "application/pdf":
