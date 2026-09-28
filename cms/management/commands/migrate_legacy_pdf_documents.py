@@ -27,6 +27,13 @@ class Command(BaseCommand):
         for document in documents.select_related("page").iterator():
             inspected += 1
             old_name = document.file.name
+            if not old_name:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Skipping document id={document.id} with no stored file name"
+                    )
+                )
+                continue
             old_url = document.file.url
             try:
                 with document.file.open("rb") as stored_file:
