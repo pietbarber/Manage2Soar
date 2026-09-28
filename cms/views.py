@@ -263,16 +263,18 @@ def document_pdf(request, document_id):
             )
 
     try:
-        with document.file.open("rb") as stored_file:
-            if stored_file.read(5) != b"%PDF-":
-                return HttpResponseForbidden("This document is not a valid PDF.")
+        stored_file = document.file.open("rb")
+        if stored_file.read(5) != b"%PDF-":
+            stored_file.close()
+            return HttpResponseForbidden("This document is not a valid PDF.")
+        stored_file.seek(0)
         response = FileResponse(
-            document.file.open("rb"),
+            stored_file,
             as_attachment=False,
             filename=document.file.name.rsplit("/", 1)[-1],
             content_type="application/pdf",
         )
-    except FileNotFoundError:
+    except OSError:
         return HttpResponseForbidden("The requested document is unavailable.")
 
     response["X-Content-Type-Options"] = "nosniff"

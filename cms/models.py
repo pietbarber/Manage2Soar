@@ -671,7 +671,7 @@ class Document(models.Model):
         if not filename.lower().endswith(".pdf"):
             return
 
-        uploaded_file = getattr(self.file, "file", None)
+        uploaded_file = getattr(self.file, "_file", None)
         if not isinstance(uploaded_file, UploadedFile):
             return
 

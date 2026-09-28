@@ -6,7 +6,7 @@ in the logsheet workflow.
 """
 
 import csv
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 from io import StringIO
 from unittest.mock import patch
@@ -1176,9 +1176,7 @@ class FinancesViewChargeDisplayTestCase(TestCase):
 
         first_logsheet = self.logsheet
         second_logsheet = Logsheet.objects.create(
-            log_date=self.logsheet.log_date.replace(
-                day=min(self.logsheet.log_date.day + 1, 28)
-            ),
+            log_date=self.logsheet.log_date + timedelta(days=1),
             airfield=self.airfield,
             created_by=self.duty_officer,
         )

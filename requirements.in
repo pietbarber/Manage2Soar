@@ -23,6 +23,7 @@ isort
 ortools
 pillow
 pip-audit
+pydenticon
 playwright
 psycopg2-binary
 pytest
@@ -31,6 +32,7 @@ pytest-django
 pytest-playwright
 python-dotenv
 python-slugify
+pytz
 qrcode
 ruff
 safety

@@ -36,8 +36,8 @@ class Command(BaseCommand):
                     )
                 )
                 continue
-            old_url = document.file.url
             try:
+                old_url = document.file.url
                 with document.file.open("rb") as stored_file:
                     if stored_file.read(5) != b"%PDF-":
                         invalid += 1
