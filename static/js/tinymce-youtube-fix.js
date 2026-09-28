@@ -83,6 +83,13 @@
                     iframes[index].removeAttribute('sandbox');
                 }
             }
+        } else {
+            var untrustedIframes = editor.getBody().querySelectorAll('iframe');
+            for (var untrustedIndex = 0; untrustedIndex < untrustedIframes.length; untrustedIndex++) {
+                if (untrustedIframes[untrustedIndex].getAttribute('src') === url) {
+                    untrustedIframes[untrustedIndex].setAttribute('sandbox', '');
+                }
+            }
         }
     }
 

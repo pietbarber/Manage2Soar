@@ -662,14 +662,17 @@ class Document(models.Model):
         ordering = ["title", "file"]  # Sort by title first, then filename
 
     def __str__(self):
-        return self.title or self.file.name
+        return self.title or self.file.name or ""
 
     def clean(self):
         super().clean()
-        if not self.file.name.lower().endswith(".pdf"):
+        filename = self.file.name or ""
+        if not filename.lower().endswith(".pdf"):
             return
 
         uploaded_file = getattr(self.file, "file", None)
+        if uploaded_file is None:
+            return
         content_type = getattr(uploaded_file, "content_type", None)
         if content_type is None:
             return
@@ -732,11 +735,11 @@ class Document(models.Model):
 
     @property
     def is_pdf(self):
-        return self.file.name.lower().endswith(".pdf")
+        return (self.file.name or "").lower().endswith(".pdf")
 
     @property
     def extension(self):
-        return self.file.name.split(".")[-1].lower()
+        return (self.file.name or "").split(".")[-1].lower()
 
 
 # Create your models here.

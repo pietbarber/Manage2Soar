@@ -18,6 +18,15 @@ def test_pdf_upload_requires_pdf_content():
 
 
 @pytest.mark.django_db
+def test_document_form_without_file_returns_required_error():
+    page = Page.objects.create(title="PDF uploads", slug="pdf-uploads")
+    form = DocumentForm(data={}, files={}, instance=Document(page=page))
+
+    assert not form.is_valid()
+    assert "file" in form.errors
+
+
+@pytest.mark.django_db
 def test_valid_pdf_upload_uses_dedicated_path():
     page = Page.objects.create(title="PDF uploads", slug="pdf-uploads")
     upload = SimpleUploadedFile(
