@@ -38,3 +38,4 @@ ruff
 safety
 social-auth-app-django
 social-auth-core
+tinycss2
