@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db import transaction
 
 from cms.models import Document, upload_document_to
 
@@ -34,6 +35,7 @@ class Command(BaseCommand):
                     )
                 )
                 continue
+            legacy_name = old_name
             old_url = document.file.url
             try:
                 with document.file.open("rb") as stored_file:
@@ -53,16 +55,31 @@ class Command(BaseCommand):
 
                     stored_file.seek(0)
                     saved_name = document.file.storage.save(new_name, stored_file)
+
+                with transaction.atomic():
                     document.file.name = saved_name
                     document.save()
-                    document.file.storage.delete(old_name)
 
-                new_url = document.file.url
-                if old_url in document.page.content:
-                    document.page.content = document.page.content.replace(
-                        old_url, new_url
-                    )
-                    document.page.save(update_fields=["content", "updated_at"])
+                    new_url = document.file.url
+                    if old_url in document.page.content:
+                        document.page.content = document.page.content.replace(
+                            old_url, new_url
+                        )
+                        document.page.save(update_fields=["content", "updated_at"])
+
+                    storage = document.file.storage
+
+                    def delete_legacy_file():
+                        try:
+                            storage.delete(legacy_name)
+                        except Exception as exc:
+                            self.stdout.write(
+                                self.style.WARNING(
+                                    f"Could not delete legacy file {old_name}: {exc}"
+                                )
+                            )
+
+                    transaction.on_commit(delete_legacy_file)
                 migrated += 1
             except Exception as exc:
                 self.stdout.write(
