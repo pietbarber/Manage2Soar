@@ -674,10 +674,7 @@ class Document(models.Model):
         if uploaded_file is None:
             return
         content_type = getattr(uploaded_file, "content_type", None)
-        if content_type is None:
-            return
-
-        if content_type != "application/pdf":
+        if content_type is not None and content_type != "application/pdf":
             raise ValidationError({"file": "PDF uploads must have PDF content."})
 
         position = uploaded_file.tell()
