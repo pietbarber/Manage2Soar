@@ -8,7 +8,7 @@ from cms.models import Document, HomePageContent, Page
 
 class Command(BaseCommand):
     help = (
-        "Audit public PDF documents and optionally rewrite CMS content to use "
+        "Audit PDF documents and optionally rewrite CMS content to use "
         "the controlled PDF endpoint."
     )
 
@@ -22,7 +22,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         apply_changes = options["apply"]
         documents = Document.objects.filter(
-            page__is_public=True,
             file__iendswith=".pdf",
         )
         inspected = rewritten = invalid = 0

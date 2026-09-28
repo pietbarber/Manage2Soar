@@ -58,7 +58,7 @@ def test_document_form_without_file_returns_required_error():
 def test_valid_pdf_upload_uses_dedicated_path():
     page = Page.objects.create(title="PDF uploads", slug="pdf-uploads")
     upload = SimpleUploadedFile(
-        "report.pdf", b"%PDF-1.7\ncontent", content_type="application/pdf"
+        "report.pdf", b"%PDF-1.7\ncontent", content_type="application/octet-stream"
     )
     document = Document(page=page, file=upload)
     form = DocumentForm(files=MultiValueDict({"file": [upload]}), instance=document)
@@ -78,6 +78,25 @@ def create_legacy_document(tmp_path, content, page_content=""):
     legacy_path.write_bytes(content)
     document = Document.objects.create(page=page, file="cms/legacy-pdfs/legacy.pdf")
     return document, page
+
+
+@pytest.mark.django_db
+def test_legacy_pdf_command_includes_private_pages(tmp_path):
+    with override_settings(
+        MEDIA_ROOT=str(tmp_path),
+        STORAGES={
+            "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+        },
+    ):
+        document, page = create_legacy_document(tmp_path, b"%PDF-1.7\ncontent")
+        page.is_public = False
+        page.content = f'<a href="{document.file.url}">PDF</a>'
+        page.save(update_fields=["is_public", "content", "updated_at"])
+
+        call_command("migrate_legacy_pdf_documents", "--apply")
+
+        page.refresh_from_db()
+        assert reverse("cms:document_pdf", args=[document.id]) in page.content
 
 
 @pytest.mark.django_db

@@ -62,6 +62,52 @@ def test_controlled_pdf_endpoint_requires_page_access(client, tmp_path):
 
 
 @pytest.mark.django_db
+def test_controlled_pdf_endpoint_requires_ancestor_access(client, tmp_path):
+    with override_settings(
+        MEDIA_ROOT=str(tmp_path),
+        STORAGES={
+            "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+        },
+    ):
+        file_path = tmp_path / "cms" / "child-page" / "child.pdf"
+        file_path.parent.mkdir(parents=True)
+        file_path.write_bytes(b"%PDF-1.7 test")
+        parent = Page.objects.create(
+            title="Private Parent", slug="private-parent", is_public=False
+        )
+        child = Page.objects.create(
+            title="Public Child", slug="public-child", parent=parent, is_public=True
+        )
+        document = Document.objects.create(page=child, file="cms/child-page/child.pdf")
+
+        response = client.get(reverse("cms:document_pdf", args=[document.id]))
+
+        assert response.status_code == 302
+        assert "next=/cms/document-pdf/" in response["Location"]
+
+
+@pytest.mark.django_db
+def test_controlled_pdf_endpoint_rejects_invalid_pdf_signature(client, tmp_path):
+    with override_settings(
+        MEDIA_ROOT=str(tmp_path),
+        STORAGES={
+            "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+        },
+    ):
+        file_path = tmp_path / "cms" / "public-page" / "invalid.pdf"
+        file_path.parent.mkdir(parents=True)
+        file_path.write_bytes(b"not a PDF")
+        page = Page.objects.create(title="Public Page", slug="public-page")
+        document = Document.objects.create(
+            page=page, file="cms/public-page/invalid.pdf"
+        )
+
+        response = client.get(reverse("cms:document_pdf", args=[document.id]))
+
+        assert response.status_code == 403
+
+
+@pytest.mark.django_db
 def test_public_page_and_document_accessible_anonymous(client, settings, tmp_path):
     # Use local filesystem storage for the test so template file lookups work
     settings.DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"

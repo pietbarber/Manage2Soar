@@ -250,10 +250,22 @@ def document_pdf(request, document_id):
     )
     if not document.is_pdf or not document.file:
         return HttpResponseForbidden("This document is not available as a PDF.")
-    if not document.page.can_user_access(request.user, request):
-        return redirect_to_login(request.get_full_path(), login_url=settings.LOGIN_URL)
+
+    page_chain = []
+    page = document.page
+    while page is not None:
+        page_chain.append(page)
+        page = page.parent
+    for ancestor in reversed(page_chain):
+        if not ancestor.can_user_access(request.user, request):
+            return redirect_to_login(
+                request.get_full_path(), login_url=settings.LOGIN_URL
+            )
 
     try:
+        with document.file.open("rb") as stored_file:
+            if stored_file.read(5) != b"%PDF-":
+                return HttpResponseForbidden("This document is not a valid PDF.")
         response = FileResponse(
             document.file.open("rb"),
             as_attachment=False,
