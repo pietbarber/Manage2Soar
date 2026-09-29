@@ -16,6 +16,13 @@
 (function () {
     'use strict';
 
+    // Sandbox policy for untrusted PDF embeds (Issue #1069).
+    // allow-scripts is required for Chrome's built-in PDF viewer (PDFium);
+    // allow-same-origin is required for cross-origin PDF hosts (e.g. GCS).
+    // Note: this combination effectively opts out of sandboxing for the
+    // embedded document, an intentional trade-off so PDFs render correctly.
+    var PDF_EMBED_SANDBOX = 'allow-scripts allow-same-origin';
+
     // Utility function to HTML-escape attribute values (XSS prevention)
     function escapeHtml(str) {
         if (str === undefined || str === null) return '';
@@ -79,7 +86,7 @@
                 if (trustedHost) {
                     iframes[index].removeAttribute('sandbox');
                 } else {
-                    iframes[index].setAttribute('sandbox', '');
+                    iframes[index].setAttribute('sandbox', PDF_EMBED_SANDBOX);
                 }
             }
         }
@@ -87,9 +94,10 @@
 
     /**
      * Generate PDF embed HTML with proper iframe attributes
-     * Note: We don't use sandbox for PDFs because Chrome's built-in PDF viewer
-     * doesn't work with sandboxed iframes. The browser's PDF viewer has its own
-     * security model that provides adequate protection.
+     * Note: the sandbox attribute is applied post-insertion by
+     * insertPdfEmbed() — untrusted embeds get PDF_EMBED_SANDBOX (allow-scripts
+     * allow-same-origin) so Chrome's built-in PDF viewer works, while trusted
+     * embeds (TINYMCE_PDF_TRUSTED_URL_PREFIXES) are left unsandboxed.
      */
     function generatePdfEmbedHtml(url) {
         var escapedUrl = escapeHtml(url);
@@ -232,7 +240,7 @@
                     if (source && isTrustedPdfUrl(source, trustedPdfUrlPrefixes)) {
                         iframes[index].removeAttribute('sandbox');
                     } else if (iframes[index].closest('.pdf-container')) {
-                        iframes[index].setAttribute('sandbox', '');
+                        iframes[index].setAttribute('sandbox', PDF_EMBED_SANDBOX);
                     }
                 }
                 event.content = container.innerHTML;

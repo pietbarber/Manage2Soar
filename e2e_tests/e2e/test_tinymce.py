@@ -826,10 +826,11 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
             f"Content after: '{content[:300]}...'"
         )
 
-        # Untrusted raw insertion must retain sandboxing.
+        # Untrusted raw insertion must get the permissive sandbox so the
+        # browser PDF viewer works (Issue #1069).
         assert (
-            "sandbox=" in content.lower()
-        ), "Untrusted PDF iframe should retain sandboxing"
+            'sandbox="allow-scripts allow-same-origin"' in content
+        ), "Untrusted PDF iframe should use the PDF-viewer-friendly sandbox"
 
         # Verify the fallback link is present
         assert 'target="_blank"' in content, "PDF embed should have fallback link"
