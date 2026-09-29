@@ -172,6 +172,34 @@ def test_cross_origin_same_path_is_not_trusted(settings):
     assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
 
 
+def test_data_src_does_not_mask_untrusted_src(settings):
+    """data-src must not be confused with the real src attribute.
+
+    A trusted data-src followed by an untrusted real src is untrusted —
+    the real src is what the browser loads, and it must be sandboxed.
+    """
+    content = (
+        '<div class="pdf-container">'
+        f'<iframe data-src="https://example.com/cms/document-pdf/42/" '
+        'src="https://attacker.example/evil.pdf" sandbox="" '
+        'width="100%" height="600" loading="lazy">'
+        "</iframe>"
+        "</div>"
+    )
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    # The untrusted real src must be upgraded to the controlled sandbox.
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+    assert 'sandbox=""' not in new_content
+
+
 @pytest.mark.django_db
 def test_apply_skips_rows_changed_concurrently(settings, capsys):
     """A concurrent editor save must not be clobbered by a stale snapshot."""
@@ -215,6 +243,63 @@ def test_apply_skips_rows_changed_concurrently(settings, capsys):
     assert page.content == concurrent_save
     assert new_pdf_url in page.content
     assert UNTRUSTED_GCS_URL not in page.content
+
+
+@pytest.mark.django_db
+def test_apply_reports_fresh_rewrites_when_concurrent_edit_changes_count(
+    settings, capsys
+):
+    """Apply-mode summary must use the locked re-read's rewrite count.
+
+    If a concurrent edit adds a new untrusted iframe after the command's
+    initial read, the locked re-read will see more rewrites than the
+    initial count. The reported and total rewrite counts must reflect the
+    fresh (locked) value, not the stale pre-lock value.
+    """
+    # Initial read sees 1 untrusted iframe to rewrite.
+    initial_content = make_embed(UNTRUSTED_GCS_URL, sandbox="")
+    page = Page.objects.create(title="Legacy", slug="legacy", content=initial_content)
+
+    # Concurrent edit adds a SECOND untrusted iframe (already in
+    # .pdf-container form) right after the initial read, so the locked
+    # re-read sees 2 rewrites.
+    concurrent_save = (
+        initial_content[: -len("</div>")]
+        + make_embed(
+            "https://storage.googleapis.com/my-bucket/media/cms-pdfs/club/second.pdf",
+            sandbox="",
+        )
+        + "</div>"
+    )
+
+    from cms.management.commands import normalize_pdf_iframe_sandbox as mod
+
+    real_normalize = mod.normalize_pdf_iframe_sandbox
+    calls = {"count": 0}
+
+    def racing_normalize(content, prefixes):
+        calls["count"] += 1
+        # First call is the command's initial read. Swap in the fresh
+        # content so the locked re-read sees it.
+        if calls["count"] == 1:
+            Page.objects.filter(pk=page.pk).update(content=concurrent_save)
+        return real_normalize(content, prefixes)
+
+    mod.normalize_pdf_iframe_sandbox = racing_normalize
+    try:
+        call_command("normalize_pdf_iframe_sandbox", "--apply")
+    finally:
+        mod.normalize_pdf_iframe_sandbox = real_normalize
+
+    output = capsys.readouterr().out
+    # The reported per-row count and the total must both be 2 (fresh),
+    # not 1 (the stale pre-lock value).
+    assert "2 iframe(s) rewritten" in output
+    assert "iframes rewritten: 2" in output
+    # Verify the applied content reflects the locked re-read's output.
+    page.refresh_from_db()
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in page.content
+    assert 'sandbox=""' not in page.content
 
 
 @pytest.mark.django_db
