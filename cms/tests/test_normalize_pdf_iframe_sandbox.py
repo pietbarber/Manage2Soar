@@ -200,6 +200,62 @@ def test_data_src_does_not_mask_untrusted_src(settings):
     assert 'sandbox=""' not in new_content
 
 
+def test_non_http_scheme_is_not_trusted(settings):
+    """file:// and other non-HTTP schemes must never be trusted."""
+    content = make_embed("file:///cms/document-pdf/42/", sandbox="")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+
+
+def test_protocol_relative_url_is_not_trusted(settings):
+    """Protocol-relative URLs (//host/path) are cross-origin → untrusted."""
+    content = make_embed("//attacker.example/cms/document-pdf/42/", sandbox="")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+
+
+def test_single_quoted_sandbox_is_recognized(settings):
+    """A single-quoted sandbox='' must be upgraded, not duplicated."""
+    import re as _re
+
+    content = (
+        '<div class="pdf-container">'
+        "<iframe src=\"https://attacker.example/evil.pdf\" sandbox='' "
+        'width="100%" height="600">'
+        "</iframe>"
+        "</div>"
+    )
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+    # Exactly one sandbox attribute — the single-quoted one was replaced,
+    # not left in place with a second attribute appended.
+    assert len(_re.findall(r"sandbox=", new_content, _re.IGNORECASE)) == 1
+
+
 @pytest.mark.django_db
 def test_apply_skips_rows_changed_concurrently(settings, capsys):
     """A concurrent editor save must not be clobbered by a stale snapshot."""

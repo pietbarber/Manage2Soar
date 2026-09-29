@@ -41,7 +41,9 @@ IFRAME_TAG_RE = re.compile(r"<iframe\b[^>]*>", re.IGNORECASE)
 # Enforce true attribute boundaries so the regex does not match the substring
 # "src" inside a different attribute name (e.g. data-src, x-src).
 ATTR_SRC_RE = re.compile(r"(?<![0-9A-Za-z_-])src=[\"']([^\"']*)[\"']", re.IGNORECASE)
-ATTR_SANDBOX_RE = re.compile(r"(?<![0-9A-Za-z_-])sandbox=\"[^\"]*\"", re.IGNORECASE)
+ATTR_SANDBOX_RE = re.compile(
+    r"(?<![0-9A-Za-z_-])sandbox=(\"[^\"]*\"|'[^']*')", re.IGNORECASE
+)
 PDF_CONTAINER_OPEN = '<div class="pdf-container">'
 
 
@@ -60,7 +62,10 @@ def _is_trusted_pdf_url(url, trusted_prefixes):
       origin, so e.g. ``https://attacker.example/cms/document-pdf/42/``
       never matches a ``https://example.com/cms/document-pdf/`` prefix;
     * relative stored URLs (``/cms/document-pdf/42/``) are resolved against
-      the page origin by the browser, so only the path is compared here.
+      the page origin by the browser, so only the path is compared here;
+    * non-HTTP schemes (``file://``, ``data:``, etc.) and protocol-relative
+      URLs (``//host/path``) are always untrusted — they cannot resolve to
+      a same-origin web PDF.
     """
     if not url:
         return False
@@ -68,6 +73,17 @@ def _is_trusted_pdf_url(url, trusted_prefixes):
         parsed = urlparse(url)
     except ValueError:
         return False
+
+    # Non-HTTP/HTTPS schemes (file://, data:, javascript:, etc.) are never
+    # trusted — they cannot resolve to a same-origin web PDF.
+    if parsed.scheme and parsed.scheme not in ("http", "https"):
+        return False
+
+    # Protocol-relative URLs (//host/path) always carry a host but no
+    # scheme; they are cross-origin by nature and must not be trusted.
+    if not parsed.scheme and parsed.netloc:
+        return False
+
     is_absolute = parsed.scheme in ("http", "https") and bool(parsed.netloc)
     for prefix in trusted_prefixes:
         try:
@@ -117,10 +133,8 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
         has_sandbox = ATTR_SANDBOX_RE.search(tag) is not None
         sandbox_value = None
         if has_sandbox:
-            sandbox_match = re.search(
-                r"(?<![0-9A-Za-z_-])sandbox=\"([^\"]*)\"", tag, re.IGNORECASE
-            )
-            sandbox_value = sandbox_match.group(1) if sandbox_match else None
+            quoted = ATTR_SANDBOX_RE.search(tag).group(1)  # e.g. "foo" or 'foo'
+            sandbox_value = quoted[1:-1]  # strip surrounding quotes
 
         if _is_trusted_pdf_url(src, trusted_prefixes):
             # Trusted embeds stay unsandboxed (Issue #1067 behavior).
