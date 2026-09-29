@@ -575,8 +575,11 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
         self.page.click("#heading1 button")
         embed = self.page.wait_for_selector("#pdfEmbed_1", timeout=5000)
+        assert embed is not None, "PDF embed iframe (#pdfEmbed_1) should be present"
+        src = embed.get_attribute("src")
+        assert src is not None, "PDF embed iframe should have a src attribute"
 
-        assert embed.get_attribute("src").endswith(f"/cms/document-pdf/{document.id}/")
+        assert src.endswith(f"/cms/document-pdf/{document.id}/")
 
     @unittest.skip(
         "Button is registered and works functionally, but may be in toolbar overflow menu"
