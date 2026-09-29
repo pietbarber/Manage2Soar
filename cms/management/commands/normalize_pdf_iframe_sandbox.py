@@ -43,15 +43,22 @@ SANDBOX_RE = re.compile(r"""\s+sandbox=["'][^"']*["']""", re.IGNORECASE)
 PDF_CONTAINER_OPEN = '<div class="pdf-container">'
 
 
+def _url_origin(parsed):
+    """Return the origin (scheme://netloc) of a parsed URL."""
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def _is_trusted_pdf_url(url, trusted_prefixes):
     """Server-side mirror of the TinyMCE ``isTrustedPdfUrl`` check.
 
-    A URL is trusted when its pathname equals a configured prefix path or
-    starts with it (segment-safe). Matching is done on the path component
-    only: stored content commonly uses relative URLs
-    (e.g. ``/cms/document-pdf/42/``) while configured prefixes are full
-    URLs (e.g. ``https://example.com/cms/document-pdf/``), so a strict
-    origin comparison would mis-classify trusted embeds.
+    A URL is trusted when it is a segment-safe path-prefix match under a
+    configured prefix. Mirroring the client-side check:
+
+    * absolute stored URLs must additionally match the configured prefix
+      origin, so e.g. ``https://attacker.example/cms/document-pdf/42/``
+      never matches a ``https://example.com/cms/document-pdf/`` prefix;
+    * relative stored URLs (``/cms/document-pdf/42/``) are resolved against
+      the page origin by the browser, so only the path is compared here.
     """
     if not url:
         return False
@@ -59,10 +66,15 @@ def _is_trusted_pdf_url(url, trusted_prefixes):
         parsed = urlparse(url)
     except ValueError:
         return False
+    is_absolute = parsed.scheme in ("http", "https") and bool(parsed.netloc)
     for prefix in trusted_prefixes:
         try:
             parsed_prefix = urlparse(prefix)
         except ValueError:
+            continue
+        if parsed_prefix.scheme not in ("http", "https") or not parsed_prefix.netloc:
+            continue
+        if is_absolute and _url_origin(parsed) != _url_origin(parsed_prefix):
             continue
         prefix_path = parsed_prefix.path
         if not prefix_path:
@@ -153,7 +165,7 @@ class Command(BaseCommand):
         apply_changes = options["apply"]
         trusted_prefixes = list(settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES)
 
-        scanned = inspected = rewritten = 0
+        scanned = inspected = rewritten = skipped_conflicts = 0
 
         for model, label in ((Page, "page"), (HomePageContent, "homepage")):
             rows = list(model.objects.only("id", "content"))
@@ -169,13 +181,37 @@ class Command(BaseCommand):
                 if not row_rewrites:
                     continue
                 inspected += 1
-                rewritten += row_rewrites
+
                 if apply_changes:
-                    now = timezone.now()
+                    # Re-read and lock the row inside the atomic block, then
+                    # normalize the fresh content. This ensures a concurrent
+                    # editor save is not clobbered by this stale snapshot.
                     with transaction.atomic():
-                        model.objects.filter(pk=row.pk).update(
-                            content=new_content, updated_at=now
+                        locked_row = (
+                            model.objects.select_for_update()
+                            .filter(pk=row.pk)
+                            .only("id", "content")
+                            .get()
                         )
+                        fresh_content = locked_row.content or ""
+                        locked_new, locked_rewrites = normalize_pdf_iframe_sandbox(
+                            fresh_content, trusted_prefixes
+                        )
+                        if not locked_rewrites:
+                            skipped_conflicts += 1
+                            self.stdout.write(
+                                self.style.WARNING(
+                                    f"{label} id={row.id}: skipped, content "
+                                    f"changed after this run started "
+                                    f"(concurrent edit). Re-run to normalize it."
+                                )
+                            )
+                            continue
+                        model.objects.filter(pk=row.pk).update(
+                            content=locked_new, updated_at=timezone.now()
+                        )
+
+                rewritten += row_rewrites
                 self.stdout.write(
                     f"{label} id={row.id}: {row_rewrites} iframe(s) "
                     f"{'rewritten' if apply_changes else 'would be rewritten'}"
@@ -185,6 +221,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"PDF sandbox normalization {'complete' if apply_changes else 'dry run'}. "
-                f"Objects scanned: {scanned}; iframes {action}: {rewritten}."
+                f"Objects scanned: {scanned}; iframes {action}: {rewritten}; "
+                f"conflicts skipped: {skipped_conflicts}."
             )
         )

@@ -870,17 +870,23 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
 
                 return Array.from(container.querySelectorAll('iframe')).map((iframe) => ({
                     src: iframe.getAttribute('src'),
-                    sandboxed: iframe.hasAttribute('sandbox')
+                    sandbox: iframe.getAttribute('sandbox')
                 }));
             }
             """
         )
 
-        sandbox_by_url = {item["src"]: item["sandboxed"] for item in result}
+        sandbox_by_url = {item["src"]: item["sandbox"] for item in result}
         trusted_absolute = f"{self.live_server_url}/cms/document-pdf/1/"
-        assert sandbox_by_url[trusted_absolute] is False
-        assert sandbox_by_url["/cms/document-pdf/2/"] is False
+        # Trusted embeds must be unsandboxed (no attribute at all).
+        assert sandbox_by_url[trusted_absolute] is None
+        assert sandbox_by_url["/cms/document-pdf/2/"] is None
+        # Untrusted .pdf-container embeds must carry the exact value that lets
+        # the browser PDF viewer work — an empty sandbox would still fail.
         assert (
-            sandbox_by_url[f"{self.live_server_url}/cms/document-pdf-evil/3/"] is True
+            sandbox_by_url[f"{self.live_server_url}/cms/document-pdf-evil/3/"]
+            == "allow-scripts allow-same-origin"
         )
-        assert sandbox_by_url["https://untrusted.example/trusted.pdf"] is True
+        # Non-container iframes stay sandboxed (TinyMCE default), just never
+        # trusted.
+        assert sandbox_by_url["https://untrusted.example/trusted.pdf"] is not None

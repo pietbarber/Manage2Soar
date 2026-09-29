@@ -157,6 +157,66 @@ def test_evil_prefix_path_is_not_trusted(settings):
     assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
 
 
+def test_cross_origin_same_path_is_not_trusted(settings):
+    """An absolute URL on a different origin must never be trusted."""
+    content = make_embed("https://attacker.example/cms/document-pdf/42/", sandbox="")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+
+
+@pytest.mark.django_db
+def test_apply_skips_rows_changed_concurrently(settings, capsys):
+    """A concurrent editor save must not be clobbered by a stale snapshot."""
+    original = make_embed(UNTRUSTED_GCS_URL, sandbox="")
+    page = Page.objects.create(title="Legacy", slug="legacy", content=original)
+
+    # The editor concurrently swaps the PDF URL and saves an already
+    # normalized embed for the new URL, after the command read the old row.
+    new_pdf_url = (
+        "https://storage.googleapis.com/my-bucket/media/cms-pdfs/club/fresh.pdf"
+    )
+    concurrent_save = make_embed(new_pdf_url, sandbox=PDF_EMBED_SANDBOX)
+
+    from cms.management.commands import normalize_pdf_iframe_sandbox as mod
+
+    real_normalize = mod.normalize_pdf_iframe_sandbox
+    calls = {"count": 0}
+
+    def racing_normalize(content, prefixes):
+        calls["count"] += 1
+        # First call is the command's initial read (stale content). The
+        # concurrent editor save lands right after that read, so the in-lock
+        # re-read will see the fresh, already-normalized content.
+        if calls["count"] == 1:
+            Page.objects.filter(pk=page.pk).update(content=concurrent_save)
+        return real_normalize(content, prefixes)
+
+    mod.normalize_pdf_iframe_sandbox = racing_normalize
+    try:
+        call_command("normalize_pdf_iframe_sandbox", "--apply")
+    finally:
+        mod.normalize_pdf_iframe_sandbox = real_normalize
+
+    output = capsys.readouterr().out
+    assert "skipped, content changed" in output
+    assert "conflicts skipped: 1" in output
+
+    page.refresh_from_db()
+    # The concurrent save (new URL) wins; the stale normalization that would
+    # have rewritten the old URL was not applied.
+    assert page.content == concurrent_save
+    assert new_pdf_url in page.content
+    assert UNTRUSTED_GCS_URL not in page.content
+
+
 @pytest.mark.django_db
 def test_non_pdf_container_iframes_are_untouched(settings):
     # YouTube-style iframe (not inside .pdf-container) must be ignored.
