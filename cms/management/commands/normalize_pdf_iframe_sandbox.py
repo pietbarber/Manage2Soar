@@ -24,6 +24,7 @@ Usage::
     python manage.py normalize_pdf_iframe_sandbox --apply  # apply changes
 """
 
+import posixpath
 import re
 from urllib.parse import urlparse
 
@@ -48,6 +49,24 @@ PDF_CONTAINER_OPEN = '<div class="pdf-container">'
 def _url_origin(parsed):
     """Return the origin (scheme://netloc) of a parsed URL."""
     return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _normalize_path(path):
+    """Resolve ``.``/``..`` dot segments the way a browser's ``new URL()`` does.
+
+    ``urllib.parse.urlparse`` leaves dot segments intact, so e.g.
+    ``/cms/document-pdf/../admin/`` would otherwise appear to sit under the
+    ``/cms/document-pdf/`` prefix even though the browser actually loads
+    ``/cms/admin/``. ``posixpath.normpath`` collapses the dot segments like
+    the browser, but strips a trailing slash — re-append it if the original
+    path had one so exact-prefix comparisons keep working.
+    """
+    if not path or path == "/":
+        return path
+    normalized = posixpath.normpath(path)
+    if path.endswith("/") and not normalized.endswith("/"):
+        normalized += "/"
+    return normalized
 
 
 def _is_trusted_pdf_url(url, trusted_prefixes):
@@ -83,6 +102,7 @@ def _is_trusted_pdf_url(url, trusted_prefixes):
         return False
 
     is_absolute = parsed.scheme in ("http", "https") and bool(parsed.netloc)
+    url_path = _normalize_path(parsed.path)
     for prefix in trusted_prefixes:
         try:
             parsed_prefix = urlparse(prefix)
@@ -92,10 +112,10 @@ def _is_trusted_pdf_url(url, trusted_prefixes):
             continue
         if is_absolute and _url_origin(parsed) != _url_origin(parsed_prefix):
             continue
-        prefix_path = parsed_prefix.path
+        prefix_path = _normalize_path(parsed_prefix.path)
         if not prefix_path:
             continue
-        if parsed.path == prefix_path or parsed.path.startswith(
+        if url_path == prefix_path or url_path.startswith(
             prefix_path if prefix_path.endswith("/") else prefix_path + "/"
         ):
             return True
@@ -142,10 +162,11 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
         src_match = ATTR_SRC_RE.search(tag)
         src = src_match.group(1) if src_match else ""
 
-        has_sandbox = ATTR_SANDBOX_RE.search(tag) is not None
+        sandbox_match = ATTR_SANDBOX_RE.search(tag)
+        has_sandbox = sandbox_match is not None
         sandbox_value = None
         if has_sandbox:
-            quoted = ATTR_SANDBOX_RE.search(tag).group(1)  # e.g. "foo" or 'foo'
+            quoted = sandbox_match.group(1)  # e.g. "foo" or 'foo'
             sandbox_value = quoted[1:-1]  # strip surrounding quotes
 
         if _is_trusted_pdf_url(src, trusted_prefixes):

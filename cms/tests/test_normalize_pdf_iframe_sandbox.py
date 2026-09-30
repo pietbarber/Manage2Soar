@@ -200,6 +200,48 @@ def test_data_src_does_not_mask_untrusted_src(settings):
     assert 'sandbox=""' not in new_content
 
 
+def test_dot_segment_escaping_trusted_prefix_is_not_trusted(settings):
+    """A dot-segment that resolves outside the prefix must not be trusted.
+
+    urlparse leaves ``..`` intact, but the browser's new URL() (used by the
+    client check) resolves ``/cms/document-pdf/../admin/`` to ``/cms/admin/``.
+    The server must normalize dot segments before matching, so such a URL is
+    untrusted and keeps its sandbox.
+    """
+    # Resolves to /cms/admin/ — outside the trusted prefix.
+    content = make_embed("https://example.com/cms/document-pdf/../admin/", sandbox="")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+
+
+def test_dot_segment_staying_within_prefix_is_trusted(settings):
+    """A dot-segment that resolves back inside the prefix stays trusted.
+
+    /cms/document-pdf/42/../53/ resolves to /cms/document-pdf/53/, which is
+    still under the trusted prefix, so it must remain unsandboxed.
+    """
+    content = make_embed("/cms/document-pdf/42/../53/")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    # Trusted: no rewrite, no sandbox added.
+    assert rewritten == 0
+    assert "sandbox" not in new_content
+
+
 def test_self_closing_iframe_is_validated(settings):
     """A self-closing <iframe .../> must not produce malformed markup.
 
