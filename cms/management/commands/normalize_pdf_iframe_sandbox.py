@@ -41,9 +41,7 @@ IFRAME_TAG_RE = re.compile(r"<iframe\b[^>]*>", re.IGNORECASE)
 # Enforce true attribute boundaries so the regex does not match the substring
 # "src" inside a different attribute name (e.g. data-src, x-src).
 ATTR_SRC_RE = re.compile(r"(?<![0-9A-Za-z_-])src=[\"']([^\"']*)[\"']", re.IGNORECASE)
-ATTR_SANDBOX_RE = re.compile(
-    r"(?<![0-9A-Za-z_-])sandbox=(\"[^\"]*\"|'[^']*')", re.IGNORECASE
-)
+ATTR_SANDBOX_RE = re.compile(r"\s+sandbox=(\"[^\"]*\"|'[^']*')", re.IGNORECASE)
 PDF_CONTAINER_OPEN = '<div class="pdf-container">'
 
 
@@ -104,17 +102,31 @@ def _is_trusted_pdf_url(url, trusted_prefixes):
     return False
 
 
-def _is_direct_child_of_pdf_container(content, iframe_start):
-    """Return True if the iframe starts right after a .pdf-container div.
+def _is_inside_pdf_container(content, iframe_start):
+    """Return True if the iframe is inside a .pdf-container div (any depth).
 
     This mirrors the client-side ``closest('.pdf-container')`` check that
-    only targets the PDF embed iframes (YouTube iframes are never inside a
-    ``.pdf-container`` and are left untouched).
+    matches any ancestor with that class, not just a direct child.
+    YouTube iframes are never inside a ``.pdf-container`` and are left
+    untouched.
     """
     container_start = content.rfind(PDF_CONTAINER_OPEN, 0, iframe_start)
     if container_start == -1:
         return False
-    return "</div>" not in content[container_start:iframe_start]
+    # Walk the div open/close tags between the container and the iframe,
+    # tracking nesting depth. The container's own <div> opens depth to 1;
+    # if we return to 0 (the container closed) before reaching the iframe,
+    # the iframe is a sibling, not a descendant.
+    segment = content[container_start:iframe_start]
+    depth = 0
+    for tag_match in re.finditer(r"<div\b|</div\s*>", segment, re.IGNORECASE):
+        if tag_match.group(0).startswith("</"):
+            depth -= 1
+            if depth <= 0:
+                return False
+        else:
+            depth += 1
+    return depth > 0
 
 
 def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
@@ -124,7 +136,7 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
 
     for match in IFRAME_TAG_RE.finditer(content):
         tag = match.group(0)
-        if not _is_direct_child_of_pdf_container(content, match.start()):
+        if not _is_inside_pdf_container(content, match.start()):
             continue
 
         src_match = ATTR_SRC_RE.search(tag)
@@ -137,7 +149,10 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
             sandbox_value = quoted[1:-1]  # strip surrounding quotes
 
         if _is_trusted_pdf_url(src, trusted_prefixes):
-            # Trusted embeds stay unsandboxed (Issue #1067 behavior).
+            # Trusted embeds stay unsandboxed (Issue #1067 behavior). The
+            # sandbox match includes its leading whitespace, so removing it
+            # leaves exactly one separator before the next attribute — no
+            # double-space artifact.
             if has_sandbox:
                 replacements.append(
                     (
@@ -152,7 +167,11 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
             if has_sandbox:
                 new_tag = ATTR_SANDBOX_RE.sub(f' sandbox="{PDF_EMBED_SANDBOX}"', tag)
             else:
-                new_tag = tag[:-1] + f' sandbox="{PDF_EMBED_SANDBOX}">'
+                # Append before the closing tag (handle self-closing tags).
+                if tag.endswith("/>"):
+                    new_tag = tag[:-2] + f' sandbox="{PDF_EMBED_SANDBOX}"/>'
+                else:
+                    new_tag = tag[:-1] + f' sandbox="{PDF_EMBED_SANDBOX}">'
             replacements.append((match.start(), match.end(), new_tag))
 
     # Apply replacements in reverse so offsets stay valid.

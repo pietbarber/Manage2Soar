@@ -200,6 +200,102 @@ def test_data_src_does_not_mask_untrusted_src(settings):
     assert 'sandbox=""' not in new_content
 
 
+def test_self_closing_iframe_is_validated(settings):
+    """A self-closing <iframe .../> must not produce malformed markup.
+
+    The sandbox must be appended before the closing '/>' rather than after
+    the '/', which would break the tag.
+    """
+    content = (
+        '<div class="pdf-container">'
+        '<iframe src="https://attacker.example/evil.pdf" width="100%"/>'
+        "</div>"
+    )
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"/>' in new_content
+    # The broken form (slash followed by the attribute) must not appear.
+    assert "/ sandbox=" not in new_content
+    # Still idempotent.
+    assert normalize_pdf_iframe_sandbox(new_content, [])[1] == 0
+
+
+def test_trusted_removal_leaves_no_double_space(settings):
+    """Removing a sandbox from a trusted embed must not leave a double space."""
+    content = (
+        '<div class="pdf-container">'
+        '<iframe src="https://example.com/cms/document-pdf/42/" sandbox="" '
+        'width="100%"></iframe>'
+        "</div>"
+    )
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert "sandbox" not in new_content
+    assert "  " not in new_content
+
+
+def test_nested_div_inside_container_is_sandboxed(settings):
+    """An iframe nested one level deeper in a .pdf-container is still handled.
+
+    The client-side closest('.pdf-container') matches any ancestor, so the
+    server must sandbox an iframe inside a nested <div> too.
+    """
+    content = (
+        '<div class="pdf-container">'
+        '<div class="inner">'
+        '<iframe src="https://attacker.example/evil.pdf" sandbox="" width="100%">'
+        "</iframe>"
+        "</div>"
+        "</div>"
+    )
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+
+
+def test_sibling_div_after_closed_container_is_untouched(settings):
+    """An iframe in a sibling div (after the container closed) is untouched."""
+    content = (
+        '<div class="pdf-container"></div>'
+        '<div class="other">'
+        '<iframe src="https://attacker.example/evil.pdf" sandbox="" width="100%">'
+        "</iframe>"
+        "</div>"
+    )
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    # The iframe is not inside any .pdf-container, so it must not be touched.
+    assert rewritten == 0
+    assert new_content == content
+
+
 def test_non_http_scheme_is_not_trusted(settings):
     """file:// and other non-HTTP schemes must never be trusted."""
     content = make_embed("file:///cms/document-pdf/42/", sandbox="")
