@@ -575,8 +575,11 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
         self.page.click("#heading1 button")
         embed = self.page.wait_for_selector("#pdfEmbed_1", timeout=5000)
+        assert embed is not None, "PDF embed iframe (#pdfEmbed_1) should be present"
+        src = embed.get_attribute("src")
+        assert src is not None, "PDF embed iframe should have a src attribute"
 
-        assert embed.get_attribute("src").endswith(f"/cms/document-pdf/{document.id}/")
+        assert src.endswith(f"/cms/document-pdf/{document.id}/")
 
     @unittest.skip(
         "Button is registered and works functionally, but may be in toolbar overflow menu"
@@ -826,10 +829,11 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
             f"Content after: '{content[:300]}...'"
         )
 
-        # Untrusted raw insertion must retain sandboxing.
+        # Untrusted raw insertion must get the permissive sandbox so the
+        # browser PDF viewer works (Issue #1069).
         assert (
-            "sandbox=" in content.lower()
-        ), "Untrusted PDF iframe should retain sandboxing"
+            'sandbox="allow-scripts allow-same-origin"' in content
+        ), "Untrusted PDF iframe should use the PDF-viewer-friendly sandbox"
 
         # Verify the fallback link is present
         assert 'target="_blank"' in content, "PDF embed should have fallback link"
@@ -869,17 +873,23 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
 
                 return Array.from(container.querySelectorAll('iframe')).map((iframe) => ({
                     src: iframe.getAttribute('src'),
-                    sandboxed: iframe.hasAttribute('sandbox')
+                    sandbox: iframe.getAttribute('sandbox')
                 }));
             }
             """
         )
 
-        sandbox_by_url = {item["src"]: item["sandboxed"] for item in result}
+        sandbox_by_url = {item["src"]: item["sandbox"] for item in result}
         trusted_absolute = f"{self.live_server_url}/cms/document-pdf/1/"
-        assert sandbox_by_url[trusted_absolute] is False
-        assert sandbox_by_url["/cms/document-pdf/2/"] is False
+        # Trusted embeds must be unsandboxed (no attribute at all).
+        assert sandbox_by_url[trusted_absolute] is None
+        assert sandbox_by_url["/cms/document-pdf/2/"] is None
+        # Untrusted .pdf-container embeds must carry the exact value that lets
+        # the browser PDF viewer work — an empty sandbox would still fail.
         assert (
-            sandbox_by_url[f"{self.live_server_url}/cms/document-pdf-evil/3/"] is True
+            sandbox_by_url[f"{self.live_server_url}/cms/document-pdf-evil/3/"]
+            == "allow-scripts allow-same-origin"
         )
-        assert sandbox_by_url["https://untrusted.example/trusted.pdf"] is True
+        # Non-container iframes stay sandboxed (TinyMCE default), just never
+        # trusted.
+        assert sandbox_by_url["https://untrusted.example/trusted.pdf"] is not None
