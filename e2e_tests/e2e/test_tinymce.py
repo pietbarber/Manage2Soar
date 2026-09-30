@@ -664,32 +664,28 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
             )
 
     def test_pdf_embed_html_structure(self):
-        """Verify the generated PDF embed HTML has correct structure."""
+        """Verify the generated PDF embed HTML routes through the pdf.js viewer."""
         self.create_test_member(username="pdf_admin4", is_superuser=True)
         self.login(username="pdf_admin4")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
-        # Test that the HTML generation creates proper structure
-        # by examining the button's expected behavior
+        # Test that the HTML generation creates proper structure by mirroring
+        # what generatePdfEmbedHtml() produces (Issue #1069: the iframe src
+        # always points at the self-hosted pdf.js viewer, with a fixed sandbox).
         html_check = self.page.evaluate(
             """
             () => {
-                // Simulate what the button does by checking the expected HTML pattern
                 const testUrl = 'https://example.com/test.pdf';
+                const viewerUrl = tinymce.activeEditor.settings.pdf_viewer_url
+                    || '/static/pdfjs-viewer/viewer.html';
+                const sandbox = 'allow-scripts allow-same-origin allow-downloads allow-modals';
+                const viewerSrc = viewerUrl + '?file=' + encodeURIComponent(testUrl);
 
-                // Create a temp div to parse the expected HTML structure
-                const expectedPattern = {
-                    hasContainer: true,
-                    hasIframe: true,
-                    hasFallbackLink: true,
-                    noSandbox: true  // Sandbox was removed for Chrome PDF viewer compatibility
-                };
-
-                // Generate the expected HTML structure manually
                 const html = '<div class="pdf-container">' +
-                    '<iframe src="' + testUrl + '" ' +
+                    '<iframe src="' + viewerSrc + '" ' +
+                    'sandbox="' + sandbox + '" ' +
                     'width="100%" height="600" ' +
                     'frameborder="0" ' +
                     'loading="lazy" ' +
@@ -701,13 +697,15 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
 
                 const div = document.createElement('div');
                 div.innerHTML = html;
+                const iframe = div.querySelector('iframe');
 
                 return {
                     hasContainer: div.querySelector('.pdf-container') !== null,
-                    hasIframe: div.querySelector('iframe') !== null,
+                    hasIframe: iframe !== null,
                     hasFallbackLink: div.querySelector('a[target="_blank"]') !== null,
-                    noSandbox: div.querySelector('iframe').getAttribute('sandbox') === null,
-                    iframeSrc: div.querySelector('iframe').src
+                    sandbox: iframe.getAttribute('sandbox'),
+                    pointsAtViewer: iframe.getAttribute('src').includes('pdfjs-viewer/viewer.html'),
+                    carriesTargetUrl: iframe.getAttribute('src').includes(encodeURIComponent(testUrl))
                 };
             }
         """
@@ -719,8 +717,15 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         assert html_check["hasIframe"], "PDF embed should have iframe element"
         assert html_check["hasFallbackLink"], "PDF embed should have fallback link"
         assert html_check[
-            "noSandbox"
-        ], "PDF iframe should NOT have sandbox (Chrome compatibility)"
+            "pointsAtViewer"
+        ], "PDF iframe should point at the self-hosted pdf.js viewer"
+        assert html_check[
+            "carriesTargetUrl"
+        ], "Viewer src should carry the original PDF URL as `file`"
+        assert (
+            html_check["sandbox"]
+            == "allow-scripts allow-same-origin allow-downloads allow-modals"
+        ), "PDF iframe should carry the fixed pdf.js-viewer sandbox (Issue #1069)"
 
     def test_pdf_url_inserts_embed(self):
         """Test the full E2E workflow of inserting a PDF via the button.
@@ -816,30 +821,43 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
             except Exception:
                 pass  # Timeout is OK, we'll check content below
 
-        # Verify the PDF iframe was inserted and survived content filtering
+        # Verify the PDF iframe was inserted and survived content filtering,
+        # routed through the self-hosted pdf.js viewer (Issue #1069).
         has_pdf_content = (
             "iframe" in content.lower()
             and "pdf-container" in content.lower()
-            and "example.com/test-document.pdf" in content
+            and "pdfjs-viewer/viewer.html" in content
+            and "test-document.pdf" in content
         )
 
         assert has_pdf_content, (
-            f"PDF iframe was not inserted or was filtered out by TinyMCE (Issue #341). "
+            f"PDF iframe was not inserted, was filtered out by TinyMCE, or was not "
+            f"routed through the pdf.js viewer. "
             f"Inserted: '{result.get('inserted', 'N/A')[:200]}...', "
             f"Content after: '{content[:300]}...'"
         )
 
-        # Untrusted raw insertion must get the permissive sandbox so the
-        # browser PDF viewer works (Issue #1069).
+        # Every PDF embed — trusted or cross-origin — gets the same fixed,
+        # genuine sandbox now that Chrome's native PDF viewer is no longer
+        # involved (Issue #1069).
         assert (
-            'sandbox="allow-scripts allow-same-origin"' in content
-        ), "Untrusted PDF iframe should use the PDF-viewer-friendly sandbox"
+            'sandbox="allow-scripts allow-same-origin allow-downloads allow-modals"'
+            in content
+        ), "PDF iframe should carry the fixed pdf.js-viewer sandbox"
 
         # Verify the fallback link is present
         assert 'target="_blank"' in content, "PDF embed should have fallback link"
 
-    def test_pdf_sandbox_exception_is_limited_to_trusted_pdf_prefixes(self):
-        """Trust only the controlled PDF endpoint, including relative URLs."""
+    def test_pdf_container_iframes_route_through_viewer(self):
+        """Every .pdf-container iframe routes through the pdf.js viewer (Issue #1069).
+
+        Trusted (document-pdf endpoint) and cross-origin URLs are both wrapped
+        in the viewer with the same fixed sandbox. A same-origin URL that is
+        NOT the trusted endpoint is never embedded at all — its src is
+        stripped and its sandbox is fully locked down. An iframe outside
+        .pdf-container (e.g. YouTube-style embeds) is left to TinyMCE's own
+        default sandboxing.
+        """
         trusted_prefixes = settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"]
         settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"] = [
             f"{self.live_server_url}/cms/document-pdf/"
@@ -855,7 +873,7 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
-        result = self.page.evaluate(
+        results = self.page.evaluate(
             """
             () => {
                 const editor = tinymce.activeEditor;
@@ -871,25 +889,42 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
                 const container = document.createElement('div');
                 container.innerHTML = serialized;
 
-                return Array.from(container.querySelectorAll('iframe')).map((iframe) => ({
-                    src: iframe.getAttribute('src'),
-                    sandbox: iframe.getAttribute('sandbox')
-                }));
+                return Array.from(container.querySelectorAll('iframe')).map((iframe) => {
+                    const src = iframe.getAttribute('src');
+                    let file = null;
+                    if (src) {
+                        try {
+                            file = new URL(src, window.location.origin).searchParams.get('file');
+                        } catch (e) {
+                            file = null;
+                        }
+                    }
+                    return { src, sandbox: iframe.getAttribute('sandbox'), file };
+                });
             }
             """
         )
 
-        sandbox_by_url = {item["src"]: item["sandbox"] for item in result}
-        trusted_absolute = f"{self.live_server_url}/cms/document-pdf/1/"
-        # Trusted embeds must be unsandboxed (no attribute at all).
-        assert sandbox_by_url[trusted_absolute] is None
-        assert sandbox_by_url["/cms/document-pdf/2/"] is None
-        # Untrusted .pdf-container embeds must carry the exact value that lets
-        # the browser PDF viewer work — an empty sandbox would still fail.
-        assert (
-            sandbox_by_url[f"{self.live_server_url}/cms/document-pdf-evil/3/"]
-            == "allow-scripts allow-same-origin"
+        pdf_viewer_sandbox = (
+            "allow-scripts allow-same-origin allow-downloads allow-modals"
         )
-        # Non-container iframes stay sandboxed (TinyMCE default), just never
-        # trusted.
-        assert sandbox_by_url["https://untrusted.example/trusted.pdf"] is not None
+        trusted_absolute = f"{self.live_server_url}/cms/document-pdf/1/"
+        trusted_relative = "/cms/document-pdf/2/"
+
+        # Trusted embeds (absolute and relative) are wrapped in the viewer
+        # and carry the fixed sandbox.
+        assert results[0]["file"] == trusted_absolute
+        assert results[0]["sandbox"] == pdf_viewer_sandbox
+        assert "pdfjs-viewer/viewer.html" in results[0]["src"]
+
+        assert results[1]["file"] == trusted_relative
+        assert results[1]["sandbox"] == pdf_viewer_sandbox
+
+        # A same-origin URL that is NOT the trusted endpoint is never
+        # embedded, wrapped or not — its src is stripped entirely.
+        assert results[2]["src"] is None
+        assert results[2]["sandbox"] == ""
+
+        # An iframe outside .pdf-container is left to TinyMCE's own default
+        # sandboxing — our logic never touches it.
+        assert results[3]["sandbox"] is not None

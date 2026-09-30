@@ -52,3 +52,9 @@ class TinyMCEConfigurationTest(TestCase):
             "https://example.com/cms/document-pdf/",
             settings.TINYMCE_DEFAULT_CONFIG["pdf_trusted_url_prefixes"],
         )
+
+    def test_pdf_viewer_url_configured(self):
+        """PDF embeds must route through the self-hosted pdf.js viewer (Issue #1069)."""
+        viewer_url = settings.TINYMCE_DEFAULT_CONFIG["pdf_viewer_url"]
+        self.assertEqual(viewer_url, settings.PDF_VIEWER_URL)
+        self.assertTrue(viewer_url.endswith("pdfjs-viewer/viewer.html"))

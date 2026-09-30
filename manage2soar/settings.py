@@ -583,6 +583,12 @@ TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
     if prefix.strip()
 ]
 
+# Self-hosted PDF.js viewer (Issue #1069): Chrome's native PDF viewer refuses
+# to render inside any sandboxed iframe, so CMS PDF embeds are rendered by
+# our own pdf.js-based viewer, which can stay genuinely sandboxed. Shared by
+# TINYMCE_DEFAULT_CONFIG and the normalize_pdf_iframe_sandbox command.
+PDF_VIEWER_URL = f"{STATIC_URL}pdfjs-viewer/viewer.html"
+
 TINYMCE_DEFAULT_CONFIG = {
     "relative_urls": False,  # prevent ugly ../../../ paths
     "remove_script_host": True,  # strip protocol+host from URLs
@@ -602,6 +608,10 @@ TINYMCE_DEFAULT_CONFIG = {
     # Keep sandboxing enabled except for validated, trusted PDF embeds.
     "sandbox_iframes": True,
     "pdf_trusted_url_prefixes": TINYMCE_PDF_TRUSTED_URL_PREFIXES,
+    # Self-hosted PDF.js viewer (Issue #1069): Chrome's native PDF viewer
+    # refuses to render inside any sandboxed iframe, so PDFs are rendered by
+    # our own pdf.js-based viewer instead, which can stay genuinely sandboxed.
+    "pdf_viewer_url": PDF_VIEWER_URL,
     # FIX FOR ISSUE #277 - YOUTUBE ERROR 153: Multiple approaches to ensure proper referrer policy
     # YouTube Error 153 occurs when referrer policy is too restrictive (e.g., 'no-referrer')
     # Using 'strict-origin-when-cross-origin' allows YouTube to verify the embedding domain

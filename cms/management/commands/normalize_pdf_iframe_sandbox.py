@@ -1,19 +1,25 @@
-"""Normalize the sandbox attribute on legacy PDF embed iframes (Issue #1069).
+"""Normalize legacy PDF embed iframes to use the pdf.js viewer (Issue #1069).
 
-Issue #1067 hardened CMS PDF embeds by saving an empty ``sandbox=""``
-attribute on ``.pdf-container`` iframes whose URL is not on the trusted
-prefix allowlist. An empty sandbox is the most restrictive value and
-breaks Chrome's built-in PDF viewer ("This page has been blocked by
-Chrome").
+Chrome's built-in PDF viewer refuses to activate inside ANY sandboxed
+iframe, regardless of which sandbox tokens are granted, so a plain
+``<iframe src="the.pdf" sandbox="...">`` embed can never reliably render
+inline in Chrome. Issue #1067's ``sandbox=""`` and Issue #1069's earlier
+``sandbox="allow-scripts allow-same-origin"`` both hit this wall.
 
-This command rewrites stored CMS content so that:
+This command rewrites stored CMS content so that every ``.pdf-container``
+iframe instead points at the self-hosted pdf.js viewer
+(``settings.PDF_VIEWER_URL``), passing the original PDF URL as a `file`
+query parameter. The viewer is same-origin, trusted code, so the iframe can
+stay genuinely sandboxed for every embed:
 
-* untrusted ``.pdf-container`` iframes carry
-  ``sandbox="allow-scripts allow-same-origin"`` (the value required for
-  the PDF viewer to work), and
-* iframes pointing at a trusted prefix
-  (``TINYMCE_PDF_TRUSTED_URL_PREFIXES``, e.g. ``/cms/document-pdf/``)
-  remain unsandboxed, as intended by Issue #1067.
+* trusted (``TINYMCE_PDF_TRUSTED_URL_PREFIXES``, e.g. our own
+  ``/cms/document-pdf/`` endpoint) and genuinely cross-origin URLs are both
+  wrapped in the viewer and sandboxed with
+  ``allow-scripts allow-same-origin allow-downloads allow-modals``;
+* a same-origin URL that is NOT the trusted endpoint (or anything else
+  invalid) is never embedded at all — its ``src`` is stripped and its
+  sandbox is fully locked down, since an unsandboxed same-origin fetch
+  would otherwise run with the visitor's full session privileges.
 
 The command is idempotent and safe to re-run. It defaults to a dry run;
 pass ``--apply`` to persist changes.
@@ -25,7 +31,7 @@ Usage::
 """
 
 import re
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -34,12 +40,11 @@ from django.utils import timezone
 
 from cms.models import HomePageContent, Page
 
-# Sandbox value required for Chrome's built-in PDF viewer (PDFium).
-PDF_EMBED_SANDBOX = "allow-scripts allow-same-origin"
+# Sandbox value used for every pdf.js-viewer-wrapped PDF embed. Safe because
+# the sandboxed document is our own viewer code, not the linked PDF itself.
+PDF_VIEWER_SANDBOX = "allow-scripts allow-same-origin allow-downloads allow-modals"
 
-IFRAME_TAG_RE = re.compile(
-    r"<iframe\b(?:[^\"'>]|\"[^\"]*\"|'[^']*')*>", re.IGNORECASE
-)
+IFRAME_TAG_RE = re.compile(r"<iframe\b(?:[^\"'>]|\"[^\"]*\"|'[^']*')*>", re.IGNORECASE)
 # Enforce true attribute boundaries so the regex does not match the substring
 # "src" inside a different attribute name (e.g. data-src, x-src).
 ATTR_SRC_RE = re.compile(r"(?<![0-9A-Za-z_-])src=[\"']([^\"']*)[\"']", re.IGNORECASE)
@@ -160,6 +165,93 @@ def _is_trusted_pdf_url(url, trusted_prefixes):
     return False
 
 
+def _extract_viewer_target(src, viewer_url):
+    """If `src` already points at our pdf.js viewer, return its wrapped
+    `file` target URL; otherwise None. Keeps re-normalization idempotent.
+    """
+    if not src:
+        return None
+    try:
+        parsed = urlparse(src)
+        parsed_viewer = urlparse(viewer_url)
+    except ValueError:
+        return None
+    if parsed.path != parsed_viewer.path:
+        return None
+    if parsed_viewer.netloc and parsed.netloc and parsed_viewer.netloc != parsed.netloc:
+        return None
+    values = parse_qs(parsed.query).get("file")
+    return values[0] if values else None
+
+
+def _classify_pdf_url(url, trusted_prefixes):
+    """Classify a candidate PDF URL, mirroring the client-side check in
+    ``static/js/tinymce-youtube-fix.js``'s ``classifyPdfUrl``.
+
+    Returns one of ``"trusted"``, ``"cross-origin"``,
+    ``"same-origin-blocked"``, or ``"invalid"``. Unlike the browser, this
+    command has no single "current origin" to compare against, so an
+    absolute URL is treated as same-origin only when its origin matches one
+    of the configured trusted-prefix origins (i.e. a known deployment
+    domain). The authoritative, always-correct check still happens
+    client-side at save time; this is a best-effort mirror for migrating
+    stored content.
+    """
+    if not url:
+        return "invalid"
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return "invalid"
+    if parsed.scheme and parsed.scheme not in ("http", "https"):
+        return "invalid"
+    if not parsed.scheme and parsed.netloc:
+        return "invalid"  # protocol-relative URLs are never trusted/safe
+    if _is_trusted_pdf_url(url, trusted_prefixes):
+        return "trusted"
+
+    is_absolute = parsed.scheme in ("http", "https") and bool(parsed.netloc)
+    if not is_absolute:
+        # Relative URL: resolves to our own origin but isn't the trusted path.
+        return "same-origin-blocked"
+
+    known_origins = set()
+    for prefix in trusted_prefixes:
+        try:
+            parsed_prefix = urlparse(prefix)
+        except ValueError:
+            continue
+        if parsed_prefix.scheme in ("http", "https") and parsed_prefix.netloc:
+            known_origins.add(_url_origin(parsed_prefix))
+    if _url_origin(parsed) in known_origins:
+        return "same-origin-blocked"
+    return "cross-origin"
+
+
+def _set_sandbox(tag, value):
+    """Return `tag` with its sandbox attribute set to `value` (added if absent)."""
+    if ATTR_SANDBOX_RE.search(tag):
+        return ATTR_SANDBOX_RE.sub(f' sandbox="{value}"', tag, count=1)
+    if tag.endswith("/>"):
+        return tag[:-2] + f' sandbox="{value}"/>'
+    return tag[:-1] + f' sandbox="{value}">'
+
+
+def _remove_src(tag):
+    """Return `tag` with its src attribute removed entirely."""
+    return ATTR_SRC_RE.sub("", tag, count=1)
+
+
+def _set_src(tag, value):
+    """Return `tag` with its src attribute set to `value` (added if absent)."""
+    escaped = value.replace('"', "&quot;")
+    if ATTR_SRC_RE.search(tag):
+        return ATTR_SRC_RE.sub(f'src="{escaped}"', tag, count=1)
+    if tag.endswith("/>"):
+        return tag[:-2] + f' src="{escaped}"/>'
+    return tag[:-1] + f' src="{escaped}">'
+
+
 def _is_inside_pdf_container(content, iframe_start):
     """Return True if the iframe is inside a .pdf-container div (any depth).
 
@@ -187,9 +279,8 @@ def _is_inside_pdf_container(content, iframe_start):
     return depth > 0
 
 
-def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
+def normalize_pdf_iframe_sandbox(content, trusted_prefixes, viewer_url):
     """Return (new_content, rewritten_count) for a CMS content string."""
-    rewritten = 0
     replacements = []  # (start, end, new_tag) collected in reverse order
 
     for match in IFRAME_TAG_RE.finditer(content):
@@ -199,39 +290,25 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
 
         src_match = ATTR_SRC_RE.search(tag)
         src = src_match.group(1) if src_match else ""
+        target = _extract_viewer_target(src, viewer_url) or src
+        classification = _classify_pdf_url(target, trusted_prefixes)
 
         sandbox_match = ATTR_SANDBOX_RE.search(tag)
-        has_sandbox = sandbox_match is not None
-        sandbox_value = None
-        if has_sandbox:
-            quoted = sandbox_match.group(1)  # e.g. "foo" or 'foo'
-            sandbox_value = quoted[1:-1]  # strip surrounding quotes
+        sandbox_value = sandbox_match.group(1)[1:-1] if sandbox_match else None
 
-        if _is_trusted_pdf_url(src, trusted_prefixes):
-            # Trusted embeds stay unsandboxed (Issue #1067 behavior). The
-            # sandbox match includes its leading whitespace, so removing it
-            # leaves exactly one separator before the next attribute — no
-            # double-space artifact.
-            if has_sandbox:
-                replacements.append(
-                    (
-                        match.start(),
-                        match.end(),
-                        ATTR_SANDBOX_RE.sub("", tag),
-                    )
-                )
-        else:
-            if sandbox_value == PDF_EMBED_SANDBOX:
-                continue  # already correct — idempotent
-            if has_sandbox:
-                new_tag = ATTR_SANDBOX_RE.sub(f' sandbox="{PDF_EMBED_SANDBOX}"', tag)
-            else:
-                # Append before the closing tag (handle self-closing tags).
-                if tag.endswith("/>"):
-                    new_tag = tag[:-2] + f' sandbox="{PDF_EMBED_SANDBOX}"/>'
-                else:
-                    new_tag = tag[:-1] + f' sandbox="{PDF_EMBED_SANDBOX}">'
+        if classification in ("invalid", "same-origin-blocked"):
+            if not src and sandbox_value == "":
+                continue  # already fully blocked — idempotent
+            new_tag = _set_sandbox(_remove_src(tag), "")
             replacements.append((match.start(), match.end(), new_tag))
+            continue
+
+        new_src = f"{viewer_url}?file={quote(target, safe='')}"
+        if src == new_src and sandbox_value == PDF_VIEWER_SANDBOX:
+            continue  # already correct — idempotent
+
+        new_tag = _set_sandbox(_set_src(tag, new_src), PDF_VIEWER_SANDBOX)
+        replacements.append((match.start(), match.end(), new_tag))
 
     # Apply replacements in reverse so offsets stay valid.
     new_content = content
@@ -243,9 +320,9 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes):
 
 class Command(BaseCommand):
     help = (
-        "Normalize the sandbox attribute on legacy .pdf-container iframes: "
-        "untrusted embeds get 'allow-scripts allow-same-origin' so the "
-        "browser PDF viewer works; trusted embeds stay unsandboxed."
+        "Normalize legacy .pdf-container iframes to route through the "
+        "self-hosted pdf.js viewer with a fixed sandbox, instead of relying "
+        "on Chrome's native (sandbox-incompatible) PDF viewer."
     )
 
     def add_arguments(self, parser):
@@ -258,6 +335,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         apply_changes = options["apply"]
         trusted_prefixes = list(settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES)
+        viewer_url = settings.PDF_VIEWER_URL
 
         scanned = inspected = rewritten = skipped_conflicts = 0
 
@@ -270,7 +348,7 @@ class Command(BaseCommand):
                     continue
 
                 new_content, row_rewrites = normalize_pdf_iframe_sandbox(
-                    content, trusted_prefixes
+                    content, trusted_prefixes, viewer_url
                 )
                 if not row_rewrites:
                     continue
@@ -295,7 +373,7 @@ class Command(BaseCommand):
                         )
                         fresh_content = locked_row.content or ""
                         locked_new, locked_rewrites = normalize_pdf_iframe_sandbox(
-                            fresh_content, trusted_prefixes
+                            fresh_content, trusted_prefixes, viewer_url
                         )
                         if not locked_rewrites:
                             skipped_conflicts += 1
