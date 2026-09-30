@@ -678,7 +678,9 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
             """
             () => {
                 const testUrl = 'https://example.com/test.pdf';
-                const viewerUrl = tinymce.activeEditor.settings.pdf_viewer_url
+                const editor = tinymce.activeEditor;
+                const viewerUrl = (editor.options && editor.options.get && editor.options.get('pdf_viewer_url'))
+                    || (editor.settings && editor.settings.pdf_viewer_url)
                     || '/static/pdfjs-viewer/viewer.html';
                 const sandbox = 'allow-scripts allow-same-origin allow-downloads allow-modals';
                 const viewerSrc = viewerUrl + '?file=' + encodeURIComponent(testUrl);
