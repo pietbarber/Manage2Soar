@@ -37,7 +37,9 @@ from cms.models import HomePageContent, Page
 # Sandbox value required for Chrome's built-in PDF viewer (PDFium).
 PDF_EMBED_SANDBOX = "allow-scripts allow-same-origin"
 
-IFRAME_TAG_RE = re.compile(r"<iframe\b[^>]*>", re.IGNORECASE)
+IFRAME_TAG_RE = re.compile(
+    r"<iframe\b(?:[^\"'>]|\"[^\"]*\"|'[^']*')*>", re.IGNORECASE
+)
 # Enforce true attribute boundaries so the regex does not match the substring
 # "src" inside a different attribute name (e.g. data-src, x-src).
 ATTR_SRC_RE = re.compile(r"(?<![0-9A-Za-z_-])src=[\"']([^\"']*)[\"']", re.IGNORECASE)

@@ -389,6 +389,28 @@ def test_self_closing_iframe_is_validated(settings):
     assert normalize_pdf_iframe_sandbox(new_content, [])[1] == 0
 
 
+def test_greater_than_inside_quoted_attribute_does_not_truncate_iframe(settings):
+    content = (
+        '<div class="pdf-container">'
+        '<iframe src="https://attacker.example/evil.pdf" title="A > B" '
+        'width="100%"></iframe>'
+        "</div>"
+    )
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert (
+        '<iframe src="https://attacker.example/evil.pdf" title="A > B" '
+        f'width="100%" sandbox="{PDF_EMBED_SANDBOX}"></iframe>'
+    ) in new_content
+
+
 def test_trusted_removal_leaves_no_double_space(settings):
     """Removing a sandbox from a trusted embed must not leave a double space."""
     content = (
