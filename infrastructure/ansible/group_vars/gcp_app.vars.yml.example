@@ -230,3 +230,8 @@ gke_tenants:
 #   FEATURE_FLAG_NEW_UI: "true"
 #   SENTRY_DSN: "https://..."
 #   TINYMCE_PDF_TRUSTED_URL_PREFIXES: "https://pdf.example.com/cms/document-pdf/,https://cdn.example.com/pdfs/"
+#   # Issue #1069 Phase 3: external PDF proxy. Off by default (empty). Only
+#   # set this to specific external hostnames you intend to embed PDFs from
+#   # (e.g. a partner org's document server) - never a wildcard.
+#   CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS: "docs.example.org"
+#   CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS: "86400"

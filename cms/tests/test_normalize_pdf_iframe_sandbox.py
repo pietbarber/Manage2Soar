@@ -36,6 +36,11 @@ def wrapped_src(viewer_url, target_url):
     return f"{viewer_url}?file={quote(target_url, safe='')}"
 
 
+def proxied_src(proxy_url, target_url):
+    """Build the expected external-pdf-proxy-wrapped src for `target_url`."""
+    return f"{proxy_url}?url={quote(target_url, safe='')}"
+
+
 @pytest.mark.django_db
 def test_dry_run_reports_but_changes_nothing(settings, capsys):
     page = Page.objects.create(
@@ -602,14 +607,14 @@ def test_apply_skips_rows_changed_concurrently(settings, capsys):
     real_normalize = mod.normalize_pdf_iframe_sandbox
     calls = {"count": 0}
 
-    def racing_normalize(content, prefixes, viewer_url):
+    def racing_normalize(content, prefixes, viewer_url, proxy_url=""):
         calls["count"] += 1
         # First call is the command's initial read (stale content). The
         # concurrent editor save lands right after that read, so the in-lock
         # re-read will see the fresh, already-normalized content.
         if calls["count"] == 1:
             Page.objects.filter(pk=page.pk).update(content=concurrent_save)
-        return real_normalize(content, prefixes, viewer_url)
+        return real_normalize(content, prefixes, viewer_url, proxy_url)
 
     mod.normalize_pdf_iframe_sandbox = racing_normalize
     try:
@@ -661,13 +666,13 @@ def test_apply_reports_fresh_rewrites_when_concurrent_edit_changes_count(
     real_normalize = mod.normalize_pdf_iframe_sandbox
     calls = {"count": 0}
 
-    def racing_normalize(content, prefixes, viewer_url):
+    def racing_normalize(content, prefixes, viewer_url, proxy_url=""):
         calls["count"] += 1
         # First call is the command's initial read. Swap in the fresh
         # content so the locked re-read sees it.
         if calls["count"] == 1:
             Page.objects.filter(pk=page.pk).update(content=concurrent_save)
-        return real_normalize(content, prefixes, viewer_url)
+        return real_normalize(content, prefixes, viewer_url, proxy_url)
 
     mod.normalize_pdf_iframe_sandbox = racing_normalize
     try:
@@ -756,3 +761,53 @@ def test_already_wrapped_trusted_embed_is_idempotent(settings):
         )
     assert second_rewritten == 0
     assert final_content == new_content
+
+
+def test_cross_origin_pdf_routes_through_proxy_when_enabled(settings):
+    """A cross-origin PDF is wrapped viewer(proxy(url)) when a proxy is configured."""
+    viewer_url = "/static/pdfjs-viewer/viewer.html"
+    proxy_url = "/cms/external-pdf-proxy/"
+    content = make_embed(UNTRUSTED_GCS_URL, sandbox="")
+
+    with override_settings(TINYMCE_PDF_TRUSTED_URL_PREFIXES=[]):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES, viewer_url, proxy_url
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_VIEWER_SANDBOX}"' in new_content
+    proxied = proxied_src(proxy_url, UNTRUSTED_GCS_URL)
+    assert wrapped_src(viewer_url, proxied) in new_content
+
+
+def test_trusted_pdf_does_not_route_through_proxy(settings):
+    """A trusted endpoint embed is wrapped directly, bypassing the proxy."""
+    trusted = "http://testserver/cms/document-pdf/"
+    viewer_url = "/static/pdfjs-viewer/viewer.html"
+    proxy_url = "/cms/external-pdf-proxy/"
+    content = make_embed(f"{trusted}42/", sandbox="")
+
+    with override_settings(TINYMCE_PDF_TRUSTED_URL_PREFIXES=[trusted]):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES, viewer_url, proxy_url
+        )
+
+    assert rewritten == 1
+    assert wrapped_src(viewer_url, f"{trusted}42/") in new_content
+    assert "external-pdf-proxy" not in new_content
+
+
+def test_already_proxy_wrapped_cross_origin_is_idempotent(settings):
+    """Re-normalizing an already viewer(proxy(url))-wrapped embed is stable."""
+    viewer_url = "/static/pdfjs-viewer/viewer.html"
+    proxy_url = "/cms/external-pdf-proxy/"
+    proxied = proxied_src(proxy_url, UNTRUSTED_GCS_URL)
+    content = make_embed(wrapped_src(viewer_url, proxied), sandbox=PDF_VIEWER_SANDBOX)
+
+    with override_settings(TINYMCE_PDF_TRUSTED_URL_PREFIXES=[]):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES, viewer_url, proxy_url
+        )
+
+    assert rewritten == 0
+    assert new_content == content

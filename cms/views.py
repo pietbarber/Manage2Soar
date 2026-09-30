@@ -19,6 +19,11 @@ from tinymce.widgets import TinyMCE
 
 from cms.forms import SiteFeedbackForm, VisitorContactForm
 from cms.models import HomePageContent
+from cms.pdf_proxy import (
+    ExternalPdfFetchError,
+    get_or_fetch_cached_pdf,
+    is_proxyable_external_url,
+)
 from members.decorators import active_member_required
 from members.utils import is_active_member
 from utils.email_helpers import get_absolute_club_logo_url
@@ -277,6 +282,35 @@ def document_pdf(request, document_id):
     except OSError:
         return HttpResponseForbidden("The requested document is unavailable.")
 
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-Frame-Options"] = "SAMEORIGIN"
+    response["Content-Security-Policy"] = "frame-ancestors 'self'"
+    return response
+
+
+@require_http_methods(["GET"])
+def external_pdf_proxy(request):
+    """Serve an allowlisted, cached external PDF with the document_pdf response policy."""
+    url = request.GET.get("url", "").strip()
+    if not url or not is_proxyable_external_url(url):
+        return HttpResponseForbidden("This URL is not an allowed external PDF source.")
+
+    try:
+        cached = get_or_fetch_cached_pdf(url)
+    except ExternalPdfFetchError:
+        return HttpResponseForbidden("This PDF could not be fetched or validated.")
+
+    try:
+        stored_file = cached.file.open("rb")
+    except OSError:
+        return HttpResponseForbidden("The requested document is unavailable.")
+
+    response = FileResponse(
+        stored_file,
+        as_attachment=False,
+        filename=cached.file.name.rsplit("/", 1)[-1],
+        content_type="application/pdf",
+    )
     response["X-Content-Type-Options"] = "nosniff"
     response["X-Frame-Options"] = "SAMEORIGIN"
     response["Content-Security-Policy"] = "frame-ancestors 'self'"

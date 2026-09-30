@@ -589,6 +589,28 @@ TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
 # TINYMCE_DEFAULT_CONFIG and the normalize_pdf_iframe_sandbox command.
 PDF_VIEWER_URL = f"{STATIC_URL}pdfjs-viewer/viewer.html"
 
+# External PDF proxy (Issue #1069 Phase 3): lets the pdf.js viewer render a
+# genuinely external (non-uploaded) PDF without depending on that host's CORS
+# configuration, by fetching/validating/caching it same-origin instead. Off
+# by default (empty allowlist) - a deployment must opt in per external host.
+CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = [
+    host.strip().lower()
+    for host in os.getenv("CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
+CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS = int(
+    os.getenv("CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS", str(60 * 60 * 24))
+)
+# Relative path only - urlconf isn't loaded yet at settings import time, so
+# this can't be reverse()'d; it must match cms/urls.py's "external-pdf-proxy/".
+CMS_EXTERNAL_PDF_PROXY_URL = "/cms/external-pdf-proxy/"
+# Exposed to the client only when the feature is actually enabled for this
+# deployment, so the TinyMCE JS knows whether to route cross-origin PDFs
+# through the proxy or fall back to a direct (CORS-dependent) fetch.
+PDF_EXTERNAL_PROXY_URL_FOR_CLIENT = (
+    CMS_EXTERNAL_PDF_PROXY_URL if CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS else ""
+)
+
 TINYMCE_DEFAULT_CONFIG = {
     "relative_urls": False,  # prevent ugly ../../../ paths
     "remove_script_host": True,  # strip protocol+host from URLs
@@ -612,6 +634,8 @@ TINYMCE_DEFAULT_CONFIG = {
     # refuses to render inside any sandboxed iframe, so PDFs are rendered by
     # our own pdf.js-based viewer instead, which can stay genuinely sandboxed.
     "pdf_viewer_url": PDF_VIEWER_URL,
+    # External PDF proxy (Issue #1069 Phase 3): empty string when disabled.
+    "pdf_external_proxy_url": PDF_EXTERNAL_PROXY_URL_FOR_CLIENT,
     # FIX FOR ISSUE #277 - YOUTUBE ERROR 153: Multiple approaches to ensure proper referrer policy
     # YouTube Error 153 occurs when referrer policy is too restrictive (e.g., 'no-referrer')
     # Using 'strict-origin-when-cross-origin' allows YouTube to verify the embedding domain

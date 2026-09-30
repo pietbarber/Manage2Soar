@@ -165,23 +165,47 @@ def _is_trusted_pdf_url(url, trusted_prefixes):
     return False
 
 
-def _extract_viewer_target(src, viewer_url):
-    """If `src` already points at our pdf.js viewer, return its wrapped
-    `file` target URL; otherwise None. Keeps re-normalization idempotent.
+def _extract_wrapped_target(src, wrapper_url, param_name):
+    """If `src` already points at `wrapper_url`, return its `param_name`
+    query value; otherwise None. Shared by the pdf.js-viewer and external-
+    proxy unwrap steps to keep re-normalization idempotent.
     """
-    if not src:
+    if not src or not wrapper_url:
         return None
     try:
         parsed = urlparse(src)
-        parsed_viewer = urlparse(viewer_url)
+        parsed_wrapper = urlparse(wrapper_url)
     except ValueError:
         return None
-    if parsed.path != parsed_viewer.path:
+    if parsed.path != parsed_wrapper.path:
         return None
-    if parsed_viewer.netloc and parsed.netloc and parsed_viewer.netloc != parsed.netloc:
+    if (
+        parsed_wrapper.netloc
+        and parsed.netloc
+        and parsed_wrapper.netloc != parsed.netloc
+    ):
         return None
-    values = parse_qs(parsed.query).get("file")
+    values = parse_qs(parsed.query).get(param_name)
     return values[0] if values else None
+
+
+def _resolve_original_url(src, viewer_url, proxy_url):
+    """Recover the original PDF URL from a (possibly viewer- and/or
+    proxy-wrapped) iframe src, for idempotent re-normalization.
+    """
+    viewer_target = _extract_wrapped_target(src, viewer_url, "file") or src
+    return _extract_wrapped_target(viewer_target, proxy_url, "url") or viewer_target
+
+
+def _resolve_embed_target(url, classification, proxy_url):
+    """Given the *original* PDF URL and its classification, return the value
+    that should be passed to the viewer as `file`: cross-origin URLs route
+    through the external proxy when one is configured (Issue #1069 Phase 3),
+    everything else embeds directly.
+    """
+    if classification == "cross-origin" and proxy_url:
+        return f"{proxy_url}?url={quote(url, safe='')}"
+    return url
 
 
 def _classify_pdf_url(url, trusted_prefixes):
@@ -279,7 +303,7 @@ def _is_inside_pdf_container(content, iframe_start):
     return depth > 0
 
 
-def normalize_pdf_iframe_sandbox(content, trusted_prefixes, viewer_url):
+def normalize_pdf_iframe_sandbox(content, trusted_prefixes, viewer_url, proxy_url=""):
     """Return (new_content, rewritten_count) for a CMS content string."""
     replacements = []  # (start, end, new_tag) collected in reverse order
 
@@ -290,8 +314,8 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes, viewer_url):
 
         src_match = ATTR_SRC_RE.search(tag)
         src = src_match.group(1) if src_match else ""
-        target = _extract_viewer_target(src, viewer_url) or src
-        classification = _classify_pdf_url(target, trusted_prefixes)
+        original_url = _resolve_original_url(src, viewer_url, proxy_url)
+        classification = _classify_pdf_url(original_url, trusted_prefixes)
 
         sandbox_match = ATTR_SANDBOX_RE.search(tag)
         sandbox_value = sandbox_match.group(1)[1:-1] if sandbox_match else None
@@ -303,7 +327,8 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes, viewer_url):
             replacements.append((match.start(), match.end(), new_tag))
             continue
 
-        new_src = f"{viewer_url}?file={quote(target, safe='')}"
+        embed_target = _resolve_embed_target(original_url, classification, proxy_url)
+        new_src = f"{viewer_url}?file={quote(embed_target, safe='')}"
         if src == new_src and sandbox_value == PDF_VIEWER_SANDBOX:
             continue  # already correct — idempotent
 
@@ -336,6 +361,7 @@ class Command(BaseCommand):
         apply_changes = options["apply"]
         trusted_prefixes = list(settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES)
         viewer_url = settings.PDF_VIEWER_URL
+        proxy_url = settings.PDF_EXTERNAL_PROXY_URL_FOR_CLIENT
 
         scanned = inspected = rewritten = skipped_conflicts = 0
 
@@ -348,7 +374,7 @@ class Command(BaseCommand):
                     continue
 
                 new_content, row_rewrites = normalize_pdf_iframe_sandbox(
-                    content, trusted_prefixes, viewer_url
+                    content, trusted_prefixes, viewer_url, proxy_url
                 )
                 if not row_rewrites:
                     continue
@@ -373,7 +399,7 @@ class Command(BaseCommand):
                         )
                         fresh_content = locked_row.content or ""
                         locked_new, locked_rewrites = normalize_pdf_iframe_sandbox(
-                            fresh_content, trusted_prefixes, viewer_url
+                            fresh_content, trusted_prefixes, viewer_url, proxy_url
                         )
                         if not locked_rewrites:
                             skipped_conflicts += 1
