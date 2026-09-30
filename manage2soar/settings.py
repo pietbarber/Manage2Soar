@@ -322,6 +322,15 @@ else:
     MEDIA_URL = "/media/"
     MEDIA_ROOT = BASE_DIR / "media"
 
+#############################################################
+# ---- django-import-export temporary storage ----
+# Use a shared, cross-pod backend so admin import/export works with
+# multiple GKE replicas. MediaStorage resolves to STORAGES["default"],
+# which is the shared GCS backend in production (and local FileSystemStorage
+# in development), avoiding the pod-local /tmp FileNotFoundError. See issue #1071.
+# Note: CacheStorage is not used because no shared CACHES backend is configured.
+IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.MediaStorage"
+
 # Use TinyMCE JS from configured static storage
 TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
 
