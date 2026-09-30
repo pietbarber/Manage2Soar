@@ -26,7 +26,7 @@ Usage::
 
 import posixpath
 import re
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -52,18 +52,29 @@ def _url_origin(parsed):
 
 
 def _normalize_path(path):
-    """Resolve ``.``/``..`` dot segments the way a browser's ``new URL()`` does.
+    """Resolve dot segments the way a browser's WHATWG URL parser does.
 
-    ``urllib.parse.urlparse`` leaves dot segments intact, so e.g.
-    ``/cms/document-pdf/../admin/`` would otherwise appear to sit under the
-    ``/cms/document-pdf/`` prefix even though the browser actually loads
-    ``/cms/admin/``. ``posixpath.normpath`` collapses the dot segments like
-    the browser, but strips a trailing slash — re-append it if the original
-    path had one so exact-prefix comparisons keep working.
+    ``urllib.parse.urlparse`` leaves dot segments and percent-encodings
+    intact, so e.g. ``/cms/document-pdf/../admin/`` or
+    ``/cms/document-pdf/%2e%2e/admin/`` would otherwise appear to sit under
+    the ``/cms/document-pdf/`` prefix even though the browser actually
+    loads ``/cms/admin/``.
+
+    For special-scheme URLs (http/https) the WHATWG parser:
+    * percent-decodes the path before dot-segment resolution,
+    * treats backslash (``\\`` and ``%5C``) as a path separator.
+
+    This helper mirrors both steps so the trust decision matches what the
+    browser would actually load. Legitimate percent-encoded characters
+    (e.g. ``%20`` for a space) are preserved after decoding — they simply
+    become literal characters in the path and do not affect prefix matching.
     """
     if not path or path == "/":
         return path
-    normalized = posixpath.normpath(path)
+    decoded = unquote(path)
+    # WHATWG special-scheme parser treats backslash as "/".
+    decoded = decoded.replace("\\", "/")
+    normalized = posixpath.normpath(decoded)
     if path.endswith("/") and not normalized.endswith("/"):
         normalized += "/"
     return normalized

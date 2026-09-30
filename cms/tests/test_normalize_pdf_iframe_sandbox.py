@@ -242,6 +242,83 @@ def test_dot_segment_staying_within_prefix_is_trusted(settings):
     assert "sandbox" not in new_content
 
 
+def test_encoded_dot_segment_escaping_prefix_is_not_trusted(settings):
+    """Percent-encoded dot segments must be resolved like the browser.
+
+    new URL() resolves /cms/document-pdf/%2e%2e/admin/ to /cms/admin/, so a
+    URL that percent-encodes its .. to escape the prefix must be untrusted
+    and keep its sandbox.
+    """
+    content = make_embed(
+        "https://example.com/cms/document-pdf/%2e%2e/admin/", sandbox=""
+    )
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+
+
+def test_encoded_dot_segment_staying_within_prefix_is_trusted(settings):
+    """An encoded .. that resolves back inside the prefix stays trusted.
+
+    /cms/document-pdf/42/%2e%2e/53/ resolves to /cms/document-pdf/53/, still
+    under the trusted prefix, so it must remain unsandboxed.
+    """
+    content = make_embed("/cms/document-pdf/42/%2e%2e/53/")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 0
+    assert "sandbox" not in new_content
+
+
+def test_backslash_separator_stays_within_prefix_is_trusted(settings):
+    """For special schemes, a backslash is a path separator like the browser.
+
+    new URL() treats /cms/document-pdf/42\\admin\\x.pdf as
+    /cms/document-pdf/42/admin/x.pdf, which is under the prefix, so it stays
+    trusted. A single encoded 4-dot segment is a literal filename (not ..
+    navigation) and likewise stays within the prefix.
+    """
+    content = make_embed("https://example.com/cms/document-pdf/42\\admin\\x.pdf")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 0
+    assert "sandbox" not in new_content
+
+
+def test_legit_percent_encoded_filename_stays_trusted(settings):
+    """Legitimate percent-encoding (%20 for a space) must not affect matching."""
+    content = make_embed("https://example.com/cms/document-pdf/my%20bylaws.pdf")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 0
+    assert "sandbox" not in new_content
+
+
 def test_self_closing_iframe_is_validated(settings):
     """A self-closing <iframe .../> must not produce malformed markup.
 
