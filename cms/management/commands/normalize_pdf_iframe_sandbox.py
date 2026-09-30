@@ -24,7 +24,6 @@ Usage::
     python manage.py normalize_pdf_iframe_sandbox --apply  # apply changes
 """
 
-import posixpath
 import re
 from urllib.parse import unquote, urlparse
 
@@ -60,23 +59,49 @@ def _normalize_path(path):
     the ``/cms/document-pdf/`` prefix even though the browser actually
     loads ``/cms/admin/``.
 
-    For special-scheme URLs (http/https) the WHATWG parser:
-    * percent-decodes the path before dot-segment resolution,
-    * treats backslash (``\\`` and ``%5C``) as a path separator.
+    For special-scheme URLs (http/https) the WHATWG parser resolves each
+    path segment whose *decoded* value is ``.`` or ``..`` as
+    navigation, but leaves every other segment in its original
+    (percent-encoded) form. That means:
 
-    This helper mirrors both steps so the trust decision matches what the
-    browser would actually load. Legitimate percent-encoded characters
-    (e.g. ``%20`` for a space) are preserved after decoding — they simply
-    become literal characters in the path and do not affect prefix matching.
+    * ``%2e%2e`` / ``%2E%2E`` decode to ``..`` and move one level up;
+    * a *literal* ``\\`` is a path separator, so it is split on;
+    * encoded separators and ordinary characters stay literal — ``%2F``,
+      ``%5C``, ``%20`` are NOT decoded, so e.g. ``cms%2Fdocument-pdf``
+      does not collapse to ``cms/document-pdf`` and repeated slashes are
+      not collapsed;
+    * a single encoded 4-dot segment (``%2e%2e%2e%2e``) decodes to the
+      literal name ``....`` (no dot *boundary*), so it is a filename, not
+      two levels of ``..``.
+
+    This mirrors what the browser actually loads, so the trust decision
+    matches the client-side ``isTrustedPdfUrl`` check.
     """
     if not path or path == "/":
         return path
-    decoded = unquote(path)
-    # WHATWG special-scheme parser treats backslash as "/".
-    decoded = decoded.replace("\\", "/")
-    normalized = posixpath.normpath(decoded)
-    if path.endswith("/") and not normalized.endswith("/"):
-        normalized += "/"
+    had_trailing_slash = path.endswith("/")
+    # WHATWG special-scheme parser treats a literal backslash as "/".
+    segments = path.replace("\\", "/").split("/")
+    resolved: list[str] = []
+    for segment in segments:
+        if segment == "":
+            resolved.append(segment)
+        elif unquote(segment) == ".":
+            # Current-directory marker: dropped, matching the browser.
+            continue
+        elif unquote(segment) == "..":
+            if resolved and resolved[-1] != "":
+                resolved.pop()
+            # A leading ".." (or one with nothing to pop) is a no-op.
+        else:
+            resolved.append(segment)
+    if not resolved:
+        resolved = [""]
+    elif had_trailing_slash and resolved[-1] != "":
+        resolved.append("")
+    normalized = "/".join(resolved)
+    if not normalized:
+        normalized = "/"
     return normalized
 
 

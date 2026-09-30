@@ -319,6 +319,49 @@ def test_legit_percent_encoded_filename_stays_trusted(settings):
     assert "sandbox" not in new_content
 
 
+def test_encoded_slash_is_not_decoded_to_separator(settings):
+    """Encoded slashes (%2F) must not collapse into real path separators.
+
+    new URL() keeps /cms%2Fdocument-pdf/42/ as-is (it does NOT become
+    /cms/document-pdf/42/), so it does not sit under the /cms/document-pdf/
+    prefix and must be untrusted. Blanket percent-decoding would wrongly
+    broaden the allowlist here.
+    """
+    content = make_embed("https://example.com/cms%2Fdocument-pdf/42/", sandbox="")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    assert rewritten == 1
+    assert f'sandbox="{PDF_EMBED_SANDBOX}"' in new_content
+
+
+def test_encoded_backslash_is_not_decoded_to_separator(settings):
+    """Encoded backslashes (%5C) stay literal, not path separators.
+
+    new URL() keeps /cms/document-pdf/%5Cadmin%5Cx.pdf as-is, so it stays
+    under the prefix (trusted). Only a raw backslash is a separator for the
+    browser; percent-encoded backslashes must not be decoded into one.
+    """
+    content = make_embed("https://example.com/cms/document-pdf/%5Cadmin%5Cx.pdf")
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=["https://example.com/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES
+        )
+
+    # %5C is not a real separator, so the path stays within the prefix and
+    # the embed remains trusted (no sandbox added).
+    assert rewritten == 0
+    assert "sandbox" not in new_content
+
+
 def test_self_closing_iframe_is_validated(settings):
     """A self-closing <iframe .../> must not produce malformed markup.
 
