@@ -286,11 +286,15 @@ if GS_BUCKET_NAME:
         "default": {
             "BACKEND": "manage2soar.storage_backends.MediaRootGCS",
         },
+        "import_export": {
+            "BACKEND": "manage2soar.storage_backends.PrivateImportExportGCS",
+        },
         "staticfiles": {
             "BACKEND": "manage2soar.storage_backends.StaticRootGCS",
         },
     }
 
+    GS_IMPORT_EXPORT_BUCKET_NAME = os.getenv("GS_IMPORT_EXPORT_BUCKET_NAME")
     GS_DEFAULT_ACL = os.getenv("GS_DEFAULT_ACL", "publicRead")
 
     # Multi-tenant GCP URLs
@@ -314,6 +318,12 @@ else:
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
+        "import_export": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+            "OPTIONS": {
+                "location": str(BASE_DIR / "media" / "django-import-export"),
+            },
+        },
         "staticfiles": {
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
@@ -324,11 +334,9 @@ else:
 
 #############################################################
 # ---- django-import-export temporary storage ----
-# Use a shared, cross-pod backend so admin import/export works with
-# multiple GKE replicas. MediaStorage resolves to STORAGES["default"],
-# which is the shared GCS backend in production (and local FileSystemStorage
-# in development), avoiding the pod-local /tmp FileNotFoundError. See issue #1071.
-# Note: CacheStorage is not used because no shared CACHES backend is configured.
+# Use a dedicated private storage alias so member import files are not public.
+# Its GCS bucket is shared across pods and has an IaC-managed expiration policy.
+# See issue #1071.
 IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.MediaStorage"
 
 # Use TinyMCE JS from configured static storage

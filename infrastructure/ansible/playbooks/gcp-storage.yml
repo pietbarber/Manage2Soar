@@ -46,6 +46,8 @@
     gcs_project: "{{ gcp_project | default('manage2soar') }}"
     gcs_location: "{{ gke_gcs_location | default('us-east1') }}"
     gcs_storage_class: "{{ gke_gcs_storage_class | default('STANDARD') }}"
+    gcs_import_export_bucket_name: >-
+      {{ gke_gcs_import_export_bucket | default(gcs_bucket_name ~ '-private-import-export') }}
     # Service account defaults to the same project as GCS bucket for consistency with
     # setup-gcs-bucket.sh behavior (when using default PROJECT_ID).
     gcs_service_account: "{{ gke_service_account_email | default('django@' ~ gcs_project ~ '.iam.gserviceaccount.com') }}"
@@ -110,3 +112,79 @@
           - "Bucket name: {{ verify_result.resources[0].name }}"
           - "Location: {{ verify_result.resources[0].location }}"
           - "Uniform bucket-level access: {{ verify_result.resources[0].iamConfiguration.uniformBucketLevelAccess.enabled }}"
+
+    - name: Ensure private import/export bucket exists with uniform access
+      tags: [bucket]
+      google.cloud.gcp_storage_bucket:
+        name: "{{ gcs_import_export_bucket_name }}"
+        project: "{{ gcs_project }}"
+        location: "{{ gcs_location }}"
+        storage_class: "{{ gcs_storage_class }}"
+        iam_configuration:
+          uniform_bucket_level_access:
+            enabled: true
+        state: present
+        auth_kind: application
+
+    - name: Get private import/export bucket configuration
+      tags: [permissions, lifecycle]
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - describe
+          - "gs://{{ gcs_import_export_bucket_name }}"
+          - --format=json
+      register: import_export_bucket_info_raw
+      changed_when: false
+
+    - name: Parse private import/export bucket configuration
+      ansible.builtin.set_fact:
+        import_export_bucket_info: "{{ import_export_bucket_info_raw.stdout | from_json }}"
+
+    - name: Enforce public access prevention on private import/export bucket
+      tags: [permissions]
+      ansible.builtin.command:
+        argv:
+          - gsutil
+          - pap
+          - set
+          - enforced
+          - "gs://{{ gcs_import_export_bucket_name }}"
+      when: >-
+        import_export_bucket_info.iamConfiguration.publicAccessPrevention | default('') != 'enforced'
+
+    - name: Grant application service account access to private import/export bucket
+      tags: [permissions]
+      google.cloud.gcp_storage_bucket_iam_binding:
+        bucket: "{{ gcs_import_export_bucket_name }}"
+        role: "roles/storage.objectAdmin"
+        members:
+          - "serviceAccount:{{ gcs_service_account }}"
+        project: "{{ gcs_project }}"
+        auth_kind: application
+
+    - name: Check for import/export object expiration lifecycle rule
+      tags: [lifecycle]
+      ansible.builtin.set_fact:
+        import_export_lifecycle_exists: >-
+          {{
+            import_export_bucket_info.lifecycle.rule | default([])
+            | selectattr('action.type', 'equalto', 'Delete')
+            | selectattr('condition.age', 'equalto', 1)
+            | selectattr('condition.matchesPrefix', 'equalto', ['django-import-export/'])
+            | list | length > 0
+          }}
+
+    - name: Apply import/export object expiration lifecycle policy
+      tags: [lifecycle]
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - update
+          - "gs://{{ gcs_import_export_bucket_name }}"
+          - "--lifecycle-file={{ playbook_dir }}/../files/gcs-import-export-lifecycle.json"
+      when: not import_export_lifecycle_exists
