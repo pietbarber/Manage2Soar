@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.test import TestCase
 from tablib import Dataset
 
@@ -7,6 +8,12 @@ from members.resources import MemberResource
 
 class MemberImportResourceTests(TestCase):
     """Regression tests for member CSV import normalization."""
+
+    def test_import_export_uses_shared_media_storage_for_temporary_files(self):
+        self.assertEqual(
+            settings.IMPORT_EXPORT_TMP_STORAGE_CLASS,
+            "import_export.tmp_storages.MediaStorage",
+        )
 
     def test_null_like_ssa_values_are_stored_as_none(self):
         dataset = Dataset(headers=["username", "SSA_member_number"])

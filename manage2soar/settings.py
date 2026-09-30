@@ -271,6 +271,8 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
 GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", f"{CLUB_PREFIX}/media")
 GS_STATIC_LOCATION = os.getenv("GS_STATIC_LOCATION", f"{CLUB_PREFIX}/static")
 
+IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.MediaStorage"
+
 # Credentials for GCS (only load if using GCS)
 if GS_BUCKET_NAME:
     GS_PROJECT_ID = os.getenv("GS_PROJECT_ID")  # optional
