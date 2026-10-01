@@ -16,6 +16,7 @@ import * as pdfjsLib from "../vendor/pdfjs/build/pdf.mjs";
 import { TextLayerBuilder } from "../vendor/pdfjs/web/pdf_viewer.mjs";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "../vendor/pdfjs/build/pdf.worker.min.mjs";
+const pdfjsAssetBaseUrl = new URL("../", import.meta.url);
 
 const statusEl = document.getElementById("status");
 const pagesEl = document.getElementById("pages");
@@ -108,10 +109,10 @@ async function loadAndRender() {
     try {
         const loadingTask = pdfjsLib.getDocument({
             url: file,
-            cMapUrl: "../cmaps/",
+            cMapUrl: new URL("cmaps/", pdfjsAssetBaseUrl).href,
             cMapPacked: true,
-            standardFontDataUrl: "../standard_fonts/",
-            wasmUrl: "../wasm/",
+            standardFontDataUrl: new URL("standard_fonts/", pdfjsAssetBaseUrl).href,
+            wasmUrl: new URL("wasm/", pdfjsAssetBaseUrl).href,
         });
         pdfDocument = await loadingTask.promise;
         setStatus("");

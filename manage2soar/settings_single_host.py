@@ -247,7 +247,7 @@ TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
     if prefix.strip()
 ]
 
-PDF_VIEWER_URL = f"{STATIC_URL}pdfjs-viewer/viewer.html"
+PDF_VIEWER_URL = "/cms/pdf-viewer/pdfjs-viewer/viewer.html"
 CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = [
     host.strip().lower()
     for host in os.getenv("CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS", "").split(",")

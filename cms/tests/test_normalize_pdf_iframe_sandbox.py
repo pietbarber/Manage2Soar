@@ -796,7 +796,10 @@ def test_legacy_gcs_viewer_is_migrated_to_same_origin_viewer(settings):
     assert rewritten == 1
     assert settings.PDF_VIEWER_URL in new_content
     assert f'<iframe src="{legacy_viewer}' not in new_content
-    assert wrapped_src(settings.PDF_VIEWER_URL, target) in new_content
+    assert (
+        wrapped_src(settings.PDF_VIEWER_URL, f"{settings.SITE_URL}{target}")
+        in new_content
+    )
 
 
 def test_cross_origin_pdf_routes_through_proxy_when_enabled(settings):
