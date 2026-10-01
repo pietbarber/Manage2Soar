@@ -152,13 +152,21 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/var/www/m2s/media")
 
 # Use WhiteNoise for serving static files (no GCS needed)
+#
+# The import/export alias is deliberately placed OUTSIDE MEDIA_ROOT. Nginx
+# aliases all of /var/www/m2s/media to the public /media/ URL, so any file
+# under MEDIA_ROOT (including member import CSVs) would be web-accessible.
+# The dedicated directory is provisioned separately by the m2s-app Ansible
+# role (owned by the app user, not web-served). Override with IMPORT_EXPORT_TMP_DIR.
+IMPORT_EXPORT_TMP_DIR = os.getenv("IMPORT_EXPORT_TMP_DIR", "/opt/m2s/import-export-tmp")
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "import_export": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
-        "OPTIONS": {"location": str(Path(MEDIA_ROOT) / "django-import-export")},
+        "OPTIONS": {"location": IMPORT_EXPORT_TMP_DIR},
     },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",

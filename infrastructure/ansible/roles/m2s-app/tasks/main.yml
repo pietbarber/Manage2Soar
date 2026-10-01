@@ -47,6 +47,18 @@
     - "{{ m2s_django_static_root }}"
     - "{{ m2s_django_media_root }}"
 
+- name: Create private import/export temporary storage directory
+  # Holds django-import-export member import/export temp files. Kept OUTSIDE
+  # /var/www/m2s/media (which Nginx serves publicly at /media/) and made
+  # 0750 (owner+group only, not world-readable) so these PII files are never
+  # web-accessible (issue #1071).
+  ansible.builtin.file:
+    path: "{{ m2s_import_export_tmp_dir }}"
+    state: directory
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    mode: "0750"
+
 - name: Clone or update application repository
   ansible.builtin.git:
     repo: "{{ m2s_git_repo }}"
