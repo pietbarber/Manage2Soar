@@ -108,10 +108,10 @@ async function loadAndRender() {
     try {
         const loadingTask = pdfjsLib.getDocument({
             url: file,
-            cMapUrl: "../vendor/pdfjs/cmaps/",
+            cMapUrl: "../cmaps/",
             cMapPacked: true,
-            standardFontDataUrl: "../vendor/pdfjs/standard_fonts/",
-            wasmUrl: "../vendor/pdfjs/wasm/",
+            standardFontDataUrl: "../standard_fonts/",
+            wasmUrl: "../wasm/",
         });
         pdfDocument = await loadingTask.promise;
         setStatus("");
