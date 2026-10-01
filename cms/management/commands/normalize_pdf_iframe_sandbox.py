@@ -32,7 +32,7 @@ Usage::
 
 import html
 import re
-from urllib.parse import parse_qs, quote, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urljoin, urlparse
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -215,7 +215,7 @@ def _resolve_embed_target(url, classification, proxy_url, proxy_hosts):
     ):
         signature = sign_external_pdf_url(url)
         return f"{proxy_url}?url={quote(url, safe='')}&signature={quote(signature, safe='')}"
-    return url
+    return urljoin(settings.SITE_URL.rstrip("/") + "/", url)
 
 
 def _classify_pdf_url(url, trusted_prefixes):

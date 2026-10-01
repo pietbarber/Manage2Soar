@@ -163,7 +163,12 @@ def test_relative_trusted_url_matches_full_url_prefix(settings):
 
     assert rewritten == 1
     assert f'sandbox="{PDF_VIEWER_SANDBOX}"' in new_content
-    assert wrapped_src(settings.PDF_VIEWER_URL, "/cms/document-pdf/42/") in new_content
+    assert (
+        wrapped_src(
+            settings.PDF_VIEWER_URL, f"{settings.SITE_URL}/cms/document-pdf/42/"
+        )
+        in new_content
+    )
 
 
 def test_evil_prefix_path_on_own_origin_is_blocked(settings):
@@ -284,7 +289,10 @@ def test_dot_segment_staying_within_prefix_is_trusted(settings):
     assert rewritten == 1
     assert f'sandbox="{PDF_VIEWER_SANDBOX}"' in new_content
     assert (
-        wrapped_src(settings.PDF_VIEWER_URL, "/cms/document-pdf/42/../53/")
+        wrapped_src(
+            settings.PDF_VIEWER_URL,
+            f"{settings.SITE_URL}/cms/document-pdf/53/",
+        )
         in new_content
     )
 

@@ -187,7 +187,9 @@
       python manage.py normalize_pdf_iframe_sandbox --apply
   delegate_to: localhost
   run_once: true
-  when: gke_normalize_pdf_iframes | bool
+  when:
+    - gke_normalize_pdf_iframes | bool
+    - gke_wait_for_rollout | bool
   register: normalize_pdf_result
   retries: "{{ gke_management_command_retries | int }}"
   delay: "{{ gke_management_command_retry_delay | int }}"

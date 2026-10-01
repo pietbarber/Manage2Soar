@@ -969,7 +969,7 @@ startxref
         assert results[0]["sandbox"] == pdf_viewer_sandbox
         assert "pdfjs-viewer/viewer.html" in results[0]["src"]
 
-        assert results[1]["file"] == trusted_relative
+        assert results[1]["file"] == f"{self.live_server_url}{trusted_relative}"
         assert results[1]["sandbox"] == pdf_viewer_sandbox
 
         # A same-origin URL that is NOT the trusted endpoint is never

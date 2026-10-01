@@ -2,6 +2,7 @@
 import logging
 import mimetypes
 import posixpath
+from urllib.parse import urlparse
 
 from django import forms
 from django.conf import settings
@@ -290,6 +291,12 @@ def document_pdf(request, document_id):
     response["X-Content-Type-Options"] = "nosniff"
     response["X-Frame-Options"] = "SAMEORIGIN"
     response["Content-Security-Policy"] = "frame-ancestors 'self'"
+    viewer_origin = urlparse(settings.PDF_VIEWER_URL)
+    if viewer_origin.scheme and viewer_origin.netloc:
+        response["Access-Control-Allow-Origin"] = (
+            viewer_origin.scheme + "://" + viewer_origin.netloc
+        )
+        response["Vary"] = "Origin"
     return response
 
 
@@ -343,6 +350,12 @@ def external_pdf_proxy(request):
     response["X-Content-Type-Options"] = "nosniff"
     response["X-Frame-Options"] = "SAMEORIGIN"
     response["Content-Security-Policy"] = "frame-ancestors 'self'"
+    viewer_origin = urlparse(settings.PDF_VIEWER_URL)
+    if viewer_origin.scheme and viewer_origin.netloc:
+        response["Access-Control-Allow-Origin"] = (
+            viewer_origin.scheme + "://" + viewer_origin.netloc
+        )
+        response["Vary"] = "Origin"
     return response
 
 

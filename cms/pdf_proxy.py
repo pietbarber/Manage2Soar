@@ -19,7 +19,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 import urllib3
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.core.signing import BadSignature, Signer
 from django.db import IntegrityError
 from django.utils import timezone
 
@@ -29,8 +29,7 @@ MAX_RESPONSE_BYTES = 25 * 1024 * 1024  # 25 MB
 FETCH_TIMEOUT_SECONDS = (5, 15)  # (connect, read)
 MAX_REDIRECTS = 3
 PDF_SIGNATURE = b"%PDF-"
-PROXY_SIGNATURE_MAX_AGE = 60 * 60 * 24
-_proxy_signer = TimestampSigner(salt="cms.external-pdf-proxy")
+_proxy_signer = Signer(salt="cms.external-pdf-proxy")
 
 
 class ExternalPdfFetchError(Exception):
@@ -45,18 +44,8 @@ def verify_external_pdf_url(url, signature):
     if not url or not signature:
         return False
     try:
-        return (
-            _proxy_signer.unsign(
-                signature,
-                max_age=getattr(
-                    settings,
-                    "CMS_EXTERNAL_PDF_PROXY_SIGNATURE_MAX_AGE",
-                    PROXY_SIGNATURE_MAX_AGE,
-                ),
-            )
-            == url
-        )
-    except (BadSignature, SignatureExpired):
+        return _proxy_signer.unsign(signature) == url
+    except BadSignature:
         return False
 
 

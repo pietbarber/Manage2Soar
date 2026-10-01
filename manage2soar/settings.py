@@ -583,9 +583,9 @@ TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
     if prefix.strip()
 ]
 
-# Same-origin PDF.js viewer (Issue #1069): a GCS-hosted viewer would resolve
-# relative PDF URLs against storage.googleapis.com and trigger a CORS failure.
-PDF_VIEWER_URL = "/cms/pdf-viewer/pdfjs-viewer/viewer.html"
+# Isolated PDF.js viewer origin (Issue #1069). PDF targets are absolute
+# application URLs, so the viewer can remain cross-origin from the CMS page.
+PDF_VIEWER_URL = f"{STATIC_URL}pdfjs-viewer/viewer.html"
 
 # External PDF proxy (Issue #1069 Phase 3): lets the pdf.js viewer render a
 # genuinely external (non-uploaded) PDF without depending on that host's CORS
