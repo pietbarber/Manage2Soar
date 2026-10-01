@@ -59,6 +59,25 @@
     group: "{{ m2s_app_group }}"
     mode: "0750"
 
+- name: Deploy systemd-tmpfiles retention policy for import/export temp files
+  # django-import-export keeps member import CSVs (PII) until the confirmation
+  # request is processed, so an upload abandoned at the preview step must be
+  # expired by the OS. This mirrors the 1-day GCS lifecycle rule on the private
+  # import/export bucket. The stock systemd-tmpfiles-clean.timer (runs daily)
+  # performs the cleanup per the age below.
+  ansible.builtin.template:
+    src: import-export-tmpfiles.conf.j2
+    dest: /etc/tmpfiles.d/m2s-import-export.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Ensure systemd-tmpfiles-clean timer is enabled and active
+  ansible.builtin.systemd:
+    name: systemd-tmpfiles-clean.timer
+    state: started
+    enabled: true
+
 - name: Clone or update application repository
   ansible.builtin.git:
     repo: "{{ m2s_git_repo }}"
