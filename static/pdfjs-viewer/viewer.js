@@ -12,10 +12,10 @@
 // bytes directly (e.g. /cms/document-pdf/<id>/ or the external PDF proxy) so
 // that pdf.js's fetch() is never blocked by cross-origin CORS restrictions.
 
-import * as pdfjsLib from "/cms/pdf-viewer/vendor/pdfjs/build/pdf.mjs";
-import { TextLayerBuilder } from "/cms/pdf-viewer/vendor/pdfjs/web/pdf_viewer.mjs";
+import * as pdfjsLib from "../vendor/pdfjs/build/pdf.mjs";
+import { TextLayerBuilder } from "../vendor/pdfjs/web/pdf_viewer.mjs";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/cms/pdf-viewer/vendor/pdfjs/build/pdf.worker.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "../vendor/pdfjs/build/pdf.worker.min.mjs";
 
 const statusEl = document.getElementById("status");
 const pagesEl = document.getElementById("pages");
@@ -108,10 +108,10 @@ async function loadAndRender() {
     try {
         const loadingTask = pdfjsLib.getDocument({
             url: file,
-            cMapUrl: "/cms/pdf-viewer/vendor/pdfjs/cmaps/",
+            cMapUrl: "../vendor/pdfjs/cmaps/",
             cMapPacked: true,
-            standardFontDataUrl: "/cms/pdf-viewer/vendor/pdfjs/standard_fonts/",
-            wasmUrl: "/cms/pdf-viewer/vendor/pdfjs/wasm/",
+            standardFontDataUrl: "../vendor/pdfjs/standard_fonts/",
+            wasmUrl: "../vendor/pdfjs/wasm/",
         });
         pdfDocument = await loadingTask.promise;
         setStatus("");
