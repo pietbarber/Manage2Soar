@@ -42,6 +42,8 @@ def test_pdf_viewer_assets_are_same_origin_and_traversal_safe(client):
 
     assert viewer.status_code == 200
     assert viewer["Content-Type"].startswith("text/html")
+    assert viewer["X-Frame-Options"] == "SAMEORIGIN"
+    assert viewer["Content-Security-Policy"] == "frame-ancestors 'self'"
     assert module.status_code == 200
     assert module["Content-Type"].startswith("text/javascript")
     assert traversal.status_code == 404
