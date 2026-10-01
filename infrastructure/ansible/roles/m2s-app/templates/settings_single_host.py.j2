@@ -236,10 +236,9 @@ TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
     if prefix.strip()
 ]
 
-# Self-hosted PDF.js viewer (Issue #1069): Chrome's native PDF viewer refuses
-# to render inside any sandboxed iframe, so CMS PDF embeds are rendered by
-# our own pdf.js-based viewer, which can stay genuinely sandboxed.
-PDF_VIEWER_URL = f"{STATIC_URL}pdfjs-viewer/viewer.html"
+# Same-origin PDF.js viewer (Issue #1069): a GCS-hosted viewer would resolve
+# relative PDF URLs against storage.googleapis.com and trigger a CORS failure.
+PDF_VIEWER_URL = "/cms/pdf-viewer/pdfjs-viewer/viewer.html"
 
 # External PDF proxy (Issue #1069 Phase 3). Off by default (empty allowlist).
 CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = [

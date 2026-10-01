@@ -1,74 +1,75 @@
 /* Minimal chrome for the self-hosted PDF.js viewer (Issue #1069). */
 
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background: #525659;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #525659;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 #toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  padding: 0.4em 0.75em;
-  background: #323639;
-  color: #eee;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.4em 0.75em;
+    background: #323639;
+    color: #eee;
 }
 
 #toolbar button {
-  background: #474b4e;
-  color: #eee;
-  border: 1px solid #5a5e61;
-  border-radius: 4px;
-  padding: 0.2em 0.6em;
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1.2;
+    background: #474b4e;
+    color: #eee;
+    border: 1px solid #5a5e61;
+    border-radius: 4px;
+    padding: 0.2em 0.6em;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1.2;
 }
 
 #toolbar button:hover {
-  background: #565a5d;
+    background: #565a5d;
 }
 
 #zoomLevel {
-  min-width: 3.5em;
-  text-align: center;
-  font-size: 0.9rem;
+    min-width: 3.5em;
+    text-align: center;
+    font-size: 0.9rem;
 }
 
 #status {
-  padding: 1em;
-  color: #eee;
-  text-align: center;
+    padding: 1em;
+    color: #eee;
+    text-align: center;
 }
 
 #status:empty {
-  display: none;
+    display: none;
 }
 
 #status.error {
-  color: #ffb4b4;
+    color: #ffb4b4;
 }
 
 #status a {
-  color: #9ecbff;
+    color: #9ecbff;
 }
 
 #pages {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75em;
-  padding: 0.75em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.75em;
 }
 
 #pages canvas {
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-  max-width: 100%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    max-width: 100%;
 }

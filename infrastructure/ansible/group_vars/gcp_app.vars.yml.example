@@ -161,8 +161,9 @@ gke_apply_config: true
 # Wait for rollout to complete
 gke_wait_for_rollout: true
 
-# Rollout timeout (seconds)
-gke_rollout_timeout: 300
+# Rollout timeout (seconds). Large images and new-node NEG health propagation
+# can take several minutes before all replicas are ready.
+gke_rollout_timeout: 900
 
 # Deploy CronJobs
 gke_deploy_cronjobs: true

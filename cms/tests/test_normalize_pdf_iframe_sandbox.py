@@ -763,6 +763,30 @@ def test_already_wrapped_trusted_embed_is_idempotent(settings):
     assert final_content == new_content
 
 
+def test_legacy_gcs_viewer_is_migrated_to_same_origin_viewer(settings):
+    """Existing GCS viewer embeds are unwrapped before being rewrapped locally."""
+    target = "/cms/document-pdf/7/"
+    legacy_viewer = (
+        "https://storage.googleapis.com/manage2soar/demo/static/"
+        "pdfjs-viewer/viewer.html"
+    )
+    content = make_embed(wrapped_src(legacy_viewer, target), sandbox=PDF_VIEWER_SANDBOX)
+
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=[settings.SITE_URL + "/cms/document-pdf/"]
+    ):
+        new_content, rewritten = normalize_pdf_iframe_sandbox(
+            content,
+            settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES,
+            settings.PDF_VIEWER_URL,
+        )
+
+    assert rewritten == 1
+    assert settings.PDF_VIEWER_URL in new_content
+    assert f'<iframe src="{legacy_viewer}' not in new_content
+    assert wrapped_src(settings.PDF_VIEWER_URL, target) in new_content
+
+
 def test_cross_origin_pdf_routes_through_proxy_when_enabled(settings):
     """A cross-origin PDF is wrapped viewer(proxy(url)) when a proxy is configured."""
     viewer_url = "/static/pdfjs-viewer/viewer.html"

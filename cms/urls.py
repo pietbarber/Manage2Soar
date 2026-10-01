@@ -17,6 +17,11 @@ urlpatterns = [
         views.external_pdf_proxy,
         name="external_pdf_proxy",
     ),
+    path(
+        "pdf-viewer/<path:asset_path>",
+        views.pdf_viewer_asset,
+        name="pdf_viewer_asset",
+    ),
     # CMS Edit pages
     path("edit/page/<int:page_id>/", views.edit_cms_page, name="edit_page"),
     path(

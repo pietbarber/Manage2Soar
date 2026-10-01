@@ -24,7 +24,7 @@
     // genuinely sandboxed for every embed — there is no longer a
     // trusted/untrusted sandbox distinction.
     var PDF_VIEWER_SANDBOX = 'allow-scripts allow-same-origin allow-downloads allow-modals';
-    var DEFAULT_PDF_VIEWER_URL = '/static/pdfjs-viewer/viewer.html';
+    var DEFAULT_PDF_VIEWER_URL = '/cms/pdf-viewer/pdfjs-viewer/viewer.html';
 
     // Utility function to HTML-escape attribute values (XSS prevention)
     function escapeHtml(str) {
@@ -115,7 +115,8 @@
         try {
             var parsed = new URL(src, window.location.origin);
             var viewerParsed = new URL(viewerUrl, window.location.origin);
-            if (parsed.origin !== viewerParsed.origin || parsed.pathname !== viewerParsed.pathname) {
+            var isLegacyViewer = parsed.pathname.endsWith('/static/pdfjs-viewer/viewer.html');
+            if (!isLegacyViewer && (parsed.origin !== viewerParsed.origin || parsed.pathname !== viewerParsed.pathname)) {
                 return null;
             }
             return parsed.searchParams.get('file');

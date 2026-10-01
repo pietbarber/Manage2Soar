@@ -177,7 +177,8 @@ def _extract_wrapped_target(src, wrapper_url, param_name):
         parsed_wrapper = urlparse(wrapper_url)
     except ValueError:
         return None
-    if parsed.path != parsed_wrapper.path:
+    is_legacy_viewer = parsed.path.endswith("/static/pdfjs-viewer/viewer.html")
+    if not is_legacy_viewer and parsed.path != parsed_wrapper.path:
         return None
     if (
         parsed_wrapper.netloc

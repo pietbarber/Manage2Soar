@@ -1,5 +1,7 @@
 # Generic CMS Page view for arbitrary pages and directories
 import logging
+import mimetypes
+import posixpath
 
 from django import forms
 from django.conf import settings
@@ -8,7 +10,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
-from django.http import FileResponse, HttpResponseForbidden
+from django.http import FileResponse, Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -286,6 +288,22 @@ def document_pdf(request, document_id):
     response["X-Frame-Options"] = "SAMEORIGIN"
     response["Content-Security-Policy"] = "frame-ancestors 'self'"
     return response
+
+
+@require_http_methods(["GET"])
+def pdf_viewer_asset(request, asset_path):
+    """Serve only the bundled same-origin PDF.js viewer assets."""
+    normalized_path = posixpath.normpath(asset_path)
+    allowed = normalized_path.startswith(("pdfjs-viewer/", "vendor/pdfjs/"))
+    if not allowed or normalized_path.startswith("../") or normalized_path == ".":
+        raise Http404
+
+    file_path = settings.BASE_DIR / "static" / normalized_path
+    if not file_path.is_file():
+        raise Http404
+
+    content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+    return FileResponse(file_path.open("rb"), content_type=content_type)
 
 
 @require_http_methods(["GET"])
