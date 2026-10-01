@@ -9,6 +9,7 @@ from django.urls import reverse
 from cms.models import ExternalPdfCache
 from cms.pdf_proxy import (
     ExternalPdfFetchError,
+    _request_pinned_pdf,
     get_or_fetch_cached_pdf,
     is_proxyable_external_url,
 )
@@ -18,17 +19,16 @@ ALLOWED_URL = "https://pdfs.example.com/bylaws.pdf"
 
 class _FakeResponse:
     def __init__(self, status_code, content=b"", headers=None, is_redirect=False):
-        self.status_code = status_code
+        self.status = status_code
         self._content = content
         self.headers = headers or {}
-        self.is_redirect = is_redirect
         self.closed = False
 
-    def iter_content(self, chunk_size=65536):
+    def stream(self, chunk_size=65536):
         for start in range(0, len(self._content), chunk_size):
             yield self._content[start : start + chunk_size]
 
-    def close(self):
+    def release_conn(self):
         self.closed = True
 
 
@@ -90,6 +90,27 @@ def test_allows_allowlisted_host_resolving_publicly(settings, monkeypatch):
     assert is_proxyable_external_url(ALLOWED_URL) is True
 
 
+def test_pinned_request_uses_public_ip_and_relative_path(monkeypatch):
+    class FakePool:
+        def __init__(self, host, **kwargs):
+            self.host = host
+            self.kwargs = kwargs
+
+        def request(self, method, path, **kwargs):
+            assert method == "GET"
+            assert path == "/bylaws.pdf"
+            assert kwargs["headers"] == {"Host": "pdfs.example.com"}
+            return "response"
+
+    _patch_public_dns(monkeypatch, ip="93.184.216.34")
+    pool = FakePool
+    monkeypatch.setattr("cms.pdf_proxy.urllib3.HTTPSConnectionPool", pool)
+
+    response = _request_pinned_pdf(ALLOWED_URL)
+
+    assert response == "response"
+
+
 # --- get_or_fetch_cached_pdf / _fetch_validated_pdf_bytes ----------------------
 
 
@@ -100,7 +121,7 @@ def test_fetch_caches_valid_pdf(settings, monkeypatch, tmp_path):
 
     with _local_storage_settings(tmp_path):
         with patch(
-            "cms.pdf_proxy.requests.get",
+            "cms.pdf_proxy._request_pinned_pdf",
             return_value=_FakeResponse(200, content=b"%PDF-1.7 hello"),
         ) as mock_get:
             cached = get_or_fetch_cached_pdf(ALLOWED_URL)
@@ -118,7 +139,7 @@ def test_fetch_rejects_non_pdf_content(settings, monkeypatch, tmp_path):
 
     with _local_storage_settings(tmp_path):
         with patch(
-            "cms.pdf_proxy.requests.get",
+            "cms.pdf_proxy._request_pinned_pdf",
             return_value=_FakeResponse(200, content=b"<html>not a pdf</html>"),
         ):
             with pytest.raises(ExternalPdfFetchError):
@@ -135,7 +156,7 @@ def test_fetch_rejects_oversized_response(settings, monkeypatch, tmp_path):
 
     with _local_storage_settings(tmp_path):
         with patch(
-            "cms.pdf_proxy.requests.get",
+            "cms.pdf_proxy._request_pinned_pdf",
             return_value=_FakeResponse(200, content=b"%PDF-1.7 way too big"),
         ):
             with pytest.raises(ExternalPdfFetchError):
@@ -154,7 +175,7 @@ def test_fetch_follows_allowlisted_redirect(settings, monkeypatch, tmp_path):
     ]
 
     with _local_storage_settings(tmp_path):
-        with patch("cms.pdf_proxy.requests.get", side_effect=responses):
+        with patch("cms.pdf_proxy._request_pinned_pdf", side_effect=responses):
             cached = get_or_fetch_cached_pdf(ALLOWED_URL)
 
         with cached.file.open("rb") as fh:
@@ -175,7 +196,7 @@ def test_fetch_rejects_redirect_to_disallowed_host(settings, monkeypatch, tmp_pa
     ]
 
     with _local_storage_settings(tmp_path):
-        with patch("cms.pdf_proxy.requests.get", side_effect=responses):
+        with patch("cms.pdf_proxy._request_pinned_pdf", side_effect=responses):
             with pytest.raises(ExternalPdfFetchError):
                 get_or_fetch_cached_pdf(ALLOWED_URL)
 
@@ -188,7 +209,7 @@ def test_cached_copy_is_reused_within_ttl(settings, monkeypatch, tmp_path):
 
     with _local_storage_settings(tmp_path):
         with patch(
-            "cms.pdf_proxy.requests.get",
+            "cms.pdf_proxy._request_pinned_pdf",
             return_value=_FakeResponse(200, content=b"%PDF-1.7 hello"),
         ) as mock_get:
             get_or_fetch_cached_pdf(ALLOWED_URL)
@@ -205,13 +226,13 @@ def test_stale_cache_served_when_refresh_fetch_fails(settings, monkeypatch, tmp_
 
     with _local_storage_settings(tmp_path):
         with patch(
-            "cms.pdf_proxy.requests.get",
+            "cms.pdf_proxy._request_pinned_pdf",
             return_value=_FakeResponse(200, content=b"%PDF-1.7 hello"),
         ):
             get_or_fetch_cached_pdf(ALLOWED_URL)
 
         with patch(
-            "cms.pdf_proxy.requests.get",
+            "cms.pdf_proxy._request_pinned_pdf",
             side_effect=ExternalPdfFetchError("network down"),
         ):
             cached = get_or_fetch_cached_pdf(ALLOWED_URL)
@@ -245,7 +266,7 @@ def test_view_serves_allowlisted_pdf(client, settings, monkeypatch, tmp_path):
 
     with _local_storage_settings(tmp_path):
         with patch(
-            "cms.pdf_proxy.requests.get",
+            "cms.pdf_proxy._request_pinned_pdf",
             return_value=_FakeResponse(200, content=b"%PDF-1.7 hello"),
         ):
             response = client.get(
@@ -268,7 +289,7 @@ def test_view_returns_403_when_fetch_fails_and_nothing_cached(
     _patch_public_dns(monkeypatch)
 
     with patch(
-        "cms.pdf_proxy.requests.get",
+        "cms.pdf_proxy._request_pinned_pdf",
         return_value=_FakeResponse(200, content=b"not a pdf"),
     ):
         response = client.get(reverse("cms:external_pdf_proxy"), {"url": ALLOWED_URL})

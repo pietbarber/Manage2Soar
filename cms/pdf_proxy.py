@@ -14,9 +14,9 @@ every visitor; see ``CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS``.
 import hashlib
 import ipaddress
 import socket
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
-import requests
+import urllib3
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils import timezone
@@ -33,19 +33,20 @@ class ExternalPdfFetchError(Exception):
     """Raised when an external PDF URL cannot be safely fetched or validated."""
 
 
-def _resolves_to_public_address(hostname):
-    """Reject hostnames that resolve to any private/loopback/link-local/reserved IP."""
+def _public_addresses(hostname):
+    """Return unique public IPs for `hostname`, or an empty list if unsafe."""
     try:
         infos = socket.getaddrinfo(hostname, None)
     except (socket.gaierror, UnicodeError, OverflowError):
-        return False
+        return []
     if not infos:
-        return False
+        return []
+    addresses = []
     for _family, _type, _proto, _canonname, sockaddr in infos:
         try:
             ip = ipaddress.ip_address(sockaddr[0])
         except ValueError:
-            return False
+            return []
         if (
             ip.is_private
             or ip.is_loopback
@@ -54,8 +55,10 @@ def _resolves_to_public_address(hostname):
             or ip.is_reserved
             or ip.is_unspecified
         ):
-            return False
-    return True
+            return []
+        if str(ip) not in addresses:
+            addresses.append(str(ip))
+    return addresses
 
 
 def is_proxyable_external_url(url):
@@ -67,11 +70,46 @@ def is_proxyable_external_url(url):
         parsed = urlparse(url)
     except ValueError:
         return False
-    if parsed.scheme != "https" or not parsed.hostname:
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.port not in (None, 443)
+    ):
         return False
     if parsed.hostname.lower() not in allowed_hosts:
         return False
-    return _resolves_to_public_address(parsed.hostname)
+    return bool(_public_addresses(parsed.hostname))
+
+
+def _request_pinned_pdf(url):
+    """Fetch a validated URL through a public-IP-pinned HTTPS connection."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    addresses = _public_addresses(hostname)
+    if not addresses:
+        raise ExternalPdfFetchError("URL no longer resolves to a public address.")
+
+    path = urlunparse(("", "", parsed.path or "/", parsed.params, parsed.query, ""))
+    pool = urllib3.HTTPSConnectionPool(
+        addresses[0],
+        port=443,
+        timeout=urllib3.Timeout(
+            connect=FETCH_TIMEOUT_SECONDS[0], read=FETCH_TIMEOUT_SECONDS[1]
+        ),
+        cert_reqs="CERT_REQUIRED",
+        assert_hostname=hostname,
+        server_hostname=hostname,
+        retries=False,
+    )
+    try:
+        return pool.request(
+            "GET",
+            path,
+            headers={"Host": hostname},
+            preload_content=False,
+        )
+    except urllib3.exceptions.HTTPError as exc:
+        raise ExternalPdfFetchError(f"Fetch failed: {exc}") from exc
 
 
 def _fetch_validated_pdf_bytes(url):
@@ -82,18 +120,10 @@ def _fetch_validated_pdf_bytes(url):
             raise ExternalPdfFetchError(
                 "URL is not on the allowed external PDF host list."
             )
-        try:
-            response = requests.get(
-                current_url,
-                stream=True,
-                timeout=FETCH_TIMEOUT_SECONDS,
-                allow_redirects=False,
-            )
-        except requests.RequestException as exc:
-            raise ExternalPdfFetchError(f"Fetch failed: {exc}") from exc
+        response = _request_pinned_pdf(current_url)
 
         try:
-            if response.is_redirect or response.status_code in (
+            if response.status in (
                 301,
                 302,
                 303,
@@ -106,9 +136,9 @@ def _fetch_validated_pdf_bytes(url):
                 current_url = urljoin(current_url, location)
                 continue
 
-            if response.status_code != 200:
+            if response.status != 200:
                 raise ExternalPdfFetchError(
-                    f"Unexpected status code {response.status_code}."
+                    f"Unexpected status code {response.status}."
                 )
 
             content_length = response.headers.get("Content-Length")
@@ -119,7 +149,7 @@ def _fetch_validated_pdf_bytes(url):
 
             chunks = []
             total = 0
-            for chunk in response.iter_content(chunk_size=65536):
+            for chunk in response.stream(65536):
                 total += len(chunk)
                 if total > MAX_RESPONSE_BYTES:
                     raise ExternalPdfFetchError(
@@ -127,7 +157,7 @@ def _fetch_validated_pdf_bytes(url):
                     )
                 chunks.append(chunk)
         finally:
-            response.close()
+            response.release_conn()
 
         content = b"".join(chunks)
         if not content.startswith(PDF_SIGNATURE):
