@@ -282,7 +282,7 @@ def document_pdf(request, document_id):
         response = FileResponse(
             stored_file,
             as_attachment=False,
-            filename=document.file.name.rsplit("/", 1)[-1],
+            filename=(document.file.name or "document.pdf").rsplit("/", 1)[-1],
             content_type="application/pdf",
         )
     except OSError:
@@ -344,7 +344,7 @@ def external_pdf_proxy(request):
     response = FileResponse(
         stored_file,
         as_attachment=False,
-        filename=cached.file.name.rsplit("/", 1)[-1],
+        filename=(cached.file.name or "external.pdf").rsplit("/", 1)[-1],
         content_type="application/pdf",
     )
     response["X-Content-Type-Options"] = "nosniff"

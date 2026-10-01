@@ -1,9 +1,16 @@
 """Tests for the external PDF proxy (Issue #1069 Phase 3)."""
 
+import json
 from unittest.mock import patch
 
 import pytest
-from django.test import override_settings
+from django.contrib.auth import (
+    BACKEND_SESSION_KEY,
+    HASH_SESSION_KEY,
+    SESSION_KEY,
+    get_user_model,
+)
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 
 from cms.models import ExternalPdfCache
@@ -14,8 +21,17 @@ from cms.pdf_proxy import (
     is_proxyable_external_url,
     sign_external_pdf_url,
 )
+from cms.views import sign_external_pdf
 
 ALLOWED_URL = "https://pdfs.example.com/bylaws.pdf"
+
+
+def login_test_user(client, user):
+    session = client.session
+    session[SESSION_KEY] = str(user.pk)
+    session[BACKEND_SESSION_KEY] = "django.contrib.auth.backends.ModelBackend"
+    session[HASH_SESSION_KEY] = user.get_session_auth_hash()
+    session.save()
 
 
 class _FakeResponse:
@@ -249,6 +265,56 @@ def test_stale_cache_served_when_refresh_fetch_fails(settings, monkeypatch, tmp_
 def test_view_rejects_missing_url(client):
     response = client.get(reverse("cms:external_pdf_proxy"))
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_sign_view_requires_authentication(client):
+    response = client.get(reverse("cms:external_pdf_sign"), {"url": ALLOWED_URL})
+    assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_sign_view_rejects_non_webmaster(settings, client, monkeypatch):
+    settings.CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = ["pdfs.example.com"]
+    _patch_public_dns(monkeypatch)
+    user = get_user_model().objects.create_user("ordinary", password="password")
+    user.set_password("password")
+    user.save(update_fields=["password"])
+    request = RequestFactory().get(
+        reverse("cms:external_pdf_sign"), {"url": ALLOWED_URL}
+    )
+    request.user = user
+    response = sign_external_pdf.__wrapped__(request)
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_sign_view_allows_webmaster_only_for_allowlisted_host(
+    settings, client, monkeypatch
+):
+    settings.CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = ["pdfs.example.com"]
+    _patch_public_dns(monkeypatch)
+    user = get_user_model().objects.create_user("webmaster", password="password")
+    user.webmaster = True
+    user.set_password("password")
+    user.save(update_fields=["password"])
+    allowed_request = RequestFactory().get(
+        reverse("cms:external_pdf_sign"), {"url": ALLOWED_URL}
+    )
+    allowed_request.user = user
+    response = sign_external_pdf.__wrapped__(allowed_request)
+    rejected_request = RequestFactory().get(
+        reverse("cms:external_pdf_sign"), {"url": "https://other.example/a.pdf"}
+    )
+    rejected_request.user = user
+    rejected = sign_external_pdf.__wrapped__(rejected_request)
+
+    assert response.status_code == 200
+    payload = json.loads(response.content)
+    assert payload["url"] == ALLOWED_URL
+    assert payload["signature"]
+    assert rejected.status_code == 403
 
 
 @pytest.mark.django_db
