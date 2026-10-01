@@ -363,6 +363,8 @@ def external_pdf_proxy(request):
 @require_http_methods(["GET"])
 def sign_external_pdf(request):
     """Sign an allowed external PDF target for an authenticated CMS editor."""
+    if not (request.user.is_superuser or getattr(request.user, "webmaster", False)):
+        return HttpResponseForbidden("CMS webmaster permission is required.")
     url = request.GET.get("url", "").strip()
     if not is_proxyable_external_url(url):
         return HttpResponseForbidden("This URL is not an allowed external PDF source.")

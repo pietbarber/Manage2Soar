@@ -153,11 +153,6 @@
      */
     function resolveEmbedTarget(url, classification, proxyUrl, proxyHosts, signedProxyUrl) {
         if (signedProxyUrl) return new URL(signedProxyUrl, window.location.origin).href;
-        var parsedUrl = parsePdfUrl(url);
-        if (classification === 'cross-origin' && signedProxyUrl && proxyUrl && parsedUrl &&
-            proxyHosts.indexOf(parsedUrl.hostname.toLowerCase()) !== -1) {
-            return new URL(buildProxySrc(proxyUrl, url), window.location.origin).href;
-        }
         return new URL(url, window.location.origin).href;
     }
 
