@@ -7,7 +7,8 @@
 # step would otherwise persist indefinitely. This rule clears any file in the
 # directory older than the retention period while keeping the directory itself.
 #
-# Type: X  -> clean out the contents of an existing directory, do NOT remove it
+# Type: e  -> clean an EXISTING directory's contents by age; keep the directory
+#             (X would be an exclusion rule and would NOT register it for cleanup)
 # Age:  {{ m2s_import_export_retention_days }}d -> mirrors the GCS lifecycle rule
-# (mode/user/group are ignored for type X, hence the dashes)
-X {{ m2s_import_export_tmp_dir }} - - - {{ m2s_import_export_retention_days }}d
+# (mode/user/group not applicable here, hence the dashes)
+e {{ m2s_import_export_tmp_dir }} - - - {{ m2s_import_export_retention_days }}d

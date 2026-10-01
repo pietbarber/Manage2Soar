@@ -313,7 +313,13 @@ if GS_BUCKET_NAME:
             f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
         )
 else:
-    # Local development without GCS - use Django's default file storage
+    # Local development without GCS - use Django's default file storage.
+    # The import/export alias is deliberately OUTSIDE MEDIA_ROOT: when DEBUG=True,
+    # urls.py serves the entire MEDIA_ROOT tree unauthenticated via static(),
+    # which would expose member import CSVs (PII) over /media/.
+    _import_export_dev_dir = os.getenv(
+        "IMPORT_EXPORT_TMP_DIR", str(BASE_DIR / "import-export-tmp")
+    )
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -321,7 +327,7 @@ else:
         "import_export": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
             "OPTIONS": {
-                "location": str(BASE_DIR / "media" / "django-import-export"),
+                "location": _import_export_dev_dir,
             },
         },
         "staticfiles": {
