@@ -68,8 +68,34 @@ body {
     padding: 0.75em;
 }
 
+.pdf-page {
+    position: relative;
+    background: #fff;
+}
+
 #pages canvas {
     background: #fff;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
     max-width: 100%;
+}
+
+.textLayer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    line-height: 1;
+    transform-origin: 0 0;
+    user-select: text;
+}
+
+.textLayer span {
+    position: absolute;
+    color: transparent;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0 0;
+}
+
+.textLayer span::selection {
+    background: rgba(0, 96, 255, 0.25);
 }

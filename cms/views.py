@@ -6,11 +6,12 @@ import posixpath
 from django import forms
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
-from django.http import FileResponse, Http404, HttpResponseForbidden
+from django.http import FileResponse, Http404, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -25,6 +26,8 @@ from cms.pdf_proxy import (
     ExternalPdfFetchError,
     get_or_fetch_cached_pdf,
     is_proxyable_external_url,
+    sign_external_pdf_url,
+    verify_external_pdf_url,
 )
 from members.decorators import active_member_required
 from members.utils import is_active_member
@@ -313,7 +316,12 @@ def pdf_viewer_asset(request, asset_path):
 def external_pdf_proxy(request):
     """Serve an allowlisted, cached external PDF with the document_pdf response policy."""
     url = request.GET.get("url", "").strip()
-    if not url or not is_proxyable_external_url(url):
+    signature = request.GET.get("signature", "")
+    if (
+        not url
+        or not verify_external_pdf_url(url, signature)
+        or not is_proxyable_external_url(url)
+    ):
         return HttpResponseForbidden("This URL is not an allowed external PDF source.")
 
     try:
@@ -336,6 +344,17 @@ def external_pdf_proxy(request):
     response["X-Frame-Options"] = "SAMEORIGIN"
     response["Content-Security-Policy"] = "frame-ancestors 'self'"
     return response
+
+
+@login_required
+@require_http_methods(["GET"])
+def sign_external_pdf(request):
+    """Sign an allowed external PDF target for an authenticated CMS editor."""
+    url = request.GET.get("url", "").strip()
+    if not is_proxyable_external_url(url):
+        return HttpResponseForbidden("This URL is not an allowed external PDF source.")
+    signature = sign_external_pdf_url(url)
+    return JsonResponse({"url": url, "signature": signature})
 
 
 def homepage(request):

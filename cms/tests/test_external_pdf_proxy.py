@@ -12,6 +12,7 @@ from cms.pdf_proxy import (
     _request_pinned_pdf,
     get_or_fetch_cached_pdf,
     is_proxyable_external_url,
+    sign_external_pdf_url,
 )
 
 ALLOWED_URL = "https://pdfs.example.com/bylaws.pdf"
@@ -251,6 +252,14 @@ def test_view_rejects_missing_url(client):
 
 
 @pytest.mark.django_db
+def test_view_rejects_unsigned_url(client, settings, monkeypatch):
+    settings.CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = ["pdfs.example.com"]
+    _patch_public_dns(monkeypatch)
+    response = client.get(reverse("cms:external_pdf_proxy"), {"url": ALLOWED_URL})
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
 def test_view_rejects_disallowed_host(client, settings):
     settings.CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = ["pdfs.example.com"]
     response = client.get(
@@ -270,7 +279,8 @@ def test_view_serves_allowlisted_pdf(client, settings, monkeypatch, tmp_path):
             return_value=_FakeResponse(200, content=b"%PDF-1.7 hello"),
         ):
             response = client.get(
-                reverse("cms:external_pdf_proxy"), {"url": ALLOWED_URL}
+                reverse("cms:external_pdf_proxy"),
+                {"url": ALLOWED_URL, "signature": sign_external_pdf_url(ALLOWED_URL)},
             )
 
         assert response.status_code == 200
@@ -292,6 +302,9 @@ def test_view_returns_403_when_fetch_fails_and_nothing_cached(
         "cms.pdf_proxy._request_pinned_pdf",
         return_value=_FakeResponse(200, content=b"not a pdf"),
     ):
-        response = client.get(reverse("cms:external_pdf_proxy"), {"url": ALLOWED_URL})
+        response = client.get(
+            reverse("cms:external_pdf_proxy"),
+            {"url": ALLOWED_URL, "signature": sign_external_pdf_url(ALLOWED_URL)},
+        )
 
     assert response.status_code == 403

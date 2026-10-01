@@ -250,6 +250,7 @@ CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS = int(
     os.getenv("CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS", str(60 * 60 * 24))
 )
 CMS_EXTERNAL_PDF_PROXY_URL = "/cms/external-pdf-proxy/"
+CMS_EXTERNAL_PDF_PROXY_SIGN_URL = "/cms/external-pdf-sign/"
 PDF_EXTERNAL_PROXY_URL_FOR_CLIENT = (
     CMS_EXTERNAL_PDF_PROXY_URL if CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS else ""
 )
@@ -266,6 +267,8 @@ TINYMCE_DEFAULT_CONFIG = {
     "pdf_trusted_url_prefixes": TINYMCE_PDF_TRUSTED_URL_PREFIXES,
     "pdf_viewer_url": PDF_VIEWER_URL,
     "pdf_external_proxy_url": PDF_EXTERNAL_PROXY_URL_FOR_CLIENT,
+    "pdf_external_proxy_allowed_hosts": CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS,
+    "pdf_external_sign_url": CMS_EXTERNAL_PDF_PROXY_SIGN_URL,
     "extended_valid_elements": (
         "iframe[src|width|height|frameborder|sandbox|referrerpolicy|loading|title|allow|allowfullscreen],"
         "div[class|style]"

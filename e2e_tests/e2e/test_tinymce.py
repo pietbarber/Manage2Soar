@@ -11,9 +11,11 @@ These tests verify TinyMCE editor functionality, particularly:
 """
 
 import unittest
+from urllib.parse import quote
 
 import pytest
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from cms.models import Document, Page
 
@@ -580,6 +582,54 @@ class TestTinyMCEPDFEmbed(DjangoPlaywrightTestCase):
         assert src is not None, "PDF embed iframe should have a src attribute"
 
         assert src.endswith(f"/cms/document-pdf/{document.id}/")
+
+    def test_same_origin_pdf_viewer_renders_canvas_and_text_layer(self):
+        """Load a real controlled PDF through the sandboxed PDF.js iframe."""
+        pdf_bytes = b"""%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >> endobj
+4 0 obj << /Length 0 >> stream
+endstream endobj
+xref
+0 5
+0000000000 65535 f
+trailer << /Root 1 0 R /Size 5 >>
+startxref
+0
+%%EOF
+"""
+        page = Page.objects.create(
+            title="PDF viewer smoke test", slug="pdf-viewer-smoke-test", content=""
+        )
+        document = Document.objects.create(
+            page=page,
+            title="Viewer smoke test",
+            file=SimpleUploadedFile("viewer-smoke-test.pdf", pdf_bytes),
+        )
+        viewer_url = (
+            f"/cms/pdf-viewer/pdfjs-viewer/viewer.html?file="
+            f"{quote(f'/cms/document-pdf/{document.id}/', safe='')}"
+        )
+        page.content = (
+            '<div class="pdf-container">'
+            f'<iframe src="{viewer_url}" sandbox="allow-scripts allow-same-origin '
+            'allow-downloads allow-modals" width="100%" height="600"></iframe>'
+            "</div>"
+        )
+        page.save(update_fields=["content"])
+
+        self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
+        frame = self.page.locator(".pdf-container iframe").content_frame
+        frame.locator("#pages canvas").wait_for(timeout=15000)
+        assert frame.locator(".textLayer").count() == 1
+        assert frame.locator("#status").text_content() == ""
+
+        before = frame.locator("#pages canvas").bounding_box()["width"]
+        frame.locator("#zoomIn").click()
+        self.page.wait_for_timeout(300)
+        after = frame.locator("#pages canvas").bounding_box()["width"]
+        assert after > before
 
     @unittest.skip(
         "Button is registered and works functionally, but may be in toolbar overflow menu"

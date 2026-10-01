@@ -102,8 +102,9 @@
         return viewerUrl + '?file=' + encodeURIComponent(targetUrl);
     }
 
-    function buildProxySrc(proxyUrl, targetUrl) {
-        return proxyUrl + '?url=' + encodeURIComponent(targetUrl);
+    function buildProxySrc(proxyUrl, targetUrl, signature) {
+        return proxyUrl + '?url=' + encodeURIComponent(targetUrl) +
+            '&signature=' + encodeURIComponent(signature);
     }
 
     /**
@@ -150,8 +151,11 @@
      * through the external proxy when one is configured (so pdf.js never
      * depends on that host's CORS headers), everything else embeds directly.
      */
-    function resolveEmbedTarget(url, classification, proxyUrl) {
-        if (classification === 'cross-origin' && proxyUrl) {
+    function resolveEmbedTarget(url, classification, proxyUrl, proxyHosts, signedProxyUrl) {
+        if (signedProxyUrl) return signedProxyUrl;
+        var parsedUrl = parsePdfUrl(url);
+        if (classification === 'cross-origin' && proxyUrl && parsedUrl &&
+            proxyHosts.indexOf(parsedUrl.hostname.toLowerCase()) !== -1) {
             return buildProxySrc(proxyUrl, url);
         }
         return url;
@@ -173,9 +177,11 @@
      * cross-origin URLs, when configured), so Chrome's native PDF
      * viewer/sandbox incompatibility never comes into play.
      */
-    function generatePdfEmbedHtml(url, viewerUrl, classification, proxyUrl) {
+    function generatePdfEmbedHtml(url, viewerUrl, classification, proxyUrl, proxyHosts, signedProxyUrl) {
         var escapedUrl = escapeHtml(url);
-        var embedTarget = resolveEmbedTarget(url, classification, proxyUrl);
+        var embedTarget = resolveEmbedTarget(
+            url, classification, proxyUrl, proxyHosts, signedProxyUrl
+        );
         var viewerSrc = escapeHtml(buildViewerSrc(viewerUrl, embedTarget));
         return '<div class="pdf-container">' +
             '<iframe src="' + viewerSrc + '" ' +
@@ -309,7 +315,9 @@
 
             var trustedPdfUrlPrefixes = config.pdf_trusted_url_prefixes || [];
             var pdfViewerUrl = config.pdf_viewer_url || DEFAULT_PDF_VIEWER_URL;
-            var pdfExternalProxyUrl = config.pdf_external_proxy_url || '';
+            var pdfExternalProxyUrl = config.pdf_external_proxy_url || '/cms/external-pdf-proxy/';
+            var pdfExternalProxyHosts = config.pdf_external_proxy_allowed_hosts || [];
+            var pdfExternalSignUrl = config.pdf_external_sign_url || '/cms/external-pdf-sign/';
             editor.on('GetContent', function (event) {
                 var container = document.createElement('div');
                 container.innerHTML = event.content || '';
@@ -320,6 +328,9 @@
                     if (!src) continue;
 
                     var originalUrl = resolveOriginalUrl(src, pdfViewerUrl, pdfExternalProxyUrl);
+                    var existingProxyTarget = extractViewerTarget(src, pdfViewerUrl) || src;
+                    var existingProxySignature = extractProxyTarget(existingProxyTarget, pdfExternalProxyUrl) &&
+                        new URL(existingProxyTarget, window.location.origin).searchParams.get('signature');
                     var classification = classifyPdfUrl(originalUrl, trustedPdfUrlPrefixes);
                     if (classification === 'invalid' || classification === 'same-origin-blocked') {
                         // Never embed an untrusted same-origin URL, wrapped or not.
@@ -327,7 +338,10 @@
                         iframe.setAttribute('sandbox', '');
                         continue;
                     }
-                    var embedTarget = resolveEmbedTarget(originalUrl, classification, pdfExternalProxyUrl);
+                    var embedTarget = resolveEmbedTarget(
+                        originalUrl, classification, pdfExternalProxyUrl, pdfExternalProxyHosts,
+                        existingProxySignature ? existingProxyTarget : null
+                    );
                     iframe.setAttribute('src', buildViewerSrc(pdfViewerUrl, embedTarget));
                     iframe.setAttribute('sandbox', PDF_VIEWER_SANDBOX);
                 }
@@ -338,7 +352,7 @@
             editor.ui.registry.addButton('insertpdf', {
                 text: '📄 Insert PDF',
                 tooltip: 'Insert an embedded PDF document',
-                onAction: function () {
+                onAction: async function () {
                     var url = prompt(
                         'Enter the PDF URL (must be https:// or http://):\n\n' +
                         'Tip: for files already uploaded to this site, use the document\'s ' +
@@ -367,8 +381,40 @@
                         );
                         if (!proceed) return;
                     }
-                    var html = generatePdfEmbedHtml(url, pdfViewerUrl, classification, pdfExternalProxyUrl);
-                    editor.insertContent(html, { format: 'raw' });
+                    var parsedUrl = parsePdfUrl(url);
+                    var shouldProxy = classification === 'cross-origin' &&
+                        pdfExternalProxyUrl && parsedUrl &&
+                        pdfExternalProxyHosts.indexOf(parsedUrl.hostname.toLowerCase()) !== -1;
+                    if (shouldProxy) {
+                        try {
+                            var response = await fetch(
+                                pdfExternalSignUrl + '?url=' + encodeURIComponent(url),
+                                { credentials: 'same-origin' }
+                            );
+                            if (!response.ok) throw new Error('External PDF signing failed');
+                            var signed = await response.json();
+                            var signedProxyUrl = buildProxySrc(
+                                pdfExternalProxyUrl, url, signed.signature
+                            );
+                            editor.insertContent(
+                                generatePdfEmbedHtml(
+                                    url, pdfViewerUrl, classification, pdfExternalProxyUrl,
+                                    pdfExternalProxyHosts, signedProxyUrl
+                                ),
+                                { format: 'raw' }
+                            );
+                        } catch (error) {
+                            alert('This external PDF could not be authorized for embedding.');
+                        }
+                    } else {
+                        editor.insertContent(
+                            generatePdfEmbedHtml(
+                                url, pdfViewerUrl, classification, pdfExternalProxyUrl,
+                                pdfExternalProxyHosts, null
+                            ),
+                            { format: 'raw' }
+                        );
+                    }
                 }
             });
 

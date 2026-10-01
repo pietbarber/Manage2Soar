@@ -18,6 +18,11 @@ urlpatterns = [
         name="external_pdf_proxy",
     ),
     path(
+        "external-pdf-sign/",
+        views.sign_external_pdf,
+        name="external_pdf_sign",
+    ),
+    path(
         "pdf-viewer/<path:asset_path>",
         views.pdf_viewer_asset,
         name="pdf_viewer_asset",

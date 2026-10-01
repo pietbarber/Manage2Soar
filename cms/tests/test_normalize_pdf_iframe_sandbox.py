@@ -11,6 +11,7 @@ from cms.management.commands.normalize_pdf_iframe_sandbox import (
     normalize_pdf_iframe_sandbox,
 )
 from cms.models import HomePageContent, Page
+from cms.pdf_proxy import sign_external_pdf_url
 
 UNTRUSTED_GCS_URL = (
     "https://storage.googleapis.com/my-bucket/media/cms-pdfs/club/bylaws.pdf"
@@ -700,7 +701,10 @@ def test_non_pdf_container_iframes_are_untouched(settings):
         'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>'
     )
 
-    with override_settings(TINYMCE_PDF_TRUSTED_URL_PREFIXES=[]):
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=[],
+        CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS=["storage.googleapis.com"],
+    ):
         new_content, rewritten = normalize_pdf_iframe_sandbox(
             content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES, settings.PDF_VIEWER_URL
         )
@@ -793,15 +797,19 @@ def test_cross_origin_pdf_routes_through_proxy_when_enabled(settings):
     proxy_url = "/cms/external-pdf-proxy/"
     content = make_embed(UNTRUSTED_GCS_URL, sandbox="")
 
-    with override_settings(TINYMCE_PDF_TRUSTED_URL_PREFIXES=[]):
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=[],
+        CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS=["storage.googleapis.com"],
+    ):
         new_content, rewritten = normalize_pdf_iframe_sandbox(
             content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES, viewer_url, proxy_url
         )
 
     assert rewritten == 1
     assert f'sandbox="{PDF_VIEWER_SANDBOX}"' in new_content
-    proxied = proxied_src(proxy_url, UNTRUSTED_GCS_URL)
-    assert wrapped_src(viewer_url, proxied) in new_content
+    assert viewer_url in new_content
+    assert quote(proxy_url, safe="") in new_content
+    assert quote("signature=", safe="") in new_content
 
 
 def test_trusted_pdf_does_not_route_through_proxy(settings):
@@ -826,9 +834,13 @@ def test_already_proxy_wrapped_cross_origin_is_idempotent(settings):
     viewer_url = "/static/pdfjs-viewer/viewer.html"
     proxy_url = "/cms/external-pdf-proxy/"
     proxied = proxied_src(proxy_url, UNTRUSTED_GCS_URL)
+    proxied += "&signature=" + quote(sign_external_pdf_url(UNTRUSTED_GCS_URL), safe="")
     content = make_embed(wrapped_src(viewer_url, proxied), sandbox=PDF_VIEWER_SANDBOX)
 
-    with override_settings(TINYMCE_PDF_TRUSTED_URL_PREFIXES=[]):
+    with override_settings(
+        TINYMCE_PDF_TRUSTED_URL_PREFIXES=[],
+        CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS=["storage.googleapis.com"],
+    ):
         new_content, rewritten = normalize_pdf_iframe_sandbox(
             content, settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES, viewer_url, proxy_url
         )

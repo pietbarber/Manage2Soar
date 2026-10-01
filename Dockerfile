@@ -35,7 +35,7 @@ RUN apt-get update \
 
 RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
 RUN if [ -f package.json ]; then npm run vendor:tablesort || true; fi
-RUN if [ -f package.json ]; then npm run vendor:pdfjs || true; fi
+RUN if [ -f package.json ]; then npm run vendor:pdfjs; fi
 
 # Static files are collected post-deployment by Ansible with GCS credentials
 # (see roles/gke-deploy/tasks/deploy.yml)

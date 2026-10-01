@@ -13,6 +13,7 @@
 // that pdf.js's fetch() is never blocked by cross-origin CORS restrictions.
 
 import * as pdfjsLib from "/cms/pdf-viewer/vendor/pdfjs/build/pdf.mjs";
+import { TextLayerBuilder } from "/cms/pdf-viewer/vendor/pdfjs/web/pdf_viewer.mjs";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/cms/pdf-viewer/vendor/pdfjs/build/pdf.worker.min.mjs";
 
@@ -52,12 +53,21 @@ async function renderAllPages() {
         const outputScale = window.devicePixelRatio || 1;
         const viewport = page.getViewport({ scale });
 
+        const pageContainer = document.createElement("section");
+        pageContainer.className = "pdf-page";
+        pageContainer.setAttribute("aria-label", `PDF page ${pageNumber}`);
+        pagesEl.appendChild(pageContainer);
+
         const canvas = document.createElement("canvas");
         canvas.width = Math.floor(viewport.width * outputScale);
         canvas.height = Math.floor(viewport.height * outputScale);
         canvas.style.width = `${Math.floor(viewport.width)}px`;
         canvas.style.height = `${Math.floor(viewport.height)}px`;
-        pagesEl.appendChild(canvas);
+        pageContainer.appendChild(canvas);
+
+        const textLayerBuilder = new TextLayerBuilder({ pdfPage: page });
+        textLayerBuilder.div.setAttribute("aria-label", `Text from PDF page ${pageNumber}`);
+        pageContainer.appendChild(textLayerBuilder.div);
 
         const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
         await page.render({
@@ -65,6 +75,8 @@ async function renderAllPages() {
             transform,
             viewport,
         }).promise;
+
+        await textLayerBuilder.render({ viewport });
     }
 }
 
@@ -94,7 +106,13 @@ async function loadAndRender() {
 
     setStatus("Loading PDF\u2026");
     try {
-        const loadingTask = pdfjsLib.getDocument({ url: file });
+        const loadingTask = pdfjsLib.getDocument({
+            url: file,
+            cMapUrl: "/cms/pdf-viewer/vendor/pdfjs/cmaps/",
+            cMapPacked: true,
+            standardFontDataUrl: "/cms/pdf-viewer/vendor/pdfjs/standard_fonts/",
+            wasmUrl: "/cms/pdf-viewer/vendor/pdfjs/wasm/",
+        });
         pdfDocument = await loadingTask.promise;
         setStatus("");
         await renderAllPages();

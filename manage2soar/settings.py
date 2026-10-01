@@ -602,6 +602,7 @@ CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS = int(
 # Relative path only - urlconf isn't loaded yet at settings import time, so
 # this can't be reverse()'d; it must match cms/urls.py's "external-pdf-proxy/".
 CMS_EXTERNAL_PDF_PROXY_URL = "/cms/external-pdf-proxy/"
+CMS_EXTERNAL_PDF_PROXY_SIGN_URL = "/cms/external-pdf-sign/"
 # Exposed to the client only when the feature is actually enabled for this
 # deployment, so the TinyMCE JS knows whether to route cross-origin PDFs
 # through the proxy or fall back to a direct (CORS-dependent) fetch.
@@ -634,6 +635,8 @@ TINYMCE_DEFAULT_CONFIG = {
     "pdf_viewer_url": PDF_VIEWER_URL,
     # External PDF proxy (Issue #1069 Phase 3): empty string when disabled.
     "pdf_external_proxy_url": PDF_EXTERNAL_PROXY_URL_FOR_CLIENT,
+    "pdf_external_proxy_allowed_hosts": CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS,
+    "pdf_external_sign_url": CMS_EXTERNAL_PDF_PROXY_SIGN_URL,
     # FIX FOR ISSUE #277 - YOUTUBE ERROR 153: Multiple approaches to ensure proper referrer policy
     # YouTube Error 153 occurs when referrer policy is too restrictive (e.g., 'no-referrer')
     # Using 'strict-origin-when-cross-origin' allows YouTube to verify the embedding domain

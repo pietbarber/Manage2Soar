@@ -30,6 +30,7 @@ Usage::
     python manage.py normalize_pdf_iframe_sandbox --apply  # apply changes
 """
 
+import html
 import re
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
@@ -39,6 +40,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from cms.models import HomePageContent, Page
+from cms.pdf_proxy import sign_external_pdf_url
 
 # Sandbox value used for every pdf.js-viewer-wrapped PDF embed. Safe because
 # the sandboxed document is our own viewer code, not the linked PDF itself.
@@ -198,14 +200,21 @@ def _resolve_original_url(src, viewer_url, proxy_url):
     return _extract_wrapped_target(viewer_target, proxy_url, "url") or viewer_target
 
 
-def _resolve_embed_target(url, classification, proxy_url):
+def _resolve_embed_target(url, classification, proxy_url, proxy_hosts):
     """Given the *original* PDF URL and its classification, return the value
     that should be passed to the viewer as `file`: cross-origin URLs route
     through the external proxy when one is configured (Issue #1069 Phase 3),
     everything else embeds directly.
     """
-    if classification == "cross-origin" and proxy_url:
-        return f"{proxy_url}?url={quote(url, safe='')}"
+    parsed = urlparse(url)
+    if (
+        classification == "cross-origin"
+        and proxy_url
+        and parsed.hostname
+        and parsed.hostname.lower() in proxy_hosts
+    ):
+        signature = sign_external_pdf_url(url)
+        return f"{proxy_url}?url={quote(url, safe='')}&signature={quote(signature, safe='')}"
     return url
 
 
@@ -314,7 +323,7 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes, viewer_url, proxy_ur
             continue
 
         src_match = ATTR_SRC_RE.search(tag)
-        src = src_match.group(1) if src_match else ""
+        src = html.unescape(src_match.group(1)) if src_match else ""
         original_url = _resolve_original_url(src, viewer_url, proxy_url)
         classification = _classify_pdf_url(original_url, trusted_prefixes)
 
@@ -328,7 +337,12 @@ def normalize_pdf_iframe_sandbox(content, trusted_prefixes, viewer_url, proxy_ur
             replacements.append((match.start(), match.end(), new_tag))
             continue
 
-        embed_target = _resolve_embed_target(original_url, classification, proxy_url)
+        embed_target = _resolve_embed_target(
+            original_url,
+            classification,
+            proxy_url,
+            settings.CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS,
+        )
         new_src = f"{viewer_url}?file={quote(embed_target, safe='')}"
         if src == new_src and sandbox_value == PDF_VIEWER_SANDBOX:
             continue  # already correct — idempotent
@@ -362,7 +376,7 @@ class Command(BaseCommand):
         apply_changes = options["apply"]
         trusted_prefixes = list(settings.TINYMCE_PDF_TRUSTED_URL_PREFIXES)
         viewer_url = settings.PDF_VIEWER_URL
-        proxy_url = settings.PDF_EXTERNAL_PROXY_URL_FOR_CLIENT
+        proxy_url = settings.CMS_EXTERNAL_PDF_PROXY_URL
 
         scanned = inspected = rewritten = skipped_conflicts = 0
 

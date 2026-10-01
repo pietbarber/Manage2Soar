@@ -19,6 +19,8 @@ from urllib.parse import urljoin, urlparse, urlunparse
 import urllib3
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.db import IntegrityError
 from django.utils import timezone
 
 from .models import ExternalPdfCache
@@ -27,10 +29,35 @@ MAX_RESPONSE_BYTES = 25 * 1024 * 1024  # 25 MB
 FETCH_TIMEOUT_SECONDS = (5, 15)  # (connect, read)
 MAX_REDIRECTS = 3
 PDF_SIGNATURE = b"%PDF-"
+PROXY_SIGNATURE_MAX_AGE = 60 * 60 * 24
+_proxy_signer = TimestampSigner(salt="cms.external-pdf-proxy")
 
 
 class ExternalPdfFetchError(Exception):
     """Raised when an external PDF URL cannot be safely fetched or validated."""
+
+
+def sign_external_pdf_url(url):
+    return _proxy_signer.sign(url)
+
+
+def verify_external_pdf_url(url, signature):
+    if not url or not signature:
+        return False
+    try:
+        return (
+            _proxy_signer.unsign(
+                signature,
+                max_age=getattr(
+                    settings,
+                    "CMS_EXTERNAL_PDF_PROXY_SIGNATURE_MAX_AGE",
+                    PROXY_SIGNATURE_MAX_AGE,
+                ),
+            )
+            == url
+        )
+    except (BadSignature, SignatureExpired):
+        return False
 
 
 def _public_addresses(hostname):
@@ -47,14 +74,7 @@ def _public_addresses(hostname):
             ip = ipaddress.ip_address(sockaddr[0])
         except ValueError:
             return []
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_multicast
-            or ip.is_reserved
-            or ip.is_unspecified
-        ):
+        if not ip.is_global:
             return []
         if str(ip) not in addresses:
             addresses.append(str(ip))
@@ -70,11 +90,11 @@ def is_proxyable_external_url(url):
         parsed = urlparse(url)
     except ValueError:
         return False
-    if (
-        parsed.scheme != "https"
-        or not parsed.hostname
-        or parsed.port not in (None, 443)
-    ):
+    try:
+        port = parsed.port
+    except ValueError:
+        return False
+    if parsed.scheme != "https" or not parsed.hostname or port not in (None, 443):
         return False
     if parsed.hostname.lower() not in allowed_hosts:
         return False
@@ -142,20 +162,30 @@ def _fetch_validated_pdf_bytes(url):
                 )
 
             content_length = response.headers.get("Content-Length")
-            if content_length and int(content_length) > MAX_RESPONSE_BYTES:
-                raise ExternalPdfFetchError(
-                    "Response exceeds the maximum allowed size."
-                )
-
-            chunks = []
-            total = 0
-            for chunk in response.stream(65536):
-                total += len(chunk)
-                if total > MAX_RESPONSE_BYTES:
+            if content_length:
+                try:
+                    content_length_value = int(content_length)
+                except (TypeError, ValueError) as exc:
+                    raise ExternalPdfFetchError(
+                        "Response has an invalid Content-Length."
+                    ) from exc
+                if content_length_value > MAX_RESPONSE_BYTES:
                     raise ExternalPdfFetchError(
                         "Response exceeds the maximum allowed size."
                     )
-                chunks.append(chunk)
+
+            chunks = []
+            total = 0
+            try:
+                for chunk in response.stream(65536):
+                    total += len(chunk)
+                    if total > MAX_RESPONSE_BYTES:
+                        raise ExternalPdfFetchError(
+                            "Response exceeds the maximum allowed size."
+                        )
+                    chunks.append(chunk)
+            except urllib3.exceptions.HTTPError as exc:
+                raise ExternalPdfFetchError("PDF response stream failed.") from exc
         finally:
             response.release_conn()
 
@@ -193,5 +223,9 @@ def get_or_fetch_cached_pdf(url):
         cached.file.save(f"{digest}.pdf", ContentFile(content), save=False)
         cached.content_hash = digest
         cached.size_bytes = len(content)
-    cached.save()
+    try:
+        cached.save()
+    except IntegrityError:
+        # Another worker won the unique URL race while this request fetched.
+        cached = ExternalPdfCache.objects.get(url=url)
     return cached
