@@ -47,7 +47,7 @@
     gcs_location: "{{ gke_gcs_location | default('us-east1') }}"
     gcs_storage_class: "{{ gke_gcs_storage_class | default('STANDARD') }}"
     gcs_import_export_bucket_name: >-
-      {{ gke_gcs_import_export_bucket | default(gcs_bucket_name ~ '-private-import-export') }}
+      {{ gke_gcs_import_export_bucket | default(gcs_project ~ '-private-import-export') }}
     # Service account defaults to the same project as GCS bucket for consistency with
     # setup-gcs-bucket.sh behavior (when using default PROJECT_ID).
     gcs_service_account: "{{ gke_service_account_email | default('django@' ~ gcs_project ~ '.iam.gserviceaccount.com') }}"
@@ -140,6 +140,7 @@
       changed_when: false
 
     - name: Parse private import/export bucket configuration
+      tags: [permissions, lifecycle]
       ansible.builtin.set_fact:
         import_export_bucket_info: "{{ import_export_bucket_info_raw.stdout | from_json }}"
 
