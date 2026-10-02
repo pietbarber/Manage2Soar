@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 from django.contrib.messages import constants as messages
@@ -317,8 +318,12 @@ else:
     # The import/export alias is deliberately OUTSIDE MEDIA_ROOT: when DEBUG=True,
     # urls.py serves the entire MEDIA_ROOT tree unauthenticated via static(),
     # which would expose member import CSVs (PII) over /media/.
+    # It is also deliberately placed OUTSIDE the repository checkout (in the
+    # OS-managed temp dir), so an abandoned preview CSV never becomes an
+    # untracked file that could be committed by accident (issue #1071).
     _import_export_dev_dir = os.getenv(
-        "IMPORT_EXPORT_TMP_DIR", str(BASE_DIR / "import-export-tmp")
+        "IMPORT_EXPORT_TMP_DIR",
+        str(Path(tempfile.gettempdir()) / "m2s-import-export-tmp"),
     )
     STORAGES = {
         "default": {
