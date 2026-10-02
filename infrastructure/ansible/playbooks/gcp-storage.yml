@@ -7,8 +7,16 @@
 #   1. Install required Ansible collections:
 #      ansible-galaxy collection install google.cloud
 #
-#   2. Authenticate with GCP:
-#      gcloud auth application-default login
+#   2. Authenticate with GCP. This playbook needs TWO credential surfaces:
+#      a. Application Default Credentials (ADC), used by the google.cloud
+#         modules (gcp_storage_bucket):
+#         gcloud auth application-default login
+#      b. An active gcloud CLI account, used by the `gcloud storage` and
+#         `gsutil` tasks. NOTE: ADC does NOT authenticate the gcloud CLI, so
+#         the CLI must be authenticated explicitly, e.g.:
+#         gcloud auth login
+#         # or, for non-interactive use (CI / service account):
+#         gcloud auth activate-service-account --key-file=/path/to/key.json
 #
 #   3. Copy an example inventory and customize it, for example:
 #      cp inventory/gcp_app.yml.example inventory/gcp_app.yml
@@ -59,6 +67,33 @@
       {{ gke_service_account_email | default(gcs_project ~ '-django@' ~ gcs_project ~ '.iam.gserviceaccount.com') }}
 
   tasks:
+    # The `gcloud storage` and `gsutil` tasks below authenticate with an active
+    # gcloud CLI account. ADC (`gcloud auth application-default login`) does NOT
+    # authenticate the gcloud CLI, so verify the CLI account exists up front and
+    # fail with an actionable message instead of a cryptic error mid-playbook.
+    - name: Check for an active gcloud CLI account
+      tags: [permissions, verify, lifecycle]
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - auth
+          - list
+          - --filter=status:ACTIVE
+          - --format=value(account)
+      register: gcloud_cli_accounts
+      changed_when: false
+
+    - name: Fail if no active gcloud CLI account is configured
+      tags: [permissions, verify, lifecycle]
+      ansible.builtin.fail:
+        msg: >-
+          No active gcloud CLI account found. The `gcloud storage` and `gsutil`
+          tasks in this playbook authenticate with a gcloud CLI account, which is
+          NOT covered by ADC (`gcloud auth application-default login`). Run
+          `gcloud auth login` (or `gcloud auth activate-service-account
+          --key-file=<key>.json` for non-interactive use) and re-run.
+      when: (gcloud_cli_accounts.stdout | trim | length) == 0
+
     - name: Ensure bucket exists with uniform access
       tags: [bucket]
       google.cloud.gcp_storage_bucket:
@@ -130,20 +165,25 @@
 
     - name: Verify bucket is accessible
       tags: [verify]
-      google.cloud.gcp_storage_bucket_info:
-        name: "{{ gcs_bucket_name }}"
-        project: "{{ gcs_project }}"
-        auth_kind: application
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - describe
+          - "gs://{{ gcs_bucket_name }}"
+          - --format=json
       register: verify_result
+      changed_when: false
 
     - name: Display verification result
       tags: [verify]
       ansible.builtin.debug:
         msg:
           - "Bucket verification successful"
-          - "Bucket name: {{ verify_result.resources[0].name }}"
-          - "Location: {{ verify_result.resources[0].location }}"
-          - "Uniform bucket-level access: {{ verify_result.resources[0].iamConfiguration.uniformBucketLevelAccess.enabled }}"
+          - "Bucket name: {{ (verify_result.stdout | from_json).name }}"
+          - "Location: {{ (verify_result.stdout | from_json).location }}"
+          - "Uniform bucket-level access: {{ (verify_result.stdout | from_json).uniform_bucket_level_access | default('unknown') }}"
 
     - name: Ensure private import/export bucket exists with uniform access
       tags: [bucket]
