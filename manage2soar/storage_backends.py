@@ -2,6 +2,7 @@
 
 from django.conf import settings
 from django.contrib.staticfiles.storage import ManifestFilesMixin
+from django.core.exceptions import ImproperlyConfigured
 from storages.backends.gcloud import GoogleCloudStorage
 
 
@@ -31,3 +32,19 @@ class StaticRootGCS(GoogleCloudStorage):
         "cache_control": "public, max-age=31536000, immutable",
         "content_disposition": "inline",  # Serve files inline, not as downloads
     }
+
+
+class PrivateImportExportGCS(GoogleCloudStorage):
+    location = "django-import-export"
+    default_acl = None
+    querystring_auth = True
+    file_overwrite = False
+
+    def __init__(self, *args, **kwargs):
+        bucket_name = getattr(settings, "GS_IMPORT_EXPORT_BUCKET_NAME", None)
+        if not bucket_name:
+            raise ImproperlyConfigured(
+                "GS_IMPORT_EXPORT_BUCKET_NAME must be set for private import/export storage."
+            )
+        super().__init__(*args, **kwargs)
+        self.bucket_name = bucket_name

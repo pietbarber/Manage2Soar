@@ -273,6 +273,13 @@ def document_pdf(request, document_id):
                 request.get_full_path(), login_url=settings.LOGIN_URL
             )
 
+    # Bind the name up front and guard against None (Pylance: FieldFile.name is
+    # str | None). document.is_pdf guarantees a non-empty ".pdf" name, but Pylance
+    # cannot see through that property, so narrow it explicitly here.
+    filename = document.file.name
+    if not filename:
+        return HttpResponseForbidden("This document is not available as a PDF.")
+
     try:
         stored_file = document.file.open("rb")
         if stored_file.read(5) != b"%PDF-":
@@ -282,7 +289,7 @@ def document_pdf(request, document_id):
         response = FileResponse(
             stored_file,
             as_attachment=False,
-            filename=(document.file.name or "document.pdf").rsplit("/", 1)[-1],
+            filename=filename.rsplit("/", 1)[-1],
             content_type="application/pdf",
         )
     except OSError:

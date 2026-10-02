@@ -1,0 +1,14 @@
+# systemd-tmpfiles configuration for M2S import/export temporary storage
+# Managed by Ansible - DO NOT EDIT MANUALLY
+#
+# django-import-export writes member import CSVs (PII) to
+# {{ m2s_import_export_tmp_dir }}. Objects are only removed after the
+# confirmation request is processed, so an upload abandoned at the preview
+# step would otherwise persist indefinitely. This rule clears any file in the
+# directory older than the retention period while keeping the directory itself.
+#
+# Type: e  -> clean an EXISTING directory's contents by age; keep the directory
+#             (X would be an exclusion rule and would NOT register it for cleanup)
+# Age:  {{ m2s_import_export_retention_days }}d -> mirrors the GCS lifecycle rule
+# (mode/user/group not applicable here, hence the dashes)
+e {{ m2s_import_export_tmp_dir }} - - - {{ m2s_import_export_retention_days }}d

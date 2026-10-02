@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 from django.contrib.messages import constants as messages
@@ -286,11 +287,15 @@ if GS_BUCKET_NAME:
         "default": {
             "BACKEND": "manage2soar.storage_backends.MediaRootGCS",
         },
+        "import_export": {
+            "BACKEND": "manage2soar.storage_backends.PrivateImportExportGCS",
+        },
         "staticfiles": {
             "BACKEND": "manage2soar.storage_backends.StaticRootGCS",
         },
     }
 
+    GS_IMPORT_EXPORT_BUCKET_NAME = os.getenv("GS_IMPORT_EXPORT_BUCKET_NAME")
     GS_DEFAULT_ACL = os.getenv("GS_DEFAULT_ACL", "publicRead")
 
     # Multi-tenant GCP URLs
@@ -309,10 +314,26 @@ if GS_BUCKET_NAME:
             f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
         )
 else:
-    # Local development without GCS - use Django's default file storage
+    # Local development without GCS - use Django's default file storage.
+    # The import/export alias is deliberately OUTSIDE MEDIA_ROOT: when DEBUG=True,
+    # urls.py serves the entire MEDIA_ROOT tree unauthenticated via static(),
+    # which would expose member import CSVs (PII) over /media/.
+    # It is also deliberately placed OUTSIDE the repository checkout (in the
+    # OS-managed temp dir), so an abandoned preview CSV never becomes an
+    # untracked file that could be committed by accident (issue #1071).
+    _import_export_dev_dir = os.getenv(
+        "IMPORT_EXPORT_TMP_DIR",
+        str(Path(tempfile.gettempdir()) / "m2s-import-export-tmp"),
+    )
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "import_export": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+            "OPTIONS": {
+                "location": _import_export_dev_dir,
+            },
         },
         "staticfiles": {
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
@@ -321,6 +342,13 @@ else:
     STATIC_URL = "/static/"
     MEDIA_URL = "/media/"
     MEDIA_ROOT = BASE_DIR / "media"
+
+#############################################################
+# ---- django-import-export temporary storage ----
+# Use a dedicated private storage alias so member import files are not public.
+# Its GCS bucket is shared across pods and has an IaC-managed expiration policy.
+# See issue #1071.
+IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.MediaStorage"
 
 # Use TinyMCE JS from configured static storage
 TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")

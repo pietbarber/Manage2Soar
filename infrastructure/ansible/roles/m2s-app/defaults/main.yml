@@ -23,6 +23,15 @@ m2s_django_debug: false
 m2s_django_allowed_hosts: "{{ m2s_domain }}"
 m2s_django_static_root: "/var/www/m2s/static"
 m2s_django_media_root: "/var/www/m2s/media"
+# Private, non-web-served storage for django-import-export temp files.
+# Deliberately OUTSIDE /var/www/m2s/media so Nginx does not expose member
+# import CSVs over the public /media/ URL (issue #1071).
+m2s_import_export_tmp_dir: "{{ m2s_app_home }}/import-export-tmp"
+# Retention (days) for import/export temp files. django-import-export removes
+# an object only after the confirmation request is processed, so uploads
+# abandoned at the preview step must be expired separately. Mirrors the 1-day
+# GCS lifecycle rule applied to the private import/export bucket.
+m2s_import_export_retention_days: 1
 
 # Gunicorn settings
 m2s_gunicorn_bind: "127.0.0.1:8000"

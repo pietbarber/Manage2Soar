@@ -113,6 +113,9 @@ gke_db_conn_max_age: "{{ postgresql_conn_max_age | default(300) }}"
 # GCS bucket name
 gke_gcs_bucket: "{{ gcp_project }}"
 
+# Private bucket for django-import-export temporary files
+gke_gcs_import_export_bucket: "{{ gke_gcs_bucket }}-private-import-export"
+
 # GCS project ID
 gke_gcs_project_id: "{{ gcp_project }}"
 
