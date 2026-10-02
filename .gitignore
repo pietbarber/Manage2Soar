@@ -223,6 +223,9 @@ infrastructure/ansible/credentials/
 *-service-account-key.json
 gcp-credentials*.json
 
+# Secrets backup tarballs (built by audit-ansible-secrets.sh tarball) - NEVER commit
+ansible-secrets-*.tar.gz
+
 # Generated secrets
 infrastructure/ansible/generated_secrets/
 infrastructure/scripts/*.generated
