@@ -114,7 +114,9 @@
           - --role=roles/storage.objectAdmin
       when: >-
         'serviceAccount:' ~ gcs_service_account not in (
-          gcs_bucket_policy.bindings | selectattr('role', 'equalto', 'roles/storage.objectAdmin')
+          gcs_bucket_policy.bindings
+          | selectattr('role', 'equalto', 'roles/storage.objectAdmin')
+          | rejectattr('condition', 'defined')
           | map(attribute='members') | list | flatten | default([])
         )
 
@@ -217,7 +219,9 @@
           - --role=roles/storage.objectAdmin
       when: >-
         'serviceAccount:' ~ gcs_service_account not in (
-          import_export_bucket_policy.bindings | selectattr('role', 'equalto', 'roles/storage.objectAdmin')
+          import_export_bucket_policy.bindings
+          | selectattr('role', 'equalto', 'roles/storage.objectAdmin')
+          | rejectattr('condition', 'defined')
           | map(attribute='members') | list | flatten | default([])
         )
 
