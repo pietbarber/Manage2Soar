@@ -737,6 +737,32 @@ class Document(models.Model):
         return (self.file.name or "").split(".")[-1].lower()
 
 
+def upload_external_pdf_cache_to(instance, filename):
+    return f"external-pdf-cache/{filename}"
+
+
+class ExternalPdfCache(models.Model):
+    """Cached bytes for an allowlisted external PDF URL (Issue #1069 Phase 3).
+
+    Populated by cms.pdf_proxy so a visitor's page view never triggers a
+    direct, unbounded outbound fetch of a third-party URL; see
+    CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS / CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS.
+    """
+
+    url = models.URLField(max_length=2000, unique=True)
+    file = models.FileField(upload_to=upload_external_pdf_cache_to)
+    content_hash = models.CharField(max_length=64)
+    size_bytes = models.BigIntegerField()
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "External PDF Cache Entry"
+        verbose_name_plural = "External PDF Cache Entries"
+
+    def __str__(self):
+        return self.url
+
+
 # Create your models here.
 
 

@@ -247,6 +247,21 @@ TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
     if prefix.strip()
 ]
 
+PDF_VIEWER_URL = "/cms/pdf-viewer/pdfjs-viewer/viewer.html"
+CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = [
+    host.strip().lower()
+    for host in os.getenv("CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
+CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS = int(
+    os.getenv("CMS_EXTERNAL_PDF_PROXY_CACHE_TTL_SECONDS", str(60 * 60 * 24))
+)
+CMS_EXTERNAL_PDF_PROXY_URL = "/cms/external-pdf-proxy/"
+CMS_EXTERNAL_PDF_PROXY_SIGN_URL = "/cms/external-pdf-sign/"
+PDF_EXTERNAL_PROXY_URL_FOR_CLIENT = (
+    CMS_EXTERNAL_PDF_PROXY_URL if CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS else ""
+)
+
 TINYMCE_DEFAULT_CONFIG = {
     "relative_urls": False,
     "remove_script_host": True,
@@ -257,6 +272,10 @@ TINYMCE_DEFAULT_CONFIG = {
     "toolbar": "undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | insertpdf | help",
     "sandbox_iframes": True,
     "pdf_trusted_url_prefixes": TINYMCE_PDF_TRUSTED_URL_PREFIXES,
+    "pdf_viewer_url": PDF_VIEWER_URL,
+    "pdf_external_proxy_url": PDF_EXTERNAL_PROXY_URL_FOR_CLIENT,
+    "pdf_external_proxy_allowed_hosts": CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS,
+    "pdf_external_sign_url": CMS_EXTERNAL_PDF_PROXY_SIGN_URL,
     "extended_valid_elements": (
         "iframe[src|width|height|frameborder|sandbox|referrerpolicy|loading|title|allow|allowfullscreen],"
         "div[class|style]"

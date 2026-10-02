@@ -5,6 +5,8 @@
 node_modules/
 # Exclude built TinyMCE assets
 static/tinymce/
+# Exclude vendored pdf.js build output (regenerated via `npm run vendor:pdfjs`)
+static/vendor/pdfjs/
 
 ### Django ###
 *.log

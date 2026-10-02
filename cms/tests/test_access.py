@@ -35,6 +35,24 @@ def test_controlled_pdf_endpoint_sets_safe_inline_headers(client, tmp_path):
         assert b"".join(response.streaming_content) == b"%PDF-1.7 test"
 
 
+def test_pdf_viewer_assets_are_same_origin_and_traversal_safe(client):
+    viewer = client.get("/cms/pdf-viewer/pdfjs-viewer/viewer.html")
+    module = client.get("/cms/pdf-viewer/vendor/pdfjs/build/pdf.mjs")
+    traversal = client.get("/cms/pdf-viewer/../manage2soar/settings.py")
+
+    assert viewer.status_code == 200
+    assert viewer["Content-Type"].startswith("text/html")
+    assert viewer["X-Frame-Options"] == "SAMEORIGIN"
+    assert viewer["Content-Security-Policy"] == (
+        "frame-ancestors 'self'; sandbox allow-scripts allow-same-origin "
+        "allow-downloads allow-modals"
+    )
+    assert module.status_code == 200
+    assert module["Content-Type"].startswith("text/javascript")
+    assert module["Content-Security-Policy"] == "frame-ancestors 'self'"
+    assert traversal.status_code == 404
+
+
 @pytest.mark.django_db
 def test_controlled_pdf_endpoint_requires_page_access(client, tmp_path):
     with override_settings(

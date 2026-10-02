@@ -1,14 +1,18 @@
 # Generic CMS Page view for arbitrary pages and directories
 import logging
+import mimetypes
+import posixpath
+from urllib.parse import urlparse
 
 from django import forms
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
-from django.http import FileResponse, HttpResponseForbidden
+from django.http import FileResponse, Http404, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -19,6 +23,13 @@ from tinymce.widgets import TinyMCE
 
 from cms.forms import SiteFeedbackForm, VisitorContactForm
 from cms.models import HomePageContent
+from cms.pdf_proxy import (
+    ExternalPdfFetchError,
+    get_or_fetch_cached_pdf,
+    is_proxyable_external_url,
+    sign_external_pdf_url,
+    verify_external_pdf_url,
+)
 from members.decorators import active_member_required
 from members.utils import is_active_member
 from utils.email_helpers import get_absolute_club_logo_url
@@ -271,7 +282,7 @@ def document_pdf(request, document_id):
         response = FileResponse(
             stored_file,
             as_attachment=False,
-            filename=document.file.name.rsplit("/", 1)[-1],
+            filename=(document.file.name or "document.pdf").rsplit("/", 1)[-1],
             content_type="application/pdf",
         )
     except OSError:
@@ -280,7 +291,89 @@ def document_pdf(request, document_id):
     response["X-Content-Type-Options"] = "nosniff"
     response["X-Frame-Options"] = "SAMEORIGIN"
     response["Content-Security-Policy"] = "frame-ancestors 'self'"
+    viewer_origin = urlparse(settings.PDF_VIEWER_URL)
+    if viewer_origin.scheme and viewer_origin.netloc:
+        response["Access-Control-Allow-Origin"] = (
+            viewer_origin.scheme + "://" + viewer_origin.netloc
+        )
+        response["Vary"] = "Origin"
     return response
+
+
+@require_http_methods(["GET"])
+def pdf_viewer_asset(request, asset_path):
+    """Serve only the bundled same-origin PDF.js viewer assets."""
+    normalized_path = posixpath.normpath(asset_path)
+    allowed = normalized_path.startswith(("pdfjs-viewer/", "vendor/pdfjs/"))
+    if not allowed or normalized_path.startswith("../") or normalized_path == ".":
+        raise Http404
+
+    file_path = settings.BASE_DIR / "static" / normalized_path
+    if not file_path.is_file():
+        raise Http404
+
+    content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+    response = FileResponse(file_path.open("rb"), content_type=content_type)
+    response["X-Frame-Options"] = "SAMEORIGIN"
+    response["Content-Security-Policy"] = "frame-ancestors 'self'"
+    if normalized_path == "pdfjs-viewer/viewer.html":
+        response[
+            "Content-Security-Policy"
+        ] += "; sandbox allow-scripts allow-same-origin allow-downloads allow-modals"
+    return response
+
+
+@require_http_methods(["GET"])
+def external_pdf_proxy(request):
+    """Serve an allowlisted, cached external PDF with the document_pdf response policy."""
+    url = request.GET.get("url", "").strip()
+    signature = request.GET.get("signature", "")
+    if (
+        not url
+        or not verify_external_pdf_url(url, signature)
+        or not is_proxyable_external_url(url)
+    ):
+        return HttpResponseForbidden("This URL is not an allowed external PDF source.")
+
+    try:
+        cached = get_or_fetch_cached_pdf(url)
+    except ExternalPdfFetchError:
+        return HttpResponseForbidden("This PDF could not be fetched or validated.")
+
+    try:
+        stored_file = cached.file.open("rb")
+    except OSError:
+        return HttpResponseForbidden("The requested document is unavailable.")
+
+    response = FileResponse(
+        stored_file,
+        as_attachment=False,
+        filename=(cached.file.name or "external.pdf").rsplit("/", 1)[-1],
+        content_type="application/pdf",
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-Frame-Options"] = "SAMEORIGIN"
+    response["Content-Security-Policy"] = "frame-ancestors 'self'"
+    viewer_origin = urlparse(settings.PDF_VIEWER_URL)
+    if viewer_origin.scheme and viewer_origin.netloc:
+        response["Access-Control-Allow-Origin"] = (
+            viewer_origin.scheme + "://" + viewer_origin.netloc
+        )
+        response["Vary"] = "Origin"
+    return response
+
+
+@login_required
+@require_http_methods(["GET"])
+def sign_external_pdf(request):
+    """Sign an allowed external PDF target for an authenticated CMS editor."""
+    if not (request.user.is_superuser or getattr(request.user, "webmaster", False)):
+        return HttpResponseForbidden("CMS webmaster permission is required.")
+    url = request.GET.get("url", "").strip()
+    if not is_proxyable_external_url(url):
+        return HttpResponseForbidden("This URL is not an allowed external PDF source.")
+    signature = sign_external_pdf_url(url)
+    return JsonResponse({"url": url, "signature": signature})
 
 
 def homepage(request):

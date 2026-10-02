@@ -31,6 +31,8 @@
       - zlib1g-dev
       - libxml2-dev
       - libxslt1-dev
+      - nodejs
+      - npm
     state: present
     update_cache: true
 
@@ -104,6 +106,24 @@
     virtualenv: "{{ m2s_venv_path }}"
   become: true
   become_user: "{{ m2s_app_user }}"
+
+- name: Install frontend dependencies for static vendoring
+  ansible.builtin.command:
+    cmd: npm ci --no-audit --no-fund
+    chdir: "{{ m2s_app_home }}/app"
+  become: true
+  become_user: "{{ m2s_app_user }}"
+  when:
+    - git_result.changed or (m2s_force_collectstatic | default(false) | bool)
+
+- name: Vendor PDF.js static assets
+  ansible.builtin.command:
+    cmd: npm run vendor:pdfjs
+    chdir: "{{ m2s_app_home }}/app"
+  become: true
+  become_user: "{{ m2s_app_user }}"
+  when:
+    - git_result.changed or (m2s_force_collectstatic | default(false) | bool)
 
 - name: Deploy Django environment file
   ansible.builtin.template:
