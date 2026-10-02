@@ -74,9 +74,13 @@ disk", a clean clone or CI checkout (which legitimately lacks the local secrets)
 is never blocked. It enforces only the checks that hold on any checkout:
 
 - Every manifest entry is **gitignored** (rules are committed, so this works
-  everywhere).
-- **No** manifest entry is **tracked** by git -- if you ever `git rm --cached`
-  or stop ignoring a secret, the commit is blocked and the path is printed.
+  everywhere) -- if you ever stop ignoring a secret (e.g. remove its
+  `.gitignore` rule), the commit is blocked and the path is printed.
+- **No** manifest entry is **tracked** by git -- if you ever force-add an
+  ignored secret into the index (e.g. `git add -f infrastructure/ansible/group_vars/localhost/vault.yml`)
+  or otherwise make a manifest entry tracked, the commit is blocked and the
+  path is printed. (Removing a secret from tracking with `git rm --cached` is
+  the *opposite* direction and is safe.)
 
 The **missing-file** guarantee lives in the manual `audit` command (see above);
 run it on provisioned operator workstations before a deployment.

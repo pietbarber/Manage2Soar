@@ -262,6 +262,16 @@ build_tarball() {
         out="$(realpath -m -- "${out}" 2>/dev/null || printf '%s' "${out}")"
     fi
 
+    # SECURITY: reject an EXISTING output path that is a symlink. `tar -czf`
+    # follows the link and would write the secret archive wherever it points --
+    # e.g. /tmp/backup.tar.gz -> <repo>/secret.tar.gz would dump secrets into the
+    # repo. A brand-new (non-existent) output name is always safe to write.
+    if [[ -L "${out}" ]]; then
+        echo "ERROR: output path is an existing symlink; refusing to write through it:" >&2
+        echo "       ${out} -> $(readlink "${out}")" >&2
+        exit 2
+    fi
+
     # SECURITY: if the archive lands inside the repository, its name MUST match
     # the protected ignore pattern (ansible-secrets-*.tar.gz) AND be gitignored.
     # Otherwise a custom in-repo name could be committed by accident.
@@ -294,7 +304,17 @@ build_tarball() {
     done < <(active_entries)
 
     echo "Creating backup tarball with ${#files[@]} file(s)..."
-    ( cd "${PROJECT_ROOT}" && tar -czf "${out}" "${files[@]}" )
+    # SECURITY: the archive is gzip-compressed but NOT encrypted. Force a
+    # restrictive umask (077) inside the subshell so the file is created mode
+    # 0600 even if the caller's umask is permissive (022); chmod 0600 is a
+    # belt-and-suspenders guard. The umask change is scoped to the subshell and
+    # never leaks to the caller process.
+    (
+        umask 077
+        cd "${PROJECT_ROOT}"
+        tar -czf "${out}" "${files[@]}"
+        chmod 600 "${out}"
+    )
 
     echo
     echo "Created: ${out}"
