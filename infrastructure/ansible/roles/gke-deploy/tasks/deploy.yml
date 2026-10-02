@@ -180,6 +180,30 @@
   delegate_to: localhost
   run_once: true
 
+- name: Normalize legacy CMS PDF embeds
+  ansible.builtin.command:
+    cmd: >
+      kubectl exec deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --
+      python manage.py normalize_pdf_iframe_sandbox --apply
+  delegate_to: localhost
+  run_once: true
+  when:
+    - gke_normalize_pdf_iframes | bool
+    - gke_wait_for_rollout | bool
+  register: normalize_pdf_result
+  retries: "{{ gke_management_command_retries | int }}"
+  delay: "{{ gke_management_command_retry_delay | int }}"
+  until: normalize_pdf_result.rc == 0
+
+- name: Display PDF normalization result
+  ansible.builtin.debug:
+    msg: "{{ normalize_pdf_result.stdout_lines }}"
+  when:
+    - gke_normalize_pdf_iframes | bool
+    - normalize_pdf_result.stdout_lines is defined
+  delegate_to: localhost
+  run_once: true
+
 # ============================================================
 # OPTIONAL POST-DEPLOY BACKFILL COMMANDS
 # ============================================================

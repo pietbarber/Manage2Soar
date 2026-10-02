@@ -1,9 +1,12 @@
 {
   "dependencies": {
+    "pdfjs-dist": "^6.3.289",
     "tablesort": "^5.2.1",
     "tinymce": "^8.6.0"
   },
   "scripts": {
-    "vendor:tablesort": "mkdir -p static/vendor && cp node_modules/tablesort/dist/tablesort.min.js static/vendor/tablesort.min.js"
+    "vendor:tablesort": "mkdir -p static/vendor && cp node_modules/tablesort/dist/tablesort.min.js static/vendor/tablesort.min.js",
+    "vendor:pdfjs": "mkdir -p static/vendor/pdfjs && rm -rf static/vendor/pdfjs/* && cp -r node_modules/pdfjs-dist/build static/vendor/pdfjs/build && cp -r node_modules/pdfjs-dist/web static/vendor/pdfjs/web && cp -r node_modules/pdfjs-dist/cmaps static/vendor/pdfjs/cmaps && cp -r node_modules/pdfjs-dist/standard_fonts static/vendor/pdfjs/standard_fonts && cp -r node_modules/pdfjs-dist/wasm static/vendor/pdfjs/wasm && rm -f static/vendor/pdfjs/web/compressed.tracemonkey-pldi-09.pdf",
+    "vendor": "npm run vendor:tablesort && npm run vendor:pdfjs"
   }
 }

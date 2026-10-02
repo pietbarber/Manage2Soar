@@ -5,6 +5,7 @@ from django.utils.html import format_html
 
 from .models import (
     Document,
+    ExternalPdfCache,
     HomePageContent,
     HomePageImage,
     Page,
@@ -376,6 +377,40 @@ class DocumentAdmin(admin.ModelAdmin):
         if not obj.uploaded_by:
             obj.uploaded_by = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(ExternalPdfCache)
+class ExternalPdfCacheAdmin(admin.ModelAdmin):
+    """Read-mostly view of cached external PDFs (Issue #1069 Phase 3).
+
+    Entries are created/refreshed automatically by cms.pdf_proxy; deleting
+    one here simply forces the next page view to re-fetch and re-validate it.
+    """
+
+    list_display = ("url", "size_bytes", "fetched_at")
+    search_fields = ("url",)
+    readonly_fields = ("url", "file", "content_hash", "size_bytes", "fetched_at")
+
+    def has_module_permission(self, request):
+        return super().has_module_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
+        )
+
+    def has_view_permission(self, request, obj=None):
+        return super().has_view_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
+        )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class HomePageImageInline(admin.TabularInline):

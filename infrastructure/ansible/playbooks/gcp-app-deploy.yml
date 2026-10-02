@@ -508,6 +508,29 @@
         - not ansible_check_mode
       tags: [verify]
 
+    - name: Normalize legacy CMS PDF embeds after tenant rollouts
+      ansible.builtin.command:
+        cmd: >
+          kubectl exec deployment/django-app-{{ tenant.prefix }}
+          -n {{ tenant.namespace | default('tenant-' + tenant.prefix) }} --
+          python manage.py normalize_pdf_iframe_sandbox --apply
+      delegate_to: localhost
+      run_once: false
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        loop_var: tenant
+        label: "{{ tenant.prefix }}"
+      when:
+        - (gke_deploy_tenants | length) > 1
+        - gke_wait_for_rollout_enabled | bool
+        - not ansible_check_mode
+        - gke_normalize_pdf_iframes | default(true) | bool
+      register: tenant_pdf_normalization
+      retries: "{{ gke_management_command_retries | int }}"
+      delay: "{{ gke_management_command_retry_delay | int }}"
+      until: tenant_pdf_normalization.rc == 0
+      tags: [deploy, verify]
+
   post_tasks:
     # Auto-run migrations for any tenant with unapplied migrations.
     # Uses 'migrate --check' (exits non-zero if unapplied migrations exist) to detect

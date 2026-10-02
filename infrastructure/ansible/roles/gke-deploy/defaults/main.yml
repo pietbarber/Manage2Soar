@@ -231,7 +231,7 @@ gke_wait_for_rollout: true
 gke_run_verify: true
 
 # Rollout timeout (seconds)
-gke_rollout_timeout: 600  # 10 minutes - increased from 5 to handle slow startups and image pulls
+gke_rollout_timeout: 900  # 15 minutes for slow image pulls and NEG health propagation
 
 # Run database migrations
 gke_run_migrations: false
@@ -240,6 +240,10 @@ gke_run_migrations: false
 # Enabled by default — skipping this causes missing CSS/JS on the site if new static files were added.
 # The cost and time overhead is minimal (~10s); the risk of skipping is a broken site.
 gke_collect_static: true
+
+# Normalize legacy CMS PDF embeds after deployment. The command is idempotent
+# and dry-run-safe at the application level; apply mode repairs stored content.
+gke_normalize_pdf_iframes: true
 
 # Retry policy for kubectl exec management commands (migrate/collectstatic).
 # This helps absorb transient failures such as rc=137 when a selected pod is

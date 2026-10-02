@@ -16,12 +16,15 @@
 (function () {
     'use strict';
 
-    // Sandbox policy for untrusted PDF embeds (Issue #1069).
-    // allow-scripts is required for Chrome's built-in PDF viewer (PDFium);
-    // allow-same-origin is required for cross-origin PDF hosts (e.g. GCS).
-    // Note: this combination effectively opts out of sandboxing for the
-    // embedded document, an intentional trade-off so PDFs render correctly.
-    var PDF_EMBED_SANDBOX = 'allow-scripts allow-same-origin';
+    // Sandbox policy for PDF embeds (Issue #1069).
+    // Chrome's built-in PDF viewer refuses to activate inside ANY sandboxed
+    // iframe, regardless of which tokens are granted, so PDFs are rendered by
+    // our own self-hosted pdf.js viewer (static/pdfjs-viewer/) instead. That
+    // viewer is same-origin, trusted code, so the surrounding iframe can stay
+    // genuinely sandboxed for every embed — there is no longer a
+    // trusted/untrusted sandbox distinction.
+    var PDF_VIEWER_SANDBOX = 'allow-scripts allow-same-origin allow-downloads allow-modals';
+    var DEFAULT_PDF_VIEWER_URL = '/cms/pdf-viewer/pdfjs-viewer/viewer.html';
 
     // Utility function to HTML-escape attribute values (XSS prevention)
     function escapeHtml(str) {
@@ -77,32 +80,107 @@
         }
     }
 
-    function insertPdfEmbed(editor, html, url, trustedHost) {
-        editor.insertContent(html, { format: 'raw' });
+    /**
+     * Classify a candidate PDF URL so callers know whether it's safe to embed:
+     * - 'trusted': matches TINYMCE_PDF_TRUSTED_URL_PREFIXES (e.g. our own
+     *   /cms/document-pdf/ endpoint).
+     * - 'cross-origin': a different origin than this site; safe to hand to
+     *   the pdf.js viewer (it fetches independently of our session/cookies).
+     * - 'same-origin-blocked': on our own origin but NOT the trusted PDF
+     *   endpoint — never embedded, since the viewer's same-origin fetch would
+     *   otherwise run with the visitor's full session privileges.
+     * - 'invalid': not a usable http(s) URL at all.
+     */
+    function classifyPdfUrl(url, trustedUrlPrefixes) {
+        var parsedUrl = parsePdfUrl(url);
+        if (!parsedUrl || !isValidPdfUrl(url)) return 'invalid';
+        if (isTrustedPdfUrl(url, trustedUrlPrefixes)) return 'trusted';
+        return parsedUrl.origin === window.location.origin ? 'same-origin-blocked' : 'cross-origin';
+    }
 
-        var iframes = editor.getBody().querySelectorAll('iframe');
-        for (var index = 0; index < iframes.length; index++) {
-            if (iframes[index].getAttribute('src') === url) {
-                if (trustedHost) {
-                    iframes[index].removeAttribute('sandbox');
-                } else {
-                    iframes[index].setAttribute('sandbox', PDF_EMBED_SANDBOX);
-                }
+    function buildViewerSrc(viewerUrl, targetUrl) {
+        return viewerUrl + '?file=' + encodeURIComponent(targetUrl);
+    }
+
+    function buildProxySrc(proxyUrl, targetUrl, signature) {
+        return proxyUrl + '?url=' + encodeURIComponent(targetUrl) +
+            '&signature=' + encodeURIComponent(signature);
+    }
+
+    /**
+     * If `src` already points at our pdf.js viewer, return the wrapped
+     * `file` target URL; otherwise null. Used to make re-normalization
+     * idempotent instead of wrapping an already-wrapped viewer URL again.
+     */
+    function extractViewerTarget(src, viewerUrl) {
+        try {
+            var parsed = new URL(src, window.location.origin);
+            var viewerParsed = new URL(viewerUrl, window.location.origin);
+            var isLegacyViewer = parsed.pathname.endsWith('/static/pdfjs-viewer/viewer.html');
+            if (!isLegacyViewer && (parsed.origin !== viewerParsed.origin || parsed.pathname !== viewerParsed.pathname)) {
+                return null;
             }
+            return parsed.searchParams.get('file');
+        } catch (e) {
+            return null;
         }
     }
 
     /**
-     * Generate PDF embed HTML with proper iframe attributes
-     * Note: the sandbox attribute is applied post-insertion by
-     * insertPdfEmbed() — untrusted embeds get PDF_EMBED_SANDBOX (allow-scripts
-     * allow-same-origin) so Chrome's built-in PDF viewer works, while trusted
-     * embeds (TINYMCE_PDF_TRUSTED_URL_PREFIXES) are left unsandboxed.
+     * If `src` already points at the external PDF proxy, return the wrapped
+     * `url` target; otherwise null. Same idempotency purpose as
+     * extractViewerTarget(), one layer further out (Issue #1069 Phase 3).
      */
-    function generatePdfEmbedHtml(url) {
+    function extractProxyTarget(src, proxyUrl) {
+        if (!proxyUrl) return null;
+        try {
+            var parsed = new URL(src, window.location.origin);
+            var proxyParsed = new URL(proxyUrl, window.location.origin);
+            if (parsed.origin !== proxyParsed.origin || parsed.pathname !== proxyParsed.pathname) {
+                return null;
+            }
+            return parsed.searchParams.get('url');
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Given the *original* PDF URL and its classification, return the value
+     * that should be passed to the viewer as `file`: cross-origin URLs route
+     * through the external proxy when one is configured (so pdf.js never
+     * depends on that host's CORS headers), everything else embeds directly.
+     */
+    function resolveEmbedTarget(url, classification, proxyUrl, proxyHosts, signedProxyUrl) {
+        if (signedProxyUrl) return new URL(signedProxyUrl, window.location.origin).href;
+        return new URL(url, window.location.origin).href;
+    }
+
+    /**
+     * Recover the original PDF URL from a (possibly viewer- and/or
+     * proxy-wrapped) iframe src, for idempotent re-normalization.
+     */
+    function resolveOriginalUrl(src, viewerUrl, proxyUrl) {
+        var viewerTarget = extractViewerTarget(src, viewerUrl) || src;
+        return extractProxyTarget(viewerTarget, proxyUrl) || viewerTarget;
+    }
+
+    /**
+     * Generate PDF embed HTML. The iframe always points at the self-hosted
+     * pdf.js viewer (Issue #1069) with a fixed, genuine sandbox — the viewer
+     * itself fetches and renders `url` (via the external proxy for
+     * cross-origin URLs, when configured), so Chrome's native PDF
+     * viewer/sandbox incompatibility never comes into play.
+     */
+    function generatePdfEmbedHtml(url, viewerUrl, classification, proxyUrl, proxyHosts, signedProxyUrl) {
         var escapedUrl = escapeHtml(url);
+        var embedTarget = resolveEmbedTarget(
+            url, classification, proxyUrl, proxyHosts, signedProxyUrl
+        );
+        var viewerSrc = escapeHtml(buildViewerSrc(viewerUrl, embedTarget));
         return '<div class="pdf-container">' +
-            '<iframe src="' + escapedUrl + '" ' +
+            '<iframe src="' + viewerSrc + '" ' +
+            'sandbox="' + PDF_VIEWER_SANDBOX + '" ' +
             'width="100%" height="600" ' +
             'frameborder="0" ' +
             'loading="lazy" ' +
@@ -231,17 +309,36 @@
             }
 
             var trustedPdfUrlPrefixes = config.pdf_trusted_url_prefixes || [];
+            var pdfViewerUrl = config.pdf_viewer_url || DEFAULT_PDF_VIEWER_URL;
+            var pdfExternalProxyUrl = config.pdf_external_proxy_url || '/cms/external-pdf-proxy/';
+            var pdfExternalProxyHosts = config.pdf_external_proxy_allowed_hosts || [];
+            var pdfExternalSignUrl = config.pdf_external_sign_url || '/cms/external-pdf-sign/';
             editor.on('GetContent', function (event) {
                 var container = document.createElement('div');
                 container.innerHTML = event.content || '';
-                var iframes = container.querySelectorAll('iframe');
+                var iframes = container.querySelectorAll('.pdf-container iframe');
                 for (var index = 0; index < iframes.length; index++) {
-                    var source = iframes[index].getAttribute('src');
-                    if (source && isTrustedPdfUrl(source, trustedPdfUrlPrefixes)) {
-                        iframes[index].removeAttribute('sandbox');
-                    } else if (iframes[index].closest('.pdf-container')) {
-                        iframes[index].setAttribute('sandbox', PDF_EMBED_SANDBOX);
+                    var iframe = iframes[index];
+                    var src = iframe.getAttribute('src');
+                    if (!src) continue;
+
+                    var originalUrl = resolveOriginalUrl(src, pdfViewerUrl, pdfExternalProxyUrl);
+                    var existingProxyTarget = extractViewerTarget(src, pdfViewerUrl) || src;
+                    var existingProxySignature = extractProxyTarget(existingProxyTarget, pdfExternalProxyUrl) &&
+                        new URL(existingProxyTarget, window.location.origin).searchParams.get('signature');
+                    var classification = classifyPdfUrl(originalUrl, trustedPdfUrlPrefixes);
+                    if (classification === 'invalid' || classification === 'same-origin-blocked') {
+                        // Never embed an untrusted same-origin URL, wrapped or not.
+                        iframe.removeAttribute('src');
+                        iframe.setAttribute('sandbox', '');
+                        continue;
                     }
+                    var embedTarget = resolveEmbedTarget(
+                        originalUrl, classification, pdfExternalProxyUrl, pdfExternalProxyHosts,
+                        existingProxySignature ? existingProxyTarget : null
+                    );
+                    iframe.setAttribute('src', buildViewerSrc(pdfViewerUrl, embedTarget));
+                    iframe.setAttribute('sandbox', PDF_VIEWER_SANDBOX);
                 }
                 event.content = container.innerHTML;
             });
@@ -250,26 +347,68 @@
             editor.ui.registry.addButton('insertpdf', {
                 text: '📄 Insert PDF',
                 tooltip: 'Insert an embedded PDF document',
-                onAction: function () {
-                    var url = prompt('Enter the PDF URL (must be https:// or http://):');
-                    if (url) {
-                        url = url.trim();
-                        if (isValidPdfUrl(url)) {
-                            var trustedPdfUrl = isTrustedPdfUrl(url, trustedPdfUrlPrefixes);
-                            // Check if URL ends with .pdf and warn if not
-                            if (!trustedPdfUrl && !url.toLowerCase().endsWith('.pdf')) {
-                                var proceed = confirm(
-                                    'This URL does not end with .pdf\n\n' +
-                                    'If this is not a PDF file, it may not display correctly.\n\n' +
-                                    'Continue anyway?'
-                                );
-                                if (!proceed) return;
-                            }
-                            var html = generatePdfEmbedHtml(url);
-                            insertPdfEmbed(editor, html, url, trustedPdfUrl);
-                        } else {
-                            alert('Invalid URL. Please enter a valid http:// or https:// URL.');
+                onAction: async function () {
+                    var url = prompt(
+                        'Enter the PDF URL (must be https:// or http://):\n\n' +
+                        'Tip: for files already uploaded to this site, use the document\'s ' +
+                        '/cms/document-pdf/ link, not the raw storage URL.'
+                    );
+                    if (!url) return;
+                    url = url.trim();
+                    if (!isValidPdfUrl(url)) {
+                        alert('Invalid URL. Please enter a valid http:// or https:// URL.');
+                        return;
+                    }
+                    var classification = classifyPdfUrl(url, trustedPdfUrlPrefixes);
+                    if (classification === 'same-origin-blocked') {
+                        alert(
+                            'This URL is on this site but is not the trusted PDF link.\n\n' +
+                            'Please use the document\'s /cms/document-pdf/ link instead, or upload the file here.'
+                        );
+                        return;
+                    }
+                    // Check if URL ends with .pdf and warn if not
+                    if (classification !== 'trusted' && !url.toLowerCase().endsWith('.pdf')) {
+                        var proceed = confirm(
+                            'This URL does not end with .pdf\n\n' +
+                            'If this is not a PDF file, it may not display correctly.\n\n' +
+                            'Continue anyway?'
+                        );
+                        if (!proceed) return;
+                    }
+                    var parsedUrl = parsePdfUrl(url);
+                    var shouldProxy = classification === 'cross-origin' &&
+                        pdfExternalProxyUrl && parsedUrl &&
+                        pdfExternalProxyHosts.indexOf(parsedUrl.hostname.toLowerCase()) !== -1;
+                    if (shouldProxy) {
+                        try {
+                            var response = await fetch(
+                                pdfExternalSignUrl + '?url=' + encodeURIComponent(url),
+                                { credentials: 'same-origin' }
+                            );
+                            if (!response.ok) throw new Error('External PDF signing failed');
+                            var signed = await response.json();
+                            var signedProxyUrl = buildProxySrc(
+                                pdfExternalProxyUrl, url, signed.signature
+                            );
+                            editor.insertContent(
+                                generatePdfEmbedHtml(
+                                    url, pdfViewerUrl, classification, pdfExternalProxyUrl,
+                                    pdfExternalProxyHosts, signedProxyUrl
+                                ),
+                                { format: 'raw' }
+                            );
+                        } catch (error) {
+                            alert('This external PDF could not be authorized for embedding.');
                         }
+                    } else {
+                        editor.insertContent(
+                            generatePdfEmbedHtml(
+                                url, pdfViewerUrl, classification, pdfExternalProxyUrl,
+                                pdfExternalProxyHosts, null
+                            ),
+                            { format: 'raw' }
+                        );
                     }
                 }
             });
