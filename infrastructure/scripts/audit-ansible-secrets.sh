@@ -13,9 +13,16 @@
 #   3. NOT tracked  (git ls-files does not match it)
 #
 # Usage:
-#   audit-ansible-secrets.sh audit    [default]  Verify the manifest is complete
-#                                                and correct. Exits non-zero on
-#                                                any violation.
+#   audit-ansible-secrets.sh audit    [default]  Full audit: every entry must
+#                                                exist, be gitignored, and be
+#                                                untracked. For provisioned
+#                                                operator workstations that hold
+#                                                the secrets.
+#   audit-ansible-secrets.sh check             Metadata-only: manifest parses,
+#                                                every entry is gitignored and
+#                                                untracked. Skips "exists on
+#                                                disk", so it is safe in a clean
+#                                                clone or CI. Used by pre-commit.
 #   audit-ansible-secrets.sh list              Print the manifest (comments stripped)
 #   audit-ansible-secrets.sh sync              Overwrite ~/bin/ansible-secrets-files.txt
 #                                                with the current manifest
@@ -132,6 +139,62 @@ audit() {
 }
 
 # ---------------------------------------------------------------------------
+# check  -> metadata-only audit (safe in a clean clone / CI)
+#   Validates the manifest WITHOUT requiring the secret files to exist on disk:
+#     * manifest is present and has at least one active entry
+#     * every entry is gitignored (rules are committed, so this works on any clone)
+#     * NO entry is tracked by git (the real security risk; safe to check anywhere)
+#   Skips the "exists on disk" check so it never blocks a fresh contributor clone
+#   or a CI checkout that legitimately lacks the local secrets. This is the mode
+#   the pre-commit hook uses.
+# ---------------------------------------------------------------------------
+check() {
+    local failures=0
+    local entry count
+
+    if [[ ! -f "${MANIFEST}" ]]; then
+        echo "FAIL: manifest not found: ${MANIFEST}" >&2
+        return 1
+    fi
+
+    count="$(active_entries | wc -l | tr -d ' ')"
+    if [[ "${count}" -eq 0 ]]; then
+        echo "FAIL: manifest has no active (non-comment) entries" >&2
+        return 1
+    fi
+
+    echo "Check (metadata-only): required-secrets-manifest.txt"
+    echo "Root   : ${PROJECT_ROOT}"
+    echo "Entries: ${count}"
+    echo
+    echo "  (skips 'exists on disk' -- safe for clean clones / CI)"
+    echo
+
+    while IFS= read -r entry; do
+        [[ -z "${entry}" ]] && continue
+
+        if ! is_ignored "${entry}"; then
+            printf '  [FAIL] NOT gitignored    : %s\n' "${entry}"
+            failures=$((failures + 1))
+        fi
+
+        if is_tracked "${entry}"; then
+            printf '  [FAIL] TRACKED by git    : %s   <-- MUST NOT be committed\n' "${entry}"
+            failures=$((failures + 1))
+        fi
+    done < <(active_entries)
+
+    echo
+    if (( failures == 0 )); then
+        echo "PASS: manifest parses; every entry is gitignored and untracked."
+        return 0
+    else
+        echo "FAIL: ${failures} violation(s). Fix before committing."
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # list
 # ---------------------------------------------------------------------------
 list() {
@@ -181,6 +244,26 @@ build_tarball() {
         *)  out="${PWD}/${out}" ;;
     esac
 
+    # SECURITY: if the archive lands inside the repository, its name MUST match
+    # the protected ignore pattern (ansible-secrets-*.tar.gz) AND be gitignored.
+    # Otherwise a custom in-repo name could be committed by accident.
+    case "${out}" in
+        "${PROJECT_ROOT}"/*)
+            local base rel
+            base="${out##*/}"
+            rel="${out#"${PROJECT_ROOT}"/}"
+            if [[ ! "${base}" =~ ^ansible-secrets-.*\.tar\.gz$ ]]; then
+                echo "ERROR: in-repo tarball must be named 'ansible-secrets-*.tar.gz' (the gitignored pattern)." >&2
+                echo "       Got '${base}'. Use an out-of-repo path, e.g. /secure/backup.tar.gz" >&2
+                exit 2
+            fi
+            if ! is_ignored "${rel}"; then
+                echo "ERROR: resolved in-repo output is not gitignored: ${out}" >&2
+                exit 2
+            fi
+            ;;
+    esac
+
     local files=()
     local entry
     while IFS= read -r entry; do
@@ -201,8 +284,8 @@ build_tarball() {
     echo "SHA-256:"
     ( cd "${PROJECT_ROOT}" && sha256sum "${out}" )
     echo
-    echo "NEXT: store this tarball securely (encrypted at rest, off-box). "
-    echo "      ALSO back up the Vault password (ANSIBLE_VAULT_PASSWORD) "
+    echo "NEXT: store this tarball securely (it is gzip-compressed, NOT encrypted). "
+    echo "      ALSO back up the Vault password file (~/.ansible_vault_pass) "
     echo "      separately -- it is not in the tarball."
 }
 
@@ -212,6 +295,7 @@ build_tarball() {
 cmd="${1:-audit}"
 case "${cmd}" in
     audit)   audit ;;
+    check)   check ;;
     list)    list ;;
     sync)    sync_bin_list ;;
     tarball) shift; build_tarball "${1:-}" ;;

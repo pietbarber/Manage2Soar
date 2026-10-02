@@ -2,13 +2,16 @@
 # Security-focused hooks to catch issues before they reach the repository
 
 repos:
-  # Verify the required-secrets manifest is complete and that no secret file
-  # is tracked / accidentally un-ignored. Keeps "always remember, never forget."
+  # Verify the required-secrets manifest is valid and that no secret file is
+  # tracked / accidentally un-ignored. Uses the METADATA-ONLY `check` mode so a
+  # clean clone or CI checkout (which legitimately lacks the local secrets) is
+  # never blocked by the "exists on disk" rule. Run the fuller `audit` (with the
+  # existence check) manually on provisioned operator workstations.
   - repo: local
     hooks:
       - id: audit-ansible-secrets
         name: audit-ansible-secrets
-        entry: infrastructure/scripts/audit-ansible-secrets.sh audit
+        entry: infrastructure/scripts/audit-ansible-secrets.sh check
         language: script
         pass_filenames: false
 

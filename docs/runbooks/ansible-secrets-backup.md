@@ -12,7 +12,8 @@
 - **Audit**: verify the required-secret manifest is complete and that every entry is
   gitignored and untracked.
 - **Sync**: regenerate `~/bin/ansible-secrets-files.txt` from the single source of truth.
-- **Tarball**: build an encrypted-at-rest backup archive of every required secret file.
+- **Tarball**: build a compressed (gzip) backup archive of every required secret file
+  (NOT encrypted -- any encryption depends on where you store it).
 - **Restore**: how to get a working box / new co-webmaster up and running.
 
 ## The single source of truth
@@ -31,8 +32,13 @@ The manifest is the authoritative list. `~/bin/ansible-secrets-files.txt` is a
 All commands are run from the project root.
 
 ```bash
-# 1. Verify the manifest is complete + correct (also runs automatically in pre-commit)
+# 1a. Full audit: every entry must exist, be gitignored, and be untracked
+#     (run this on provisioned operator workstations that hold the secrets)
 ./infrastructure/scripts/audit-ansible-secrets.sh audit
+
+# 1b. Metadata-only check: same as above minus "exists on disk" -- this is the
+#     mode the pre-commit hook runs, so it also passes on a clean clone / CI
+./infrastructure/scripts/audit-ansible-secrets.sh check
 
 # 2. Print the active file list (no comments)
 ./infrastructure/scripts/audit-ansible-secrets.sh list
@@ -78,12 +84,14 @@ This means:
 ./infrastructure/scripts/audit-ansible-secrets.sh tarball    # create the archive
 ```
 
-**Store the tarball securely** (encrypted at rest, off-box / in your vault of choice).
+**Store the tarball securely.** It is gzip-compressed, NOT encrypted -- put it in an
+encrypted store / off-box and rely on destination-level encryption if that matters.
 
-> ⚠️ **The Ansible Vault password is NOT in the tarball.** It is an environment
-> value (`ANSIBLE_VAULT_PASSWORD`) or `--vault-id`, not a file. Back it up
-> **separately** (password manager / encrypted note) or you cannot decrypt
-> `group_vars/all/vault.yml`, `gcp_mail/vault.yml`, etc.
+> ⚠️ **The Ansible Vault password is NOT in the tarball.** In this repo it is a
+> *file* on the operator's home machine (`~/.ansible_vault_pass`, or the path named
+> by `ANSIBLE_VAULT_PASSWORD_FILE`), so it lives outside the repository and is not
+> part of the tarball. Back it up **separately** (password manager / encrypted note)
+> or you cannot decrypt `group_vars/all/vault.yml`, `gcp_mail/vault.yml`, etc.
 
 ## Restoration (new box / co-webmaster)
 
@@ -96,9 +104,11 @@ tar -xzf ansible-secrets-YYYYmmdd-HHMMSS.tar.gz -C /path/to/project
 # 2. Confirm the manifest still matches what you just restored
 ./infrastructure/scripts/audit-ansible-secrets.sh audit
 
-# 3. Make sure the Vault password is available for the playbooks
-export ANSIBLE_VAULT_PASSWORD='<from your secure store>'
-#    ...or use: --vault-id @prompt  /  --vault-id myid@/path/to/vault-pass
+# 3. Make sure the Vault password file is available for the playbooks
+#    (convention in this repo: ~/.ansible_vault_pass, or set ANSIBLE_VAULT_PASSWORD_FILE)
+cp /secure/store/ansible_vault_pass ~/.ansible_vault_pass
+chmod 600 ~/.ansible_vault_pass
+#    ...or pass: --vault-password-file ~/.ansible_vault_pass
 ```
 
 After that, the playbooks run as normal, e.g.:
