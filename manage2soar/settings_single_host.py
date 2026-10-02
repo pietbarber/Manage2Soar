@@ -156,8 +156,13 @@ MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/var/www/m2s/media")
 # The import/export alias is deliberately placed OUTSIDE MEDIA_ROOT. Nginx
 # aliases all of /var/www/m2s/media to the public /media/ URL, so any file
 # under MEDIA_ROOT (including member import CSVs) would be web-accessible.
-# The dedicated directory is provisioned separately by the m2s-app Ansible
-# role (owned by the app user, not web-served). Override with IMPORT_EXPORT_TMP_DIR.
+# The dedicated directory is provisioned (and cleaned up by the systemd-tmpfiles
+# retention rule) by the m2s-app Ansible role, so it stays owned by the app user
+# and is never web-served. The m2s_import_export_tmp_dir Ansible variable is the
+# single source of truth and is written into app/.env (IMPORT_EXPORT_TMP_DIR),
+# which defaults to this same path. Do not point IMPORT_EXPORT_TMP_DIR at an
+# unprovisioned path, or the directory may not exist and abandoned member CSVs
+# will bypass the retention policy (issue #1071).
 IMPORT_EXPORT_TMP_DIR = os.getenv("IMPORT_EXPORT_TMP_DIR", "/opt/m2s/import-export-tmp")
 
 STORAGES = {
