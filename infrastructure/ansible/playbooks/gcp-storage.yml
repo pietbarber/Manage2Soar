@@ -130,20 +130,25 @@
 
     - name: Verify bucket is accessible
       tags: [verify]
-      google.cloud.gcp_storage_bucket_info:
-        name: "{{ gcs_bucket_name }}"
-        project: "{{ gcs_project }}"
-        auth_kind: application
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - describe
+          - "gs://{{ gcs_bucket_name }}"
+          - --format=json
       register: verify_result
+      changed_when: false
 
     - name: Display verification result
       tags: [verify]
       ansible.builtin.debug:
         msg:
           - "Bucket verification successful"
-          - "Bucket name: {{ verify_result.resources[0].name }}"
-          - "Location: {{ verify_result.resources[0].location }}"
-          - "Uniform bucket-level access: {{ verify_result.resources[0].iamConfiguration.uniformBucketLevelAccess.enabled }}"
+          - "Bucket name: {{ (verify_result.stdout | from_json).name }}"
+          - "Location: {{ (verify_result.stdout | from_json).location }}"
+          - "Uniform bucket-level access: {{ (verify_result.stdout | from_json).uniform_bucket_level_access | default('unknown') }}"
 
     - name: Ensure private import/export bucket exists with uniform access
       tags: [bucket]
