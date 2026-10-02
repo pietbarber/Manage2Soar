@@ -83,24 +83,50 @@
           - "Self Link: {{ bucket_result.selfLink }}"
           - "Storage Class: {{ bucket_result.storageClass }}"
 
+    - name: Get bucket IAM policy
+      tags: [permissions]
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - get-iam-policy
+          - "gs://{{ gcs_bucket_name }}"
+          - --format=json
+      register: gcs_bucket_policy_raw
+      changed_when: false
+
+    - name: Parse bucket IAM policy
+      tags: [permissions]
+      ansible.builtin.set_fact:
+        gcs_bucket_policy: "{{ gcs_bucket_policy_raw.stdout | from_json }}"
+
     - name: Grant service account Storage Object Admin role
       tags: [permissions]
-      google.cloud.gcp_storage_bucket_iam_binding:
-        bucket: "{{ gcs_bucket_name }}"
-        role: "roles/storage.objectAdmin"
-        members:
-          - "serviceAccount:{{ gcs_service_account }}"
-        project: "{{ gcs_project }}"
-        auth_kind: application
-      register: iam_result
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - add-iam-policy-binding
+          - "gs://{{ gcs_bucket_name }}"
+          - "--member=serviceAccount:{{ gcs_service_account }}"
+          - --role=roles/storage.objectAdmin
+      when: >-
+        'serviceAccount:' ~ gcs_service_account not in (
+          gcs_bucket_policy.bindings
+          | selectattr('role', 'equalto', 'roles/storage.objectAdmin')
+          | rejectattr('condition', 'defined')
+          | map(attribute='members') | list | flatten | default([])
+        )
 
     - name: Display IAM member information
       tags: [permissions]
       ansible.builtin.debug:
         msg:
-          - "Role: {{ iam_result.role }}"
-          - "Member: {{ iam_result.member }}"
-          - "Bucket: {{ iam_result.bucket }}"
+          - "Role: roles/storage.objectAdmin"
+          - "Member: serviceAccount:{{ gcs_service_account }}"
+          - "Bucket: {{ gcs_bucket_name }}"
 
     - name: Verify bucket is accessible
       tags: [verify]
@@ -162,15 +188,42 @@
       when: >-
         import_export_bucket_info.iamConfiguration.publicAccessPrevention | default('') != 'enforced'
 
+    - name: Get private import/export bucket IAM policy
+      tags: [permissions]
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - get-iam-policy
+          - "gs://{{ gcs_import_export_bucket_name }}"
+          - --format=json
+      register: import_export_bucket_policy_raw
+      changed_when: false
+
+    - name: Parse private import/export bucket IAM policy
+      tags: [permissions]
+      ansible.builtin.set_fact:
+        import_export_bucket_policy: "{{ import_export_bucket_policy_raw.stdout | from_json }}"
+
     - name: Grant application service account access to private import/export bucket
       tags: [permissions]
-      google.cloud.gcp_storage_bucket_iam_binding:
-        bucket: "{{ gcs_import_export_bucket_name }}"
-        role: "roles/storage.objectAdmin"
-        members:
-          - "serviceAccount:{{ gcs_service_account }}"
-        project: "{{ gcs_project }}"
-        auth_kind: application
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - add-iam-policy-binding
+          - "gs://{{ gcs_import_export_bucket_name }}"
+          - "--member=serviceAccount:{{ gcs_service_account }}"
+          - --role=roles/storage.objectAdmin
+      when: >-
+        'serviceAccount:' ~ gcs_service_account not in (
+          import_export_bucket_policy.bindings
+          | selectattr('role', 'equalto', 'roles/storage.objectAdmin')
+          | rejectattr('condition', 'defined')
+          | map(attribute='members') | list | flatten | default([])
+        )
 
     - name: Check for import/export object expiration lifecycle rule
       tags: [lifecycle]
