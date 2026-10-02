@@ -631,6 +631,28 @@ startxref
         after = frame.locator("#pages canvas").bounding_box()["width"]
         assert after > before
 
+        self.page.locator(".pdf-container iframe").evaluate(
+            "iframe => iframe.removeAttribute('sandbox')"
+        )
+        self.page.locator(".pdf-container iframe").evaluate(
+            "iframe => iframe.contentWindow.location.reload()"
+        )
+        frame.locator("#pages canvas").wait_for(timeout=15000)
+        with self.page.expect_console_message(
+            predicate=lambda message: "allow-forms" in message.text
+            and "sandboxed" in message.text,
+            timeout=5000,
+        ):
+            frame.locator("body").evaluate(
+                """body => {
+                    const form = body.ownerDocument.createElement('form');
+                    form.action = '/cms/';
+                    body.appendChild(form);
+                    form.submit();
+                }"""
+            )
+        assert frame.locator("#pages canvas").count() == 1
+
     @unittest.skip(
         "Button is registered and works functionally, but may be in toolbar overflow menu"
     )

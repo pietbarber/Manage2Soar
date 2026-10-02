@@ -316,6 +316,10 @@ def pdf_viewer_asset(request, asset_path):
     response = FileResponse(file_path.open("rb"), content_type=content_type)
     response["X-Frame-Options"] = "SAMEORIGIN"
     response["Content-Security-Policy"] = "frame-ancestors 'self'"
+    if normalized_path == "pdfjs-viewer/viewer.html":
+        response[
+            "Content-Security-Policy"
+        ] += "; sandbox allow-scripts allow-same-origin allow-downloads allow-modals"
     return response
 
 
