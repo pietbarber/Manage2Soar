@@ -26,6 +26,10 @@ from cms.views import sign_external_pdf
 ALLOWED_URL = "https://pdfs.example.com/bylaws.pdf"
 
 
+def call_sign_view(request):
+    return getattr(sign_external_pdf, "__wrapped__")(request)
+
+
 def login_test_user(client, user):
     session = client.session
     session[SESSION_KEY] = str(user.pk)
@@ -284,7 +288,7 @@ def test_sign_view_rejects_non_webmaster(settings, client, monkeypatch):
         reverse("cms:external_pdf_sign"), {"url": ALLOWED_URL}
     )
     request.user = user
-    response = sign_external_pdf.__wrapped__(request)
+    response = call_sign_view(request)
 
     assert response.status_code == 403
 
@@ -303,12 +307,12 @@ def test_sign_view_allows_webmaster_only_for_allowlisted_host(
         reverse("cms:external_pdf_sign"), {"url": ALLOWED_URL}
     )
     allowed_request.user = user
-    response = sign_external_pdf.__wrapped__(allowed_request)
+    response = call_sign_view(allowed_request)
     rejected_request = RequestFactory().get(
         reverse("cms:external_pdf_sign"), {"url": "https://other.example/a.pdf"}
     )
     rejected_request.user = user
-    rejected = sign_external_pdf.__wrapped__(rejected_request)
+    rejected = call_sign_view(rejected_request)
 
     assert response.status_code == 200
     payload = json.loads(response.content)
