@@ -40,9 +40,10 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Resolve project root + manifest path
 # ---------------------------------------------------------------------------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # script lives in infrastructure/scripts/ ; project root is two levels up
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# (pwd -P => physical path, so in-repo comparisons below are symlink-safe)
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
 MANIFEST="${PROJECT_ROOT}/infrastructure/ansible/required-secrets-manifest.txt"
 
 if [[ ! -f "${MANIFEST}" ]]; then
@@ -238,11 +239,28 @@ build_tarball() {
         ts="$(date +%Y%m%d-%H%M%S)"
         out="${PROJECT_ROOT}/ansible-secrets-${ts}.tar.gz"
     fi
-    # Resolve to absolute if relative
+    # Resolve to absolute if relative, then CANONICALIZE the parent directory
+    # physically (resolving `..`, symlinks, redundant segments). A plain `$PWD`
+    # prefix would not catch an absolute path such as
+    # /tmp/..//<project>/secrets.tar.gz that resolves INSIDE the repository.
     case "${out}" in
         /*) : ;;
         *)  out="${PWD}/${out}" ;;
     esac
+
+    local out_dir out_base
+    out_dir="$(cd "$(dirname "${out}")" 2>/dev/null && pwd -P || true)"
+    out_base="${out##*/}"
+    if [[ -n "${out_dir}" ]]; then
+        if [[ "${out_dir}" == "/" ]]; then
+            out="/${out_base}"
+        else
+            out="${out_dir}/${out_base}"
+        fi
+    else
+        # Parent does not exist yet -- lexical normalization as a fallback.
+        out="$(realpath -m -- "${out}" 2>/dev/null || printf '%s' "${out}")"
+    fi
 
     # SECURITY: if the archive lands inside the repository, its name MUST match
     # the protected ignore pattern (ansible-secrets-*.tar.gz) AND be gitignored.

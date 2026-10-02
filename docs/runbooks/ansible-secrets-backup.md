@@ -68,13 +68,18 @@ lost.
 
 ## Pre-commit enforcement
 
-A `local` pre-commit hook (`audit-ansible-secrets`) runs `audit` on every commit.
-This means:
+A `local` pre-commit hook (`audit-ansible-secrets`) runs the **metadata-only
+`check` mode** on every commit. Because `check` deliberately skips "exists on
+disk", a clean clone or CI checkout (which legitimately lacks the local secrets)
+is never blocked. It enforces only the checks that hold on any checkout:
 
-- You **cannot commit** while a required secret file is missing, un-ignored, or
-  accidentally tracked.
-- If you ever `git rm --cached` or stop ignoring a secret, the commit is blocked
-  and the offending path is printed.
+- Every manifest entry is **gitignored** (rules are committed, so this works
+  everywhere).
+- **No** manifest entry is **tracked** by git -- if you ever `git rm --cached`
+  or stop ignoring a secret, the commit is blocked and the path is printed.
+
+The **missing-file** guarantee lives in the manual `audit` command (see above);
+run it on provisioned operator workstations before a deployment.
 
 ## Backup procedure (before changes / regularly)
 
