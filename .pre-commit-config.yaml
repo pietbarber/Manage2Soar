@@ -2,6 +2,16 @@
 # Security-focused hooks to catch issues before they reach the repository
 
 repos:
+  # Verify the required-secrets manifest is complete and that no secret file
+  # is tracked / accidentally un-ignored. Keeps "always remember, never forget."
+  - repo: local
+    hooks:
+      - id: audit-ansible-secrets
+        name: audit-ansible-secrets
+        entry: infrastructure/scripts/audit-ansible-secrets.sh audit
+        language: script
+        pass_filenames: false
+
   # Python security scanning
   - repo: https://github.com/PyCQA/bandit
     rev: "1.8.6"
