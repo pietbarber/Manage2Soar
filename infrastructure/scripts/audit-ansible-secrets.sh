@@ -116,15 +116,22 @@ audit() {
         | grep -vE '\.example$|\.retry$|node_modules|staticfiles|static/|__pycache__|\.pyc|media/|\.github/conversations/|/files/README|manifest|site-packages|dist-packages|\.venv|/venv-|/env/|\.tox/' \
         || true ) > "${tmp_forg}" 2>/dev/null
 
-    if [[ -s "${tmp_forg}" ]]; then
-        echo
-        echo "  [WARN] Gitignored secret-looking files NOT in the manifest:"
-        while IFS= read -r f; do
-            [[ -z "${f}" ]] && continue
-            if ! printf '%s\n' "${known}" | grep -qxF -- "${f}"; then
-                printf '           + %s\n' "${f}"
+    # Print the heading/footer ONLY if there is at least one genuinely-unknown
+    # (not-in-manifest) file, so a complete manifest does not print an empty [WARN]
+    # block just because the candidate list was non-empty.
+    local warned=0
+    while IFS= read -r f; do
+        [[ -z "${f}" ]] && continue
+        if ! printf '%s\n' "${known}" | grep -qxF -- "${f}"; then
+            if (( warned == 0 )); then
+                echo
+                echo "  [WARN] Gitignored secret-looking files NOT in the manifest:"
+                warned=1
             fi
-        done < "${tmp_forg}"
+            printf '           + %s\n' "${f}"
+        fi
+    done < "${tmp_forg}"
+    if (( warned == 1 )); then
         echo "       (add them to the manifest if they are required, or leave them out if optional)"
     fi
     rm -f "${tmp_forg}"
@@ -349,9 +356,11 @@ build_tarball() {
     echo "SHA-256:"
     ( cd "${PROJECT_ROOT}" && sha256sum "${out}" )
     echo
-    echo "NEXT: store this tarball securely (it is gzip-compressed, NOT encrypted). "
-    echo "      ALSO back up the Vault password file (~/.ansible_vault_pass) "
-    echo "      separately -- it is not in the tarball."
+    echo "NEXT: store this tarball securely (it is gzip-compressed, NOT encrypted)."
+    echo "      ALSO back up the Vault password file(s) separately -- they are NOT in"
+    echo "      the tarball, and the archived vaults cannot be decrypted without them:"
+    echo "        - ~/.ansible_vault_pass              (master vault: app/database/mail)"
+    echo "        - ~/.ansible_vault_pass_single_host  (single_host/vault.yml, if used)"
 }
 
 # ---------------------------------------------------------------------------

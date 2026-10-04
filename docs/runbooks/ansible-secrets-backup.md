@@ -9,8 +9,10 @@
 
 ## What this covers
 
-- **Audit**: verify the required-secret manifest is complete and that every entry is
-  gitignored and untracked.
+- **Audit**: verify that every **listed** entry exists on disk, is gitignored, and is
+  untracked, and surface a *warning* for secret-looking gitignored files that are
+  missing from the manifest. It does **not** prove the manifest is complete (see
+  below).
 - **Sync**: regenerate `~/bin/ansible-secrets-files.txt` from the single source of truth.
 - **Tarball**: build a compressed (gzip) backup archive of every required secret file
   (NOT encrypted -- any encryption depends on where you store it).
@@ -96,11 +98,19 @@ run it on provisioned operator workstations before a deployment.
 **Store the tarball securely.** It is gzip-compressed, NOT encrypted -- put it in an
 encrypted store / off-box and rely on destination-level encryption if that matters.
 
-> ⚠️ **The Ansible Vault password is NOT in the tarball.** In this repo it is a
-> *file* on the operator's home machine (`~/.ansible_vault_pass`, or the path named
-> by `ANSIBLE_VAULT_PASSWORD_FILE`), so it lives outside the repository and is not
-> part of the tarball. Back it up **separately** (password manager / encrypted note)
-> or you cannot decrypt `group_vars/all/vault.yml`, `gcp_mail/vault.yml`, etc.
+> ⚠️ **The Ansible Vault password file(s) are NOT in the tarball.** In this repo
+> they are *files* on the operator's home machine, outside the repository. There
+> are **two** of them, and the tarball contains vaults encrypted with *both*:
+>
+> - `~/.ansible_vault_pass` — the **master** vault (app / database / mail), or the
+>   path named by `ANSIBLE_VAULT_PASSWORD_FILE`.
+> - `~/.ansible_vault_pass_single_host` — used by `group_vars/single_host/vault.yml`
+>   (see `group_vars/single_host.vault.yml.example`), which uses a **separate**
+>   password from the master vault.
+>
+> Back up **both** separately (password manager / encrypted note) -- otherwise the
+> archived vaults cannot be decrypted after a restore, and `single_host/vault.yml`
+> in particular would be left undecryptable if only the master password is kept.
 
 ## Restoration (new box / co-webmaster)
 
@@ -113,11 +123,15 @@ tar -xzf ansible-secrets-YYYYmmdd-HHMMSS.tar.gz -C /path/to/project
 # 2. Confirm the manifest still matches what you just restored
 ./infrastructure/scripts/audit-ansible-secrets.sh audit
 
-# 3. Make sure the Vault password file is available for the playbooks
-#    (convention in this repo: ~/.ansible_vault_pass, or set ANSIBLE_VAULT_PASSWORD_FILE)
+# 3. Make sure the Vault password file(s) are available for the playbooks.
+#    The tarball contains vaults encrypted with BOTH of these -- restore each
+#    one separately (they are not in the tarball):
+#      ~/.ansible_vault_pass             (master vault: app/database/mail)
+#      ~/.ansible_vault_pass_single_host (single_host/vault.yml, if you use it)
 cp /secure/store/ansible_vault_pass ~/.ansible_vault_pass
 chmod 600 ~/.ansible_vault_pass
 #    ...or pass: --vault-password-file ~/.ansible_vault_pass
+#    (and likewise for ~/.ansible_vault_pass_single_host)
 ```
 
 After that, the playbooks run as normal, e.g.:
