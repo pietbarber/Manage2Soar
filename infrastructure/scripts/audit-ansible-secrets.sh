@@ -279,6 +279,16 @@ build_tarball() {
         exit 2
     fi
 
+    # SECURITY: reject an EXISTING directory as OUT. `mv -f` would treat it as a
+    # destination folder and move the secret archive into it under its temporary
+    # name, leaving an unexpected secret-bearing file, and `sha256sum` would then
+    # fail on the directory.
+    if [[ -d "${out}" ]]; then
+        echo "ERROR: output path is an existing directory; refusing:" >&2
+        echo "       ${out}" >&2
+        exit 2
+    fi
+
     # SECURITY: if the archive lands inside the repository, its name MUST match
     # the protected ignore pattern (ansible-secrets-*.tar.gz) AND be gitignored.
     # Otherwise a custom in-repo name could be committed by accident.
@@ -328,11 +338,19 @@ build_tarball() {
     # never truncated in place -- if tar fails the old target is left untouched
     # and the temp file is removed.
     local tmp_arch
-    if ! tmp_arch="$(mktemp --tmpdir="${out_parent}" .ansible-secrets-XXXXXX.tar.gz)"; then
+    # Use a temporary basename that MATCHES the committed ignore rule
+    # (ansible-secrets-*.tar.gz) so an unpublished/interrupted temp archive can
+    # never be staged by `git add -A`. A leading-dot name (".ansible-secrets-*")
+    # would NOT match that pattern.
+    if ! tmp_arch="$(mktemp --tmpdir="${out_parent}" ansible-secrets-XXXXXX.tar.gz)"; then
         echo "ERROR: could not create temp archive in ${out_parent}" >&2
         exit 2
     fi
     chmod 600 "${tmp_arch}" 2>/dev/null || true
+    # Safety net: if interrupted (SIGINT/SIGTERM) or an error path exits before the
+    # atomic publish below, remove the unpublished temp archive so no secret-bearing
+    # file is left behind.
+    trap 'rm -f "${tmp_arch}" 2>/dev/null || true' INT TERM ERR
 
     local tar_rc=0
     (
@@ -349,6 +367,8 @@ build_tarball() {
     # Atomic publish (POSIX rename). Preserves the temp file's 0600 mode and
     # never leaves a partially-written secret archive at OUT.
     mv -f "${tmp_arch}" "${out}"
+    # Temp no longer exists (renamed onto OUT) -- clear the cleanup trap.
+    trap - INT TERM ERR
 
     echo
     echo "Created: ${out}"
@@ -378,7 +398,7 @@ case "${cmd}" in
         ;;
     *)
         echo "Unknown command: ${cmd}" >&2
-        echo "Try: audit | list | sync | tarball" >&2
+        echo "Try: audit | check | list | sync | tarball" >&2
         exit 2
         ;;
 esac
