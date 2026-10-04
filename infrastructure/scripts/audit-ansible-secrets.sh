@@ -304,17 +304,44 @@ build_tarball() {
     done < <(active_entries)
 
     echo "Creating backup tarball with ${#files[@]} file(s)..."
-    # SECURITY: the archive is gzip-compressed but NOT encrypted. Force a
-    # restrictive umask (077) inside the subshell so the file is created mode
-    # 0600 even if the caller's umask is permissive (022); chmod 0600 is a
-    # belt-and-suspenders guard. The umask change is scoped to the subshell and
-    # never leaks to the caller process.
+    # Resolve the directory that will hold the archive so we can create a fresh
+    # temp file inside it and atomically rename it onto the final path.
+    local out_parent
+    out_parent="$(cd "$(dirname "${out}")" 2>/dev/null && pwd -P || true)"
+    if [[ -z "${out_parent}" ]]; then
+        echo "ERROR: output directory does not exist: $(dirname "${out}")" >&2
+        exit 2
+    fi
+
+    # SECURITY: the archive is gzip-compressed but NOT encrypted. Write into a
+    # freshly created mode-0600 temp file (mktemp -t creates 0600 regardless of
+    # the caller's umask) in the destination directory, then atomically rename it
+    # onto OUT only after tar succeeds. This guarantees the secret bytes are
+    # never world-readable, and a pre-existing world-readable (0644) target is
+    # never truncated in place -- if tar fails the old target is left untouched
+    # and the temp file is removed.
+    local tmp_arch
+    if ! tmp_arch="$(mktemp --tmpdir="${out_parent}" .ansible-secrets-XXXXXX.tar.gz)"; then
+        echo "ERROR: could not create temp archive in ${out_parent}" >&2
+        exit 2
+    fi
+    chmod 600 "${tmp_arch}" 2>/dev/null || true
+
+    local tar_rc=0
     (
-        umask 077
         cd "${PROJECT_ROOT}"
-        tar -czf "${out}" "${files[@]}"
-        chmod 600 "${out}"
-    )
+        tar -czf "${tmp_arch}" "${files[@]}"
+    ) || tar_rc=$?
+
+    if (( tar_rc != 0 )); then
+        rm -f "${tmp_arch}"
+        echo "ERROR: tar failed (exit ${tar_rc}); existing target left untouched." >&2
+        exit "${tar_rc}"
+    fi
+
+    # Atomic publish (POSIX rename). Preserves the temp file's 0600 mode and
+    # never leaves a partially-written secret archive at OUT.
+    mv -f "${tmp_arch}" "${out}"
 
     echo
     echo "Created: ${out}"
