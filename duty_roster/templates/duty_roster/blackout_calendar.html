@@ -75,14 +75,14 @@
           <div class="card-body">
             <div class="row g-4">
               {% for month in months %}
-              <div class="col-12 col-lg-3">
+              <div class="col-12 col-md-6">
                 <div class="calendar-month-container">
                   <div class="month-header text-center mb-3">
                     <h5 class="fw-bold text-primary mb-0">{{ month.label }}</h5>
                     <small class="text-muted">Select unavailable dates</small>
                   </div>
 
-                  <div class="calendar-table-wrapper">
+                  <div class="table-responsive calendar-table-wrapper">
                     <table class="table table-sm table-bordered blackout-calendar mb-0">
                       <thead class="table-primary">
                         <tr class="text-center small fw-semibold">
