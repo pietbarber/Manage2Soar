@@ -16,6 +16,7 @@ This directory contains operational runbooks for system administrators managing 
 | [Badge Import](badges-import.md) | Copy the club's badge catalog (SSA + FAI badges and their legs) from one tenant to an empty tenant; includes a GCS copy of the badge image objects so they render out of the box | Onboarding a new club's badge catalog |
 | [Ansible Playbook Guide](ansible-playbook-guide.md) | Complete reference for all Ansible playbooks | Reference |
 | [Database Operations](database-operations.md) | PostgreSQL backups, restoration, troubleshooting | Database changes, disaster recovery |
+| [Ansible Secrets Backup](ansible-secrets-backup.md) | Audit/sync/backup the gitignored files required to run the site & playbooks | Before deploys, onboarding a co-webmaster, disaster recovery |
 | Security Operations *(coming soon)* | Secret rotation, vulnerability patching | Security incidents, monthly maintenance |
 | Disaster Recovery *(coming soon)* | System restore, data recovery | Critical outages |
 
