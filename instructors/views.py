@@ -20,7 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
-from django.utils.html import format_html, strip_tags
+from django.utils.html import format_html
 from django.utils.timezone import now
 from django.views import View as DjangoView
 from django.views.decorators.csrf import csrf_exempt
@@ -71,6 +71,7 @@ from knowledgetest.models import (
 )
 from knowledgetest.views import get_presets
 from logsheet.models import Flight, Towplane
+from logsheet.utils.finalization_email import html_to_text_preserve_links
 from logsheet.utils.tow_logbook import get_tow_logbook_data
 from members.decorators import active_member_required
 from members.models import Member
@@ -3084,8 +3085,9 @@ def _foreflight_ground_values(g, member):
     """Build ForeFlight column values for one ground session, received or given."""
     minutes = int(g.duration.total_seconds() // 60) if g.duration else 0
     titles = ", ".join(ls.lesson.title for ls in g.lesson_scores.all())
-    # Session notes are an HTMLField; the CSV wants a plain-text rendering.
-    notes_text = strip_tags(g.notes or "").strip()
+    # Session notes are an HTMLField; the CSV wants a plain-text rendering that
+    # preserves paragraph/line breaks and decodes entities.
+    notes_text = html_to_text_preserve_links(g.notes or "")
     comment = "Ground instruction"
     if g.location:
         comment += f" ({g.location})"

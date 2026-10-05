@@ -290,6 +290,26 @@ def test_ground_sessions_received_given_and_zero_duration_are_kept(client):
 
 
 @pytest.mark.django_db
+def test_ground_session_notes_with_multiple_paragraphs_are_preserved(client):
+    student = _make_member("ff_ground_multi")
+    instructor = _make_member("ff_ground_multi_inst", instructor=True)
+    GroundInstruction.objects.create(
+        student=student,
+        instructor=instructor,
+        date=date(2026, 5, 3),
+        duration=timedelta(minutes=45),
+        notes="<p>First &amp; second</p><p>Third</p>",
+    )
+
+    received = _flight_rows(_export(client, student))
+    comment = received[0]["PilotComments"]
+    # Paragraphs must not be merged into a single word, and entities decoded.
+    assert "First & second" in comment
+    assert "Third" in comment
+    assert "FirstThird" not in comment
+
+
+@pytest.mark.django_db
 def test_tow_day_with_two_towplanes_yields_one_row_per_towplane(client):
     tow_pilot = _make_member("ff_tow_pilot", towpilot=True)
     glider_pilot = _make_member("ff_tow_glider_pilot")
