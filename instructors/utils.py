@@ -371,7 +371,11 @@ def classify_logbook_flight_minutes(flight, member_id, rating_date):
             if is_logbook_rated_dual_flight(flight_date, rating_date):
                 pic_m += duration_m
         else:
-            if not flight.passenger_id and not flight.passenger_name:
+            if (
+                not flight.passenger_id
+                and not flight.passenger_name
+                and not flight.legacy_passenger_name
+            ):
                 solo_m += duration_m
             pic_m += duration_m
     elif is_instructor:

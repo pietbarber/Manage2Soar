@@ -247,6 +247,9 @@ def test_legacy_passenger_name_fallback_is_exported(client):
     (row,) = _flight_rows(_export(client, pilot))
     # No instructor on the flight, so the passenger occupies Person1.
     assert row["Person1"] == "Rider From Legacy Import;Passenger;;"
+    # A known occupant means this is not solo, even when only the legacy
+    # passenger fallback is present.
+    assert row["Solo"] == ""
 
 
 @pytest.mark.django_db
