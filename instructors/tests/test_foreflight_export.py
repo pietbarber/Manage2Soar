@@ -230,6 +230,30 @@ def test_passenger_flight_is_kept_without_time_or_landings(client):
 
 
 @pytest.mark.django_db
+def test_passenger_row_labels_pilot_as_student_when_instructor_present(client):
+    member = _make_member("ff_dual_passenger")
+    pilot = _make_member("ff_dual_pilot")
+    instructor = _make_member("ff_dual_instructor", instructor=True)
+    glider, logsheet = _setup(pilot)
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        instructor=instructor,
+        passenger=member,
+        glider=glider,
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 25),
+    )
+
+    content = _export(client, member)
+    (row,) = _flight_rows(content)
+    # The pilot was receiving instruction, so they are a Student, not PIC.
+    assert row["Person1"] == f"{pilot.full_display_name};Student;;"
+    assert row["Person2"] == f"{instructor.full_display_name};Instructor;;"
+
+
+@pytest.mark.django_db
 def test_legacy_passenger_name_fallback_is_exported(client):
     pilot = _make_member("ff_legacy_pilot")
     glider, logsheet = _setup(pilot)

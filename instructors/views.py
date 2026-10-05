@@ -3044,7 +3044,10 @@ def _foreflight_flight_values(f, flight_date, classification, report_lookup):
         if f.notes:
             comment += f". {f.notes}"
         values["PilotComments"] = comment
-        values["Person1"] = ff.packed_person(pilot_name, "PIC")
+        # When the flight had instructor context the pilot was receiving
+        # instruction, so label them a Student rather than PIC.
+        pilot_role = "Student" if has_logbook_instructor_context(f) else "PIC"
+        values["Person1"] = ff.packed_person(pilot_name, pilot_role)
         values["Person2"] = ff.packed_person(instructor_name, "Instructor")
         return values
 
