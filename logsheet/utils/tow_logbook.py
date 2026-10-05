@@ -52,10 +52,16 @@ def get_tow_logbook_data(member, start_date):
     day_summaries = list(day_summaries)
 
     member_towplane_ids_by_logsheet = {}
-    for row in tow_flights.values("logsheet_id", "towplane_id").distinct():
+    towplane_tows_by_logsheet = {}
+    for row in tow_flights.values(
+        "logsheet_id", "towplane_id", "towplane__n_number"
+    ).annotate(tows=Count("id")):
         member_towplane_ids_by_logsheet.setdefault(row["logsheet_id"], set()).add(
             row["towplane_id"]
         )
+        towplane_tows_by_logsheet.setdefault(row["logsheet_id"], {})[
+            row["towplane_id"]
+        ] = (row["towplane__n_number"], row["tows"])
 
     logsheet_ids = [row["logsheet_id"] for row in day_summaries]
     tow_pilot_counts = {
@@ -111,6 +117,7 @@ def get_tow_logbook_data(member, start_date):
         else:
             hours_source = "Estimated (shared tow day)"
 
+        actual_by_towplane = {}
         if solo_towpilot_day:
             closeouts = closeouts_by_logsheet.get(logsheet_id, [])
             closeout_total = Decimal("0.00")
@@ -119,18 +126,24 @@ def get_tow_logbook_data(member, start_date):
                 # Issue #968: sum of per-renter charges; falls back to the
                 # legacy single-renter scalar when no charge rows exist.
                 rental_hours = Decimal(closeout.total_rental_hours or 0)
+                closeout_hours = None
                 if closeout.tach_time is not None:
-                    closeout_total += max(
+                    closeout_hours = max(
                         Decimal("0.00"), Decimal(closeout.tach_time) - rental_hours
                     )
-                    has_actual = True
                 elif closeout.start_tach is not None and closeout.end_tach is not None:
-                    closeout_total += max(
+                    closeout_hours = max(
                         Decimal("0.00"),
                         (Decimal(closeout.end_tach) - Decimal(closeout.start_tach))
                         - rental_hours,
                     )
+                if closeout_hours is not None:
+                    closeout_total += closeout_hours
                     has_actual = True
+                    actual_by_towplane[closeout.towplane_id] = (
+                        actual_by_towplane.get(closeout.towplane_id, Decimal("0.00"))
+                        + closeout_hours
+                    )
 
             if has_actual:
                 tow_hours = closeout_total.quantize(
@@ -143,6 +156,33 @@ def get_tow_logbook_data(member, start_date):
                 Decimal(your_tows) * TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+        # Per-towplane split: actual tach when this towplane has a closeout,
+        # otherwise the per-tow estimate. On a day with actual tach for another
+        # towplane, a towplane without a closeout is flagged unresolved at 0.00
+        # so the per-towplane hours still sum to tow_hours.
+        towplanes = []
+        for towplane_id, (n_number, tows) in sorted(
+            towplane_tows_by_logsheet.get(logsheet_id, {}).items(),
+            key=lambda item: (item[1][0] or "", item[0]),
+        ):
+            allocation_resolved = True
+            if actual_by_towplane:
+                tp_hours = actual_by_towplane.get(towplane_id)
+                if tp_hours is None:
+                    tp_hours = Decimal("0.00")
+                    allocation_resolved = False
+            else:
+                tp_hours = Decimal(tows) * TOW_LOGBOOK_ESTIMATED_TACH_PER_TOW
+            towplanes.append(
+                {
+                    "towplane_id": towplane_id,
+                    "n_number": n_number or "",
+                    "tows": tows,
+                    "hours": tp_hours.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+                    "allocation_resolved": allocation_resolved,
+                }
+            )
+
         total_tow_hours += tow_hours
         day_rows.append(
             {
@@ -151,6 +191,7 @@ def get_tow_logbook_data(member, start_date):
                 "your_tows": your_tows,
                 "tow_hours": tow_hours,
                 "hours_source": hours_source,
+                "towplanes": towplanes,
             }
         )
 
