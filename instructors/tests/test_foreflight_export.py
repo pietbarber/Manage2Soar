@@ -153,7 +153,8 @@ def test_glider_flight_row_values(client):
     assert aircraft["equipType"] == "aircraft"
     assert aircraft["TypeCode"] == ""
     assert aircraft["GearType"] == ""
-    assert aircraft["EngineType"] == "Non-Powered"
+    # Glider has no engine metadata (could be a motor glider), so this stays blank.
+    assert aircraft["EngineType"] == ""
     assert aircraft["Category/Class"] == "Glider"
     assert aircraft["complexAircraft"] == ""
 
@@ -227,6 +228,26 @@ def test_passenger_flight_is_kept_without_time_or_landings(client):
 
 
 @pytest.mark.django_db
+def test_legacy_passenger_name_fallback_is_exported(client):
+    pilot = _make_member("ff_legacy_pilot")
+    glider, logsheet = _setup(pilot)
+    # No passenger member, no plain passenger_name; only the legacy fallback.
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        glider=glider,
+        legacy_passenger_name="Rider From Legacy Import",
+        launch_method="tow",
+        launch_time=time(10, 0),
+        landing_time=time(10, 25),
+    )
+
+    (row,) = _flight_rows(_export(client, pilot))
+    # No instructor on the flight, so the passenger occupies Person1.
+    assert row["Person1"] == "Rider From Legacy Import;Passenger;;"
+
+
+@pytest.mark.django_db
 def test_ground_sessions_received_given_and_zero_duration_are_kept(client):
     student = _make_member("ff_ground_student")
     instructor = _make_member("ff_ground_instructor", instructor=True)
@@ -236,6 +257,7 @@ def test_ground_sessions_received_given_and_zero_duration_are_kept(client):
         date=date(2026, 5, 1),
         duration=timedelta(minutes=90),
         location="Clubhouse",
+        notes="<p>Covered <b>14 CFR 91.161</b> recency of experience.</p>",
     )
     GroundInstruction.objects.create(
         student=student,
@@ -252,7 +274,12 @@ def test_ground_sessions_received_given_and_zero_duration_are_kept(client):
         assert row["TotalTime"] == ""
         assert row["GroundTrainingGiven"] == ""
         assert row["InstructorName"] == instructor.full_display_name
-    assert received[0]["PilotComments"] == "Ground instruction (Clubhouse)"
+    # Session notes (HTMLField) are exported as plain text, tags stripped.
+    assert received[0]["PilotComments"] == (
+        "Ground instruction (Clubhouse). Covered 14 CFR 91.161 recency of experience."
+    )
+    # The zero-duration session has no notes, so its comment is unchanged.
+    assert received[1]["PilotComments"] == "Ground instruction"
 
     given = _flight_rows(_export(client, instructor))
     assert [r["GroundTrainingGiven"] for r in given] == ["1.50", "0.00"]

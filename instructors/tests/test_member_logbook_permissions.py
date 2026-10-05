@@ -1185,8 +1185,11 @@ def test_foreflight_csv_aggregates_tow_pilot_daily_summary_rows(client):
 
     rows = _parse_foreflight_flights_rows(response.content.decode())
 
+    # The comment now also carries the day's hours source (measured vs estimated).
     tow_rows = [
-        row for row in rows if row.get("PilotComments", "") == "Tow pilot daily summary"
+        row
+        for row in rows
+        if row.get("PilotComments", "").startswith("Tow pilot daily summary")
     ]
 
     assert len(tow_rows) == 1
@@ -1273,7 +1276,7 @@ def test_foreflight_csv_sorts_rows_by_date_across_events_and_tow_summaries(clien
     observed_dates = [
         row["Date"]
         for row in rows
-        if row.get("PilotComments", "") == "Tow pilot daily summary"
+        if row.get("PilotComments", "").startswith("Tow pilot daily summary")
         or float(row.get("GroundTraining", "0") or 0) > 0
     ]
 

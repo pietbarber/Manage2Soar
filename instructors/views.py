@@ -20,7 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
-from django.utils.html import format_html
+from django.utils.html import format_html, strip_tags
 from django.utils.timezone import now
 from django.views import View as DjangoView
 from django.views.decorators.csrf import csrf_exempt
@@ -3045,7 +3045,9 @@ def _foreflight_flight_values(f, flight_date, classification, report_lookup):
         values["Person2"] = ff.packed_person(instructor_name, "Instructor")
         return values
 
-    passenger_name = _foreflight_name(f.passenger, f.passenger_name)
+    passenger_name = _foreflight_name(
+        f.passenger, f.passenger_name, f.legacy_passenger_name
+    )
     persons = []
     if is_instructor:
         persons.append(ff.packed_person(pilot_name, "Student"))
@@ -3082,9 +3084,13 @@ def _foreflight_ground_values(g, member):
     """Build ForeFlight column values for one ground session, received or given."""
     minutes = int(g.duration.total_seconds() // 60) if g.duration else 0
     titles = ", ".join(ls.lesson.title for ls in g.lesson_scores.all())
+    # Session notes are an HTMLField; the CSV wants a plain-text rendering.
+    notes_text = strip_tags(g.notes or "").strip()
     comment = "Ground instruction"
     if g.location:
         comment += f" ({g.location})"
+    if notes_text:
+        comment += f". {notes_text}"
 
     values = {"Date": g.date.strftime("%Y-%m-%d")}
     if g.student_id == member.id:
@@ -3106,9 +3112,13 @@ def _foreflight_tow_rows(tow_day):
         airfield_identifier = ""
     date_str = tow_day["tow_date"].strftime("%Y-%m-%d")
 
+    hours_source = tow_day.get("hours_source", "")
+
     rows = []
     for towplane in tow_day.get("towplanes", []):
         note = "Tow pilot daily summary"
+        if hours_source:
+            note += f"; {hours_source}"
         if not towplane["allocation_resolved"]:
             note += "; hours unresolved for this towplane (no tach closeout)"
         tows = str(towplane["tows"])
@@ -3131,6 +3141,9 @@ def _foreflight_tow_rows(tow_day):
     if not rows:
         hours = str(tow_day["tow_hours"])
         tows = str(tow_day["your_tows"])
+        note = "Tow pilot daily summary; towplane unresolved"
+        if hours_source:
+            note += f"; {hours_source}"
         rows.append(
             ff.flight_row(
                 {
@@ -3141,7 +3154,7 @@ def _foreflight_tow_rows(tow_day):
                     "PIC": hours,
                     "Takeoff Day": tows,
                     "Landing Full-Stop Day": tows,
-                    "PilotComments": "Tow pilot daily summary; towplane unresolved",
+                    "PilotComments": note,
                 }
             )
         )
@@ -3206,6 +3219,8 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
         tp["towplane_id"] for day in tow_day_rows for tp in day.get("towplanes", [])
     }
 
+    # EngineType is intentionally left blank: Glider carries no engine metadata,
+    # so it could be a self-launching motor glider (Flight.LaunchMethod.SELF).
     aircraft_rows = [
         ff.aircraft_row(
             {
@@ -3213,7 +3228,6 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                 "equipType": "aircraft",
                 "Make": glider.make,
                 "Model": glider.model,
-                "EngineType": "Non-Powered",
                 "Category/Class": "Glider",
             }
         )
@@ -3237,7 +3251,6 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
                 {
                     "AircraftID": _FOREFLIGHT_UNKNOWN_AIRCRAFT_ID,
                     "equipType": "aircraft",
-                    "EngineType": "Non-Powered",
                     "Category/Class": "Glider",
                 }
             )
