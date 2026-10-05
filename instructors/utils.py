@@ -414,11 +414,14 @@ def get_logbook_glider_time_summary(member):
         | (Q(legacy_instructor_name__isnull=False) & ~Q(legacy_instructor_name=""))
     )
     dual_filter = Q(pilot=member) & instructor_present_filter
+    # Solo = no instructor AND no passenger of any kind (member, name, or legacy).
+    # legacy_passenger_name is nullable, so use the isnull/blank pattern.
     solo_filter = (
         Q(pilot=member)
         & ~instructor_present_filter
         & Q(passenger__isnull=True)
         & Q(passenger_name="")
+        & (Q(legacy_passenger_name__isnull=True) | Q(legacy_passenger_name=""))
     )
     instruction_given_filter = Q(instructor=member)
     total_filter = Q(pilot=member) | Q(instructor=member)
