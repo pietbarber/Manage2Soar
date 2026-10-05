@@ -3036,6 +3036,8 @@ def _foreflight_flight_values(f, flight_date, classification, report_lookup):
     if not (is_pilot or is_instructor):
         # The logbook owner was a passenger; no time or landings are exported so
         # the owner decides whether the line belongs in his logbook.
+        values["TimeOff"] = ""
+        values["TimeOn"] = ""
         comment = _FOREFLIGHT_PASSENGER_LABEL
         if dur_m:
             comment += f", {dur_m // 60}:{dur_m % 60:02d} aloft"

@@ -221,6 +221,8 @@ def test_passenger_flight_is_kept_without_time_or_landings(client):
         assert row[column] == ""
     assert row["Takeoff Day"] == ""
     assert row["Landing Full-Stop Day"] == ""
+    assert row["TimeOff"] == ""
+    assert row["TimeOn"] == ""
     assert row["PilotComments"].startswith("Passenger (logbook owner not pilot)")
     assert "0:25 aloft" in row["PilotComments"]
     assert row["Person1"] == f"{pilot.full_display_name};PIC;;"
