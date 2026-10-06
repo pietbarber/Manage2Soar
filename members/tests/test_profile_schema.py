@@ -1,11 +1,6 @@
 import pytest
 
-from members.models import (
-    EmergencyContact,
-    Member,
-    ProfileInformationRequest,
-    ProfileInformationRequestEvent,
-)
+from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
 from siteconfig.models import default_member_profile_field_policies
 
@@ -62,25 +57,6 @@ def test_approved_application_creates_structured_emergency_contact():
     assert contact.relationship == "Parent"
     assert contact.mobile_phone == "555-0201"
     assert member.emergency_contact is None
-
-
-@pytest.mark.django_db
-def test_profile_request_records_are_auditable():
-    member = Member.objects.create_user(username="requested_member")
-    request = ProfileInformationRequest.objects.create(
-        member=member,
-        origin=ProfileInformationRequest.Origin.STAFF_REQUEST,
-        requested_fields=["phone"],
-    )
-    event = ProfileInformationRequestEvent.objects.create(
-        request=request,
-        actor=member,
-        action="requested",
-        details={"fields": ["phone"]},
-    )
-
-    assert request.status == ProfileInformationRequest.Status.REQUESTED
-    assert list(request.events.values_list("pk", flat=True)) == [event.pk]
 
 
 def test_profile_policy_defaults_are_explicit_and_safe():

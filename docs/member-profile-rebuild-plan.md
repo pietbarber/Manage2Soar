@@ -67,9 +67,8 @@ Afterward, run:
 
 1. Add the `EmergencyContact` model and application-to-member mapping.
 2. Add per-field `Member.contact_visibility` data.
-3. Add `ProfileInformationRequest` and `ProfileInformationRequestEvent`.
-4. Add site policy storage and safe defaults.
-5. Write data migrations and legacy fallbacks.
+3. Add site policy storage and safe defaults.
+4. Write data migrations and legacy fallbacks.
 
 Verification gate:
 
