@@ -22,6 +22,11 @@ urlpatterns = [
         name="update_contact_visibility",
     ),
     path(
+        "<int:member_id>/contact-visibility/",
+        views.update_contact_visibility,
+        name="update_contact_visibility",
+    ),
+    path(
         "<int:member_id>/emergency-contacts/add/",
         views.emergency_contact_edit,
         name="emergency_contact_add",

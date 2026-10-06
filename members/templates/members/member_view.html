@@ -122,14 +122,22 @@
       </div>
 
       <!-- QR Code Section -->
+      {% if not member.redact_contact or request.user == member or request.user.is_staff or request.user.member_manager %}
       <div class="qr-container mt-4">
         <h6 class="fw-bold text-center mb-3">
           <i class="bi bi-qr-code me-2"></i>Contact Card
         </h6>
+        {% if not member.redact_contact or request.user == member or request.user.is_staff %}
         <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR code for {{ member.full_display_name }}'s contact information" class="img-fluid">
-        <p class="small text-muted mt-2 mb-2">Scan to add the contact information you are allowed to see</p>
-        <a class="btn btn-sm btn-outline-primary" href="{% url 'members:member_vcard' member.id %}"><i class="bi bi-person-vcard me-1"></i>Download vCard</a>
+        <p class="small text-muted mt-2 mb-0">Scan to add contact info to your phone</p>
+        {% else %}
+        <div class="text-muted text-center">
+          <i class="bi bi-eye-slash display-6"></i>
+          <p class="mt-2 mb-0"><em>Contact information redacted</em></p>
+        </div>
+        {% endif %}
       </div>
+      {% endif %}
     </div>
 
     <!-- Right Column - Member Information -->
@@ -137,15 +145,9 @@
       <!-- Contact Information Card -->
       <div class="card contact-info mb-4">
         <div class="card-header bg-primary text-white">
-          <div class="d-flex justify-content-between align-items-start gap-3">
-            <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Contact Information</h5>
-            {% if staff_contact_status %}
-            <div class="small text-end" title="What regular members can see">
-              <div class="fw-semibold">Regular-member visibility</div>
-              {% for status in staff_contact_status %}<span class="badge {% if status.shared %}bg-success{% else %}bg-secondary{% endif %} ms-1" title="{{ status.source }}">{{ status.label }}: {% if status.shared %}visible{% else %}private{% endif %}</span>{% endfor %}
-            </div>
-            {% endif %}
-          </div>
+          <h5 class="mb-0">
+            <i class="bi bi-person-lines-fill me-2"></i>Contact Information
+          </h5>
         </div>
         <div class="card-body">
           <div class="row g-3">
@@ -223,6 +225,10 @@
           </div>
         </div>
       </div>
+
+      {% if staff_contact_status %}
+      <div class="alert alert-light border small mb-4"><strong>Regular-member visibility:</strong>{% for status in staff_contact_status %} {{ status.label }}: {% if status.shared %}visible{% else %}hidden{% endif %} ({{ status.source }}){% if not forloop.last %};{% endif %}{% endfor %}</div>
+      {% endif %}
 
       {% if privacy_sharing %}
       <div class="card mb-4"><div class="card-header"><i class="bi bi-shield-lock me-2"></i>Contact Privacy</div><form method="post" action="{% url 'members:update_contact_visibility' member.id %}" class="card-body">{% csrf_token %}<p class="small text-muted">Choose which contact details other regular members can see.</p><div class="form-check"><input class="form-check-input" type="checkbox" name="share_email" id="share_email"{% if privacy_sharing.email %} checked{% endif %}><label class="form-check-label" for="share_email">Share email</label></div><div class="form-check"><input class="form-check-input" type="checkbox" name="share_phone" id="share_phone"{% if privacy_sharing.phone %} checked{% endif %}><label class="form-check-label" for="share_phone">Share phone numbers</label></div><div class="form-check"><input class="form-check-input" type="checkbox" name="share_address" id="share_address"{% if privacy_sharing.address %} checked{% endif %}><label class="form-check-label" for="share_address">Share postal address</label></div><button class="btn btn-sm btn-primary mt-3" type="submit">Save Privacy Settings</button></form></div>

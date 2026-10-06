@@ -38,28 +38,14 @@ def can_view_contact_field(viewer, subject_member, field, site_config=None):
     if getattr(subject_member, "redact_contact", False):
         return False
 
-    return contact_field_visibility(subject_member, field, site_config)["shared"]
-
-
-def contact_field_visibility(subject_member, field, site_config=None):
-    """Return effective regular-member visibility and its source."""
-    if field not in {"email", "phone", "address"}:
-        raise ValueError(f"Unsupported contact field: {field}")
-    if getattr(subject_member, "redact_contact", False):
-        return {"shared": False, "source": "legacy full redaction"}
-
     preference = (getattr(subject_member, "contact_visibility", None) or {}).get(field)
     if preference == "share":
-        return {"shared": True, "source": "member choice: Share"}
+        return True
     if preference == "hide":
-        return {"shared": False, "source": "member choice: Hide"}
+        return False
 
     if site_config is None:
         from siteconfig.models import SiteConfiguration
 
         site_config = SiteConfiguration.objects.first()
-    shared = bool(getattr(site_config, f"share_member_{field}_by_default", True))
-    return {
-        "shared": shared,
-        "source": f"club default: {'Share' if shared else 'Hide'}",
-    }
+    return bool(getattr(site_config, f"share_member_{field}_by_default", True))
