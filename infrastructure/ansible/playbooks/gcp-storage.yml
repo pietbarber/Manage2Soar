@@ -39,6 +39,7 @@
 #
 # Tags:
 #   - bucket: Bucket creation and configuration
+#   - cors: CORS policy configuration on the bucket
 #   - permissions: IAM policy and service account bindings
 #   - verify: Verification checks
 
@@ -65,6 +66,24 @@
     # infrastructure/ansible/docs/gcs-service-accounts.md.
     gcs_service_account: >-
       {{ gke_service_account_email | default(gcs_project ~ '-django@' ~ gcs_project ~ '.iam.gserviceaccount.com') }}
+    # CORS allowed origins (issue #1089). Derived solely from the tenant domain
+    # list in group_vars (gke_tenants[].domains / gke_tenants[].domain), which is
+    # the multi-tenant source of truth and mirrors the club domain stored in
+    # SiteConfiguration (domain_name / canonical_url). Bare domains are prefixed
+    # with https:// and de-duplicated into the single-origin list the
+    # gcp_storage_bucket module expects. No tenant is hardcoded here — this
+    # playbook must remain tenant-agnostic; run against an inventory/group_vars
+    # that defines gke_tenants (as the rest of this playbook already requires).
+    gcs_cors_origins: >-
+      {{ (
+         (gke_tenants | default([]) | selectattr('domains', 'defined') | map(attribute='domains') | list | flatten)
+         + (gke_tenants | default([]) | selectattr('domain', 'defined') | map(attribute='domain') | list)
+       )
+       | map('string')
+       | reject('eq', '')
+       | map('regex_replace', '^(?!https?://)', 'https://')
+       | unique
+       | list }}
 
   tasks:
     # The `gcloud storage` and `gsutil` tasks below authenticate with an active
@@ -117,6 +136,29 @@
           - "Location: {{ bucket_result.location }}"
           - "Self Link: {{ bucket_result.selfLink }}"
           - "Storage Class: {{ bucket_result.storageClass }}"
+
+    # CORS policy (issue #1089). Applied via a dedicated, guarded task so that:
+    #   - --tags cors can target it independently, and
+    #   - it is cleanly SKIPPED (not sent as an empty/invalid rule to GCP) when
+    #     no tenant has a domain defined.
+    # Origins are derived solely from gke_tenants (the multi-tenant source of
+    # truth); no domain is hardcoded in this playbook.
+    - name: Ensure bucket CORS policy
+      tags: [cors]
+      when: gcs_cors_origins | length > 0
+      google.cloud.gcp_storage_bucket:
+        name: "{{ gcs_bucket_name }}"
+        project: "{{ gcs_project }}"
+        cors:
+          - origin: "{{ gcs_cors_origins }}"
+            method:
+              - GET
+            response_header:
+              - Content-Type
+            max_age_seconds: 3600
+        state: present
+        auth_kind: application
+      register: bucket_cors_result
 
     - name: Get bucket IAM policy
       tags: [permissions]
