@@ -16,7 +16,6 @@ def convert_request_policies(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("siteconfig", "0052_merge_0049_reservation_preferences_and_0051_visiting_pilot_visits"),
         ("siteconfig", "0052_siteconfiguration_member_profile_field_policies_and_more"),
     ]
 

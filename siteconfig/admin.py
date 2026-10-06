@@ -8,6 +8,7 @@ from duty_roster.models import DutyRoleDefinition
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
+    MEMBER_PROFILE_POLICY_FIELDS,
     ChargeableItem,
     MailingList,
     MailingListCriterion,
@@ -64,17 +65,31 @@ class MailingListAdminForm(forms.ModelForm):
 class SiteConfigurationAdminForm(forms.ModelForm):
     """Admin form with period-neutral reservation cap wording."""
 
+    for _field_name in MEMBER_PROFILE_POLICY_FIELDS:
+        locals()[f"profile_policy_{_field_name}"] = forms.BooleanField(
+            required=False,
+            label=_field_name.replace("_", " ").title(),
+            help_text="Allow members to edit this field directly.",
+        )
+    del _field_name
+
     class Meta:
         model = SiteConfiguration
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        policy_field = self.fields["member_profile_field_policies"]
-        policy_field.help_text = (
-            "JSON mapping of profile fields to Direct or Disabled. The paused "
-            "Request mode is not available."
-        )
+        policy_field = self.fields.get("member_profile_field_policies")
+        if policy_field:
+            policy_field.help_text = (
+                "Select which profile fields members may edit directly."
+            )
+            policy_field.widget = forms.HiddenInput()
+        policies = getattr(self.instance, "member_profile_field_policies", None) or {}
+        for field_name in MEMBER_PROFILE_POLICY_FIELDS:
+            self.fields[f"profile_policy_{field_name}"].initial = (
+                policies.get(field_name) == "direct"
+            )
         reservation_cap_field = self.fields.get("max_reservations_per_year")
         if reservation_cap_field:
             reservation_cap_field.label = "Max reservations per selected period"
@@ -130,37 +145,6 @@ class SiteConfigurationAdminForm(forms.ModelForm):
                 help_text=visiting_pilot_status_field.help_text,
             )
 
-        # Initialize preset toggle based on whether any non-specific preset is enabled.
-        configured = getattr(self.instance, "glider_reservation_time_preferences", None)
-        configured_periods = configured or [
-            v for v, _ in GliderReservation.TIME_PREFERENCE_CHOICES
-        ]
-        presets_enabled = any(period != "specific" for period in configured_periods)
-        self.fields["glider_reservation_presets_mode"].initial = presets_enabled
-
-        # If presets disabled, hide time-range inputs server-side for clarity
-        if not presets_enabled:
-            for period in self.RESERVATION_TIME_RANGE_FIELDS:
-                self.fields[f"glider_reservation_{period}_start"].widget = (
-                    forms.HiddenInput()
-                )
-                self.fields[f"glider_reservation_{period}_end"].widget = (
-                    forms.HiddenInput()
-                )
-
-        configured_ranges = (
-            getattr(self.instance, "glider_reservation_time_ranges", None)
-            or default_glider_reservation_time_ranges()
-        )
-        for period in self.RESERVATION_TIME_RANGE_FIELDS:
-            range_config = configured_ranges.get(period, {})
-            self.fields[f"glider_reservation_{period}_start"].initial = (
-                range_config.get("start")
-            )
-            self.fields[f"glider_reservation_{period}_end"].initial = range_config.get(
-                "end"
-            )
-
     def clean_glider_reservation_time_preferences(self):
         return self.cleaned_data["glider_reservation_time_preferences"]
 
@@ -202,16 +186,21 @@ class SiteConfigurationAdminForm(forms.ModelForm):
         instance.glider_reservation_time_ranges = self.cleaned_data.get(
             "glider_reservation_time_ranges", {}
         )
-        instance.member_profile_field_policies = {
-            field_name: self.cleaned_data[f"profile_policy_{field_name}"]
-            for field_name in MEMBER_PROFILE_POLICY_FIELDS
-        }
+        if "member_profile_field_policies" in self.fields:
+            instance.member_profile_field_policies = {
+                field_name: (
+                    "direct"
+                    if self.cleaned_data.get(f"profile_policy_{field_name}")
+                    else "disabled"
+                )
+                for field_name in MEMBER_PROFILE_POLICY_FIELDS
+            }
         if commit:
             instance.save()
         return instance
 
     def clean_member_profile_field_policies(self):
-        policies = self.cleaned_data["member_profile_field_policies"]
+        policies = self.cleaned_data.get("member_profile_field_policies") or {}
         allowed = {"direct", "disabled"}
         return {
             field_name: policy if policy in allowed else "disabled"
@@ -296,15 +285,16 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
         (
             "Member Profile Self-Service",
             {
-                "fields": (
-                    "member_profile_self_service_enabled",
-                    "member_profile_field_policies",
+                "fields": ("member_profile_self_service_enabled",)
+                + tuple(
+                    f"profile_policy_{field_name}"
+                    for field_name in MEMBER_PROFILE_POLICY_FIELDS
                 ),
                 "description": (
-                    "Configure which profile fields members may change. Use direct for "
-                    "immediate changes, request for a future approval workflow, or "
-                    "disabled to prevent member changes."
+                    "Configure which profile fields members may edit directly. "
+                    "Collapsed by default to keep the site settings page compact."
                 ),
+                "classes": ("collapse",),
             },
         ),
         (

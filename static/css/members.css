@@ -91,6 +91,36 @@
     transform: scale(1.05);
 }
 
+.profile-action-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    min-width: 12rem;
+}
+
+.profile-action-buttons > .btn {
+    display: block;
+    width: 100%;
+}
+
+.staff-reveal {
+    cursor: pointer;
+}
+
+.staff-reveal:hover .staff-redacted,
+.staff-reveal:focus .staff-redacted {
+    text-decoration: underline;
+}
+
+.staff-reveal.is-revealed .staff-redacted {
+    display: none;
+}
+
+.staff-reveal.is-revealed .staff-revealed {
+    display: inline !important;
+}
+
 .contact-info {
     background: var(--bs-white, #fff);
     border-radius: 12px;

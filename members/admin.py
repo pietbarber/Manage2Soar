@@ -182,6 +182,19 @@ class MemberBadgeInline(admin.TabularInline):
 
 # This form is referenced by MemberAdmin via the 'form' attribute.
 class CustomMemberChangeForm(UserChangeForm):
+    share_email = forms.BooleanField(
+        required=False,
+        label="Share email with regular members",
+    )
+    share_phone = forms.BooleanField(
+        required=False,
+        label="Share phone numbers with regular members",
+    )
+    share_address = forms.BooleanField(
+        required=False,
+        label="Share postal address with regular members",
+    )
+
     class Meta:
         model = Member
         fields = (
@@ -193,6 +206,30 @@ class CustomMemberChangeForm(UserChangeForm):
             "instructor",
             "towpilot",
         )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        visibility = getattr(self.instance, "contact_visibility", None) or {}
+        for field_name in ("email", "phone", "address"):
+            self.fields[f"share_{field_name}"].initial = (
+                visibility.get(field_name) == "share"
+            )
+
+    def save(self, commit=True):
+        member = super().save(commit=False)
+        if all(
+            f"share_{field_name}" in self.cleaned_data
+            for field_name in ("email", "phone", "address")
+        ):
+            member.contact_visibility = {
+                field_name: (
+                    "share" if self.cleaned_data[f"share_{field_name}"] else "hide"
+                )
+                for field_name in ("email", "phone", "address")
+            }
+        if commit:
+            member.save()
+        return member
 
 
 #########################
@@ -398,6 +435,9 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "private_notes",
                     "public_notes",
                     "redact_contact",
+                    "share_email",
+                    "share_phone",
+                    "share_address",
                 )
             },
         ),

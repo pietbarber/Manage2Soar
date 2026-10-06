@@ -3,10 +3,13 @@ import logging
 import os
 from datetime import date, timedelta
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.core import signing
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.mail import EmailMultiAlternatives
@@ -66,6 +69,19 @@ from .utils.badge_utils import suppress_badge_board_legs, suppress_member_badge_
 from .utils.vcard_tools import generate_vcard, generate_vcard_qr
 
 logger = logging.getLogger(__name__)
+EMAIL_CHANGE_TOKEN_MAX_AGE = 60 * 60 * 24
+
+
+def _send_account_security_email(recipient, subject, body):
+    if not recipient:
+        return
+    EmailMultiAlternatives(
+        subject=subject,
+        body=body,
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[recipient],
+    ).send()
+
 
 try:
     from notifications.models import Notification
@@ -198,7 +214,7 @@ def member_list(request):
     site_config = SiteConfiguration.objects.first()
     for member in page_obj.object_list:
         member.directory_contact_visibility = {
-            field: can_view_contact_field(request.user, member, field, site_config)
+            field: contact_field_visibility(member, field, site_config)["shared"]
             for field in ("email", "phone", "address")
         }
 
@@ -251,6 +267,10 @@ def member_view(request, member_id):
     is_self = request.user == member
     can_edit = is_self or request.user.is_superuser
     profile_photo_policy = get_member_profile_field_policy("profile_photo")
+    emergency_contacts_editable = (
+        get_member_profile_field_policy("emergency_contacts") == "direct"
+    )
+    password_editable = get_member_profile_field_policy("password") == "direct"
 
     # Decide whether to show solo/checkride buttons
     show_need_buttons = member.glider_rating not in ("private", "commercial")
@@ -261,15 +281,29 @@ def member_view(request, member_id):
     # Determine whether the requester can view personal info, and generate
     # a QR code accordingly (redacted QR omits contact fields).
     site_config = SiteConfiguration.objects.first()
+    regular_contact_visibility = {
+        field: contact_field_visibility(member, field, site_config)
+        for field in ("email", "phone", "address")
+    }
     contact_visibility = {
         field: can_view_contact_field(request.user, member, field, site_config)
         for field in ("email", "phone", "address")
     }
     can_view_personal = can_view_personal_info_fn(request.user, member)
+    mask_contact_values = is_privileged_viewer(request.user) and not is_self
+    redact_contact_fields = {
+        field: mask_contact_values and not regular_contact_visibility[field]["shared"]
+        for field in ("email", "phone", "address")
+    }
+    has_staff_redactions = any(redact_contact_fields.values())
+    qr_visibility = {
+        field: True if is_self else regular_contact_visibility[field]["shared"]
+        for field in ("email", "phone", "address")
+    }
     qr_png = generate_vcard_qr(
         member,
-        include_contact=can_view_personal,
-        contact_visibility=contact_visibility,
+        include_contact=any(qr_visibility.values()),
+        contact_visibility=qr_visibility,
     )
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
 
@@ -328,8 +362,13 @@ def member_view(request, member_id):
         "can_view_email": contact_visibility["email"],
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
+        "redact_contact_fields": redact_contact_fields,
+        "has_staff_redactions": has_staff_redactions,
         "privacy_sharing": (
-            contact_visibility
+            {
+                field: regular_contact_visibility[field]["shared"]
+                for field in ("email", "phone", "address")
+            }
             if is_self
             and get_member_profile_field_policy("contact_visibility") == "direct"
             else None
@@ -338,10 +377,8 @@ def member_view(request, member_id):
             [
                 {
                     "label": label,
-                    "shared": contact_visibility[field],
-                    "source": contact_field_visibility(member, field, site_config)[
-                        "source"
-                    ],
+                    "shared": regular_contact_visibility[field]["shared"],
+                    "source": regular_contact_visibility[field]["source"],
                 }
                 for field, label in (
                     ("email", "Email"),
@@ -349,10 +386,12 @@ def member_view(request, member_id):
                     ("address", "Address"),
                 )
             ]
-            if not is_self and is_privileged_viewer(request.user)
+            if is_self or is_privileged_viewer(request.user)
             else None
         ),
         "form": form,
+        "emergency_contacts_editable": emergency_contacts_editable,
+        "password_editable": password_editable,
         "is_self": is_self,
         "can_edit": can_edit,
         "biography": biography,
@@ -382,6 +421,8 @@ def account_settings(request):
             == "direct",
             "username_change_enabled": get_member_profile_field_policy("username")
             == "direct",
+            "password_change_enabled": get_member_profile_field_policy("password")
+            == "direct",
         },
     )
 
@@ -391,7 +432,11 @@ def member_vcard(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     site_config = SiteConfiguration.objects.first()
     visibility = {
-        field: can_view_contact_field(request.user, member, field, site_config)
+        field: (
+            True
+            if request.user == member
+            else contact_field_visibility(member, field, site_config)["shared"]
+        )
         for field in ("email", "phone", "address")
     }
     response = HttpResponse(
@@ -443,6 +488,14 @@ def request_email_change(request):
         to=[new_email],
     )
     message.send()
+    _send_account_security_email(
+        request.user.email,
+        "Manage2Soar email change requested",
+        (
+            f"A request was made to change your Manage2Soar email address to "
+            f"{new_email}. If you did not make this request, contact a club manager."
+        ),
+    )
     messages.success(request, "A confirmation link was sent to your new email address.")
     return redirect("members:member_view", member_id=request.user.id)
 
@@ -452,9 +505,20 @@ def request_email_change(request):
 def update_username(request):
     if get_member_profile_field_policy("username") != "direct":
         return render(request, "403.html", status=403)
+    old_username = request.user.username
     form = UsernameChangeForm(request.POST, instance=request.user)
     if form.is_valid():
+        new_username = request.POST.get("username", "").strip()
         form.save()
+        if new_username != old_username:
+            _send_account_security_email(
+                request.user.email,
+                "Your Manage2Soar username changed",
+                (
+                    f"Your Manage2Soar username changed from {old_username} to "
+                    f"{new_username}. If you did not make this change, contact a club manager."
+                ),
+            )
         messages.success(request, "Your username has been updated.")
     else:
         messages.error(request, form.errors.get("username", ["Invalid username."])[0])
@@ -482,10 +546,19 @@ def confirm_email_change(request, token):
         member.save(update_fields=["pending_email", "pending_email_requested_at"])
         messages.error(request, "That email address is no longer available.")
         return redirect("members:member_view", member_id=member.id)
+    old_email = member.email
     member.email = member.pending_email
     member.pending_email = ""
     member.pending_email_requested_at = None
     member.save(update_fields=["email", "pending_email", "pending_email_requested_at"])
+    _send_account_security_email(
+        old_email,
+        "Your Manage2Soar email address changed",
+        (
+            f"Your Manage2Soar email address changed to {member.email}. "
+            "If you did not make this change, contact a club manager."
+        ),
+    )
     messages.success(request, "Your email address has been updated.")
     return redirect("members:member_view", member_id=member.id)
 
@@ -511,6 +584,8 @@ def update_contact_visibility(request, member_id):
 @active_member_required
 @require_http_methods(["GET", "POST"])
 def emergency_contact_edit(request, member_id, contact_id=None):
+    if get_member_profile_field_policy("emergency_contacts") != "direct":
+        return render(request, "403.html", status=403)
     member = get_object_or_404(Member, pk=member_id)
     if request.user != member:
         return render(request, "403.html", status=403)
@@ -537,6 +612,8 @@ def emergency_contact_edit(request, member_id, contact_id=None):
 @active_member_required
 @require_http_methods(["GET", "POST"])
 def emergency_contact_delete(request, member_id, contact_id):
+    if get_member_profile_field_policy("emergency_contacts") != "direct":
+        return render(request, "403.html", status=403)
     member = get_object_or_404(Member, pk=member_id)
     contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
     if request.user != member:
@@ -792,6 +869,11 @@ def set_password(request):
         if form.is_valid():
             member.set_password(form.cleaned_data["new_password1"])
             member.save()
+            _send_account_security_email(
+                member.email,
+                "Your Manage2Soar password changed",
+                "Your Manage2Soar password was changed. If you did not make this change, contact a club manager.",
+            )
             messages.success(request, "Password changed successfully.")
             return redirect("members:member_list")
     else:

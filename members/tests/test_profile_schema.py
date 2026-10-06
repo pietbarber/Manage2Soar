@@ -1,5 +1,8 @@
 import pytest
+from django.test import Client
+from django.urls import reverse
 
+from members.admin import CustomMemberChangeForm
 from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
 from members.utils.membership import clear_active_membership_statuses_cache
@@ -71,7 +74,7 @@ def test_profile_policy_defaults_are_explicit_and_safe():
 
     assert policies["username"] == "disabled"
     assert policies["email"] == "disabled"
-    assert policies["emergency_contacts"] == "request"
+    assert policies["emergency_contacts"] == "direct"
     assert policies["password"] == "direct"
     assert policies["profile_photo"] == "direct"
 
@@ -105,9 +108,25 @@ def test_admin_profile_policy_choices_exclude_paused_request_mode():
     form.cleaned_data = {"member_profile_field_policies": {"phone": "request"}}
     assert form.clean_member_profile_field_policies() == {"phone": "disabled"}
     assert (
-        "Request mode is not available"
+        "Select which profile fields"
         in form.fields["member_profile_field_policies"].help_text
     )
+    assert form.fields["profile_policy_phone"].initial is False
+    assert form.fields["profile_policy_phone"].required is False
+
+
+@pytest.mark.django_db
+def test_member_admin_exposes_contact_sharing_controls():
+    member = Member.objects.create_user(
+        username="visibility_admin",
+        contact_visibility={"email": "hide", "phone": "share"},
+    )
+
+    form = CustomMemberChangeForm(instance=member)
+
+    assert form.fields["share_email"].initial is False
+    assert form.fields["share_phone"].initial is True
+    assert form.fields["share_address"].initial is False
 
 
 @pytest.mark.django_db

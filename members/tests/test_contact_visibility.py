@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from django.core import signing
 from django.test import Client
 from django.urls import reverse
 
@@ -112,6 +113,32 @@ def test_qr_vcard_omits_hidden_contact_fields():
 
 
 @pytest.mark.django_db
+def test_privileged_vcard_respects_member_visibility():
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    viewer = Member.objects.create_user(
+        username="vcard_manager",
+        membership_status="Privacy Active",
+        member_manager=True,
+    )
+    subject = Member.objects.create_user(
+        username="vcard_private_member",
+        email="hidden-vcard@example.com",
+        phone="555-0100",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide", "phone": "share"},
+    )
+    client = Client()
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_vcard", args=[subject.id]))
+
+    assert response.status_code == 200
+    assert b"hidden-vcard@example.com" not in response.content
+    assert b"555-0100" in response.content
+
+
+@pytest.mark.django_db
 def test_directory_omits_hidden_email_from_content_and_data_attribute():
     MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
@@ -135,6 +162,32 @@ def test_directory_omits_hidden_email_from_content_and_data_attribute():
     assert subject.full_display_name.encode() in response.content
     assert b"hidden@example.com" not in response.content
     assert b'data-email="hidden@example.com"' not in response.content
+
+
+@pytest.mark.django_db
+def test_directory_keeps_hidden_email_redacted_for_privileged_viewers():
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    viewer = Member.objects.create_user(
+        username="directory_manager",
+        membership_status="Privacy Active",
+        member_manager=True,
+    )
+    Member.objects.create_user(
+        username="private_manager_view",
+        first_name="Private",
+        last_name="Member",
+        email="hidden-manager@example.com",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide", "phone": "hide"},
+    )
+    client = Client()
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_list"))
+
+    assert response.status_code == 200
+    assert b"hidden-manager@example.com" not in response.content
 
 
 @pytest.mark.django_db
@@ -191,7 +244,7 @@ def test_vcard_download_filters_contact_fields_for_regular_member():
 
 
 @pytest.mark.django_db
-def test_email_change_requires_confirmation_before_replacing_email():
+def test_email_change_requires_confirmation_before_replacing_email(mailoutbox):
     MembershipStatus.objects.create(name="Email Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
     SiteConfiguration.objects.create(
@@ -216,7 +269,10 @@ def test_email_change_requires_confirmation_before_replacing_email():
     member.refresh_from_db()
     assert member.email == "old@example.com"
     assert member.pending_email == "new@example.com"
-    assert mail.outbox[-1].to == ["new@example.com"]
+    assert [message.to for message in mailoutbox] == [
+        ["new@example.com"],
+        ["old@example.com"],
+    ]
 
     token = signing.dumps(
         {"member_id": member.pk, "email": "new@example.com"},
