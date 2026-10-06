@@ -47,15 +47,19 @@ def _parse_foreflight_flights_rows(csv_text):
 
 def _parse_foreflight_aircraft_rows(csv_text):
     lines = csv_text.splitlines()
-    aircraft_header = "AircraftID,EquipmentType,TypeCode,Year,Make,Model,Category,Class"
+    aircraft_header = "AircraftID,equipType,TypeCode,Year,Make,Model,GearType"
     header_idx = next(
         i for i, line in enumerate(lines) if line.startswith(aircraft_header)
     )
     flights_table_idx = next(
         i for i, line in enumerate(lines) if line.startswith("Flights Table")
     )
-    aircraft_section = "\n".join(lines[header_idx:flights_table_idx]).strip()
-    return list(csv.DictReader(io.StringIO(aircraft_section)))
+    aircraft_section = "\n".join(lines[header_idx:flights_table_idx])
+    return [
+        row
+        for row in csv.DictReader(io.StringIO(aircraft_section))
+        if any(row.values())
+    ]
 
 
 @pytest.mark.django_db
@@ -929,7 +933,7 @@ def test_foreflight_csv_shows_lesson_title_not_code(client):
     # Flight row has an AircraftID set; the ground row has GroundTraining > 0
     # and no AircraftID. Both must show the title, not the bare code "1c".
     flight_row = next(r for r in rows if r["AircraftID"])
-    ground_row = next(r for r in rows if float(r["GroundTraining"]) > 0)
+    ground_row = next(r for r in rows if float(r["GroundTraining"] or 0) > 0)
     assert flight_row is not None
     assert ground_row is not None
     for row in (flight_row, ground_row):
@@ -975,16 +979,14 @@ def test_foreflight_csv_has_aircraft_and_flights_sections(client):
         "This row is required for importing into ForeFlight. "
         "Do not delete or modify."
     )
-    assert lines[0] == f"ForeFlight Logbook Import,{required_text}"
-    assert lines[1] == ""
-    assert lines[2] == "Aircraft Table"
-    assert (
-        lines[3]
-        == "Text,Text,Text,YYYY,Text,Text,Text,Text,Text,Text,Boolean,Boolean,Boolean,Boolean"
+    assert lines[0].startswith(f"ForeFlight Logbook Import,{required_text}")
+    assert lines[2].startswith("Aircraft Table")
+    assert lines[3].startswith(
+        "Text,Text,Text,YYYY,Text,Text,Text,Text,Text,Boolean,Boolean,Boolean,Boolean"
     )
 
     # Check for aircraft section header
-    assert "AircraftID,EquipmentType,TypeCode,Year,Make,Model,Category,Class" in content
+    assert "AircraftID,equipType,TypeCode,Year,Make,Model,GearType" in content
     # Check for flights preamble rows before the flights header
     assert "Flights Table" in content
     assert "Decimal or HH:MM" in content
@@ -1111,7 +1113,7 @@ def test_foreflight_csv_includes_required_import_preamble_row(client):
         "This row is required for importing into ForeFlight. "
         "Do not delete or modify."
     )
-    assert lines[0] == f"ForeFlight Logbook Import,{required_text}"
+    assert lines[0].startswith(f"ForeFlight Logbook Import,{required_text}")
 
 
 @pytest.mark.django_db
@@ -1179,20 +1181,23 @@ def test_foreflight_csv_aggregates_tow_pilot_daily_summary_rows(client):
     aircraft_rows = _parse_foreflight_aircraft_rows(response.content.decode())
     towplane_rows = [row for row in aircraft_rows if row.get("AircraftID") == "N30TP"]
     assert len(towplane_rows) == 1
-    assert towplane_rows[0]["Category"] == "Airplane"
+    assert towplane_rows[0]["Category/Class"] == "ASEL"
 
     rows = _parse_foreflight_flights_rows(response.content.decode())
 
+    # The comment now also carries the day's hours source (measured vs estimated).
     tow_rows = [
-        row for row in rows if row.get("PilotComments", "") == "Tow pilot daily summary"
+        row
+        for row in rows
+        if row.get("PilotComments", "").startswith("Tow pilot daily summary")
     ]
 
     assert len(tow_rows) == 1
     tow_row = tow_rows[0]
     assert tow_row["Date"] == "2026-05-23"
-    assert tow_row["DayTakeoffs"] == "3"
-    assert tow_row["DayLandingsFullStop"] == "3"
-    assert tow_row["AllLandings"] == "3"
+    assert tow_row["AircraftID"] == "N30TP"
+    assert tow_row["Takeoff Day"] == "3"
+    assert tow_row["Landing Full-Stop Day"] == "3"
     assert float(tow_row["PIC"]) > 0
 
 
@@ -1271,7 +1276,7 @@ def test_foreflight_csv_sorts_rows_by_date_across_events_and_tow_summaries(clien
     observed_dates = [
         row["Date"]
         for row in rows
-        if row.get("PilotComments", "") == "Tow pilot daily summary"
+        if row.get("PilotComments", "").startswith("Tow pilot daily summary")
         or float(row.get("GroundTraining", "0") or 0) > 0
     ]
 
@@ -1337,8 +1342,8 @@ def test_foreflight_aircraft_rows_sanitize_formula_cells(client):
     assert response.status_code == 200
     aircraft_rows = _parse_foreflight_aircraft_rows(response.content.decode())
 
-    glider_row = next(row for row in aircraft_rows if row["Category"] == "Glider")
-    towplane_row = next(row for row in aircraft_rows if row["Category"] == "Airplane")
+    glider_row = next(row for row in aircraft_rows if row["Category/Class"] == "Glider")
+    towplane_row = next(row for row in aircraft_rows if row["Category/Class"] == "ASEL")
 
     assert glider_row["AircraftID"] == "'=NGLDR"
     assert glider_row["Make"] == "'+GliderMake"
