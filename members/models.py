@@ -92,6 +92,9 @@ class Biography(models.Model):
 
 
 class Member(AbstractUser):
+    pending_email = models.EmailField(blank=True)
+    pending_email_requested_at = models.DateTimeField(blank=True, null=True)
+
     pilot_certificate_number = models.CharField(
         max_length=32,
         blank=True,
