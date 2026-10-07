@@ -15,13 +15,5 @@
     "files.associations": {
         ".bandit": "yaml",
         "*.bandit": "yaml"
-    },
-    "yaml.schemas": {
-        "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/vars.json": [
-            "**/group_vars/**/*.yml",
-            "**/group_vars/**/*.yaml",
-            "**/host_vars/**/*.yml",
-            "**/host_vars/**/*.yaml"
-        ]
     }
 }
