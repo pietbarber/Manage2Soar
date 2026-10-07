@@ -104,6 +104,25 @@
        | map('regex_replace', '^(?!https?://)', 'https://')
        | unique
        | list }}
+    # The single CORS rule object (issue #1089) as a GCS-API-shaped JSON
+    # document consumed by `gcloud storage buckets update --cors-file`.
+    # Note the camelCase keys (responseHeader / maxAgeSeconds) — these are the
+    # field names the GCS API and the gcloud CLI expect (the Ansible module
+    # translates snake_case to this form internally, so the spelling only
+    # differs when we talk to the CLI directly).
+    gcs_cors_rule:
+      - origin: "{{ gcs_cors_origins }}"
+        method:
+          - GET
+        responseHeader:
+          - Content-Type
+        maxAgeSeconds: 3600
+    # The CORS JSON file passed to `gcloud storage buckets update --cors-file`.
+    # Rendered on demand into the controller's temp dir by the `Render bucket
+    # CORS policy file` task (issue #1089, PR review) — keeping the PR's
+    # "no static files" acceptance criterion: no `cors*.json` is committed,
+    # and no domain is hardcoded in the playbook.
+    gcs_cors_file: "{{ (ansible_env.TMPDIR | default(ansible_env.TEMP | default('/tmp'))) | regex_replace('/$', '') ~ '/gcs-bucket-cors.json' }}"
 
   tasks:
     # The `gcloud storage` and `gsutil` tasks below authenticate with an active
@@ -157,28 +176,99 @@
           - "Self Link: {{ bucket_result.selfLink }}"
           - "Storage Class: {{ bucket_result.storageClass }}"
 
-    # CORS policy (issue #1089). Applied via a dedicated, guarded task so that:
-    #   - --tags cors can target it independently, and
-    #   - it is cleanly SKIPPED (not sent as an empty/invalid rule to GCP) when
-    #     no tenant has a domain defined.
-    # Origins are derived solely from gke_tenants (the multi-tenant source of
-    # truth); no domain is hardcoded in this playbook.
-    - name: Ensure bucket CORS policy
+    # CORS policy (issue #1089). Applied via the gcloud CLI rather than the
+    # google.cloud.gcp_storage_bucket Ansible module, because (per PR review of
+    # this PR):
+    #   1. The module's `update` path issues a full HTTP PUT that drops all
+    #      unsupplied bucket fields (labels, lifecycle, logging, IAM,
+    #      versioning, website), which can reset configuration managed by other
+    #      tasks or other tooling. The gcloud CLI's `--cors-file` performs a
+    #      partial PATCH that touches only the CORS field.
+    #   2. The module's request serializer drops falsy values, so an empty
+    #      `cors` list (no active tenants) is silently omitted from the PUT
+    #      body and cannot revoke a previously-set CORS policy. The CLI's
+    #      `--clear-cors` does this correctly.
+    # Idempotency: read the live CORS policy and compare before mutating, so a
+    # re-run against an already-correct bucket is a no-op (preserving the PR's
+    # "re-run shows no diff" criterion). No domain is hardcoded.
+    - name: Get current bucket CORS policy
+      tags: [cors]
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - describe
+          - "gs://{{ gcs_bucket_name }}"
+          - --format=json(cors)
+      register: gcs_cors_current_raw
+      changed_when: false
+
+    - name: Parse current bucket CORS policy
+      tags: [cors]
+      ansible.builtin.set_fact:
+        # `describe --format=json(cors)` may emit an empty string or `null` when
+        # the bucket has no CORS; normalize all of {empty, null, list} to a
+        # list so the idempotency comparison below never sees a non-list.
+        gcs_cors_current: >-
+          {{ (gcs_cors_current_raw.stdout | trim | default('[]', true))
+             | from_json
+             | default([], true) }}
+
+    - name: Determine whether bucket CORS already matches the desired state
+      tags: [cors]
+      ansible.builtin.set_fact:
+        # method/responseHeader/maxAgeSeconds are constant in this playbook
+        # (GET / Content-Type / 3600), so comparing the flattened set of
+        # authorized origins is a complete idempotency check. Flattening
+        # handles the empty case (no active tenants -> [] == []) and sorting
+        # makes it robust to origin-list ordering and rule splitting.
+        gcs_cors_unchanged: >-
+          {{
+            (gcs_cors_current | map(attribute='origin') | list | flatten | sort | list | to_json)
+            ==
+            (gcs_cors_rule | map(attribute='origin') | list | flatten | sort | list | to_json)
+          }}
+
+    - name: Render desired bucket CORS policy file
       tags: [cors]
       when: gcs_cors_origins | length > 0
-      google.cloud.gcp_storage_bucket:
-        name: "{{ gcs_bucket_name }}"
-        project: "{{ gcs_project }}"
-        cors:
-          - origin: "{{ gcs_cors_origins }}"
-            method:
-              - GET
-            response_header:
-              - Content-Type
-            max_age_seconds: 3600
-        state: present
-        auth_kind: application
-      register: bucket_cors_result
+      ansible.builtin.copy:
+        content: "{{ gcs_cors_rule | to_json(indent=2) }}"
+        dest: "{{ gcs_cors_file }}"
+        mode: "0600"
+
+    - name: Apply bucket CORS policy (non-empty origins)
+      tags: [cors]
+      when:
+        - gcs_cors_origins | length > 0
+        - not gcs_cors_unchanged
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - update
+          - "gs://{{ gcs_bucket_name }}"
+          - "--cors-file={{ gcs_cors_file }}"
+      register: bucket_cors_apply_result
+      changed_when: true
+
+    - name: Clear bucket CORS policy (no active tenants with domains)
+      tags: [cors]
+      when:
+        - gcs_cors_origins | length == 0
+        - not gcs_cors_unchanged
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - update
+          - "gs://{{ gcs_bucket_name }}"
+          - --clear-cors
+      register: bucket_cors_clear_result
+      changed_when: true
 
     - name: Get bucket IAM policy
       tags: [permissions]
