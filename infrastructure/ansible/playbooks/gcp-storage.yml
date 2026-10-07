@@ -72,18 +72,32 @@
     # infrastructure/ansible/docs/gcs-service-accounts.md.
     gcs_service_account: >-
       {{ gke_service_account_email | default(gcs_project ~ '-django@' ~ gcs_project ~ '.iam.gserviceaccount.com') }}
-    # CORS allowed origins (issue #1089). Derived solely from the tenant domain
-    # list in group_vars (gke_tenants[].domains / gke_tenants[].domain), which is
-    # the multi-tenant source of truth and mirrors the club domain stored in
-    # SiteConfiguration (domain_name / canonical_url). Bare domains are prefixed
-    # with https:// and de-duplicated into the single-origin list the
-    # gcp_storage_bucket module expects. No tenant is hardcoded here — this
-    # playbook must remain tenant-agnostic; run against an inventory/group_vars
-    # that defines gke_tenants (as the rest of this playbook already requires).
+    # Active tenants only (issue #1089, PR review). The tenant-lifecycle contract
+    # (infrastructure/ansible/docs/tenant-lifecycle.md) and the SSL cert playbook
+    # (update-ssl-cert.yml) both exclude `suspended`/`retired` tenants from
+    # normal routing and TLS domains; bucket CORS must follow the same rule so
+    # suspending or retiring a tenant removes its origin from the bucket policy
+    # on the next run. Entries without a `status` key are treated as active for
+    # backward compatibility, matching the pattern used by update-ssl-cert.yml.
+    gcs_active_tenants: >-
+      {{
+        (gke_tenants | default([]) | rejectattr('status', 'defined') | list)
+        +
+        (gke_tenants | default([]) | selectattr('status', 'equalto', 'active') | list)
+      }}
+    # CORS allowed origins (issue #1089). Derived solely from the *active*
+    # tenant domain list in group_vars (gcs_active_tenants[].domains /
+    # gcs_active_tenants[].domain), which is the multi-tenant source of truth
+    # and mirrors the club domain stored in SiteConfiguration
+    # (domain_name / canonical_url). Bare domains are prefixed with https://
+    # and de-duplicated into the single-origin list the gcp_storage_bucket
+    # module expects. No tenant is hardcoded here — this playbook must remain
+    # tenant-agnostic; run against an inventory/group_vars that defines
+    # gke_tenants (as the rest of this playbook already requires).
     gcs_cors_origins: >-
       {{ (
-         (gke_tenants | default([]) | selectattr('domains', 'defined') | map(attribute='domains') | list | flatten)
-         + (gke_tenants | default([]) | selectattr('domain', 'defined') | map(attribute='domain') | list)
+         (gcs_active_tenants | default([]) | selectattr('domains', 'defined') | map(attribute='domains') | list | flatten)
+         + (gcs_active_tenants | default([]) | selectattr('domain', 'defined') | map(attribute='domain') | list)
        )
        | map('string')
        | reject('eq', '')
