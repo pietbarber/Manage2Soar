@@ -254,13 +254,27 @@
         # `is defined`-guarded cleanup below work too. Keeping the PR's "no
         # static files" acceptance criterion: no `cors*.json` is committed and
         # no domain is hardcoded.
-        - name: Materialize temporary bucket CORS policy file path
+        # `ansible.builtin.tempfile` atomically creates and reserves a unique
+        # path (unlike `mktemp -u`, which only prints a candidate name that a
+        # concurrent local process could claim before `copy` runs). The
+        # registered `.path` is reused for the copy destination, the
+        # `--cors-file` argument, and the `always` cleanup so all references
+        # agree. `check_mode: false` forces creation/cleanup to run in `--check`
+        # mode (so `.path` is always available and no stray file lingers);
+        # `changed_when: false` suppresses that temporary housekeeping from the
+        # change report (issue #1089, PR review).
+        - name: Create temporary bucket CORS policy file
           tags: [cors]
           when:
             - gcs_cors_origins | length > 0
             - not gcs_cors_unchanged
-          ansible.builtin.set_fact:
-            gcs_cors_file: "{{ lookup('pipe', 'mktemp -u -t gcs-bucket-cors.XXXXXX') }}"
+          ansible.builtin.tempfile:
+            state: file
+            prefix: gcs-bucket-cors-
+            suffix: .json
+          register: gcs_cors_tmpfile
+          check_mode: false
+          changed_when: false
 
         - name: Render desired bucket CORS policy file
           tags: [cors]
@@ -269,7 +283,7 @@
             - not gcs_cors_unchanged
           ansible.builtin.copy:
             content: "{{ gcs_cors_rule | to_json(indent=2) }}"
-            dest: "{{ gcs_cors_file }}"
+            dest: "{{ gcs_cors_tmpfile.path }}"
             mode: "0600"
 
         - name: Apply bucket CORS policy (non-empty origins)
@@ -284,7 +298,7 @@
               - buckets
               - update
               - "gs://{{ gcs_bucket_name }}"
-              - "--cors-file={{ gcs_cors_file }}"
+              - "--cors-file={{ gcs_cors_tmpfile.path }}"
           register: bucket_cors_apply_result
           changed_when: true
 
@@ -307,14 +321,19 @@
       always:
         # Remove the temporary CORS file even if a gcloud command above failed,
         # so reruns never leave a stale payload in the temp dir. Guarded on the
-        # fact being defined because the path is only materialized when a
+        # registration being defined because the file is only created when a
         # non-empty policy is actually (re)written; this is a no-op otherwise.
+        # `check_mode: false` + `changed_when: false` mirror the create step so
+        # cleanup also runs (and is suppressed from the change report) in
+        # `--check` mode.
         - name: Remove temporary bucket CORS policy file
           tags: [cors]
-          when: gcs_cors_file is defined
+          when: gcs_cors_tmpfile is defined and gcs_cors_tmpfile.path is defined
           ansible.builtin.file:
-            path: "{{ gcs_cors_file }}"
+            path: "{{ gcs_cors_tmpfile.path }}"
             state: absent
+          check_mode: false
+          changed_when: false
 
     - name: Get bucket IAM policy
       tags: [permissions]
