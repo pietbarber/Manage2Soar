@@ -1,10 +1,12 @@
+import json
 import re
 from collections import defaultdict
 
 from django.core.exceptions import ValidationError
-from import_export import resources
+from import_export import fields, resources
+from import_export.results import RowResult
 
-from .models import Member
+from .models import EmergencyContact, Member
 
 # Shared safe member CSV schema used by both import-export resource and
 # custom admin CSV action to avoid schema drift across export paths.
@@ -20,6 +22,7 @@ MEMBER_CSV_FIELDS = (
     "phone",
     "mobile_phone",
     "emergency_contact",
+    "emergency_contacts",
     "membership_status",
     "date_joined",
     "private_glider_checkride_date",
@@ -49,9 +52,78 @@ MEMBER_CSV_FIELDS = (
     "private_notes",
 )
 
+EMERGENCY_CONTACT_CSV_FIELDS = (
+    "name",
+    "relationship",
+    "home_phone",
+    "mobile_phone",
+    "preferred_contact_method",
+    "preferred_contact_details",
+    "address",
+)
+
+
+def serialize_emergency_contacts(member):
+    """Serialize structured contacts as a JSON array for the member CSV."""
+    contacts = member.emergency_contacts.all()
+    return json.dumps(
+        [
+            {field: getattr(contact, field) for field in EMERGENCY_CONTACT_CSV_FIELDS}
+            for contact in contacts
+        ],
+        ensure_ascii=False,
+    )
+
+
+def parse_emergency_contacts(raw_value):
+    """Validate and normalize the structured contacts JSON column."""
+    if raw_value in (None, ""):
+        return []
+
+    try:
+        contacts = json.loads(raw_value)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("Emergency contacts must be a JSON array.") from exc
+
+    if not isinstance(contacts, list):
+        raise ValueError("Emergency contacts must be a JSON array.")
+
+    parsed_contacts = []
+    for index, contact in enumerate(contacts, start=1):
+        if not isinstance(contact, dict):
+            raise ValueError(f"Emergency contact {index} must be a JSON object.")
+
+        unknown_fields = set(contact) - set(EMERGENCY_CONTACT_CSV_FIELDS)
+        if unknown_fields:
+            raise ValueError(
+                f"Emergency contact {index} contains unsupported fields: "
+                f"{', '.join(sorted(unknown_fields))}."
+            )
+
+        name = contact.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"Emergency contact {index} must include a name.")
+
+        parsed_contact = {}
+        for field in EMERGENCY_CONTACT_CSV_FIELDS:
+            value = contact.get(field, "")
+            if not isinstance(value, str):
+                raise ValueError(
+                    f"Emergency contact {index} field '{field}' must be text."
+                )
+            parsed_contact[field] = value
+        parsed_contacts.append(parsed_contact)
+
+    return parsed_contacts
+
 
 class MemberResource(resources.ModelResource):
     """Normalize imported member fields before persistence."""
+
+    emergency_contacts = fields.Field(
+        column_name="emergency_contacts",
+        readonly=True,
+    )
 
     _SSA_NULL_TOKENS = {"", "0", "null", "none", "na", "n/a", "unknown"}
     _LEGACY_USERNAME_NULL_TOKENS = {"", "0", "null", "none", "na", "n/a", "unknown"}
@@ -59,6 +131,9 @@ class MemberResource(resources.ModelResource):
     class Meta:
         model = Member
         fields = MEMBER_CSV_FIELDS
+
+    def dehydrate_emergency_contacts(self, member):
+        return serialize_emergency_contacts(member)
 
     def before_import(self, dataset, **kwargs):
         """Preload usernames once to avoid per-row existence queries during import."""
@@ -230,6 +305,9 @@ class MemberResource(resources.ModelResource):
 
     def before_import_row(self, row, **kwargs):
         """Treat placeholder SSA values as missing so unique constraint is not hit."""
+        if "emergency_contacts" in row:
+            parse_emergency_contacts(row["emergency_contacts"])
+
         row["SSA_member_number"] = self._normalize_nullable_value(
             row.get("SSA_member_number"),
             self._SSA_NULL_TOKENS,
@@ -239,6 +317,23 @@ class MemberResource(resources.ModelResource):
             self._LEGACY_USERNAME_NULL_TOKENS,
         )
         row["username"] = self._normalize_username(row.get("username"))
+
+    def after_import_row(self, row, row_result, **kwargs):
+        """Replace related contacts when the CSV includes the JSON column."""
+        super().after_import_row(row, row_result, **kwargs)
+        if (
+            "emergency_contacts" not in row
+            or row_result.object_id is None
+            or row_result.import_type == RowResult.IMPORT_TYPE_DELETE
+        ):
+            return
+
+        contacts = parse_emergency_contacts(row["emergency_contacts"])
+        member = Member.objects.get(pk=row_result.object_id)
+        member.emergency_contacts.all().delete()
+        EmergencyContact.objects.bulk_create(
+            [EmergencyContact(member=member, **contact) for contact in contacts]
+        )
 
     def before_save_instance(self, instance, row, **kwargs):
         """Enforce NULL (not empty string) for missing values on final save path."""

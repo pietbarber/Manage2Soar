@@ -321,7 +321,8 @@
                   </div>
                   {% if contact.home_phone %}<span class="me-3">Home: <a href="tel:{{ contact.home_phone }}">{{ contact.home_phone|format_us_phone }}</a></span>{% endif %}
                   {% if contact.mobile_phone %}<span class="me-3">Mobile: <a href="tel:{{ contact.mobile_phone }}">{{ contact.mobile_phone|format_us_phone }}</a></span>{% endif %}
-                  {% if contact.preferred_contact_details %}<span>Preferred: {{ contact.preferred_contact_details }}</span>{% endif %}
+                  {% if contact.preferred_contact_method %}<div>Preferred method: {{ contact.get_preferred_contact_method_display }}</div>{% endif %}
+                  {% if contact.preferred_contact_details %}<div>Additional preferred contact details: {{ contact.preferred_contact_details }}</div>{% endif %}
                   {% if contact.address %}<div class="mt-1">{{ contact.address|linebreaksbr }}</div>{% endif %}
                 </div>
                 {% endfor %}

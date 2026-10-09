@@ -209,6 +209,38 @@ def test_profile_privacy_checkboxes_show_effective_member_preferences():
 
 
 @pytest.mark.django_db
+def test_staff_contact_legend_shows_regular_member_visibility():
+    viewer = Member.objects.create_user(
+        username="privacy_admin",
+        email="admin@example.com",
+        is_staff=True,
+        is_superuser=True,
+    )
+    subject = Member.objects.create_user(
+        username="hidden_member",
+        first_name="Hidden",
+        last_name="Member",
+        contact_visibility={"email": "hide"},
+    )
+    client = Client()
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_view", args=[subject.pk]))
+
+    assert response.status_code == 200
+    email_status = next(
+        status
+        for status in response.context["staff_contact_status"]
+        if status["label"] == "Email"
+    )
+    assert email_status == {
+        "label": "Email",
+        "shared": False,
+        "source": "member choice: Hide",
+    }
+
+
+@pytest.mark.django_db
 def test_vcard_download_filters_contact_fields_for_regular_member():
     MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()

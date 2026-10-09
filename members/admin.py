@@ -28,7 +28,7 @@ from .models import (
     VisitingPilotVisit,
 )
 from .models_applications import MembershipApplication
-from .resources import MEMBER_CSV_FIELDS, MemberResource
+from .resources import MEMBER_CSV_FIELDS, MemberResource, serialize_emergency_contacts
 from .utils.image_processing import generate_profile_thumbnails
 
 logger = logging.getLogger(__name__)
@@ -306,8 +306,15 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         response["Content-Disposition"] = "attachment; filename=members_export.csv"
         writer = csv.writer(response)
         writer.writerow(fields)
-        for member in queryset:
-            row = [getattr(member, f, "") for f in fields]
+        for member in queryset.prefetch_related("emergency_contacts"):
+            row = [
+                (
+                    serialize_emergency_contacts(member)
+                    if field == "emergency_contacts"
+                    else getattr(member, field, "")
+                )
+                for field in fields
+            ]
             writer.writerow(row)
         return response
 

@@ -322,7 +322,7 @@ def member_view(request, member_id):
             [
                 {
                     "label": label,
-                    "shared": contact_visibility[field],
+                    "shared": effective_contact_visibility[field],
                     "source": contact_field_visibility(member, field, site_config)[
                         "source"
                     ],
@@ -416,9 +416,9 @@ def emergency_contact_edit(request, member_id, contact_id=None):
 @require_http_methods(["GET", "POST"])
 def emergency_contact_delete(request, member_id, contact_id):
     member = get_object_or_404(Member, pk=member_id)
-    contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
     if request.user != member:
         return render(request, "403.html", status=403)
+    contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
 
     is_last_contact = member.emergency_contacts.count() == 1
     form = (
