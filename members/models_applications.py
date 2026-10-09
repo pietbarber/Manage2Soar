@@ -412,6 +412,7 @@ class MembershipApplication(models.Model):
         # username collision between generate_username()'s exists() check and
         # the actual INSERT.  Cap retries to avoid an infinite loop if the
         # IntegrityError is caused by a different unique constraint.
+        member = None
         for _attempt in range(MAX_USERNAME_RETRIES):
             candidate_username = generate_username(self.first_name, self.last_name)
             try:
@@ -429,6 +430,9 @@ class MembershipApplication(models.Model):
                     raise
                 if _attempt == MAX_USERNAME_RETRIES - 1:
                     raise  # username race, but exhausted retries
+
+        if member is None:
+            raise RuntimeError("Member account creation did not succeed.")
 
         # Set additional member fields from application
         member.middle_initial = self.middle_initial
