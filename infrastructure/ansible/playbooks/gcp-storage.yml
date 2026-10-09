@@ -39,6 +39,7 @@
 #
 # Tags:
 #   - bucket: Bucket creation and configuration
+#   - cors: CORS policy configuration on the bucket
 #   - permissions: IAM policy and service account bindings
 #   - verify: Verification checks
 
@@ -47,6 +48,12 @@
   hosts: localhost
   connection: local
   become: false
+  # Inventory only defines the "all" group, so group_vars/gcp_app/vars.yml is
+  # never auto-loaded; without this, gke_tenants falls back to the stale
+  # inline list in inventory/gcp_app.yml (or defaults to []) and the CORS
+  # task applies incomplete origins or silently skips.
+  vars_files:
+    - ../group_vars/gcp_app/vars.yml
 
   vars:
     # Default bucket settings (override in inventory or command line)
@@ -65,6 +72,51 @@
     # infrastructure/ansible/docs/gcs-service-accounts.md.
     gcs_service_account: >-
       {{ gke_service_account_email | default(gcs_project ~ '-django@' ~ gcs_project ~ '.iam.gserviceaccount.com') }}
+    # Active tenants only (issue #1089, PR review). The tenant-lifecycle contract
+    # (infrastructure/ansible/docs/tenant-lifecycle.md) and the SSL cert playbook
+    # (update-ssl-cert.yml) both exclude `suspended`/`retired` tenants from
+    # normal routing and TLS domains; bucket CORS must follow the same rule so
+    # suspending or retiring a tenant removes its origin from the bucket policy
+    # on the next run. Entries without a `status` key are treated as active for
+    # backward compatibility, matching the pattern used by update-ssl-cert.yml.
+    gcs_active_tenants: >-
+      {{
+        (gke_tenants | default([]) | rejectattr('status', 'defined') | list)
+        +
+        (gke_tenants | default([]) | selectattr('status', 'equalto', 'active') | list)
+      }}
+    # CORS allowed origins (issue #1089). Derived solely from the *active*
+    # tenant domain list in group_vars (gcs_active_tenants[].domains /
+    # gcs_active_tenants[].domain), which is the multi-tenant source of truth
+    # and mirrors the club domain stored in SiteConfiguration
+    # (domain_name / canonical_url). Bare domains are prefixed with https://
+    # and de-duplicated into the single-origin list the gcp_storage_bucket
+    # module expects. No tenant is hardcoded here — this playbook must remain
+    # tenant-agnostic; run against an inventory/group_vars that defines
+    # gke_tenants (as the rest of this playbook already requires).
+    gcs_cors_origins: >-
+      {{ (
+         (gcs_active_tenants | default([]) | selectattr('domains', 'defined') | map(attribute='domains') | list | flatten)
+         + (gcs_active_tenants | default([]) | selectattr('domain', 'defined') | map(attribute='domain') | list)
+       )
+       | map('string')
+       | reject('eq', '')
+       | map('regex_replace', '^(?!https?://)', 'https://')
+       | unique
+       | list }}
+    # The single CORS rule object (issue #1089) as a GCS-API-shaped JSON
+    # document consumed by `gcloud storage buckets update --cors-file`.
+    # Note the camelCase keys (responseHeader / maxAgeSeconds) — these are the
+    # field names the GCS API and the gcloud CLI expect (the Ansible module
+    # translates snake_case to this form internally, so the spelling only
+    # differs when we talk to the CLI directly).
+    gcs_cors_rule:
+      - origin: "{{ gcs_cors_origins }}"
+        method:
+          - GET
+        responseHeader:
+          - Content-Type
+        maxAgeSeconds: 3600
 
   tasks:
     # The `gcloud storage` and `gsutil` tasks below authenticate with an active
@@ -117,6 +169,157 @@
           - "Location: {{ bucket_result.location }}"
           - "Self Link: {{ bucket_result.selfLink }}"
           - "Storage Class: {{ bucket_result.storageClass }}"
+
+    # CORS policy (issue #1089). Applied via the gcloud CLI rather than the
+    # google.cloud.gcp_storage_bucket Ansible module, because (per PR review of
+    # this PR):
+    #   1. The module's `update` path issues a full HTTP PUT that drops all
+    #      unsupplied bucket fields (labels, lifecycle, logging, IAM,
+    #      versioning, website), which can reset configuration managed by other
+    #      tasks or other tooling. The gcloud CLI's `--cors-file` performs a
+    #      partial PATCH that touches only the CORS field.
+    #   2. The module's request serializer drops falsy values, so an empty
+    #      `cors` list (no active tenants) is silently omitted from the PUT
+    #      body and cannot revoke a previously-set CORS policy. The CLI's
+    #      `--clear-cors` does this correctly.
+    # Idempotency: read the live CORS policy and compare before mutating, so a
+    # re-run against an already-correct bucket is a no-op (preserving the PR's
+    # "re-run shows no diff" criterion). No domain is hardcoded.
+    - name: Manage bucket CORS policy
+      tags: [cors]
+      block:
+        # check_mode: false so this read-only describe still runs (and yields
+        # stdout for the comparison) during `--check --diff`; the mutation
+        # commands below remain skipped in check mode.
+        - name: Get current bucket CORS policy
+          tags: [cors]
+          ansible.builtin.command:
+            argv:
+              - gcloud
+              - storage
+              - buckets
+              - describe
+              - "gs://{{ gcs_bucket_name }}"
+              - --format=json(cors)
+          check_mode: false
+          register: gcs_cors_current_raw
+          changed_when: false
+
+        - name: Parse current bucket CORS policy
+          tags: [cors]
+          ansible.builtin.set_fact:
+            # `describe --format=json(cors)` emits a projected object such as
+            # {"cors": [...]} (or an empty string / null when there is no
+            # CORS). Unwrap the `cors` key and normalize to a list so the
+            # comparison below never sees a non-list.
+            gcs_cors_current: >-
+              {{ (gcs_cors_current_raw.stdout | trim | default('{"cors": []}', true)
+                 | from_json).cors | default([], true) }}
+
+        - name: Determine whether bucket CORS already matches the desired state
+          tags: [cors]
+          ansible.builtin.set_fact:
+            # Require the intended single-rule shape and compare every field,
+            # normalizing list ordering only. The desired rule is always a
+            # single rule with method GET, responseHeader Content-Type and
+            # maxAgeSeconds 3600, so matching those fixed values plus the
+            # origin set fully proves the live policy equals the desired one
+            # (catches a live rule with the same origins but POST / a different
+            # response header / TTL). Empty case: desired is no rules, so the
+            # live policy must be empty.
+            gcs_cors_unchanged: >-
+              {{
+                (
+                  (gcs_cors_origins | length > 0
+                   and (gcs_cors_current | length) == 1
+                   and ((gcs_cors_current.0.origin | default([]) | sort) == (gcs_cors_origins | sort))
+                   and ((gcs_cors_current.0.method | default([]) | sort) == ['GET'])
+                   and ((gcs_cors_current.0.responseHeader | default([]) | sort) == ['Content-Type'])
+                   and (gcs_cors_current.0.maxAgeSeconds | default(-1)) == 3600)
+                )
+                or
+                (
+                  (gcs_cors_origins | length) == 0
+                  and (gcs_cors_current | length) == 0
+                )
+              }}
+
+        # Atomically create and reserve a unique temporary path only when the
+        # policy needs to be written. Reuse the registered `.path` for the copy,
+        # gcloud argument, and `always` cleanup so every reference agrees.
+        # `check_mode: false` makes the path available during `--check`, while
+        # `changed_when: false` keeps this housekeeping out of change reports.
+        - name: Create temporary bucket CORS policy file
+          tags: [cors]
+          when:
+            - gcs_cors_origins | length > 0
+            - not gcs_cors_unchanged
+          ansible.builtin.tempfile:
+            state: file
+            prefix: gcs-bucket-cors-
+            suffix: .json
+          register: gcs_cors_tmpfile
+          check_mode: false
+          changed_when: false
+
+        - name: Render desired bucket CORS policy file
+          tags: [cors]
+          when:
+            - gcs_cors_origins | length > 0
+            - not gcs_cors_unchanged
+          ansible.builtin.copy:
+            content: "{{ gcs_cors_rule | to_json(indent=2) }}"
+            dest: "{{ gcs_cors_tmpfile.path }}"
+            mode: "0600"
+
+        - name: Apply bucket CORS policy (non-empty origins)
+          tags: [cors]
+          when:
+            - gcs_cors_origins | length > 0
+            - not gcs_cors_unchanged
+          ansible.builtin.command:
+            argv:
+              - gcloud
+              - storage
+              - buckets
+              - update
+              - "gs://{{ gcs_bucket_name }}"
+              - "--cors-file={{ gcs_cors_tmpfile.path }}"
+          register: bucket_cors_apply_result
+          changed_when: true
+
+        - name: Clear bucket CORS policy (no active tenants with domains)
+          tags: [cors]
+          when:
+            - gcs_cors_origins | length == 0
+            - not gcs_cors_unchanged
+          ansible.builtin.command:
+            argv:
+              - gcloud
+              - storage
+              - buckets
+              - update
+              - "gs://{{ gcs_bucket_name }}"
+              - --clear-cors
+          register: bucket_cors_clear_result
+          changed_when: true
+
+      always:
+        # Remove the temporary CORS file even if a gcloud command above failed,
+        # so reruns never leave a stale payload in the temp dir. Guarded on the
+        # registration being defined because the file is only created when a
+        # non-empty policy is actually (re)written; this is a no-op otherwise.
+        # `check_mode: false` + `changed_when: false` mirror the create step so
+        # cleanup also runs (and is suppressed from the change report) in
+        # `--check` mode.
+        - name: Remove temporary bucket CORS policy file
+          tags: [cors]
+          when: gcs_cors_tmpfile is defined and gcs_cors_tmpfile.path is defined
+          ansible.builtin.file:
+            path: "{{ gcs_cors_tmpfile.path }}"
+            state: absent
+          check_mode: false
+          changed_when: false
 
     - name: Get bucket IAM policy
       tags: [permissions]
