@@ -1,6 +1,6 @@
 ---
 name: pr-execute-review-workorder
-description: pr-execute-review-workorder
+description: Execute items from docs/ai-tasks/pr-review-workorder.md without GitHub interactions, commits, or pushes.
 disable-model-invocation: true
 ---
 # Execute PR Review Work Order
