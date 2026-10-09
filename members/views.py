@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -445,23 +445,29 @@ def emergency_contact_edit(request, member_id, contact_id=None):
 @active_member_required
 @require_http_methods(["GET", "POST"])
 def emergency_contact_delete(request, member_id, contact_id):
-    member = get_object_or_404(Member, pk=member_id)
-    if request.user != member:
-        return render(request, "403.html", status=403)
-    contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
+    with transaction.atomic():
+        members = Member.objects.all()
+        if request.method == "POST":
+            members = members.select_for_update()
+        member = get_object_or_404(members, pk=member_id)
+        if request.user != member:
+            return render(request, "403.html", status=403)
+        contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
 
-    is_last_contact = member.emergency_contacts.count() == 1
-    form = (
-        EmergencyContactDeclineForm(request.POST or None) if is_last_contact else None
-    )
-    if request.method == "POST" and not is_last_contact:
-        contact.delete()
-        messages.success(request, "Emergency contact removed.")
-        return redirect("members:member_view", member_id=member.id)
-    if request.method == "POST" and form and form.is_valid():
-        contact.delete()
-        messages.success(request, "Emergency contact removed.")
-        return redirect("members:member_view", member_id=member.id)
+        is_last_contact = member.emergency_contacts.count() == 1
+        form = (
+            EmergencyContactDeclineForm(request.POST or None)
+            if is_last_contact
+            else None
+        )
+        if request.method == "POST" and not is_last_contact:
+            contact.delete()
+            messages.success(request, "Emergency contact removed.")
+            return redirect("members:member_view", member_id=member.id)
+        if request.method == "POST" and form and form.is_valid():
+            contact.delete()
+            messages.success(request, "Emergency contact removed.")
+            return redirect("members:member_view", member_id=member.id)
 
     return render(
         request,

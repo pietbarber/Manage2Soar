@@ -1,4 +1,7 @@
+from unittest.mock import patch
+
 import pytest
+from django.db.models.query import QuerySet
 from django.test import Client
 from django.urls import reverse
 
@@ -109,6 +112,31 @@ def test_removing_final_contact_requires_confirmation(member, client_for):
     response = client_for.post(delete_url, {"confirmation": "NO EMERGENCY CONTACT"})
     assert response.status_code == 302
     assert not EmergencyContact.objects.filter(pk=contact.pk).exists()
+
+
+@pytest.mark.django_db
+def test_contact_delete_locks_member_before_recounting(member, client_for):
+    contact = EmergencyContact.objects.create(member=member, name="First Contact")
+    remaining_contact = EmergencyContact.objects.create(
+        member=member, name="Second Contact"
+    )
+    delete_url = reverse(
+        "members:emergency_contact_delete", args=[member.pk, contact.pk]
+    )
+    original_select_for_update = QuerySet.select_for_update
+
+    with patch.object(
+        QuerySet,
+        "select_for_update",
+        autospec=True,
+        side_effect=original_select_for_update,
+    ) as select_for_update:
+        response = client_for.post(delete_url, {})
+
+    assert response.status_code == 302
+    select_for_update.assert_called_once()
+    assert not EmergencyContact.objects.filter(pk=contact.pk).exists()
+    assert EmergencyContact.objects.filter(pk=remaining_contact.pk).exists()
 
 
 @pytest.mark.django_db
