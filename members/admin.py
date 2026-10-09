@@ -28,7 +28,12 @@ from .models import (
     VisitingPilotVisit,
 )
 from .models_applications import MembershipApplication
-from .resources import MEMBER_CSV_FIELDS, MemberResource, serialize_emergency_contacts
+from .resources import (
+    MEMBER_CSV_FIELDS,
+    MemberResource,
+    serialize_contact_visibility,
+    serialize_emergency_contacts,
+)
 from .utils.image_processing import generate_profile_thumbnails
 
 logger = logging.getLogger(__name__)
@@ -311,7 +316,11 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                 (
                     serialize_emergency_contacts(member)
                     if field == "emergency_contacts"
-                    else getattr(member, field, "")
+                    else (
+                        serialize_contact_visibility(member)
+                        if field == "contact_visibility"
+                        else getattr(member, field, "")
+                    )
                 )
                 for field in fields
             ]
