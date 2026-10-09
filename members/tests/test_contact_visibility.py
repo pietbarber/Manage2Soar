@@ -165,31 +165,36 @@ def test_directory_omits_hidden_email_from_content_and_data_attribute():
 
 
 @pytest.mark.django_db
-def test_member_can_update_contact_visibility():
+def test_member_can_set_and_inherit_contact_visibility():
     MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
     member = Member.objects.create_user(
-        username="privacy_member", membership_status="Privacy Active"
+        username="privacy_member",
+        membership_status="Privacy Active",
+        contact_visibility={"phone": "share"},
     )
     client = Client()
     client.force_login(member)
 
     response = client.post(
         reverse("members:update_contact_visibility", args=[member.id]),
-        {"share_email": "on", "share_address": "on"},
+        {
+            "visibility_email": "hide",
+            "visibility_phone": "share",
+            "visibility_address": "inherit",
+        },
     )
 
     assert response.status_code == 302
     member.refresh_from_db()
     assert member.contact_visibility == {
-        "email": "share",
-        "phone": "hide",
-        "address": "share",
+        "email": "hide",
+        "phone": "share",
     }
 
 
 @pytest.mark.django_db
-def test_profile_privacy_checkboxes_show_effective_member_preferences():
+def test_profile_privacy_controls_show_member_overrides():
     MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
     member = Member.objects.create_user(
@@ -203,9 +208,54 @@ def test_profile_privacy_checkboxes_show_effective_member_preferences():
     response = client.get(reverse("members:member_view", args=[member.id]))
 
     assert response.status_code == 200
-    assert b'name="share_email" id="share_email">' in response.content
-    assert b'name="share_phone" id="share_phone" checked' in response.content
-    assert b'name="share_address" id="share_address" checked' in response.content
+    assert response.context["privacy_settings"] == [
+        {
+            "field": "email",
+            "label": "Email",
+            "preference": "hide",
+            "shared": False,
+        },
+        {
+            "field": "phone",
+            "label": "Phone numbers",
+            "preference": "share",
+            "shared": True,
+        },
+        {
+            "field": "address",
+            "label": "Postal address",
+            "preference": "inherit",
+            "shared": True,
+        },
+    ]
+    assert b'name="visibility_email" id="visibility_email"' in response.content
+    assert b'<option value="hide" selected>Hide</option>' in response.content
+    assert (
+        b'<option value="inherit" selected>Inherit club default</option>'
+        in response.content
+    )
+
+
+@pytest.mark.django_db
+def test_contact_visibility_rejects_unsupported_policy():
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    member = Member.objects.create_user(
+        username="invalid_privacy_member",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide"},
+    )
+    client = Client()
+    client.force_login(member)
+
+    response = client.post(
+        reverse("members:update_contact_visibility", args=[member.id]),
+        {"visibility_email": "public"},
+    )
+
+    assert response.status_code == 400
+    member.refresh_from_db()
+    assert member.contact_visibility == {"email": "hide"}
 
 
 @pytest.mark.django_db

@@ -75,6 +75,31 @@ class MemberContactCSVTests(TestCase):
         self.assertFalse(result.has_errors())
         self.assertEqual(self.member.emergency_contacts.get().name, "Jane Doe")
 
+    def test_invalid_replacement_contact_preserves_existing_contacts(self):
+        invalid_contacts = [
+            [{"name": "Invalid Contact", "preferred_contact_method": "carrier_pigeon"}],
+            [{"name": "N" * 201}],
+            [{"name": "Invalid Contact", "home_phone": "1" * 21}],
+        ]
+
+        for contacts in invalid_contacts:
+            with self.subTest(contacts=contacts):
+                dataset = Dataset(headers=["id", "username", "emergency_contacts"])
+                dataset.append(
+                    (
+                        self.member.pk,
+                        self.member.username,
+                        json.dumps(contacts),
+                    )
+                )
+                result = MemberResource().import_data(dataset, dry_run=False)
+
+                self.assertTrue(result.has_validation_errors())
+                self.assertEqual(
+                    list(self.member.emergency_contacts.values_list("name", flat=True)),
+                    ["Jane Doe"],
+                )
+
     def test_custom_admin_csv_action_includes_structured_contacts(self):
         member_admin = MemberAdmin(Member, admin.site)
         response = member_admin.export_members_csv(

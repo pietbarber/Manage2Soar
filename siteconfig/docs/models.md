@@ -24,6 +24,9 @@ erDiagram
         string club_zip_code
         string club_country
         string club_phone
+        boolean share_member_email_by_default
+        boolean share_member_phone_by_default
+        boolean share_member_address_by_default
         text operations_info
         boolean schedule_instructors
         boolean schedule_tow_pilots
@@ -99,6 +102,7 @@ erDiagram
 - **Key Features:** Singleton model (only one instance allowed), complete contact form customization, configurable role titles, scheduling toggles, club address/location management, visiting pilot security token lifecycle, surge threshold configuration
 - **Billing master switch (Issue #982):** `billing_app_enabled` controls whether tenant billing workflows are active at all. When disabled, billing views and member personal-charge endpoints are gated, and logsheet finalization skips ledger posting/cost-freezing.
 - **Contact Fields:** `contact_welcome_text`, `contact_response_info`, complete address fields, `club_phone`, `operations_info`
+- **Member Contact Sharing Defaults:** `share_member_email_by_default`, `share_member_phone_by_default`, and `share_member_address_by_default` control regular-member visibility when a member has no explicit per-field preference. All three default to `True`.
 - **Role Titles:** All staff positions configurable (Duty Officer, Instructor, Tow Pilot, etc.)
 - **Operational Settings:** Scheduling preferences, reservation controls, towplane rental permissions, notification settings
 - **Billing Settings:**

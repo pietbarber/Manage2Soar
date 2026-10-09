@@ -318,6 +318,25 @@ def member_view(request, member_id):
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
         "privacy_sharing": effective_contact_visibility if is_self else None,
+        "privacy_settings": (
+            [
+                {
+                    "field": field,
+                    "label": label,
+                    "preference": (member.contact_visibility or {}).get(
+                        field, "inherit"
+                    ),
+                    "shared": effective_contact_visibility[field],
+                }
+                for field, label in (
+                    ("email", "Email"),
+                    ("phone", "Phone numbers"),
+                    ("address", "Postal address"),
+                )
+            ]
+            if is_self
+            else None
+        ),
         "staff_contact_status": (
             [
                 {
@@ -377,10 +396,21 @@ def update_contact_visibility(request, member_id):
     if request.user != member:
         return render(request, "403.html", status=403)
 
-    member.contact_visibility = {
-        field: "share" if request.POST.get(f"share_{field}") else "hide"
-        for field in ("email", "phone", "address")
-    }
+    contact_visibility = dict(member.contact_visibility or {})
+    for field in ("email", "phone", "address"):
+        key = f"visibility_{field}"
+        if key not in request.POST:
+            continue
+
+        preference = request.POST[key]
+        if preference not in {"inherit", "share", "hide"}:
+            return HttpResponse("Invalid contact visibility choice.", status=400)
+        if preference == "inherit":
+            contact_visibility.pop(field, None)
+        else:
+            contact_visibility[field] = preference
+
+    member.contact_visibility = contact_visibility
     member.save(update_fields=["contact_visibility"])
     messages.success(request, "Contact visibility preferences updated.")
     return redirect("members:member_view", member_id=member.id)

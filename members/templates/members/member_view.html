@@ -225,7 +225,25 @@
       </div>
 
       {% if privacy_sharing %}
-      <div class="card mb-4"><div class="card-header"><i class="bi bi-shield-lock me-2"></i>Contact Privacy</div><form method="post" action="{% url 'members:update_contact_visibility' member.id %}" class="card-body">{% csrf_token %}<p class="small text-muted">Choose which contact details other regular members can see.</p><div class="form-check"><input class="form-check-input" type="checkbox" name="share_email" id="share_email"{% if privacy_sharing.email %} checked{% endif %}><label class="form-check-label" for="share_email">Share email</label></div><div class="form-check"><input class="form-check-input" type="checkbox" name="share_phone" id="share_phone"{% if privacy_sharing.phone %} checked{% endif %}><label class="form-check-label" for="share_phone">Share phone numbers</label></div><div class="form-check"><input class="form-check-input" type="checkbox" name="share_address" id="share_address"{% if privacy_sharing.address %} checked{% endif %}><label class="form-check-label" for="share_address">Share postal address</label></div><button class="btn btn-sm btn-primary mt-3" type="submit">Save Privacy Settings</button></form></div>
+      <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-shield-lock me-2"></i>Contact Privacy</div>
+        <form method="post" action="{% url 'members:update_contact_visibility' member.id %}" class="card-body">
+          {% csrf_token %}
+          <p class="small text-muted">Choose which contact details other regular members can see. Inherit uses the club default.</p>
+          {% for setting in privacy_settings %}
+          <div class="mb-3">
+            <label class="form-label" for="visibility_{{ setting.field }}">{{ setting.label }}</label>
+            <select class="form-select" name="visibility_{{ setting.field }}" id="visibility_{{ setting.field }}">
+              <option value="inherit"{% if setting.preference == "inherit" %} selected{% endif %}>Inherit club default</option>
+              <option value="share"{% if setting.preference == "share" %} selected{% endif %}>Share</option>
+              <option value="hide"{% if setting.preference == "hide" %} selected{% endif %}>Hide</option>
+            </select>
+            <small class="text-muted">Currently {% if setting.shared %}visible{% else %}hidden{% endif %} to regular members.</small>
+          </div>
+          {% endfor %}
+          <button class="btn btn-sm btn-primary" type="submit">Save Privacy Settings</button>
+        </form>
+      </div>
       {% endif %}
 
       <!-- Member Details Card -->
