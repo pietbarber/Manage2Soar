@@ -110,13 +110,29 @@
     # field names the GCS API and the gcloud CLI expect (the Ansible module
     # translates snake_case to this form internally, so the spelling only
     # differs when we talk to the CLI directly).
+    #
+    # Methods/headers are sized for the self-hosted pdf.js viewer (issue #1069),
+    # which fetches PDFs straight from the bucket with HTTP Range requests and
+    # reads Content-Range / Accept-Ranges / Content-Length from the response to
+    # detect range support. GCS applies `responseHeader` to both preflight and
+    # actual responses, so these must be listed or the browser hides them from
+    # pdf.js. HEAD is allowed for the same range-capability probe.
+    gcs_cors_methods:
+      - GET
+      - HEAD
+    gcs_cors_response_headers:
+      - Accept-Ranges
+      - Content-Encoding
+      - Content-Length
+      - Content-Range
+      - Content-Type
+      - Range
+    gcs_cors_max_age_seconds: 3600
     gcs_cors_rule:
       - origin: "{{ gcs_cors_origins }}"
-        method:
-          - GET
-        responseHeader:
-          - Content-Type
-        maxAgeSeconds: 3600
+        method: "{{ gcs_cors_methods }}"
+        responseHeader: "{{ gcs_cors_response_headers }}"
+        maxAgeSeconds: "{{ gcs_cors_max_age_seconds | int }}"
 
   tasks:
     # The `gcloud storage` and `gsutil` tasks below authenticate with an active
@@ -200,6 +216,10 @@
               - buckets
               - describe
               - "gs://{{ gcs_bucket_name }}"
+              # --raw returns the API-shaped `cors` field (camelCase keys that
+              # match --cors-file); without it gcloud emits `cors_config` with
+              # snake_case keys, which this comparison would never match.
+              - --raw
               - --format=json(cors)
           check_mode: false
           register: gcs_cors_current_raw
@@ -221,21 +241,21 @@
           ansible.builtin.set_fact:
             # Require the intended single-rule shape and compare every field,
             # normalizing list ordering only. The desired rule is always a
-            # single rule with method GET, responseHeader Content-Type and
-            # maxAgeSeconds 3600, so matching those fixed values plus the
+            # single rule built from gcs_cors_methods, gcs_cors_response_headers
+            # and gcs_cors_max_age_seconds, so matching those values plus the
             # origin set fully proves the live policy equals the desired one
-            # (catches a live rule with the same origins but POST / a different
-            # response header / TTL). Empty case: desired is no rules, so the
-            # live policy must be empty.
+            # (catches a live rule with the same origins but a different
+            # method / response header / TTL). Empty case: desired is no
+            # rules, so the live policy must be empty.
             gcs_cors_unchanged: >-
               {{
                 (
                   (gcs_cors_origins | length > 0
                    and (gcs_cors_current | length) == 1
                    and ((gcs_cors_current.0.origin | default([]) | sort) == (gcs_cors_origins | sort))
-                   and ((gcs_cors_current.0.method | default([]) | sort) == ['GET'])
-                   and ((gcs_cors_current.0.responseHeader | default([]) | sort) == ['Content-Type'])
-                   and (gcs_cors_current.0.maxAgeSeconds | default(-1)) == 3600)
+                   and ((gcs_cors_current.0.method | default([]) | sort) == (gcs_cors_methods | sort))
+                   and ((gcs_cors_current.0.responseHeader | default([]) | sort) == (gcs_cors_response_headers | sort))
+                   and (gcs_cors_current.0.maxAgeSeconds | default(-1) | int) == (gcs_cors_max_age_seconds | int))
                 )
                 or
                 (
