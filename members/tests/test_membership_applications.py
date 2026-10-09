@@ -302,6 +302,37 @@ class MembershipApplicationFormTests:
             )
         )
 
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("emergency_contact_relationship", "Spouse"),
+            ("emergency_contact_phone", "555-987-6543"),
+        ],
+    )
+    def test_form_requires_name_when_emergency_contact_details_are_provided(
+        self, field, value
+    ):
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+            field: value,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+
+        assert not form.is_valid()
+        assert "emergency_contact_name" in form.errors
+
     def test_missing_required_fields(self):
         """Test form validation with missing required fields."""
         form_data = {

@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
@@ -344,6 +345,20 @@ class MembershipApplication(models.Model):
     def has_soaring_experience(self):
         """Check if the applicant has any soaring/glider flight experience."""
         return (self.glider_flight_hours or 0) > 0
+
+    def clean(self):
+        """Require a name when emergency-contact details are provided."""
+        super().clean()
+        if not self.emergency_contact_name and (
+            self.emergency_contact_relationship or self.emergency_contact_phone
+        ):
+            raise ValidationError(
+                {
+                    "emergency_contact_name": (
+                        "Enter a name when providing emergency-contact details."
+                    )
+                }
+            )
 
     def can_be_approved(self):
         """Check if the application has all required information for approval."""
