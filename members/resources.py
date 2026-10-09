@@ -252,6 +252,8 @@ class MemberResource(resources.ModelResource):
     def _append_suffix(base_username, counter):
         max_length = Member._meta.get_field("username").max_length
         suffix = str(counter)
+        if max_length is None:
+            return f"{base_username}{suffix}"
         truncated_base = base_username[: max_length - len(suffix)]
         return f"{truncated_base}{suffix}"
 
