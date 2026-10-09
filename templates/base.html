@@ -323,9 +323,10 @@
               <li><a class="dropdown-item" href="{% url 'members:account_settings' %}">
                 <i class="fas fa-cog me-1"></i> Account Settings
               </a></li>
-              <li><a class="dropdown-item" href="{% url 'members:biography_view' member_id=user.pk %}">
+              {% member_profile_field_editable "biography" as biography_editable %}
+              {% if biography_editable %}<li><a class="dropdown-item" href="{% url 'members:biography_view' member_id=user.pk %}">
                 <i class="fas fa-pen me-1"></i> Edit my Biography
-              </a></li>
+              </a></li>{% endif %}
               <li><a class="dropdown-item" href="{% url 'instructors:member_training_grid' member_id=user.pk %}">
                 <i class="fas fa-th me-1"></i> View my Training Grid
               </a></li>

@@ -17,10 +17,7 @@ from utils.upload_entropy import upload_site_logo
 MEMBER_PROFILE_POLICY_FIELDS = (
     "username",
     "email",
-    "phone",
-    "address",
     "emergency_contacts",
-    "nickname",
     "profile_photo",
     "biography",
     "password",
@@ -32,10 +29,7 @@ def default_member_profile_field_policies():
     return {
         "username": "disabled",
         "email": "disabled",
-        "phone": "direct",
-        "address": "direct",
         "emergency_contacts": "direct",
-        "nickname": "direct",
         "profile_photo": "direct",
         "biography": "direct",
         "password": "direct",
@@ -44,6 +38,8 @@ def default_member_profile_field_policies():
 
 
 def get_member_profile_field_policy(field):
+    if field not in MEMBER_PROFILE_POLICY_FIELDS:
+        return "disabled"
     config = SiteConfiguration.objects.first()
     if not config:
         # Preserve the pre-policy behavior until a site configuration exists.

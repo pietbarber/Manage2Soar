@@ -12,9 +12,14 @@ from django.utils.safestring import mark_safe
 
 from members.utils.kiosk import is_kiosk_session as check_kiosk_session
 from members.utils.roles import get_member_role_metadata
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
 
 register = template.Library()
+
+
+@register.simple_tag
+def member_profile_field_editable(field):
+    return get_member_profile_field_policy(field) == "direct"
 
 
 @register.filter

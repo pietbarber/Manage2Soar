@@ -6,8 +6,8 @@ from django.db import migrations, models
 
 def default_member_profile_field_policies():
     return {
-        "username": "direct",
-        "email": "request",
+        "username": "disabled",
+        "email": "disabled",
         "phone": "request",
         "address": "request",
         "emergency_contacts": "request",

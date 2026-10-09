@@ -30,6 +30,7 @@ from .models import (
 from .models_applications import MembershipApplication
 from .resources import MEMBER_CSV_FIELDS, MemberResource
 from .utils.image_processing import generate_profile_thumbnails
+from .utils.permissions import contact_field_visibility
 
 logger = logging.getLogger(__name__)
 
@@ -209,11 +210,10 @@ class CustomMemberChangeForm(UserChangeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        visibility = getattr(self.instance, "contact_visibility", None) or {}
         for field_name in ("email", "phone", "address"):
-            self.fields[f"share_{field_name}"].initial = (
-                visibility.get(field_name) == "share"
-            )
+            self.fields[f"share_{field_name}"].initial = contact_field_visibility(
+                self.instance, field_name
+            )["shared"]
 
     def save(self, commit=True):
         member = super().save(commit=False)
@@ -221,12 +221,12 @@ class CustomMemberChangeForm(UserChangeForm):
             f"share_{field_name}" in self.cleaned_data
             for field_name in ("email", "phone", "address")
         ):
-            member.contact_visibility = {
-                field_name: (
-                    "share" if self.cleaned_data[f"share_{field_name}"] else "hide"
-                )
-                for field_name in ("email", "phone", "address")
-            }
+            visibility = dict(member.contact_visibility or {})
+            for field_name in ("email", "phone", "address"):
+                shared = self.cleaned_data[f"share_{field_name}"]
+                if shared != self.fields[f"share_{field_name}"].initial:
+                    visibility[field_name] = "share" if shared else "hide"
+            member.contact_visibility = visibility
         if commit:
             member.save()
         return member

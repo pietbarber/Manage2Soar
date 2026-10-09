@@ -74,6 +74,9 @@ def test_profile_policy_defaults_are_explicit_and_safe():
 
     assert policies["username"] == "disabled"
     assert policies["email"] == "disabled"
+    assert "phone" not in policies
+    assert "address" not in policies
+    assert "nickname" not in policies
     assert policies["emergency_contacts"] == "direct"
     assert policies["password"] == "direct"
     assert policies["profile_photo"] == "direct"
@@ -85,11 +88,10 @@ def test_site_configuration_controls_profile_policy_safely():
         club_name="Test Club",
         domain_name="test.example",
         club_abbreviation="TEST",
-        member_profile_field_policies={"phone": "direct", "address": "bogus"},
+        member_profile_field_policies={"phone": "direct", "email": "bogus"},
     )
 
-    assert get_member_profile_field_policy("phone") == "direct"
-    assert get_member_profile_field_policy("address") == "disabled"
+    assert get_member_profile_field_policy("phone") == "disabled"
     assert get_member_profile_field_policy("email") == "disabled"
 
     config = SiteConfiguration.objects.first()
@@ -102,17 +104,43 @@ def test_site_configuration_controls_profile_policy_safely():
 @pytest.mark.django_db
 def test_admin_profile_policy_choices_exclude_paused_request_mode():
     form = SiteConfigurationAdminForm(
-        instance=SiteConfiguration(member_profile_field_policies={"phone": "request"})
+        instance=SiteConfiguration(member_profile_field_policies={"email": "request"})
     )
 
-    form.cleaned_data = {"member_profile_field_policies": {"phone": "request"}}
-    assert form.clean_member_profile_field_policies() == {"phone": "disabled"}
+    form.cleaned_data = {"member_profile_field_policies": {"email": "request"}}
+    assert form.clean_member_profile_field_policies() == {"email": "disabled"}
     assert (
         "Select which profile fields"
         in form.fields["member_profile_field_policies"].help_text
     )
-    assert form.fields["profile_policy_phone"].initial is False
-    assert form.fields["profile_policy_phone"].required is False
+    assert "profile_policy_phone" not in form.fields
+    assert form.fields["profile_policy_email"].initial is False
+    assert form.fields["profile_policy_email"].required is False
+
+
+@pytest.mark.django_db
+def test_disabled_profile_photo_policy_hides_upload_form():
+    MembershipStatus.objects.create(name="Photo Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example",
+        club_abbreviation="TEST",
+        member_profile_field_policies={"profile_photo": "disabled"},
+    )
+    member = Member.objects.create_user(
+        username="photo_disabled",
+        membership_status="Photo Active",
+    )
+    client = Client()
+    client.force_login(member)
+
+    response = client.get(reverse("members:member_view", args=[member.id]))
+
+    assert response.status_code == 200
+    assert b"Update Profile Photo" not in response.content
+    assert b"Edit my Biography" not in response.content
+    assert b"Write Biography" not in response.content
 
 
 @pytest.mark.django_db
@@ -126,7 +154,26 @@ def test_member_admin_exposes_contact_sharing_controls():
 
     assert form.fields["share_email"].initial is False
     assert form.fields["share_phone"].initial is True
-    assert form.fields["share_address"].initial is False
+    assert form.fields["share_address"].initial is True
+
+
+@pytest.mark.django_db
+def test_member_admin_uses_club_contact_defaults_without_overriding_them():
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example",
+        club_abbreviation="TEST",
+        share_member_email_by_default=True,
+        share_member_phone_by_default=False,
+        share_member_address_by_default=True,
+    )
+    member = Member.objects.create_user(username="visibility_inherited")
+
+    form = CustomMemberChangeForm(instance=member)
+
+    assert form.fields["share_email"].initial is True
+    assert form.fields["share_phone"].initial is False
+    assert form.fields["share_address"].initial is True
 
 
 @pytest.mark.django_db

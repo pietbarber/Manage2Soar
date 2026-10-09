@@ -265,7 +265,9 @@ def member_list(request):
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     is_self = request.user == member
-    can_edit = is_self or request.user.is_superuser
+    can_edit = request.user.is_superuser or (
+        is_self and get_member_profile_field_policy("biography") == "direct"
+    )
     profile_photo_policy = get_member_profile_field_policy("profile_photo")
     emergency_contacts_editable = (
         get_member_profile_field_policy("emergency_contacts") == "direct"
