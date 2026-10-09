@@ -605,12 +605,14 @@
       <div class="d-flex justify-content-between align-items-center">
         <div>
           <h6 class="mb-1">Contact Information Visibility</h6>
-          <p class="text-muted mb-0">
-            {% if member.redact_contact %}
-            Your contact details are currently <strong>hidden</strong> from other members.
-            {% else %}
-            Your contact details are currently <strong>visible</strong> to other members.
-            {% endif %}
+          <p class="text-muted mb-0">Current visibility to regular members:</p>
+          <div class="small">
+            <span class="badge {% if privacy_sharing.email %}bg-success{% else %}bg-secondary{% endif %}">Email: {% if privacy_sharing.email %}visible{% else %}private{% endif %}</span>
+            <span class="badge {% if privacy_sharing.phone %}bg-success{% else %}bg-secondary{% endif %}">Phone: {% if privacy_sharing.phone %}visible{% else %}private{% endif %}</span>
+            <span class="badge {% if privacy_sharing.address %}bg-success{% else %}bg-secondary{% endif %}">Address: {% if privacy_sharing.address %}visible{% else %}private{% endif %}</span>
+          </div>
+          <p class="text-muted small mb-0 mt-1">
+            The control below applies legacy full redaction to all three fields.
           </p>
         </div>
         <button type="button" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %} btn-modern" data-bs-toggle="modal" data-bs-target="#redactConfirmModal">

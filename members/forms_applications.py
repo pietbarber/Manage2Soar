@@ -199,21 +199,18 @@ class MembershipApplicationForm(forms.ModelForm):
                 attrs={
                     "class": "form-control",
                     "placeholder": "Full Name",
-                    "required": True,
                 }
             ),
             "emergency_contact_relationship": forms.TextInput(
                 attrs={
                     "class": "form-control",
                     "placeholder": "e.g., Spouse, Parent, Sibling",
-                    "required": True,
                 }
             ),
             "emergency_contact_phone": forms.TextInput(
                 attrs={
                     "class": "form-control",
                     "placeholder": "(555) 123-4567",
-                    "required": True,
                 }
             ),
             # Aviation Experience

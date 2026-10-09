@@ -8,7 +8,7 @@ from django.urls import reverse
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
 from members.utils.permissions import can_view_contact_field, contact_field_visibility
-from members.utils.vcard_tools import generate_vcard_qr
+from members.utils.vcard_tools import generate_vcard, generate_vcard_qr
 from siteconfig.models import MembershipStatus
 
 
@@ -88,6 +88,7 @@ def test_qr_vcard_omits_hidden_contact_fields():
         state_code="CA",
         state_freeform="",
         zip_code="93534",
+        country="US",
     )
     payload = {}
 
@@ -109,6 +110,32 @@ def test_qr_vcard_omits_hidden_contact_fields():
     assert "555-0100" in payload["vcard"]
     assert "555-0101" in payload["vcard"]
     assert "1 Hidden Way" not in payload["vcard"]
+
+
+def test_vcard_escapes_text_values_and_uses_crlf_line_endings():
+    member = SimpleNamespace(
+        first_name="Jane\nNOTE:Injected",
+        last_name="Doe;Smith, Jr.\\",
+        email="jane@example.com\r\nNOTE:Injected",
+        phone="555-0100",
+        mobile_phone="",
+        glider_rating="student",
+        address="1 Main St; Unit 2\nNOTE:Injected",
+        city="Lancaster",
+        state_code="CA",
+        state_freeform="",
+        zip_code="93534",
+        country="US",
+    )
+
+    vcard = generate_vcard(member)
+
+    assert "N:Doe\\;Smith\\, Jr.\\\\;Jane\\nNOTE:Injected;;;" in vcard
+    assert "EMAIL;TYPE=INTERNET,HOME:jane@example.com\\nNOTE:Injected" in vcard
+    assert "ADR;TYPE=HOME:;;1 Main St\\; Unit 2\\nNOTE:Injected;" in vcard
+    assert "\r\nNOTE:Injected" not in vcard
+    assert "\n" not in vcard.replace("\r\n", "")
+    assert vcard.endswith("\r\n")
 
 
 @pytest.mark.django_db
@@ -159,6 +186,26 @@ def test_member_can_update_contact_visibility():
         "phone": "hide",
         "address": "share",
     }
+
+
+@pytest.mark.django_db
+def test_profile_privacy_checkboxes_show_effective_member_preferences():
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    member = Member.objects.create_user(
+        username="privacy_owner",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide", "phone": "share"},
+    )
+    client = Client()
+    client.force_login(member)
+
+    response = client.get(reverse("members:member_view", args=[member.id]))
+
+    assert response.status_code == 200
+    assert b'name="share_email" id="share_email">' in response.content
+    assert b'name="share_phone" id="share_phone" checked' in response.content
+    assert b'name="share_address" id="share_address" checked' in response.content
 
 
 @pytest.mark.django_db

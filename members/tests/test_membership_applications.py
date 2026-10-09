@@ -274,6 +274,34 @@ class MembershipApplicationFormTests:
         form = MembershipApplicationForm(data=form_data)
         assert form.is_valid()
 
+    def test_valid_form_without_emergency_contact(self):
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+
+        assert form.is_valid()
+        assert all(
+            not form.fields[field].required
+            for field in (
+                "emergency_contact_name",
+                "emergency_contact_relationship",
+                "emergency_contact_phone",
+            )
+        )
+
     def test_missing_required_fields(self):
         """Test form validation with missing required fields."""
         form_data = {

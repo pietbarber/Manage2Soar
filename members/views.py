@@ -21,14 +21,9 @@ from django.views.decorators.http import require_http_methods
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
-from members.utils import (
-    can_view_contact_field,
-)
+from members.utils import can_view_contact_field
 from members.utils import can_view_personal_info as can_view_personal_info_fn
-from members.utils import (
-    contact_field_visibility,
-    is_privileged_viewer,
-)
+from members.utils import contact_field_visibility, is_privileged_viewer
 from members.utils.membership import get_active_membership_statuses
 from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
@@ -261,6 +256,10 @@ def member_view(request, member_id):
         field: can_view_contact_field(request.user, member, field, site_config)
         for field in ("email", "phone", "address")
     }
+    effective_contact_visibility = {
+        field: contact_field_visibility(member, field, site_config)["shared"]
+        for field in ("email", "phone", "address")
+    }
     can_view_personal = can_view_personal_info_fn(request.user, member)
     qr_png = generate_vcard_qr(
         member,
@@ -318,7 +317,7 @@ def member_view(request, member_id):
         "can_view_email": contact_visibility["email"],
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
-        "privacy_sharing": contact_visibility if is_self else None,
+        "privacy_sharing": effective_contact_visibility if is_self else None,
         "staff_contact_status": (
             [
                 {

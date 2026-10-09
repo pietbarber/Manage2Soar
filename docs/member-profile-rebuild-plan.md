@@ -37,37 +37,14 @@ an explicit attachment workflow before approval requests can be supported.
 
 ## Phase 0: Stable Baseline
 
-1. Repair PostgreSQL collation metadata so Django can create `test_manage2soar`.
-2. Land this contract and the test matrix below.
-3. Run the profile test suite on a clean `upstream/main` worktree.
-
-### Database Administrator Runbook
-
-The local PostgreSQL databases report collation version `2.43` while the
-operating system provides `2.44`. An administrator must reindex affected
-databases before refreshing their collation metadata. Schedule this outside
-active use because `REINDEX DATABASE` takes locks.
-
-```bash
-sudo -u postgres psql -d template1 -c "REINDEX DATABASE template1;"
-sudo -u postgres psql -d postgres -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;"
-sudo -u postgres psql -d manage2soar -c "REINDEX DATABASE manage2soar;"
-sudo -u postgres psql -d postgres -c "ALTER DATABASE manage2soar REFRESH COLLATION VERSION;"
-sudo -u postgres psql -d postgres -c "REINDEX DATABASE postgres;"
-sudo -u postgres psql -d postgres -c "ALTER DATABASE postgres REFRESH COLLATION VERSION;"
-```
-
-Afterward, run:
-
-```bash
-.venv/bin/pytest members/tests -q
-```
+1. Land this contract and the test matrix below.
+2. Run the profile test suite on a clean `upstream/main` worktree.
 
 ## Phase 1: Data Foundation
 
 1. Add the `EmergencyContact` model and application-to-member mapping.
 2. Add per-field `Member.contact_visibility` data.
-3. Add site policy storage and safe defaults.
+3. Add contact-sharing defaults to site configuration.
 4. Write data migrations and legacy fallbacks.
 
 Verification gate:
