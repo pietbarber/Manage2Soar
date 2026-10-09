@@ -1,3 +1,8 @@
+---
+name: pr-workorder-generator
+description: pr-workorder-generator
+disable-model-invocation: true
+---
 # PR Review Work Order Generator
 
 ## Purpose

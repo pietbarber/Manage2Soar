@@ -12,6 +12,9 @@
         "html.format.wrapLineLength": 0,
         "editor.formatOnSave": false
     },
+    "yaml.schemas": {
+        "./.vscode/eval-task.schema.json": ".github/evals/**/tasks/*.yaml"
+    },
     "files.associations": {
         ".bandit": "yaml",
         "*.bandit": "yaml"

@@ -1,8 +1,8 @@
 ---
-name: PR Review Request Only
-description: "Request a native GitHub Copilot review on a PR via reviewer request flow only"
+name: pr-review-request-only
+description: Request a native GitHub Copilot review on a PR via reviewer request flow only
+disable-model-invocation: true
 argument-hint: "PR number (optional if current PR context is active)"
-agent: agent
 ---
 Request a native GitHub Copilot review for the target PR using reviewer request flow (equivalent to clicking Request in the Reviewers panel).
 
