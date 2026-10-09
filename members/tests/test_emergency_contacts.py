@@ -100,6 +100,8 @@ def test_delete_endpoint_checks_ownership_before_contact_lookup(member, client_f
 
 @pytest.mark.django_db
 def test_removing_final_contact_requires_confirmation(member, client_for):
+    member.emergency_contact = "Legacy emergency contact"
+    member.save(update_fields=["emergency_contact"])
     contact = EmergencyContact.objects.create(member=member, name="Final Contact")
     delete_url = reverse(
         "members:emergency_contact_delete", args=[member.pk, contact.pk]
@@ -112,6 +114,8 @@ def test_removing_final_contact_requires_confirmation(member, client_for):
     response = client_for.post(delete_url, {"confirmation": "NO EMERGENCY CONTACT"})
     assert response.status_code == 302
     assert not EmergencyContact.objects.filter(pk=contact.pk).exists()
+    member.refresh_from_db()
+    assert not member.emergency_contact
 
 
 @pytest.mark.django_db

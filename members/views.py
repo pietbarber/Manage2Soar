@@ -466,6 +466,9 @@ def emergency_contact_delete(request, member_id, contact_id):
             return redirect("members:member_view", member_id=member.id)
         if request.method == "POST" and form and form.is_valid():
             contact.delete()
+            if member.emergency_contact:
+                member.emergency_contact = ""
+                member.save(update_fields=["emergency_contact"])
             messages.success(request, "Emergency contact removed.")
             return redirect("members:member_view", member_id=member.id)
 

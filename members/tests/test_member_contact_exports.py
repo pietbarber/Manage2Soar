@@ -3,7 +3,9 @@ import json
 from io import StringIO
 
 from django.contrib import admin
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from tablib import Dataset
 
 from members.admin import MemberAdmin
@@ -61,6 +63,26 @@ class MemberContactCSVTests(TestCase):
         self.assertEqual(contact.name, "Jane Doe")
         self.assertEqual(contact.preferred_contact_details, "Call after 5")
         self.assertEqual(contact.address, "1 Soaring Way, Lancaster")
+
+    def test_resource_export_prefetches_contacts_for_multiple_members(self):
+        second_member = Member.objects.create_user(
+            username="csv.second",
+            email="csv.second@example.com",
+        )
+        EmergencyContact.objects.create(member=second_member, name="Second Contact")
+
+        with CaptureQueriesContext(connection) as queries:
+            dataset = MemberResource().export(
+                Member.objects.filter(pk__in=[self.member.pk, second_member.pk])
+            )
+
+        contact_queries = [
+            query
+            for query in queries
+            if EmergencyContact._meta.db_table in query["sql"]
+        ]
+        self.assertEqual(len(dataset), 2)
+        self.assertEqual(len(contact_queries), 1)
 
     def test_import_export_resource_round_trips_contact_visibility_for_new_member(self):
         exported = MemberResource().export(Member.objects.filter(pk=self.member.pk))
@@ -121,6 +143,26 @@ class MemberContactCSVTests(TestCase):
                     list(self.member.emergency_contacts.values_list("name", flat=True)),
                     ["Jane Doe"],
                 )
+
+    def test_invalid_contact_does_not_save_member_changes(self):
+        dataset = Dataset(
+            headers=["id", "username", "first_name", "emergency_contacts"]
+        )
+        dataset.append(
+            (
+                self.member.pk,
+                self.member.username,
+                "Changed",
+                json.dumps([{"name": "N" * 201}]),
+            )
+        )
+
+        result = MemberResource().import_data(dataset, dry_run=False)
+
+        self.assertTrue(result.has_validation_errors())
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.first_name, "CSV")
+        self.assertEqual(self.member.emergency_contacts.get().name, "Jane Doe")
 
     def test_invalid_contact_visibility_is_rejected_without_changing_preferences(self):
         invalid_visibility_values = (

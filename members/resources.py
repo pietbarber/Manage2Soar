@@ -180,6 +180,10 @@ class MemberResource(resources.ModelResource):
         model = Member
         fields = MEMBER_CSV_FIELDS
 
+    def filter_export(self, queryset, **kwargs):
+        queryset = super().filter_export(queryset, **kwargs)
+        return queryset.prefetch_related("emergency_contacts")
+
     def dehydrate_emergency_contacts(self, member):
         return serialize_emergency_contacts(member)
 
@@ -359,7 +363,9 @@ class MemberResource(resources.ModelResource):
     def before_import_row(self, row, **kwargs):
         """Treat placeholder SSA values as missing so unique constraint is not hit."""
         if "emergency_contacts" in row:
-            parse_emergency_contacts(row["emergency_contacts"])
+            contacts = parse_emergency_contacts(row["emergency_contacts"])
+            for contact in contacts:
+                EmergencyContact(**contact).full_clean(exclude=["member"])
         if "contact_visibility" in row:
             parse_contact_visibility(row["contact_visibility"])
 

@@ -631,12 +631,12 @@
             <span class="badge {% if privacy_sharing.address %}bg-success{% else %}bg-secondary{% endif %}">Address: {% if privacy_sharing.address %}visible{% else %}private{% endif %}</span>
           </div>
           <p class="text-muted small mb-0 mt-1">
-            The control below applies legacy full redaction to all three fields.
+            The control below applies or removes full redaction. Removing it restores your per-field choices and club defaults; fields set to Hide remain private.
           </p>
         </div>
         <button type="button" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %} btn-modern" data-bs-toggle="modal" data-bs-target="#redactConfirmModal">
           <i class="bi bi-{% if member.redact_contact %}eye{% else %}eye-slash{% endif %} me-2"></i>
-          {% if member.redact_contact %}Make Visible{% else %}Hide Details{% endif %}
+          {% if member.redact_contact %}Restore Sharing Choices{% else %}Hide All Contact Details{% endif %}
         </button>
       </div>
     </div>
@@ -650,7 +650,7 @@
       <div class="modal-header">
         <h5 class="modal-title" id="redactConfirmModalLabel">
           <i class="bi bi-shield-exclamation me-2"></i>
-          {% if member.redact_contact %}Make your details visible?{% else %}Hide your contact details?{% endif %}
+          {% if member.redact_contact %}Restore your sharing choices?{% else %}Hide all your contact details?{% endif %}
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -658,7 +658,7 @@
         {% if member.redact_contact %}
         <div class="alert alert-info">
           <i class="bi bi-info-circle me-2"></i>
-          If you proceed, your personal contact details will be visible to other members again.
+          If you proceed, full redaction will be removed. Visibility will follow your per-field choices and club defaults; fields set to Hide will remain private.
         </div>
         {% else %}
         <div class="alert alert-warning">
@@ -688,7 +688,7 @@
           {% csrf_token %}
           <button type="submit" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %}">
             <i class="bi bi-{% if member.redact_contact %}eye{% else %}eye-slash{% endif %} me-2"></i>
-            {% if member.redact_contact %}Make Visible{% else %}Hide My Contact Details{% endif %}
+            {% if member.redact_contact %}Restore Sharing Choices{% else %}Hide All Contact Details{% endif %}
           </button>
         </form>
       </div>
