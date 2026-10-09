@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Account Settings - {{ member.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="mb-4 text-center">
+        <h1 class="h3 mb-1">Account Settings</h1>
+        <p class="text-muted mb-0">Manage account identifiers configured by your club.</p>
+      </div>
+
+      {% if username_change_enabled %}
+      <div class="card shadow-lg border-0 mb-4">
+        <div class="card-header bg-primary text-white text-center py-4">
+          <h3 class="mb-0"><i class="bi bi-at me-2"></i>Username</h3>
+        </div>
+        <form method="post" action="{% url 'members:update_username' %}" class="card-body p-4">
+          {% csrf_token %}
+          <label class="form-label fw-semibold" for="new_username">
+            <i class="bi bi-person me-1"></i>Username
+          </label>
+          <div class="input-group mb-4">
+            <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+            <input class="form-control" type="text" id="new_username" name="username" value="{{ member.username }}" required>
+          </div>
+          <div class="d-grid">
+            <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-check-circle me-2"></i>Save Username</button>
+          </div>
+        </form>
+        <div class="card-footer bg-light text-center py-3"><small class="text-muted"><i class="bi bi-shield-check me-1"></i>Your username identifies your club account</small></div>
+      </div>
+      {% endif %}
+
+      {% if email_change_enabled %}
+      <div class="card shadow-lg border-0 mb-4">
+        <div class="card-header bg-primary text-white text-center py-4">
+          <h3 class="mb-0"><i class="bi bi-envelope me-2"></i>Email Address</h3>
+        </div>
+        <form method="post" action="{% url 'members:request_email_change' %}" class="card-body p-4">
+          {% csrf_token %}
+          <label class="form-label fw-semibold" for="new_email">
+            <i class="bi bi-envelope-at me-1"></i>Email address
+          </label>
+          <div class="input-group mb-3">
+            <span class="input-group-text"><i class="bi bi-at"></i></span>
+            <input class="form-control" type="email" id="new_email" name="email" value="{{ member.pending_email|default:'' }}" placeholder="new@example.com" required>
+          </div>
+          {% if member.pending_email %}<div class="form-text text-warning">Confirmation pending for {{ member.pending_email }}.</div>{% endif %}
+          <div class="d-grid mt-4">
+            <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-send me-2"></i>Send Confirmation</button>
+          </div>
+        </form>
+        <div class="card-footer bg-light text-center py-3"><small class="text-muted"><i class="bi bi-shield-check me-1"></i>A confirmation link will be sent to the new address</small></div>
+      </div>
+      {% endif %}
+
+      {% if password_change_enabled %}
+      <div class="card shadow-lg border-0 mb-4">
+        <div class="card-header bg-primary text-white text-center py-4">
+          <h3 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Password</h3>
+        </div>
+        <div class="card-body p-4">
+          <p class="text-muted">Update the password used to sign in to your account.</p>
+          <div class="d-grid">
+            <a href="{% url 'members:set_password' %}" class="btn btn-primary btn-lg"><i class="bi bi-key me-2"></i>Change Password</a>
+          </div>
+        </div>
+        <div class="card-footer bg-light text-center py-3"><small class="text-muted"><i class="bi bi-shield-check me-1"></i>Changing your password sends a security notification</small></div>
+      </div>
+      {% endif %}
+
+      {% if not username_change_enabled and not email_change_enabled %}
+      <div class="alert alert-info">Your club has not enabled account identifier changes.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

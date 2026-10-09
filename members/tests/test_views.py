@@ -57,6 +57,28 @@ def test_set_password_get_shows_form(client, django_user_model):
 
 
 @pytest.mark.django_db
+def test_set_password_sends_security_notification(
+    client, django_user_model, mailoutbox
+):
+    user = django_user_model.objects.create_user(
+        username="password_notification",
+        email="password@example.com",
+        password="oldpass",
+        membership_status="Full Member",
+    )
+    client.force_login(user)
+
+    response = client.post(
+        reverse("members:set_password"),
+        {"new_password1": "newpass123", "new_password2": "newpass123"},
+    )
+
+    assert response.status_code == 302
+    assert mailoutbox[-1].to == ["password@example.com"]
+    assert "password changed" in mailoutbox[-1].subject.lower()
+
+
+@pytest.mark.django_db
 def test_set_password_mismatched_passwords(client, django_user_model):
     user = django_user_model.objects.create_user(
         username="tester2",

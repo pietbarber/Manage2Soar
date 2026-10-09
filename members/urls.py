@@ -15,6 +15,35 @@ urlpatterns = [
     path("<int:member_id>/biography/", views.biography_view, name="biography_view"),
     path("tinymce/", include("tinymce.urls")),
     path("<int:member_id>/view/", views.member_view, name="member_view"),
+    path("account/settings/", views.account_settings, name="account_settings"),
+    path("<int:member_id>/vcard/", views.member_vcard, name="member_vcard"),
+    path("username/change/", views.update_username, name="update_username"),
+    path("email/change/", views.request_email_change, name="request_email_change"),
+    path(
+        "email/confirm/<str:token>/",
+        views.confirm_email_change,
+        name="confirm_email_change",
+    ),
+    path(
+        "<int:member_id>/contact-visibility/",
+        views.update_contact_visibility,
+        name="update_contact_visibility",
+    ),
+    path(
+        "<int:member_id>/emergency-contacts/add/",
+        views.emergency_contact_edit,
+        name="emergency_contact_add",
+    ),
+    path(
+        "<int:member_id>/emergency-contacts/<int:contact_id>/edit/",
+        views.emergency_contact_edit,
+        name="emergency_contact_edit",
+    ),
+    path(
+        "<int:member_id>/emergency-contacts/<int:contact_id>/delete/",
+        views.emergency_contact_delete,
+        name="emergency_contact_delete",
+    ),
     path("set-password/", views.set_password, name="set_password"),
     path("tinymce-upload/", tinymce_image_upload, name="tinymce_image_upload"),
     path(

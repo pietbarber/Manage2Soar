@@ -114,10 +114,10 @@ class MembershipApplication(models.Model):
 
     # Emergency contact
     emergency_contact_name = models.CharField(
-        max_length=200, help_text="Emergency contact full name"
+        max_length=200, blank=True, help_text="Emergency contact full name (optional)"
     )
     emergency_contact_relationship = models.CharField(
-        max_length=100, help_text="Relationship to applicant"
+        max_length=100, blank=True, help_text="Relationship to applicant (optional)"
     )
     emergency_contact_phone = models.CharField(
         max_length=20,
@@ -126,7 +126,8 @@ class MembershipApplication(models.Model):
                 regex=r"^\+?[\d\s\-\(\)\.]+$", message="Enter a valid phone number"
             )
         ],
-        help_text="Emergency contact phone number",
+        blank=True,
+        help_text="Emergency contact phone number (optional)",
     )
 
     # Aviation Experience (from PDF form section 2)
@@ -355,8 +356,6 @@ class MembershipApplication(models.Model):
             self.city,
             self.state,
             self.zip_code,
-            self.emergency_contact_name,
-            self.emergency_contact_phone,
         ]
 
         # All required fields must be filled
@@ -391,7 +390,7 @@ class MembershipApplication(models.Model):
         # circular).
         from django.db import IntegrityError
 
-        from members.models import Member
+        from members.models import EmergencyContact, Member
         from members.utils.username import MAX_USERNAME_RETRIES, generate_username
 
         # Create the member account, retrying if a race condition produces a
@@ -427,7 +426,6 @@ class MembershipApplication(models.Model):
         member.state_freeform = self.state if len(self.state) > 2 else ""
         member.zip_code = self.zip_code
         member.country = self.country[:2] if self.country in ["USA", "US"] else "US"
-        member.emergency_contact = f"{self.emergency_contact_name} ({self.emergency_contact_relationship}): {self.emergency_contact_phone}"
 
         # Aviation information
         if self.pilot_certificate_number:
@@ -445,6 +443,13 @@ class MembershipApplication(models.Model):
         # Member starts as inactive until they complete onboarding
         member.is_active = False
         member.save()
+        if self.emergency_contact_name:
+            EmergencyContact.objects.create(
+                member=member,
+                name=self.emergency_contact_name,
+                relationship=self.emergency_contact_relationship,
+                mobile_phone=self.emergency_contact_phone,
+            )
 
         # Update application status
         self.status = "approved"

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Remove Emergency Contact{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 640px;">
+  <div class="card shadow-sm">
+    <div class="card-header bg-danger text-white"><h1 class="h4 mb-0">Remove Emergency Contact</h1></div>
+    <form method="post" class="card-body">
+      {% csrf_token %}
+      <p>Remove <strong>{{ contact.name }}</strong> from your emergency contacts?</p>
+      {% if is_last_contact %}
+      <div class="alert alert-warning">This is your final emergency contact. Only continue if you do not have an emergency contact to provide.</div>
+      <label class="form-label fw-semibold" for="{{ form.confirmation.id_for_label }}">{{ form.confirmation.label }}</label>
+      {{ form.confirmation }}
+      {% if form.confirmation.errors %}<div class="invalid-feedback d-block">{{ form.confirmation.errors|join:", " }}</div>{% endif %}
+      <div class="form-text">{{ form.confirmation.help_text }}</div>
+      {% endif %}
+      <div class="d-flex justify-content-between mt-4">
+        <a class="btn btn-outline-secondary btn-modern" href="{% url 'members:member_view' member.id %}">Cancel</a>
+        <button class="btn btn-danger btn-modern" type="submit">Remove Contact</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

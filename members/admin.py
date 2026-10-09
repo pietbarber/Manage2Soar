@@ -30,6 +30,7 @@ from .models import (
 from .models_applications import MembershipApplication
 from .resources import MEMBER_CSV_FIELDS, MemberResource
 from .utils.image_processing import generate_profile_thumbnails
+from .utils.permissions import contact_field_visibility
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +183,19 @@ class MemberBadgeInline(admin.TabularInline):
 
 # This form is referenced by MemberAdmin via the 'form' attribute.
 class CustomMemberChangeForm(UserChangeForm):
+    share_email = forms.BooleanField(
+        required=False,
+        label="Share email with regular members",
+    )
+    share_phone = forms.BooleanField(
+        required=False,
+        label="Share phone numbers with regular members",
+    )
+    share_address = forms.BooleanField(
+        required=False,
+        label="Share postal address with regular members",
+    )
+
     class Meta:
         model = Member
         fields = (
@@ -193,6 +207,29 @@ class CustomMemberChangeForm(UserChangeForm):
             "instructor",
             "towpilot",
         )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("email", "phone", "address"):
+            self.fields[f"share_{field_name}"].initial = contact_field_visibility(
+                self.instance, field_name
+            )["shared"]
+
+    def save(self, commit=True):
+        member = super().save(commit=False)
+        if all(
+            f"share_{field_name}" in self.cleaned_data
+            for field_name in ("email", "phone", "address")
+        ):
+            visibility = dict(member.contact_visibility or {})
+            for field_name in ("email", "phone", "address"):
+                shared = self.cleaned_data[f"share_{field_name}"]
+                if shared != self.fields[f"share_{field_name}"].initial:
+                    visibility[field_name] = "share" if shared else "hide"
+            member.contact_visibility = visibility
+        if commit:
+            member.save()
+        return member
 
 
 #########################
@@ -398,6 +435,9 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "private_notes",
                     "public_notes",
                     "redact_contact",
+                    "share_email",
+                    "share_phone",
+                    "share_address",
                 )
             },
         ),
