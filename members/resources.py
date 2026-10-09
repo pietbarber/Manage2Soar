@@ -328,12 +328,15 @@ class MemberResource(resources.ModelResource):
         ):
             return
 
-        contacts = parse_emergency_contacts(row["emergency_contacts"])
-        member = Member.objects.get(pk=row_result.object_id)
-        member.emergency_contacts.all().delete()
-        EmergencyContact.objects.bulk_create(
-            [EmergencyContact(member=member, **contact) for contact in contacts]
-        )
+contacts = parse_emergency_contacts(row["emergency_contacts"])
+member = Member.objects.get(pk=row_result.object_id)
+replacement_contacts = [
+    EmergencyContact(member=member, **contact) for contact in contacts
+]
+for contact in replacement_contacts:
+    contact.full_clean()
+member.emergency_contacts.all().delete()
+EmergencyContact.objects.bulk_create(replacement_contacts)
 
     def before_save_instance(self, instance, row, **kwargs):
         """Enforce NULL (not empty string) for missing values on final save path."""
