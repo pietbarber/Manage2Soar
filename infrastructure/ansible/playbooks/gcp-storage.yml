@@ -244,25 +244,11 @@
                 )
               }}
 
-        # Materialize the temporary file path ONCE (and only when we will
-        # actually write it) so the copy destination, the `--cors-file`
-        # argument, and the `always` cleanup all reference the identical
-        # value. A lazily-templated play var would re-run `mktemp -u` for each
-        # reference and could resolve to different names (issue #1089, PR
-        # review). `set_fact` (unlike `ansible.builtin.tempfile`) registers the
-        # value in both normal and `--check` mode, so check-mode runs and the
-        # `is defined`-guarded cleanup below work too. Keeping the PR's "no
-        # static files" acceptance criterion: no `cors*.json` is committed and
-        # no domain is hardcoded.
-        # `ansible.builtin.tempfile` atomically creates and reserves a unique
-        # path (unlike `mktemp -u`, which only prints a candidate name that a
-        # concurrent local process could claim before `copy` runs). The
-        # registered `.path` is reused for the copy destination, the
-        # `--cors-file` argument, and the `always` cleanup so all references
-        # agree. `check_mode: false` forces creation/cleanup to run in `--check`
-        # mode (so `.path` is always available and no stray file lingers);
-        # `changed_when: false` suppresses that temporary housekeeping from the
-        # change report (issue #1089, PR review).
+        # Atomically create and reserve a unique temporary path only when the
+        # policy needs to be written. Reuse the registered `.path` for the copy,
+        # gcloud argument, and `always` cleanup so every reference agrees.
+        # `check_mode: false` makes the path available during `--check`, while
+        # `changed_when: false` keeps this housekeeping out of change reports.
         - name: Create temporary bucket CORS policy file
           tags: [cors]
           when:
