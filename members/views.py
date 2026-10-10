@@ -1613,9 +1613,13 @@ class CustomPasswordResetView(auth_views.PasswordResetView):
             parsed = urlparse(canonical_url)
             # Set extra_email_context with canonical domain/protocol
             # These will override Django's default protocol/domain in the email template
-            if not self.extra_email_context:
-                self.extra_email_context = {}
-            self.extra_email_context["protocol"] = parsed.scheme
-            self.extra_email_context["domain"] = parsed.netloc
+            email_context = dict(self.extra_email_context or {})
+            email_context.update(
+                {
+                    "protocol": parsed.scheme,
+                    "domain": parsed.netloc,
+                }
+            )
+            self.extra_email_context = email_context
 
         return super().form_valid(form)
