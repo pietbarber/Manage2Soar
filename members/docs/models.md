@@ -49,6 +49,21 @@ erDiagram
         string pilot_certificate_number
         date private_glider_checkride_date
         string home_club
+        json contact_visibility
+    }
+
+    EmergencyContact {
+        int id PK
+        int member_id FK
+        string name
+        string relationship "nullable/optional"
+        string home_phone "nullable/optional"
+        string mobile_phone "nullable/optional"
+        string preferred_contact_method "home_phone/mobile_phone/email/other"
+        string preferred_contact_details "nullable/optional"
+        text address "nullable/optional"
+        datetime created_at
+        datetime updated_at
     }
 
     MembershipApplication {
@@ -166,6 +181,7 @@ erDiagram
     KioskToken o|--o{ KioskAccessLog : access_logs
     Member ||--o{ SafetyReport : submitted_reports
     Member ||--o{ SafetyReport : reviewed_by
+    Member ||--o{ EmergencyContact : emergency_contacts
 
     SafetyReport {
         int id PK
@@ -199,8 +215,15 @@ Values that do not fit the controlled choices are retained in
 - Can be linked to a `MembershipApplication` that created the account.
 - **Performance Optimization (Issue #285)**: Added database indexes on `membership_status` and `(last_name, first_name)` for faster filtering and sorting in logsheet operations.
 - **Photo Thumbnails (Issue #286)**: Added `profile_photo_medium` (200x200) and `profile_photo_small` (64x64) fields for optimized page loading. Thumbnails are auto-generated when photos are uploaded via admin. URL properties (`profile_image_url_medium`, `profile_image_url_small`) provide graceful fallback chains.
+- **Contact Privacy (Issue #1034)**: `contact_visibility` is a JSON map of per-field sharing preferences (`email`, `phone`, `address`) where each value is `inherit`, `share`, or `hide`. `share` and `hide` override the club default; unset values fall back to the `share_member_*_by_default` site configuration.
 
 See also: [Redaction of Personal Contact Information](redaction.md)
+
+### `EmergencyContact`
+- Structured emergency contact for a member (Issue #1034), the source of truth for emergency contacts.
+- Linked to `Member` via `member` FK (`related_name="emergency_contacts"`); a member may have zero or many.
+- All contact fields (`name` required, the rest optional) plus a `preferred_contact_method` choice and free-form `preferred_contact_details`.
+- Replaces the legacy free-text `Member.emergency_contact`, which remains display-only during migration.
 
 ### `MembershipApplication`
 - Stores membership applications from non-logged-in users (Issue #245).

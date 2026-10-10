@@ -9,7 +9,7 @@ from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
 from members.utils.permissions import can_view_contact_field, contact_field_visibility
 from members.utils.vcard_tools import generate_vcard_qr
-from siteconfig.models import MembershipStatus
+from siteconfig.models import MembershipStatus, SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -141,6 +141,13 @@ def test_directory_omits_hidden_email_from_content_and_data_attribute():
 def test_member_can_update_contact_visibility():
     MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
+    # The endpoint is gated on the member self-service policy, so establish a
+    # club configuration that enables direct updates to contact visibility.
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
     member = Member.objects.create_user(
         username="privacy_member", membership_status="Privacy Active"
     )

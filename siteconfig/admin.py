@@ -343,6 +343,11 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "minimum_billable_rental_minutes",
                     "default_tow_discount_percent",
                     "default_instructor_rate_multiplier",
+                    "share_member_email_by_default",
+                    "share_member_phone_by_default",
+                    "share_member_address_by_default",
+                    "member_profile_self_service_enabled",
+                    "member_profile_field_policies",
                 ),
                 "description": (
                     "The billing app switch controls access to the member ledger and "

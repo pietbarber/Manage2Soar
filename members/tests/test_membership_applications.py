@@ -309,6 +309,30 @@ class MembershipApplicationFormTests:
         assert not form.is_valid()
         assert "email" in form.errors
 
+    def test_application_without_emergency_contact_is_valid(self):
+        """Emergency contact details are optional and must not block submission."""
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "emergency_contact_name": "",
+            "emergency_contact_relationship": "",
+            "emergency_contact_phone": "",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+        assert form.is_valid()
+        assert form.instance.can_be_approved()
+
 
 class MembershipApplicationViewTests(TestCase):
     """Test membership application views."""

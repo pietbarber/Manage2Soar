@@ -3,6 +3,7 @@ from django.test import Client
 from django.urls import reverse
 
 from members.models import EmergencyContact, Member
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.fixture
@@ -15,6 +16,25 @@ def member():
 
 
 @pytest.fixture
+def direct_policy():
+    """Enable direct self-service edits for emergency contacts.
+
+    The add/edit/remove endpoints are gated on the member profile field
+    policy, which defaults to 'request' approval. These flow tests exercise
+    the direct mechanism, so they opt into the 'direct' policy.
+    """
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
+    policies = config.member_profile_field_policies
+    policies["emergency_contacts"] = "direct"
+    config.save(update_fields=["member_profile_field_policies"])
+    return config
+
+
+@pytest.fixture
 def client_for(member):
     client = Client()
     client.force_login(member)
@@ -22,7 +42,7 @@ def client_for(member):
 
 
 @pytest.mark.django_db
-def test_member_can_add_and_edit_emergency_contact(member, client_for):
+def test_member_can_add_and_edit_emergency_contact(member, client_for, direct_policy):
     add_url = reverse("members:emergency_contact_add", args=[member.pk])
     response = client_for.post(
         add_url,
@@ -77,7 +97,9 @@ def test_member_cannot_edit_another_members_emergency_contact(member, client_for
 
 
 @pytest.mark.django_db
-def test_removing_final_contact_requires_confirmation(member, client_for):
+def test_removing_final_contact_requires_confirmation(
+    member, client_for, direct_policy
+):
     contact = EmergencyContact.objects.create(member=member, name="Final Contact")
     delete_url = reverse(
         "members:emergency_contact_delete", args=[member.pk, contact.pk]

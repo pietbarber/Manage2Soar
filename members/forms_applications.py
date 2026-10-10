@@ -198,22 +198,19 @@ class MembershipApplicationForm(forms.ModelForm):
             "emergency_contact_name": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Full Name",
-                    "required": True,
+                    "placeholder": "Full Name (optional)",
                 }
             ),
             "emergency_contact_relationship": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "e.g., Spouse, Parent, Sibling",
-                    "required": True,
+                    "placeholder": "e.g., Spouse, Parent, Sibling (optional)",
                 }
             ),
             "emergency_contact_phone": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "(555) 123-4567",
-                    "required": True,
+                    "placeholder": "(555) 123-4567 (optional)",
                 }
             ),
             # Aviation Experience

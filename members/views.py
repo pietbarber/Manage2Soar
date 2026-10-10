@@ -37,7 +37,7 @@ from siteconfig.forms import (
     VisitingPilotReturningUpdateForm,
     VisitingPilotSignupForm,
 )
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .decorators import active_member_required
@@ -262,6 +262,9 @@ def member_view(request, member_id):
         for field in ("email", "phone", "address")
     }
     can_view_personal = can_view_personal_info_fn(request.user, member)
+    can_view_policy = (
+        is_self and get_member_profile_field_policy("contact_visibility") == "direct"
+    )
     qr_png = generate_vcard_qr(
         member,
         include_contact=can_view_personal,
@@ -318,7 +321,15 @@ def member_view(request, member_id):
         "can_view_email": contact_visibility["email"],
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
-        "privacy_sharing": contact_visibility if is_self else None,
+        "can_view_policy": can_view_policy,
+        "privacy_sharing": (
+            {
+                field: contact_field_visibility(member, field, site_config)["shared"]
+                for field in ("email", "phone", "address")
+            }
+            if can_view_policy
+            else None
+        ),
         "staff_contact_status": (
             [
                 {
@@ -378,6 +389,20 @@ def update_contact_visibility(request, member_id):
     if request.user != member:
         return render(request, "403.html", status=403)
 
+    policy = get_member_profile_field_policy("contact_visibility")
+    if policy != "direct":
+        if policy == "request":
+            messages.warning(
+                request,
+                "Changing contact visibility requires approval by a member manager.",
+            )
+        else:
+            messages.error(
+                request,
+                "Updating contact visibility is currently disabled by the club.",
+            )
+        return redirect("members:member_view", member_id=member.id)
+
     member.contact_visibility = {
         field: "share" if request.POST.get(f"share_{field}") else "hide"
         for field in ("email", "phone", "address")
@@ -393,6 +418,15 @@ def emergency_contact_edit(request, member_id, contact_id=None):
     member = get_object_or_404(Member, pk=member_id)
     if request.user != member:
         return render(request, "403.html", status=403)
+
+    if request.method == "POST" and (
+        get_member_profile_field_policy("emergency_contacts") != "direct"
+    ):
+        messages.error(
+            request,
+            "Emergency contact changes require approval by a member manager.",
+        )
+        return redirect("members:member_view", member_id=member.id)
 
     contact = None
     if contact_id is not None:
@@ -420,6 +454,15 @@ def emergency_contact_delete(request, member_id, contact_id):
     contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
     if request.user != member:
         return render(request, "403.html", status=403)
+
+    if request.method == "POST" and (
+        get_member_profile_field_policy("emergency_contacts") != "direct"
+    ):
+        messages.error(
+            request,
+            "Removing emergency contacts requires approval by a member manager.",
+        )
+        return redirect("members:member_view", member_id=member.id)
 
     is_last_contact = member.emergency_contacts.count() == 1
     form = (

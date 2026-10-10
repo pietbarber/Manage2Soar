@@ -224,7 +224,7 @@
         </div>
       </div>
 
-      {% if privacy_sharing %}
+      {% if privacy_sharing and can_view_policy %}
       <div class="card mb-4"><div class="card-header"><i class="bi bi-shield-lock me-2"></i>Contact Privacy</div><form method="post" action="{% url 'members:update_contact_visibility' member.id %}" class="card-body">{% csrf_token %}<p class="small text-muted">Choose which contact details other regular members can see.</p><div class="form-check"><input class="form-check-input" type="checkbox" name="share_email" id="share_email"{% if privacy_sharing.email %} checked{% endif %}><label class="form-check-label" for="share_email">Share email</label></div><div class="form-check"><input class="form-check-input" type="checkbox" name="share_phone" id="share_phone"{% if privacy_sharing.phone %} checked{% endif %}><label class="form-check-label" for="share_phone">Share phone numbers</label></div><div class="form-check"><input class="form-check-input" type="checkbox" name="share_address" id="share_address"{% if privacy_sharing.address %} checked{% endif %}><label class="form-check-label" for="share_address">Share postal address</label></div><button class="btn btn-sm btn-primary mt-3" type="submit">Save Privacy Settings</button></form></div>
       {% endif %}
 
