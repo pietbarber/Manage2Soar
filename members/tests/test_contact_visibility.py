@@ -317,3 +317,31 @@ def test_vcard_download_filters_contact_fields_for_regular_member():
     assert b"hidden@example.com" not in response.content
     assert b"555-0100" in response.content
     assert b"1 Hidden Way" not in response.content
+
+
+@pytest.mark.django_db
+def test_vcard_filename_does_not_disclose_email_username_for_hidden_email():
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    viewer = Member.objects.create_user(
+        username="vcard_viewer", membership_status="Privacy Active"
+    )
+    subject = Member.objects.create_user(
+        username="hidden@example.com",
+        first_name="Private",
+        last_name="Member",
+        email="hidden@example.com",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide"},
+    )
+    client = Client()
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_vcard", args=[subject.pk]))
+
+    assert response.status_code == 200
+    assert "hidden@example.com" not in response["Content-Disposition"]
+    assert response["Content-Disposition"] == (
+        f'attachment; filename="member-{subject.pk}.vcf"'
+    )
+    assert b"hidden@example.com" not in response.content

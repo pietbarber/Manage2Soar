@@ -385,7 +385,7 @@ def member_vcard(request, member_id):
     response = HttpResponse(
         generate_vcard(member, contact_visibility=visibility), content_type="text/vcard"
     )
-    response["Content-Disposition"] = f'attachment; filename="{member.username}.vcf"'
+    response["Content-Disposition"] = f'attachment; filename="member-{member.pk}.vcf"'
     return response
 
 
