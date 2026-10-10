@@ -188,11 +188,17 @@ def member_list(request):
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
     site_config = SiteConfiguration.objects.first()
+    viewer_is_privileged = is_privileged_viewer(request.user)
     for member in page_obj.object_list:
-        member.directory_contact_visibility = {
-            field: can_view_contact_field(request.user, member, field, site_config)
-            for field in ("email", "phone", "address")
-        }
+        if viewer_is_privileged or request.user == member:
+            member.directory_contact_visibility = {
+                field: True for field in ("email", "phone", "address")
+            }
+        else:
+            member.directory_contact_visibility = {
+                field: contact_field_visibility(member, field, site_config)["shared"]
+                for field in ("email", "phone", "address")
+            }
 
     return render(
         request,

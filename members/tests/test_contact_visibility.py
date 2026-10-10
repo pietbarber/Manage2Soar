@@ -7,7 +7,11 @@ from django.urls import reverse
 
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
-from members.utils.permissions import can_view_contact_field, contact_field_visibility
+from members.utils.permissions import (
+    can_view_contact_field,
+    contact_field_visibility,
+    is_privileged_viewer,
+)
 from members.utils.vcard_tools import generate_vcard, generate_vcard_qr
 from siteconfig.models import MembershipStatus
 
@@ -162,6 +166,36 @@ def test_directory_omits_hidden_email_from_content_and_data_attribute():
     assert subject.full_display_name.encode() in response.content
     assert b"hidden@example.com" not in response.content
     assert b'data-email="hidden@example.com"' not in response.content
+
+
+@pytest.mark.django_db
+def test_directory_checks_viewer_privilege_once(settings):
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    settings.MEMBERS_REDACT_EXEMPT_GROUPS = ["Directory Exempt"]
+    viewer = Member.objects.create_user(
+        username="directory_viewer", membership_status="Privacy Active"
+    )
+    Member.objects.create_user(
+        username="directory_subject_one",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide"},
+    )
+    Member.objects.create_user(
+        username="directory_subject_two",
+        membership_status="Privacy Active",
+        contact_visibility={"phone": "hide"},
+    )
+    client = Client()
+    client.force_login(viewer)
+
+    with patch(
+        "members.views.is_privileged_viewer", wraps=is_privileged_viewer
+    ) as check_viewer_privilege:
+        response = client.get(reverse("members:member_list"))
+
+    assert response.status_code == 200
+    check_viewer_privilege.assert_called_once_with(viewer)
 
 
 @pytest.mark.django_db
