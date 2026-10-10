@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
@@ -114,10 +115,10 @@ class MembershipApplication(models.Model):
 
     # Emergency contact
     emergency_contact_name = models.CharField(
-        max_length=200, help_text="Emergency contact full name"
+        max_length=200, blank=True, help_text="Emergency contact full name (optional)"
     )
     emergency_contact_relationship = models.CharField(
-        max_length=100, help_text="Relationship to applicant"
+        max_length=100, blank=True, help_text="Relationship to applicant (optional)"
     )
     emergency_contact_phone = models.CharField(
         max_length=20,
@@ -126,7 +127,8 @@ class MembershipApplication(models.Model):
                 regex=r"^\+?[\d\s\-\(\)\.]+$", message="Enter a valid phone number"
             )
         ],
-        help_text="Emergency contact phone number",
+        blank=True,
+        help_text="Emergency contact phone number (optional)",
     )
 
     # Aviation Experience (from PDF form section 2)
@@ -344,6 +346,20 @@ class MembershipApplication(models.Model):
         """Check if the applicant has any soaring/glider flight experience."""
         return (self.glider_flight_hours or 0) > 0
 
+    def clean(self):
+        """Require a name when emergency-contact details are provided."""
+        super().clean()
+        if not self.emergency_contact_name and (
+            self.emergency_contact_relationship or self.emergency_contact_phone
+        ):
+            raise ValidationError(
+                {
+                    "emergency_contact_name": (
+                        "Enter a name when providing emergency-contact details."
+                    )
+                }
+            )
+
     def can_be_approved(self):
         """Check if the application has all required information for approval."""
         required_fields = [
@@ -355,8 +371,6 @@ class MembershipApplication(models.Model):
             self.city,
             self.state,
             self.zip_code,
-            self.emergency_contact_name,
-            self.emergency_contact_phone,
         ]
 
         # All required fields must be filled
@@ -391,13 +405,14 @@ class MembershipApplication(models.Model):
         # circular).
         from django.db import IntegrityError
 
-        from members.models import Member
+        from members.models import EmergencyContact, Member
         from members.utils.username import MAX_USERNAME_RETRIES, generate_username
 
         # Create the member account, retrying if a race condition produces a
         # username collision between generate_username()'s exists() check and
         # the actual INSERT.  Cap retries to avoid an infinite loop if the
         # IntegrityError is caused by a different unique constraint.
+        member = None
         for _attempt in range(MAX_USERNAME_RETRIES):
             candidate_username = generate_username(self.first_name, self.last_name)
             try:
@@ -416,6 +431,9 @@ class MembershipApplication(models.Model):
                 if _attempt == MAX_USERNAME_RETRIES - 1:
                     raise  # username race, but exhausted retries
 
+        if member is None:
+            raise RuntimeError("Member account creation did not succeed.")
+
         # Set additional member fields from application
         member.middle_initial = self.middle_initial
         member.name_suffix = self.name_suffix
@@ -427,7 +445,6 @@ class MembershipApplication(models.Model):
         member.state_freeform = self.state if len(self.state) > 2 else ""
         member.zip_code = self.zip_code
         member.country = self.country[:2] if self.country in ["USA", "US"] else "US"
-        member.emergency_contact = f"{self.emergency_contact_name} ({self.emergency_contact_relationship}): {self.emergency_contact_phone}"
 
         # Aviation information
         if self.pilot_certificate_number:
@@ -445,6 +462,13 @@ class MembershipApplication(models.Model):
         # Member starts as inactive until they complete onboarding
         member.is_active = False
         member.save()
+        if self.emergency_contact_name:
+            EmergencyContact.objects.create(
+                member=member,
+                name=self.emergency_contact_name,
+                relationship=self.emergency_contact_relationship,
+                mobile_phone=self.emergency_contact_phone,
+            )
 
         # Update application status
         self.status = "approved"

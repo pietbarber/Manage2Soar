@@ -201,6 +201,21 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Member Contact Visibility Defaults",
+            {
+                "fields": (
+                    "share_member_email_by_default",
+                    "share_member_phone_by_default",
+                    "share_member_address_by_default",
+                ),
+                "description": (
+                    "Default visibility for member contact details when a member "
+                    "has not set an individual preference."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Scheduling Options",
             {
                 "fields": (

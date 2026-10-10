@@ -17,6 +17,23 @@ This document describes the management commands for the `members` app, especiall
 
 **Note:** The cleanup commands preserve all application data for 365 days before removal, ensuring adequate time for record-keeping and administrative review.
 
+## Administrator Member CSV
+
+Both member CSV export paths include an `emergency_contacts` column containing a
+JSON array. Each contact object contains `name`, `relationship`, `home_phone`,
+`mobile_phone`, `preferred_contact_method`, `preferred_contact_details`, and
+`address`. For example:
+
+```json
+[{"name":"Jane Doe","relationship":"Spouse","home_phone":"555-0100","mobile_phone":"","preferred_contact_method":"home_phone","preferred_contact_details":"Call after 5","address":""}]
+```
+
+The member import resource reads this column and replaces the member's
+structured contacts with the listed contacts. An empty array (`[]`) removes all
+structured contacts. CSV imports without the column leave existing structured
+contacts unchanged. The legacy `emergency_contact` column remains available
+for compatibility.
+
 ## Legacy Database Reference
 
 ### `members`

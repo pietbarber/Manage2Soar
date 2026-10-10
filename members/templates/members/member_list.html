@@ -123,7 +123,7 @@
 <!-- Members Grid -->
 <div class="row g-4" id="membersGrid">
   {% for member in members %}
-  <div class="col-xl-4 col-lg-6 col-md-6 member-item" data-name="{{ member.full_display_name|lower }}" data-email="{{ member.email|lower }}" data-roles="{{ member|member_roles }}">
+  <div class="col-xl-4 col-lg-6 col-md-6 member-item" data-name="{{ member.full_display_name|lower }}"{% if member.directory_contact_visibility.email %} data-email="{{ member.email|lower }}"{% endif %} data-roles="{{ member|member_roles }}">
     <div class="card member-card h-100">
       <div class="card-body">
         <div class="d-flex align-items-start mb-3">
@@ -156,11 +156,14 @@
 
             <!-- Contact Information -->
             <div class="member-contact small">
-              {% if not member.redact_contact %}
+              {% if member.directory_contact_visibility.email or member.directory_contact_visibility.phone %}
+                {% if member.directory_contact_visibility.email %}
                 <div class="mb-1">
                   <i class="bi bi-envelope text-muted me-1"></i>
                   <a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>
                 </div>
+                {% endif %}
+                {% if member.directory_contact_visibility.phone %}
                 {% if member.phone and member.phone == member.mobile_phone %}
                 <div class="mb-1">
                   <i class="bi bi-telephone text-muted me-1"></i>
@@ -179,6 +182,7 @@
                     <a href="tel:{{ member.mobile_phone }}" class="text-decoration-none">{{ member.mobile_phone|format_us_phone }}</a>
                   </div>
                   {% endif %}
+                {% endif %}
                 {% endif %}
               {% else %}
                 <div class="text-muted fst-italic">

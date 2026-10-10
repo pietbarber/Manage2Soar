@@ -8,7 +8,7 @@ from tinymce.widgets import TinyMCE
 
 from utils.email import enforce_noreply_from_email
 
-from .models import Biography, Member, SafetyReport
+from .models import Biography, EmergencyContact, Member, SafetyReport
 from .utils.image_processing import generate_profile_thumbnails
 
 
@@ -93,6 +93,42 @@ class BiographyForm(forms.ModelForm):
     class Meta:
         model = Biography
         fields = ["content"]
+
+
+class EmergencyContactForm(forms.ModelForm):
+    class Meta:
+        model = EmergencyContact
+        fields = [
+            "name",
+            "relationship",
+            "home_phone",
+            "mobile_phone",
+            "preferred_contact_method",
+            "preferred_contact_details",
+            "address",
+        ]
+        widgets = {
+            "address": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "preferred_contact_method": forms.Select(attrs={"class": "form-select"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name not in self.Meta.widgets:
+                field.widget.attrs["class"] = "form-control"
+
+
+class EmergencyContactDeclineForm(forms.Form):
+    confirmation = forms.CharField(
+        help_text='Type "NO EMERGENCY CONTACT" to confirm.',
+    )
+
+    def clean_confirmation(self):
+        confirmation = self.cleaned_data["confirmation"].strip().upper()
+        if confirmation != "NO EMERGENCY CONTACT":
+            raise ValidationError("Enter the confirmation phrase exactly.")
+        return confirmation
 
 
 #########################

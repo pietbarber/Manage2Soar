@@ -122,22 +122,14 @@
       </div>
 
       <!-- QR Code Section -->
-      {% if not member.redact_contact or request.user == member or request.user.is_staff or request.user.member_manager %}
       <div class="qr-container mt-4">
         <h6 class="fw-bold text-center mb-3">
           <i class="bi bi-qr-code me-2"></i>Contact Card
         </h6>
-        {% if not member.redact_contact or request.user == member or request.user.is_staff %}
         <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR code for {{ member.full_display_name }}'s contact information" class="img-fluid">
-        <p class="small text-muted mt-2 mb-0">Scan to add contact info to your phone</p>
-        {% else %}
-        <div class="text-muted text-center">
-          <i class="bi bi-eye-slash display-6"></i>
-          <p class="mt-2 mb-0"><em>Contact information redacted</em></p>
-        </div>
-        {% endif %}
+        <p class="small text-muted mt-2 mb-2">Scan to add the contact information you are allowed to see</p>
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'members:member_vcard' member.id %}"><i class="bi bi-person-vcard me-1"></i>Download vCard</a>
       </div>
-      {% endif %}
     </div>
 
     <!-- Right Column - Member Information -->
@@ -145,9 +137,15 @@
       <!-- Contact Information Card -->
       <div class="card contact-info mb-4">
         <div class="card-header bg-primary text-white">
-          <h5 class="mb-0">
-            <i class="bi bi-person-lines-fill me-2"></i>Contact Information
-          </h5>
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Contact Information</h5>
+            {% if staff_contact_status %}
+            <div class="small text-end" title="What regular members can see">
+              <div class="fw-semibold">Regular-member visibility</div>
+              {% for status in staff_contact_status %}<span class="badge {% if status.shared %}bg-success{% else %}bg-secondary{% endif %} ms-1" title="{{ status.source }}">{{ status.label }}: {% if status.shared %}visible{% else %}private{% endif %}</span>{% endfor %}
+            </div>
+            {% endif %}
+          </div>
         </div>
         <div class="card-body">
           <div class="row g-3">
@@ -156,7 +154,7 @@
                 <i class="bi bi-envelope text-primary me-3 fs-5"></i>
                 <div>
                   <strong class="d-block">Email</strong>
-                  {% if can_view_personal %}
+                  {% if can_view_email %}
                     {% if member.email and "@" in member.email %}
                       <a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>
                     {% else %}
@@ -173,7 +171,7 @@
                 <i class="bi bi-telephone text-success me-3 fs-5"></i>
                 <div>
                   <strong class="d-block">Phone</strong>
-                  {% if can_view_personal and phone_display %}
+                  {% if can_view_phone and phone_display %}
                     {% if phone_link %}
                       <a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a>
                     {% else %}
@@ -191,7 +189,7 @@
                 <i class="bi bi-phone text-info me-3 fs-5"></i>
                 <div>
                   <strong class="d-block">Mobile</strong>
-                  {% if can_view_personal and mobile_display %}
+                  {% if can_view_phone and mobile_display %}
                     {% if mobile_link %}
                       <a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a>
                     {% else %}
@@ -210,7 +208,7 @@
                 <i class="bi bi-geo-alt text-warning me-3 fs-5 mt-1"></i>
                 <div>
                   <strong class="d-block">Address</strong>
-                  {% if can_view_personal and member.address %}
+                  {% if can_view_address and member.address %}
                     <address class="mb-0">
                       {{ member.address }}<br>
                       {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
@@ -225,6 +223,28 @@
           </div>
         </div>
       </div>
+
+      {% if privacy_sharing %}
+      <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-shield-lock me-2"></i>Contact Privacy</div>
+        <form method="post" action="{% url 'members:update_contact_visibility' member.id %}" class="card-body">
+          {% csrf_token %}
+          <p class="small text-muted">Choose which contact details other regular members can see. Inherit uses the club default.</p>
+          {% for setting in privacy_settings %}
+          <div class="mb-3">
+            <label class="form-label" for="visibility_{{ setting.field }}">{{ setting.label }}</label>
+            <select class="form-select" name="visibility_{{ setting.field }}" id="visibility_{{ setting.field }}">
+              <option value="inherit"{% if setting.preference == "inherit" %} selected{% endif %}>Inherit club default</option>
+              <option value="share"{% if setting.preference == "share" %} selected{% endif %}>Share</option>
+              <option value="hide"{% if setting.preference == "hide" %} selected{% endif %}>Hide</option>
+            </select>
+            <small class="text-muted">Currently {% if setting.shared %}visible{% else %}hidden{% endif %} to regular members.</small>
+          </div>
+          {% endfor %}
+          <button class="btn btn-sm btn-primary" type="submit">Save Privacy Settings</button>
+        </form>
+      </div>
+      {% endif %}
 
       <!-- Member Details Card -->
       <div class="card contact-info mb-4">
@@ -310,11 +330,26 @@
           </h2>
           <div id="collapseEmergencyContact" class="accordion-collapse collapse" aria-labelledby="headingEmergencyContact" data-bs-parent="#additionalInfoAccordion">
             <div class="accordion-body">
-              {% if member.emergency_contact %}
+              {% if member.emergency_contacts.exists %}
+                {% for contact in member.emergency_contacts.all %}
+                <div{% if not forloop.last %} class="mb-3 pb-3 border-bottom"{% endif %}>
+                  <div class="d-flex justify-content-between gap-3">
+                    <strong>{{ contact.name }}</strong>{% if contact.relationship %} ({{ contact.relationship }}){% endif %}
+                    {% if is_self %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'members:emergency_contact_edit' member.id contact.id %}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit {{ contact.name }}</span></a>{% endif %}
+                  </div>
+                  {% if contact.home_phone %}<span class="me-3">Home: <a href="tel:{{ contact.home_phone }}">{{ contact.home_phone|format_us_phone }}</a></span>{% endif %}
+                  {% if contact.mobile_phone %}<span class="me-3">Mobile: <a href="tel:{{ contact.mobile_phone }}">{{ contact.mobile_phone|format_us_phone }}</a></span>{% endif %}
+                  {% if contact.preferred_contact_method %}<div>Preferred method: {{ contact.get_preferred_contact_method_display }}</div>{% endif %}
+                  {% if contact.preferred_contact_details %}<div>Additional preferred contact details: {{ contact.preferred_contact_details }}</div>{% endif %}
+                  {% if contact.address %}<div class="mt-1">{{ contact.address|linebreaksbr }}</div>{% endif %}
+                </div>
+                {% endfor %}
+              {% elif member.emergency_contact %}
                 {{ member.emergency_contact|linebreaksbr }}
               {% else %}
                 <span class="text-muted fst-italic">No emergency contact information provided</span>
               {% endif %}
+              {% if is_self %}<div class="mt-3"><a class="btn btn-outline-primary btn-sm" href="{% url 'members:emergency_contact_add' member.id %}"><i class="bi bi-plus-circle me-1"></i>Add Emergency Contact</a></div>{% endif %}
             </div>
           </div>
         </div>
@@ -589,17 +624,19 @@
       <div class="d-flex justify-content-between align-items-center">
         <div>
           <h6 class="mb-1">Contact Information Visibility</h6>
-          <p class="text-muted mb-0">
-            {% if member.redact_contact %}
-            Your contact details are currently <strong>hidden</strong> from other members.
-            {% else %}
-            Your contact details are currently <strong>visible</strong> to other members.
-            {% endif %}
+          <p class="text-muted mb-0">Current visibility to regular members:</p>
+          <div class="small">
+            <span class="badge {% if privacy_sharing.email %}bg-success{% else %}bg-secondary{% endif %}">Email: {% if privacy_sharing.email %}visible{% else %}private{% endif %}</span>
+            <span class="badge {% if privacy_sharing.phone %}bg-success{% else %}bg-secondary{% endif %}">Phone: {% if privacy_sharing.phone %}visible{% else %}private{% endif %}</span>
+            <span class="badge {% if privacy_sharing.address %}bg-success{% else %}bg-secondary{% endif %}">Address: {% if privacy_sharing.address %}visible{% else %}private{% endif %}</span>
+          </div>
+          <p class="text-muted small mb-0 mt-1">
+            The control below applies or removes full redaction. Removing it restores your per-field choices and club defaults; fields set to Hide remain private.
           </p>
         </div>
         <button type="button" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %} btn-modern" data-bs-toggle="modal" data-bs-target="#redactConfirmModal">
           <i class="bi bi-{% if member.redact_contact %}eye{% else %}eye-slash{% endif %} me-2"></i>
-          {% if member.redact_contact %}Make Visible{% else %}Hide Details{% endif %}
+          {% if member.redact_contact %}Restore Sharing Choices{% else %}Hide All Contact Details{% endif %}
         </button>
       </div>
     </div>
@@ -613,7 +650,7 @@
       <div class="modal-header">
         <h5 class="modal-title" id="redactConfirmModalLabel">
           <i class="bi bi-shield-exclamation me-2"></i>
-          {% if member.redact_contact %}Make your details visible?{% else %}Hide your contact details?{% endif %}
+          {% if member.redact_contact %}Restore your sharing choices?{% else %}Hide all your contact details?{% endif %}
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -621,7 +658,7 @@
         {% if member.redact_contact %}
         <div class="alert alert-info">
           <i class="bi bi-info-circle me-2"></i>
-          If you proceed, your personal contact details will be visible to other members again.
+          If you proceed, full redaction will be removed. Visibility will follow your per-field choices and club defaults; fields set to Hide will remain private.
         </div>
         {% else %}
         <div class="alert alert-warning">
@@ -651,7 +688,7 @@
           {% csrf_token %}
           <button type="submit" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %}">
             <i class="bi bi-{% if member.redact_contact %}eye{% else %}eye-slash{% endif %} me-2"></i>
-            {% if member.redact_contact %}Make Visible{% else %}Hide My Contact Details{% endif %}
+            {% if member.redact_contact %}Restore Sharing Choices{% else %}Hide All Contact Details{% endif %}
           </button>
         </form>
       </div>

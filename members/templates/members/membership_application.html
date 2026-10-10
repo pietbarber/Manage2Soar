@@ -282,7 +282,7 @@
 
                 <div class="section-body">
                     <div class="form-group">
-                        <label for="{{ form.emergency_contact_name.id_for_label }}" class="form-label required-field">Emergency Contact Name</label>
+                        <label for="{{ form.emergency_contact_name.id_for_label }}" class="form-label">Emergency Contact Name (optional)</label>
                         {{ form.emergency_contact_name|add_class:"form-control" }}
                         {% if form.emergency_contact_name.errors %}
                             <div class="invalid-feedback d-block">{{ form.emergency_contact_name.errors.0 }}</div>
@@ -291,14 +291,14 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="{{ form.emergency_contact_relationship.id_for_label }}" class="form-label required-field">Relationship</label>
+                            <label for="{{ form.emergency_contact_relationship.id_for_label }}" class="form-label">Relationship (optional)</label>
                             {{ form.emergency_contact_relationship|add_class:"form-control" }}
                             {% if form.emergency_contact_relationship.errors %}
                                 <div class="invalid-feedback d-block">{{ form.emergency_contact_relationship.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="form-group">
-                            <label for="{{ form.emergency_contact_phone.id_for_label }}" class="form-label required-field">Emergency Contact Phone</label>
+                            <label for="{{ form.emergency_contact_phone.id_for_label }}" class="form-label">Emergency Contact Phone (optional)</label>
                             {{ form.emergency_contact_phone|add_class:"form-control" }}
                             {% if form.emergency_contact_phone.errors %}
                                 <div class="invalid-feedback d-block">{{ form.emergency_contact_phone.errors.0 }}</div>

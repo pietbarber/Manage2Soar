@@ -246,6 +246,11 @@ class Member(AbstractUser):
         default=False,
         help_text="If set, personal contact details (address, phones, email, QR) are hidden from non-privileged viewers.",
     )
+    contact_visibility = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Per-field contact sharing preferences: inherit, share, or hide.",
+    )
 
     @property
     def profile_image_url(self):
@@ -457,6 +462,39 @@ class Member(AbstractUser):
 # - parent_badge: optional FK to the parent badge (for legs referencing full badge)
 
 # Used in a many-to-many relationship with members through MemberBadge.
+
+
+class EmergencyContact(models.Model):
+    """A member's optional emergency contact."""
+
+    class PreferredContactMethod(models.TextChoices):
+        HOME_PHONE = "home_phone", "Home phone"
+        MOBILE_PHONE = "mobile_phone", "Mobile phone"
+        EMAIL = "email", "Email"
+        OTHER = "other", "Other"
+
+    member = models.ForeignKey(
+        Member, on_delete=models.CASCADE, related_name="emergency_contacts"
+    )
+    name = models.CharField(max_length=200)
+    relationship = models.CharField(max_length=100, blank=True)
+    home_phone = models.CharField(max_length=20, blank=True)
+    mobile_phone = models.CharField(max_length=20, blank=True)
+    preferred_contact_method = models.CharField(
+        max_length=20,
+        choices=PreferredContactMethod.choices,
+        blank=True,
+    )
+    preferred_contact_details = models.CharField(max_length=200, blank=True)
+    address = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.name} ({self.member})"
 
 
 class Badge(models.Model):

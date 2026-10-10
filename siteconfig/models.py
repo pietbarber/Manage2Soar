@@ -241,6 +241,18 @@ class SiteConfiguration(models.Model):
     )
 
     # Contact information
+    share_member_email_by_default = models.BooleanField(
+        default=True,
+        help_text="Share member email addresses by default unless a member changes it.",
+    )
+    share_member_phone_by_default = models.BooleanField(
+        default=True,
+        help_text="Share member phone numbers by default unless a member changes it.",
+    )
+    share_member_address_by_default = models.BooleanField(
+        default=True,
+        help_text="Share member addresses by default unless a member changes it.",
+    )
     contact_welcome_text = models.TextField(
         blank=True,
         default="Interested in learning to fly gliders? Have questions about our club? We'd love to hear from you! Fill out the form below and one of our member managers will get back to you soon.",

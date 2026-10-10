@@ -49,6 +49,7 @@ erDiagram
         string pilot_certificate_number
         date private_glider_checkride_date
         string home_club
+        json contact_visibility
     }
 
     MembershipApplication {
@@ -104,6 +105,20 @@ erDiagram
         int member_account_id FK
     }
 
+    EmergencyContact {
+        int id PK
+        int member_id FK
+        string name
+        string relationship
+        string home_phone
+        string mobile_phone
+        string preferred_contact_method
+        string preferred_contact_details
+        text address
+        datetime created_at
+        datetime updated_at
+    }
+
     Biography {
         int id PK
         int member_id FK
@@ -157,6 +172,7 @@ erDiagram
 
     Badge ||--o{ Badge : parent_badge
     Member ||--o| Biography : has_biography
+    Member ||--o{ EmergencyContact : emergency_contacts
     Member ||--o{ MemberBadge : earned_badges
     Badge ||--o{ MemberBadge : awarded_to_members
     Member ||--o{ Member : last_updated_by
@@ -196,6 +212,7 @@ Values that do not fit the controlled choices are retained in
 - Stores all member profile data, authentication info, and group/role logic.
 - Methods for profile image, display name, group syncing, and status.
 - Includes `home_club` field for visiting pilots from other soaring clubs.
+- Stores per-field email, phone, and address visibility preferences in `contact_visibility`.
 - Can be linked to a `MembershipApplication` that created the account.
 - **Performance Optimization (Issue #285)**: Added database indexes on `membership_status` and `(last_name, first_name)` for faster filtering and sorting in logsheet operations.
 - **Photo Thumbnails (Issue #286)**: Added `profile_photo_medium` (200x200) and `profile_photo_small` (64x64) fields for optimized page loading. Thumbnails are auto-generated when photos are uploaded via admin. URL properties (`profile_image_url_medium`, `profile_image_url_small`) provide graceful fallback chains.
@@ -209,6 +226,11 @@ See also: [Redaction of Personal Contact Information](redaction.md)
 - Links to `Member` account upon approval via `member_account` field.
 - Includes waitlist management with position tracking.
 - Administrative notes and review tracking for membership managers.
+
+### `EmergencyContact`
+- Stores an optional structured emergency contact for a member.
+- Linked to `Member`; members may have multiple contacts.
+- Records contact details and a preferred contact method.
 
 ### `Biography`
 - Stores member biographies, including rich text and upload path logic.
