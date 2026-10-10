@@ -1217,3 +1217,34 @@ class MembershipApplicationIntegrationTests:
         assert app.member_account == member
         assert app.reviewed_by == manager
         assert app.reviewed_at is not None
+
+
+class ApprovalBlankSSANumberTests(TestCase):
+    """SSA_member_number is unique, so blank applicant values must become NULL."""
+
+    def _make_application(self, first_name, email):
+        return MembershipApplication.objects.create(
+            first_name=first_name,
+            last_name="Tester",
+            email=email,
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn to fly gliders",
+            ssa_member_number="",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+    def test_approving_multiple_applicants_with_blank_ssa_number(self):
+        first = self._make_application("Ann", "ann@example.com").approve_application()
+        second = self._make_application("Bob", "bob@example.com").approve_application()
+
+        self.assertIsNone(first.SSA_member_number)
+        self.assertIsNone(second.SSA_member_number)
