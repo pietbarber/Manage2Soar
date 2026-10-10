@@ -343,11 +343,6 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "minimum_billable_rental_minutes",
                     "default_tow_discount_percent",
                     "default_instructor_rate_multiplier",
-                    "share_member_email_by_default",
-                    "share_member_phone_by_default",
-                    "share_member_address_by_default",
-                    "member_profile_self_service_enabled",
-                    "member_profile_field_policies",
                 ),
                 "description": (
                     "The billing app switch controls access to the member ledger and "
@@ -362,6 +357,29 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "configure status + glider overrides so a junior status can be "
                     "<strong>$0.00/hr</strong> on selected gliders while other gliders keep "
                     "their normal rates."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Member Contact Privacy & Self-Service",
+            {
+                "fields": (
+                    "share_member_email_by_default",
+                    "share_member_phone_by_default",
+                    "share_member_address_by_default",
+                    "member_profile_self_service_enabled",
+                    "member_profile_field_policies",
+                ),
+                "description": (
+                    "Club-wide contact-privacy defaults and member self-service policy "
+                    "(Issue #1034). The three <strong>share_member_*_by_default</strong> "
+                    "toggles set the default for whether regular members can see each "
+                    "contact field; a member's own preference (share/hide) overrides "
+                    "them. <strong>member_profile_self_service_enabled</strong> is the "
+                    "master switch for member self-service profile edits, and "
+                    "<strong>member_profile_field_policies</strong> sets each field's "
+                    "policy (disabled/direct/request)."
                 ),
                 "classes": ("collapse",),
             },
