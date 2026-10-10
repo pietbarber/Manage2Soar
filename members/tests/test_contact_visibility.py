@@ -10,7 +10,6 @@ from members.utils.membership import clear_active_membership_statuses_cache
 from members.utils.permissions import (
     can_view_contact_field,
     contact_field_visibility,
-    is_privileged_viewer,
 )
 from members.utils.vcard_tools import generate_vcard, generate_vcard_qr
 from siteconfig.models import MembershipStatus
@@ -169,33 +168,48 @@ def test_directory_omits_hidden_email_from_content_and_data_attribute():
 
 
 @pytest.mark.django_db
-def test_directory_checks_viewer_privilege_once(settings):
+@pytest.mark.parametrize(
+    "viewer_privilege",
+    [
+        {"is_staff": True},
+        {"member_manager": True},
+        {"rostermeister": True},
+    ],
+)
+def test_directory_keeps_hidden_contact_fields_redacted_for_privileged_viewers(
+    viewer_privilege,
+):
     MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
-    settings.MEMBERS_REDACT_EXEMPT_GROUPS = ["Directory Exempt"]
     viewer = Member.objects.create_user(
-        username="directory_viewer", membership_status="Privacy Active"
+        username="directory_viewer",
+        membership_status="Privacy Active",
+        **viewer_privilege,
     )
     Member.objects.create_user(
-        username="directory_subject_one",
+        username="field_hidden_subject",
+        email="field-hidden@example.com",
+        phone="555-0100",
         membership_status="Privacy Active",
-        contact_visibility={"email": "hide"},
+        contact_visibility={"email": "hide", "phone": "hide"},
     )
     Member.objects.create_user(
-        username="directory_subject_two",
+        username="fully_redacted_subject",
+        email="fully-redacted@example.com",
+        phone="555-0101",
         membership_status="Privacy Active",
-        contact_visibility={"phone": "hide"},
+        redact_contact=True,
     )
     client = Client()
     client.force_login(viewer)
 
-    with patch(
-        "members.views.is_privileged_viewer", wraps=is_privileged_viewer
-    ) as check_viewer_privilege:
-        response = client.get(reverse("members:member_list"))
+    response = client.get(reverse("members:member_list"))
 
     assert response.status_code == 200
-    check_viewer_privilege.assert_called_once_with(viewer)
+    assert b"field-hidden@example.com" not in response.content
+    assert b"555-0100" not in response.content
+    assert b"fully-redacted@example.com" not in response.content
+    assert b"555-0101" not in response.content
 
 
 @pytest.mark.django_db
