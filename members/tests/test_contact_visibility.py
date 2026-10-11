@@ -1,3 +1,4 @@
+from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -9,7 +10,11 @@ from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
 from members.utils.permissions import can_view_contact_field, contact_field_visibility
 from members.utils.vcard_tools import generate_vcard_qr
-from siteconfig.models import MembershipStatus, SiteConfiguration
+from siteconfig.models import (
+    MembershipStatus,
+    SiteConfiguration,
+    default_member_profile_field_policies,
+)
 
 
 @pytest.mark.django_db
@@ -72,6 +77,28 @@ def test_contact_visibility_reports_effective_source():
     assert contact_field_visibility(subject, "phone", config) == {
         "shared": False,
         "source": "club default: Hide",
+    }
+
+
+@pytest.mark.django_db
+def test_legacy_redaction_migration_preserves_hide_all_preference():
+    member = Member.objects.create_user(
+        username="legacy_private",
+        redact_contact=True,
+        contact_visibility={"email": "share"},
+    )
+    migration = import_module(
+        "members.migrations.0031_migrate_legacy_contact_redaction"
+    )
+
+    migration.migrate_legacy_contact_redaction(Member._meta.apps, None)
+
+    member.refresh_from_db()
+    assert not member.redact_contact
+    assert member.contact_visibility == {
+        "email": "hide",
+        "phone": "hide",
+        "address": "hide",
     }
 
 
@@ -166,6 +193,100 @@ def test_member_can_update_contact_visibility():
         "phone": "hide",
         "address": "share",
     }
+
+
+@pytest.mark.django_db
+def test_master_self_service_switch_blocks_member_edit_endpoints(client):
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_self_service_enabled=False,
+    )
+    member = Member.objects.create_user(
+        username="self_service_member", membership_status="Privacy Active"
+    )
+    original_photo = member.profile_photo.name
+    client.force_login(member)
+
+    profile_response = client.get(reverse("members:member_view", args=[member.id]))
+    assert profile_response.status_code == 200
+    assert b"Change Password" not in profile_response.content
+    assert b"Update Profile Photo" not in profile_response.content
+    assert b'name="share_email"' not in profile_response.content
+    assert b"Add Emergency Contact" not in profile_response.content
+
+    profile_post = client.post(
+        reverse("members:member_view", args=[member.id]),
+        {"profile_photo": "ignored"},
+    )
+    password_post = client.post(
+        reverse("members:set_password"),
+        {"new_password1": "test-password", "new_password2": "test-password"},
+    )
+    visibility_post = client.post(
+        reverse("members:update_contact_visibility", args=[member.id]),
+        {"share_email": "on"},
+    )
+    emergency_post = client.post(
+        reverse("members:emergency_contact_add", args=[member.id]),
+        {"name": "Emergency Person", "mobile_phone": "555-0100"},
+    )
+    biography_post = client.post(
+        reverse("members:biography_view", args=[member.id]),
+        {"content": "<p>Not allowed</p>"},
+    )
+    legacy_post = client.post(
+        reverse("members:toggle_redaction", args=[member.id]),
+    )
+
+    assert all(
+        response.status_code == 302
+        for response in (
+            profile_post,
+            password_post,
+            visibility_post,
+            emergency_post,
+            biography_post,
+            legacy_post,
+        )
+    )
+    member.refresh_from_db()
+    assert member.profile_photo.name == original_photo
+    assert member.contact_visibility == {}
+    assert member.emergency_contacts.count() == 0
+    assert not member.redact_contact
+    assert not member.biography.content
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("policy", ["disabled", "request"])
+def test_contact_visibility_endpoint_rejects_non_direct_policies(client, policy):
+    MembershipStatus.objects.create(name="Policy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    policies = default_member_profile_field_policies()
+    policies["contact_visibility"] = policy
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    member = Member.objects.create_user(
+        username=f"policy_{policy}", membership_status="Policy Active"
+    )
+    client.force_login(member)
+
+    response = client.post(
+        reverse("members:update_contact_visibility", args=[member.id]),
+        {"share_email": "on"},
+    )
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.contact_visibility == {}
 
 
 @pytest.mark.django_db

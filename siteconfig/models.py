@@ -43,6 +43,26 @@ def default_member_profile_field_policies():
     }
 
 
+def validate_member_profile_field_policies(value):
+    if not isinstance(value, dict) or set(value) != set(MEMBER_PROFILE_POLICY_FIELDS):
+        raise ValidationError(
+            "Profile field policies must define exactly the supported fields."
+        )
+
+    allowed_policies = {"disabled", "direct", "request"}
+    for field, policy in value.items():
+        allowed = (
+            {"disabled", "direct"}
+            if field in {"password", "profile_photo"}
+            else allowed_policies
+        )
+        if not isinstance(policy, str) or policy not in allowed:
+            raise ValidationError(
+                "Invalid policy for %(field)s: %(policy)s.",
+                params={"field": field, "policy": policy},
+            )
+
+
 def get_member_profile_field_policy(field):
     config = SiteConfiguration.objects.first()
     if not config or not config.member_profile_self_service_enabled:
@@ -297,6 +317,7 @@ class SiteConfiguration(models.Model):
     )
     member_profile_field_policies = models.JSONField(
         default=default_member_profile_field_policies,
+        validators=[validate_member_profile_field_policies],
         help_text="Per-field member profile policies.",
     )
     contact_welcome_text = models.TextField(

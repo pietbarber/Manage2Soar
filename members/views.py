@@ -1,7 +1,7 @@
 import base64
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date
 
 from django.conf import settings
 from django.contrib import messages
@@ -15,20 +15,14 @@ from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
-from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
-from members.utils import (
-    can_view_contact_field,
-)
+from members.utils import can_view_contact_field
 from members.utils import can_view_personal_info as can_view_personal_info_fn
-from members.utils import (
-    contact_field_visibility,
-    is_privileged_viewer,
-)
+from members.utils import contact_field_visibility, is_privileged_viewer
 from members.utils.membership import get_active_membership_statuses
 from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
@@ -253,6 +247,15 @@ def member_view(request, member_id):
 
     # Biography logic
     biography = getattr(member, "biography", None)
+    profile_photo_policy = (
+        get_member_profile_field_policy("profile_photo") if is_self else "disabled"
+    )
+    biography_policy = (
+        get_member_profile_field_policy("biography") if is_self else "disabled"
+    )
+    emergency_contacts_policy = (
+        get_member_profile_field_policy("emergency_contacts") if is_self else "disabled"
+    )
 
     # Determine whether the requester can view personal info, and generate
     # a QR code accordingly (redacted QR omits contact fields).
@@ -305,13 +308,29 @@ def member_view(request, member_id):
     member_badges = suppress_member_badge_legs(member_badges_qs)
 
     if is_self and request.method == "POST":
+        if profile_photo_policy != "direct":
+            if profile_photo_policy == "request":
+                messages.warning(
+                    request,
+                    "Changing your profile photo requires approval by a member manager.",
+                )
+            else:
+                messages.error(
+                    request,
+                    "Profile photo updates are currently disabled by the club.",
+                )
+            return redirect("members:member_view", member_id=member.pk)
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
             form.save()
             messages.success(request, "Profile photo updated.")
             return redirect("members:member_view", member_id=member.pk)
     else:
-        form = MemberProfilePhotoForm(instance=member) if is_self else None
+        form = (
+            MemberProfilePhotoForm(instance=member)
+            if is_self and profile_photo_policy == "direct"
+            else None
+        )
 
     context = {
         "member": member,
@@ -350,7 +369,11 @@ def member_view(request, member_id):
         ),
         "form": form,
         "is_self": is_self,
-        "can_edit": can_edit,
+        "can_edit": can_edit and (not is_self or biography_policy == "direct"),
+        "can_change_password": is_self
+        and get_member_profile_field_policy("password") == "direct",
+        "can_update_emergency_contacts": is_self
+        and emergency_contacts_policy == "direct",
         "biography": biography,
         "qualifications": qualifications,
         "member_badges": member_badges,
@@ -419,13 +442,18 @@ def emergency_contact_edit(request, member_id, contact_id=None):
     if request.user != member:
         return render(request, "403.html", status=403)
 
-    if request.method == "POST" and (
-        get_member_profile_field_policy("emergency_contacts") != "direct"
-    ):
-        messages.error(
-            request,
-            "Emergency contact changes require approval by a member manager.",
-        )
+    policy = get_member_profile_field_policy("emergency_contacts")
+    if policy != "direct":
+        if policy == "request":
+            messages.warning(
+                request,
+                "Emergency contact changes require approval by a member manager.",
+            )
+        else:
+            messages.error(
+                request,
+                "Emergency contact updates are currently disabled by the club.",
+            )
         return redirect("members:member_view", member_id=member.id)
 
     contact = None
@@ -455,13 +483,18 @@ def emergency_contact_delete(request, member_id, contact_id):
     if request.user != member:
         return render(request, "403.html", status=403)
 
-    if request.method == "POST" and (
-        get_member_profile_field_policy("emergency_contacts") != "direct"
-    ):
-        messages.error(
-            request,
-            "Removing emergency contacts requires approval by a member manager.",
-        )
+    policy = get_member_profile_field_policy("emergency_contacts")
+    if policy != "direct":
+        if policy == "request":
+            messages.warning(
+                request,
+                "Removing emergency contacts requires approval by a member manager.",
+            )
+        else:
+            messages.error(
+                request,
+                "Emergency contact updates are currently disabled by the club.",
+            )
         return redirect("members:member_view", member_id=member.id)
 
     is_last_contact = member.emergency_contacts.count() == 1
@@ -490,126 +523,30 @@ def emergency_contact_delete(request, member_id, contact_id):
 
 
 @active_member_required
+@require_http_methods(["POST"])
 def toggle_redaction(request, member_id):
-    """Toggle the redact_contact flag for a member.
-
-    Only the member themselves or a superuser may perform this action.
-    The view accepts POST requests from the member profile form and redirects
-    back to the member view after updating the flag.
-    """
+    """Reject the retired full-contact redaction endpoint."""
     member = get_object_or_404(Member, pk=member_id)
-
-    # Only the member themselves or superusers may toggle this flag
     if request.user != member and not request.user.is_superuser:
         return render(request, "403.html", status=403)
 
-    if request.method == "POST":
-        member.redact_contact = not member.redact_contact
-        member.save()
-        # Create a notification for all member_managers so they are aware
-        # that a member has toggled their redaction flag.
-        try:
-            if Notification is not None:
-                # Build a human-friendly message. If the actor is the member themself
-                # we phrase it as 'Member X has hidden...'; if an admin toggled for
-                # someone else we include both actor and subject.
-                if request.user == member:
-                    actor_name = member.full_display_name
-                    action = "hidden" if member.redact_contact else "made visible"
-                    message = f"Member {actor_name} has {action} their personal contact information on the members site."
-                else:
-                    actor_name = request.user.full_display_name
-                    subject_name = member.full_display_name
-                    action = "hidden" if member.redact_contact else "made visible"
-                    message = f"{actor_name} has {action} personal contact information for member {subject_name}."
-
-                url = build_absolute_url(
-                    reverse("members:member_view", kwargs={"member_id": member.pk})
-                )
-
-                # Notify every user with member_manager privilege, but dedupe
-                # so we don't spam them if the same member toggles repeatedly.
-
-                # Notify member managers so club managers
-                # are alerted when a member toggles redaction.
-                member_managers = Member.objects.filter(member_manager=True)
-                # Dedupe window: configurable via settings.REDACTION_NOTIFICATION_DEDUPE_MINUTES
-                # (integer minutes). For backward compatibility, a settings value
-                # REDACTION_NOTIFICATION_DEDUPE_HOURS may be provided. Default = 60 minutes.
-                cutoff = None
-                # Prefer SiteConfiguration value when available
-                try:
-                    from siteconfig.models import SiteConfiguration
-
-                    sc = SiteConfiguration.objects.first()
-                    if sc and getattr(
-                        sc, "redaction_notification_dedupe_minutes", None
-                    ):
-                        cutoff = timezone.now() - timedelta(
-                            minutes=int(sc.redaction_notification_dedupe_minutes)
-                        )
-                except (ImportError, AttributeError, ValueError) as e:
-                    logging.warning(
-                        f"Failed to get redaction notification settings: {e}"
-                    )
-                    sc = None
-
-                if cutoff is None:
-                    try:
-                        minutes = getattr(
-                            settings, "REDACTION_NOTIFICATION_DEDUPE_MINUTES", None
-                        )
-                        if minutes is not None:
-                            cutoff = timezone.now() - timedelta(minutes=int(minutes))
-                        else:
-                            hours = getattr(
-                                settings, "REDACTION_NOTIFICATION_DEDUPE_HOURS", 1
-                            )
-                            cutoff = timezone.now() - timedelta(hours=float(hours))
-                    except (AttributeError, ValueError, TypeError) as e:
-                        logging.warning(
-                            f"Failed to parse redaction notification timing: {e}"
-                        )
-                        cutoff = timezone.now() - timedelta(hours=1)
-                try:
-                    # Avoid N+1 queries: fetch which member_manager user ids already
-                    # have a recent notification for this URL, then bulk-create
-                    # Notification objects for the remaining recipients.
-                    manager_ids = list(member_managers.values_list("id", flat=True))
-                    existing_user_ids = set(
-                        Notification.objects.filter(
-                            user_id__in=manager_ids, url=url, created_at__gte=cutoff
-                        ).values_list("user_id", flat=True)
-                    )
-
-                    to_create = []
-                    for rm in member_managers:
-                        if rm.pk in existing_user_ids:
-                            continue
-                        to_create.append(
-                            Notification(user=rm, message=message, url=url)
-                        )
-
-                    if to_create:
-                        Notification.objects.bulk_create(to_create)
-                except Exception as e:
-                    # Fail softly if notification logic fails for any reason
-                    logging.exception(f"Failed to create redaction notifications: {e}")
-        except Exception as e:
-            # Defensive: don't let notification failures break the toggle flow
-            logging.exception(
-                f"Notification system failed during redaction toggle: {e}"
-            )
-        if member.redact_contact:
-            messages.success(
-                request, "Your personal contact information is now redacted."
-            )
-        else:
-            messages.success(
-                request,
-                "Your personal contact information is now visible to other members.",
-            )
-
+    policy = get_member_profile_field_policy("contact_visibility")
+    if policy == "request":
+        messages.warning(
+            request,
+            "Changing contact visibility requires approval by a member manager.",
+        )
+    elif policy != "direct":
+        messages.error(
+            request,
+            "Updating contact visibility is currently disabled by the club.",
+        )
+    else:
+        messages.info(
+            request,
+            "The full-contact privacy control has been retired. "
+            "Use the per-field Contact Privacy settings instead.",
+        )
     return redirect("members:member_view", member_id=member.pk)
 
 
@@ -634,6 +571,19 @@ def biography_view(request, member_id):
     biography, _ = Biography.objects.get_or_create(member=member)
 
     can_edit = request.user == member or request.user.is_superuser
+    if request.user == member:
+        policy = get_member_profile_field_policy("biography")
+        if policy != "direct":
+            if policy == "request":
+                messages.warning(
+                    request,
+                    "Biography changes require approval by a member manager.",
+                )
+            else:
+                messages.error(
+                    request, "Biography updates are currently disabled by the club."
+                )
+            return redirect("members:member_view", member_id=member.pk)
 
     if request.method == "POST" and can_edit:
         form = BiographyForm(request.POST, request.FILES, instance=biography)
@@ -704,6 +654,19 @@ def home(request):
 @active_member_required
 def set_password(request):
     member = request.user
+    policy = get_member_profile_field_policy("password")
+    if policy != "direct":
+        if policy == "request":
+            messages.warning(
+                request,
+                "Password changes require approval by a member manager.",
+            )
+        else:
+            messages.error(
+                request, "Password changes are currently disabled by the club."
+            )
+        return redirect("members:member_view", member_id=member.pk)
+
     if request.method == "POST":
         form = SetPasswordForm(request.POST)
         if form.is_valid():

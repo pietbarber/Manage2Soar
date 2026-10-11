@@ -215,7 +215,7 @@ Values that do not fit the controlled choices are retained in
 - Can be linked to a `MembershipApplication` that created the account.
 - **Performance Optimization (Issue #285)**: Added database indexes on `membership_status` and `(last_name, first_name)` for faster filtering and sorting in logsheet operations.
 - **Photo Thumbnails (Issue #286)**: Added `profile_photo_medium` (200x200) and `profile_photo_small` (64x64) fields for optimized page loading. Thumbnails are auto-generated when photos are uploaded via admin. URL properties (`profile_image_url_medium`, `profile_image_url_small`) provide graceful fallback chains.
-- **Contact Privacy (Issue #1034)**: `contact_visibility` is a JSON map of per-field sharing preferences (`email`, `phone`, `address`) where each value is `inherit`, `share`, or `hide`. `share` and `hide` override the club default; unset values fall back to the `share_member_*_by_default` site configuration.
+- **Contact Privacy (Issue #1034)**: `contact_visibility` is a JSON map of per-field sharing preferences (`email`, `phone`, `address`) where `share` and `hide` override the club default; unset values fall back to the `share_member_*_by_default` site configuration. The legacy `redact_contact=True` value is migrated to `hide` for all three fields.
 
 See also: [Redaction of Personal Contact Information](redaction.md)
 

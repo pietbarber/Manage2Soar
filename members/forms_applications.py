@@ -71,6 +71,26 @@ class MembershipApplicationForm(forms.ModelForm):
         widget=forms.Select(attrs={"class": "form-select"}),
     )
 
+    def clean(self):
+        cleaned_data = super().clean()
+        contact_name = cleaned_data.get("emergency_contact_name")
+        contact_relationship = cleaned_data.get("emergency_contact_relationship")
+        contact_phone = cleaned_data.get("emergency_contact_phone")
+
+        if contact_name or contact_relationship or contact_phone:
+            if not contact_name:
+                self.add_error(
+                    "emergency_contact_name",
+                    "Enter the emergency contact's name when providing contact details.",
+                )
+            if not contact_phone:
+                self.add_error(
+                    "emergency_contact_phone",
+                    "Enter a phone number when providing emergency contact details.",
+                )
+
+        return cleaned_data
+
     class Meta:
         model = MembershipApplication
         fields = [

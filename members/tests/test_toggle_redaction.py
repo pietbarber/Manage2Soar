@@ -3,28 +3,32 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 User = get_user_model()
 
 
 @pytest.mark.django_db
-def test_member_can_toggle_own_redaction(client):
+def test_legacy_redaction_endpoint_does_not_change_privacy_preferences(client):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
     m = Member.objects.create(
         username="self", email="self@example.com", membership_status="Full Member"
     )
-    # login as the member
     client.force_login(m)
     url = reverse("members:toggle_redaction", args=[m.id])
-    # initial should be False
-    assert not m.redact_contact
     resp = client.post(url, follow=True)
     m.refresh_from_db()
     assert resp.status_code == 200
-    assert m.redact_contact
+    assert not m.redact_contact
+    assert m.contact_visibility == {}
 
 
 @pytest.mark.django_db
-def test_other_member_cannot_toggle(client):
+def test_other_member_cannot_use_legacy_redaction_endpoint(client):
     subj = Member.objects.create(
         username="subj", email="s@example.com", membership_status="Full Member"
     )
@@ -39,7 +43,12 @@ def test_other_member_cannot_toggle(client):
 
 
 @pytest.mark.django_db
-def test_superuser_can_toggle_anyone(client):
+def test_superuser_cannot_use_legacy_redaction_endpoint(client):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
     subj = Member.objects.create(
         username="subj2", email="s2@example.com", membership_status="Full Member"
     )
@@ -49,4 +58,5 @@ def test_superuser_can_toggle_anyone(client):
     resp = client.post(url, follow=True)
     subj.refresh_from_db()
     assert resp.status_code == 200
-    assert subj.redact_contact
+    assert not subj.redact_contact
+    assert subj.contact_visibility == {}
