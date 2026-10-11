@@ -20,9 +20,13 @@ preferences. Use the Contact Privacy panel instead. If per-field self-service
 is disabled or requires approval, the endpoint rejects the change.
 
 The visibility helpers continue to treat a legacy `redact_contact=True` value
-as hidden for non-privileged viewers, in case an older database has not yet
-applied the data migration. Members themselves and privileged viewers retain
-the visibility exceptions implemented by the contact privacy helpers.
+as a legacy full-redaction choice. If an older application pod writes this
+value after the migration has run, the first new-code visibility check
+reconciles it into `hide` preferences for all three fields and clears the
+legacy flag. This transition preserves the old pod's privacy choice while
+allowing the per-field controls to manage it afterward. Members themselves and
+privileged viewers retain the visibility exceptions implemented by the
+contact privacy helpers.
 
 ## Testing
 

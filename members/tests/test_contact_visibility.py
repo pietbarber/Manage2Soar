@@ -103,6 +103,29 @@ def test_legacy_redaction_migration_preserves_hide_all_preference():
 
 
 @pytest.mark.django_db
+def test_late_legacy_redaction_write_is_reconciled_on_visibility_check():
+    viewer = Member.objects.create_user(username="viewer")
+    subject = Member.objects.create_user(
+        username="late_legacy_write",
+        contact_visibility={"email": "share"},
+    )
+    config = SimpleNamespace(share_member_email_by_default=True)
+
+    subject.redact_contact = True
+    subject.save(update_fields=["redact_contact"])
+
+    assert not can_view_contact_field(viewer, subject, "email", config)
+
+    subject.refresh_from_db()
+    assert not subject.redact_contact
+    assert subject.contact_visibility == {
+        "email": "hide",
+        "phone": "hide",
+        "address": "hide",
+    }
+
+
+@pytest.mark.django_db
 def test_legacy_redaction_migration_reverse_restores_redaction_conservatively():
     # Records the forward migration produced (all three fields hidden) must be
     # re-redacted on rollback so members are not exposed.
