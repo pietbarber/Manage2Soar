@@ -440,7 +440,7 @@ def test_master_self_service_switch_blocks_member_edit_endpoints(client):
     assert profile_response.status_code == 200
     assert b"Change Password" not in profile_response.content
     assert b"Update Profile Photo" not in profile_response.content
-    assert b'name="share_email"' not in profile_response.content
+    assert b'name="visibility_email"' not in profile_response.content
     assert b"Add Emergency Contact" not in profile_response.content
 
     profile_post = client.post(
@@ -453,7 +453,7 @@ def test_master_self_service_switch_blocks_member_edit_endpoints(client):
     )
     visibility_post = client.post(
         reverse("members:update_contact_visibility", args=[member.id]),
-        {"share_email": "on"},
+        {"visibility_email": "share"},
     )
     emergency_post = client.post(
         reverse("members:emergency_contact_add", args=[member.id]),
@@ -506,7 +506,7 @@ def test_contact_visibility_endpoint_rejects_non_direct_policies(client, policy)
 
     response = client.post(
         reverse("members:update_contact_visibility", args=[member.id]),
-        {"share_email": "on"},
+        {"visibility_email": "share"},
     )
 
     assert response.status_code == 302

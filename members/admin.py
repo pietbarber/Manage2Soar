@@ -327,7 +327,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             writer.writerow(row)
         return response
 
-    readonly_fields = ("profile_photo_preview",)
+    readonly_fields = ("profile_photo_preview", "redact_contact")
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
@@ -350,8 +350,11 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         "rostermeister",
         ActiveStatusFilter,
     )
-    # Allow quick inline editing of membership status and redaction flag
-    list_editable = ("membership_status", "redact_contact")
+    # Allow quick inline editing of membership status. `redact_contact` is
+    # retired as a writable flag (see contact-privacy retirement): it is exposed
+    # read-only so admins can still inspect it but cannot set the legacy
+    # full-redaction override that members have no UI/endpoint to clear.
+    list_editable = ("membership_status",)
     # Allow filtering by redact flag in the admin sidebar
     list_filter = list_filter + ("redact_contact",)
 
