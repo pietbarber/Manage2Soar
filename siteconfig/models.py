@@ -313,10 +313,12 @@ class SiteConfiguration(models.Model):
     )
     member_profile_self_service_enabled = models.BooleanField(
         default=True,
+        db_default=True,
         help_text="Allow members to update or request changes to configured profile fields.",
     )
     member_profile_field_policies = models.JSONField(
         default=default_member_profile_field_policies,
+        db_default=default_member_profile_field_policies(),
         validators=[validate_member_profile_field_policies],
         help_text="Per-field member profile policies.",
     )
@@ -1093,7 +1095,7 @@ class SiteConfiguration(models.Model):
                         )
             cache.delete("pwa_club_icon_url")
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:
         """Override delete to clear cache."""
         from django.core.cache import cache
 
@@ -1105,7 +1107,7 @@ class SiteConfiguration(models.Model):
                 "duty_default_max_assignments_per_month",
             ]
         )
-        super().delete(*args, **kwargs)
+        return super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"Site Configuration for {self.club_name}"
@@ -1153,7 +1155,7 @@ class MembershipStatus(models.Model):
         transaction.on_commit(clear_active_membership_statuses_cache)
         return result
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:
         """Override delete to prevent deletion if members are using this status."""
         # Import here to avoid circular imports
         try:
@@ -1172,10 +1174,11 @@ class MembershipStatus(models.Model):
             # During migrations, Member model might not be available
             pass
 
-        super().delete(*args, **kwargs)
+        result = super().delete(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
         transaction.on_commit(clear_active_membership_statuses_cache)
+        return result
 
     @classmethod
     def get_active_statuses(cls):

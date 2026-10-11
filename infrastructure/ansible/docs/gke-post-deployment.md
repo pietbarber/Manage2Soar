@@ -128,7 +128,13 @@ gcloud storage buckets list --project=manage2soar | grep manage2soar
 
 ## Step 4: Run Database Migrations
 
-Run migrations to create all Django database tables:
+For normal application releases, use the Ansible deployment workflow: when
+`gke_run_migrations` is enabled, it runs migrations in a one-off Job from the
+new image before applying the updated Deployment. Do not apply a release that
+requires a schema change and then run migrations afterward.
+
+The commands below are for initial environment setup or explicit manual
+bootstrap, before the application serves traffic:
 
 ```bash
 # SSC tenant

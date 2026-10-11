@@ -12,6 +12,7 @@ This role automates the deployment of Django applications to GKE, replacing manu
 - **Kubernetes Secrets**: Manage secrets from Ansible Vault (no more hardcoded base64!)
 - **Multi-Tenant Support**: Deploy multiple clubs to separate namespaces
 - **Automatic Rollback**: Rolls back on deployment failure
+- **Pre-Rollout Migrations**: Runs Django migrations in a one-off Kubernetes Job before updating app pods
 - **CronJob Management**: Deploy scheduled management commands
 - **Health Checks**: Verify deployment with liveness/readiness probes
 - **Versioned Deployments**: Auto-generated image tags with git commit hash
@@ -78,7 +79,7 @@ gke_memory_limit: "1Gi"
 gke_build_image: true      # Build Docker image
 gke_push_image: true       # Push to GCR
 gke_apply_config: true     # Apply K8s configs
-gke_run_migrations: false  # Run Django migrations
+gke_run_migrations: false  # Run Django migrations in a pre-rollout Kubernetes Job
 gke_deploy_cronjobs: true  # Deploy CronJobs
 ```
 
