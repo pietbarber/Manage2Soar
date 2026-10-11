@@ -56,9 +56,6 @@ erDiagram
         boolean visiting_pilot_require_rating
         string visiting_pilot_token
         datetime visiting_pilot_token_created
-        boolean share_member_email_by_default
-        boolean share_member_phone_by_default
-        boolean share_member_address_by_default
         boolean member_profile_self_service_enabled
         json member_profile_field_policies
     }

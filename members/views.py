@@ -245,21 +245,28 @@ def member_view(request, member_id):
     # Decide whether to show solo/checkride buttons
     show_need_buttons = member.glider_rating not in ("private", "commercial")
 
+    site_config = SiteConfiguration.objects.first()
+
     # Biography logic
     biography = getattr(member, "biography", None)
     profile_photo_policy = (
-        get_member_profile_field_policy("profile_photo") if is_self else "disabled"
+        get_member_profile_field_policy("profile_photo", site_config)
+        if is_self
+        else "disabled"
     )
     biography_policy = (
-        get_member_profile_field_policy("biography") if is_self else "disabled"
+        get_member_profile_field_policy("biography", site_config)
+        if is_self
+        else "disabled"
     )
     emergency_contacts_policy = (
-        get_member_profile_field_policy("emergency_contacts") if is_self else "disabled"
+        get_member_profile_field_policy("emergency_contacts", site_config)
+        if is_self
+        else "disabled"
     )
 
     # Determine whether the requester can view personal info, and generate
     # a QR code accordingly (redacted QR omits contact fields).
-    site_config = SiteConfiguration.objects.first()
     contact_visibility = {
         field: can_view_contact_field(request.user, member, field, site_config)
         for field in ("email", "phone", "address")
@@ -270,7 +277,9 @@ def member_view(request, member_id):
     }
     can_view_personal = can_view_personal_info_fn(request.user, member)
     can_view_policy = (
-        is_self and get_member_profile_field_policy("contact_visibility") == "direct"
+        is_self
+        and get_member_profile_field_policy("contact_visibility", site_config)
+        == "direct"
     )
     qr_png = generate_vcard_qr(
         member,
@@ -387,7 +396,7 @@ def member_view(request, member_id):
         "is_self": is_self,
         "can_edit": can_edit and (not is_self or biography_policy == "direct"),
         "can_change_password": is_self
-        and get_member_profile_field_policy("password") == "direct",
+        and get_member_profile_field_policy("password", site_config) == "direct",
         "can_update_emergency_contacts": is_self
         and emergency_contacts_policy == "direct",
         "biography": biography,

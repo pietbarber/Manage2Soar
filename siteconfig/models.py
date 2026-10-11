@@ -63,11 +63,12 @@ def validate_member_profile_field_policies(value):
             )
 
 
-def get_member_profile_field_policy(field):
-    config = SiteConfiguration.objects.first()
-    if not config or not config.member_profile_self_service_enabled:
+def get_member_profile_field_policy(field, site_config=None):
+    if site_config is None:
+        site_config = SiteConfiguration.objects.first()
+    if not site_config or not site_config.member_profile_self_service_enabled:
         return "disabled"
-    policy = config.member_profile_field_policies.get(field, "disabled")
+    policy = site_config.member_profile_field_policies.get(field, "disabled")
     if field in {"password", "profile_photo"} and policy == "request":
         return "disabled"
     return policy

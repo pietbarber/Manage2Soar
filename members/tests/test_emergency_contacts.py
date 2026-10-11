@@ -3,11 +3,12 @@ from unittest.mock import patch
 import pytest
 from django.db import connection
 from django.db.models.query import QuerySet
-from django.test import Client
+from django.test import Client, RequestFactory
 from django.urls import reverse
 
 from members.models import EmergencyContact, Member
-from siteconfig.models import SiteConfiguration
+from members.views import member_view
+from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
 
 
 @pytest.fixture
@@ -21,11 +22,11 @@ def member():
 
 @pytest.fixture
 def direct_policy():
-    """Enable direct self-service edits for emergency contacts.
+    """Configure direct self-service edits for emergency contacts.
 
     The add/edit/remove endpoints are gated on the member profile field
-    policy, which defaults to 'request' approval. These flow tests exercise
-    the direct mechanism, so they opt into the 'direct' policy.
+    policy, which defaults to 'direct'. These flow tests explicitly configure
+    the policy to make their required behavior clear.
     """
     config = SiteConfiguration.objects.create(
         club_name="Test Club",
@@ -229,6 +230,31 @@ def test_profile_renders_multiple_contacts_with_formatted_phone_numbers(
     assert b"Mobile Contact" in response.content
     assert b"+1 661-555-0100" in response.content
     assert b"+1 661-555-0101" in response.content
+
+
+@pytest.mark.django_db
+def test_profile_reuses_site_configuration_for_all_policies(member, direct_policy):
+    request = RequestFactory().get(reverse("members:member_view", args=[member.pk]))
+    request.user = member
+    with (
+        patch("members.views.render", return_value=None),
+        patch(
+            "members.views.get_member_profile_field_policy",
+            wraps=get_member_profile_field_policy,
+        ) as policy_lookup,
+    ):
+        member_view.__wrapped__(request, member.pk)
+
+    assert [call.args[0] for call in policy_lookup.call_args_list] == [
+        "profile_photo",
+        "biography",
+        "emergency_contacts",
+        "contact_visibility",
+        "password",
+    ]
+    site_configs = [call.args[1] for call in policy_lookup.call_args_list]
+    assert site_configs[0] is not None
+    assert all(site_config is site_configs[0] for site_config in site_configs)
 
 
 @pytest.mark.django_db
