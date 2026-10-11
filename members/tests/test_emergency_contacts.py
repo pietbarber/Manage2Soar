@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import pytest
+from django.db import connection
 from django.db.models.query import QuerySet
 from django.test import Client
 from django.urls import reverse
@@ -151,18 +152,57 @@ def test_contact_delete_locks_member_before_recounting(
     delete_url = reverse(
         "members:emergency_contact_delete", args=[member.pk, contact.pk]
     )
-    original_select_for_update = QuerySet.select_for_update
 
-    with patch.object(
-        QuerySet,
-        "select_for_update",
-        autospec=True,
-        side_effect=original_select_for_update,
-    ) as select_for_update:
+    # The reviewer flagged that merely asserting select_for_update() was called
+    # is insufficient: it does not prove the lock is still held when the
+    # recount and delete run. Record the active transaction depth at both the
+    # lock acquisition and the delete, and assert the delete happens inside
+    # the same (still-open) transaction as the lock.
+    original_select_for_update = QuerySet.select_for_update
+    select_state: dict = {}
+
+    def select_for_update_side_effect(*args, **kwargs):
+        select_state["atomic_blocks"] = len(connection.atomic_blocks)
+        select_state["autocommit"] = connection.autocommit
+        return original_select_for_update(*args, **kwargs)
+
+    original_delete = EmergencyContact.delete
+    delete_holder: dict = {}
+
+    def tracked_delete(self, *args, **kwargs):
+        delete_holder["atomic_blocks"] = len(connection.atomic_blocks)
+        delete_holder["autocommit"] = connection.autocommit
+        return original_delete(self, *args, **kwargs)
+
+    baseline_blocks = len(connection.atomic_blocks)
+
+    with (
+        patch.object(
+            QuerySet,
+            "select_for_update",
+            autospec=True,
+            side_effect=select_for_update_side_effect,
+        ) as select_for_update,
+        patch.object(EmergencyContact, "delete", tracked_delete),
+    ):
         response = client_for.post(delete_url, {})
 
     assert response.status_code == 302
     select_for_update.assert_called_once()
+
+    # Lock was acquired inside an explicit (non-autocommit) transaction.
+    assert select_state["autocommit"] is False
+    assert select_state["atomic_blocks"] >= 1
+
+    # The delete must execute while the lock's transaction is still open:
+    # same depth as the lock acquisition, and strictly deeper than the
+    # baseline the request started from. Against the old code the view's
+    # atomic block closed before the delete, so delete ran one level shallower.
+    delete_state = delete_holder
+    assert delete_state["autocommit"] is False
+    assert delete_state["atomic_blocks"] == select_state["atomic_blocks"]
+    assert delete_state["atomic_blocks"] >= baseline_blocks + 1
+
     assert not EmergencyContact.objects.filter(pk=contact.pk).exists()
     assert EmergencyContact.objects.filter(pk=remaining_contact.pk).exists()
 

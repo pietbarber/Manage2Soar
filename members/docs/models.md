@@ -236,7 +236,7 @@ Values that do not fit the controlled choices are retained in
 See also: [Redaction of Personal Contact Information](redaction.md)
 
 ### `EmergencyContact`
-- Structured emergency contact for a member (Issue #1034), the source of truth for emergency contacts.
+- Structured emergency contact for a member (Issue #1035), the source of truth for emergency contacts.
 - Linked to `Member` via `member` FK (`related_name="emergency_contacts"`); a member may have zero or many.
 - All contact fields (`name` required, the rest optional) plus a `preferred_contact_method` choice and free-form `preferred_contact_details`.
 - Replaces the legacy free-text `Member.emergency_contact`, which remains display-only during migration.

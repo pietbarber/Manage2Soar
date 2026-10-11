@@ -8,10 +8,7 @@ from django.urls import reverse
 
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
-from members.utils.permissions import (
-    can_view_contact_field,
-    contact_field_visibility,
-)
+from members.utils.permissions import can_view_contact_field, contact_field_visibility
 from members.utils.vcard_tools import generate_vcard, generate_vcard_qr
 from siteconfig.models import (
     MembershipStatus,
@@ -103,6 +100,47 @@ def test_legacy_redaction_migration_preserves_hide_all_preference():
         "phone": "hide",
         "address": "hide",
     }
+
+
+@pytest.mark.django_db
+def test_legacy_redaction_migration_reverse_restores_redaction_conservatively():
+    # Records the forward migration produced (all three fields hidden) must be
+    # re-redacted on rollback so members are not exposed.
+    migrated = Member.objects.create_user(
+        username="was_migrated",
+        redact_contact=False,
+        contact_visibility={"email": "hide", "phone": "hide", "address": "hide"},
+    )
+    # A member with any field not explicitly hidden is NOT the migration
+    # signature and must be left untouched.
+    untouched = Member.objects.create_user(
+        username="left_alone",
+        redact_contact=False,
+        contact_visibility={"email": "hide", "phone": "share", "address": "hide"},
+    )
+    # A member with no per-field preferences at all must be left untouched.
+    no_preference = Member.objects.create_user(
+        username="no_pref", redact_contact=False, contact_visibility={}
+    )
+
+    migration = import_module(
+        "members.migrations.0031_migrate_legacy_contact_redaction"
+    )
+    migration.reverse_migrate_legacy_contact_redaction(Member._meta.apps, None)
+
+    migrated.refresh_from_db()
+    assert migrated.redact_contact
+    # contact_visibility preferences are preserved; only the override is restored
+    assert migrated.contact_visibility == {
+        "email": "hide",
+        "phone": "hide",
+        "address": "hide",
+    }
+
+    untouched.refresh_from_db()
+    assert not untouched.redact_contact
+    no_preference.refresh_from_db()
+    assert not no_preference.redact_contact
 
 
 def test_qr_vcard_omits_hidden_contact_fields():

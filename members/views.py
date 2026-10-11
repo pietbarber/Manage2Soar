@@ -513,35 +513,40 @@ def emergency_contact_delete(request, member_id, contact_id):
             return render(request, "403.html", status=403)
         contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
 
-    policy = get_member_profile_field_policy("emergency_contacts")
-    if policy != "direct":
-        if policy == "request":
-            messages.warning(
-                request,
-                "Removing emergency contacts requires approval by a member manager.",
-            )
-        else:
-            messages.error(
-                request,
-                "Emergency contact updates are currently disabled by the club.",
-            )
-        return redirect("members:member_view", member_id=member.id)
+        # Keep the policy check, contact recount, and the delete mutation inside
+        # the same transaction that holds the member row lock, so a concurrent
+        # delete cannot slip through the "final contact" recount.
+        policy = get_member_profile_field_policy("emergency_contacts")
+        if policy != "direct":
+            if policy == "request":
+                messages.warning(
+                    request,
+                    "Removing emergency contacts requires approval by a member manager.",
+                )
+            else:
+                messages.error(
+                    request,
+                    "Emergency contact updates are currently disabled by the club.",
+                )
+            return redirect("members:member_view", member_id=member.id)
 
-    is_last_contact = member.emergency_contacts.count() == 1
-    form = (
-        EmergencyContactDeclineForm(request.POST or None) if is_last_contact else None
-    )
-    if request.method == "POST" and not is_last_contact:
-        contact.delete()
-        messages.success(request, "Emergency contact removed.")
-        return redirect("members:member_view", member_id=member.id)
-    if request.method == "POST" and form and form.is_valid():
-        contact.delete()
-        if member.emergency_contact:
-            member.emergency_contact = ""
-            member.save(update_fields=["emergency_contact"])
-        messages.success(request, "Emergency contact removed.")
-        return redirect("members:member_view", member_id=member.id)
+        is_last_contact = member.emergency_contacts.count() == 1
+        form = (
+            EmergencyContactDeclineForm(request.POST or None)
+            if is_last_contact
+            else None
+        )
+        if request.method == "POST" and not is_last_contact:
+            contact.delete()
+            messages.success(request, "Emergency contact removed.")
+            return redirect("members:member_view", member_id=member.id)
+        if request.method == "POST" and form and form.is_valid():
+            contact.delete()
+            if member.emergency_contact:
+                member.emergency_contact = ""
+                member.save(update_fields=["emergency_contact"])
+            messages.success(request, "Emergency contact removed.")
+            return redirect("members:member_view", member_id=member.id)
 
     return render(
         request,
