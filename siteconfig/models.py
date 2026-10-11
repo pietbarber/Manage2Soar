@@ -34,7 +34,7 @@ def default_member_profile_field_policies():
         "email": "request",
         "phone": "request",
         "address": "request",
-        "emergency_contacts": "request",
+        "emergency_contacts": "direct",
         "nickname": "request",
         "profile_photo": "direct",
         "biography": "direct",
