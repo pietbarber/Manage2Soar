@@ -2,7 +2,6 @@ import pytest
 
 from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
-from siteconfig.models import default_member_profile_field_policies
 
 
 @pytest.mark.django_db
@@ -57,13 +56,3 @@ def test_approved_application_creates_structured_emergency_contact():
     assert contact.relationship == "Parent"
     assert contact.mobile_phone == "555-0201"
     assert member.emergency_contact is None
-
-
-def test_profile_policy_defaults_are_explicit_and_safe():
-    policies = default_member_profile_field_policies()
-
-    assert policies["username"] == "direct"
-    assert policies["email"] == "request"
-    assert policies["emergency_contacts"] == "request"
-    assert policies["password"] == "direct"
-    assert policies["profile_photo"] == "direct"

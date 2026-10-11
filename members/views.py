@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -189,7 +189,7 @@ def member_list(request):
     site_config = SiteConfiguration.objects.first()
     for member in page_obj.object_list:
         member.directory_contact_visibility = {
-            field: can_view_contact_field(request.user, member, field, site_config)
+            field: contact_field_visibility(member, field, site_config)["shared"]
             for field in ("email", "phone", "address")
         }
 
@@ -262,6 +262,10 @@ def member_view(request, member_id):
     site_config = SiteConfiguration.objects.first()
     contact_visibility = {
         field: can_view_contact_field(request.user, member, field, site_config)
+        for field in ("email", "phone", "address")
+    }
+    effective_contact_visibility = {
+        field: contact_field_visibility(member, field, site_config)["shared"]
         for field in ("email", "phone", "address")
     }
     can_view_personal = can_view_personal_info_fn(request.user, member)
@@ -341,11 +345,23 @@ def member_view(request, member_id):
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
         "can_view_policy": can_view_policy,
-        "privacy_sharing": (
-            {
-                field: contact_field_visibility(member, field, site_config)["shared"]
-                for field in ("email", "phone", "address")
-            }
+        "privacy_sharing": (effective_contact_visibility if can_view_policy else None),
+        "privacy_settings": (
+            [
+                {
+                    "field": field,
+                    "label": label,
+                    "preference": (member.contact_visibility or {}).get(
+                        field, "inherit"
+                    ),
+                    "shared": effective_contact_visibility[field],
+                }
+                for field, label in (
+                    ("email", "Email"),
+                    ("phone", "Phone numbers"),
+                    ("address", "Postal address"),
+                )
+            ]
             if can_view_policy
             else None
         ),
@@ -353,7 +369,7 @@ def member_view(request, member_id):
             [
                 {
                     "label": label,
-                    "shared": contact_visibility[field],
+                    "shared": effective_contact_visibility[field],
                     "source": contact_field_visibility(member, field, site_config)[
                         "source"
                     ],
@@ -401,7 +417,7 @@ def member_vcard(request, member_id):
     response = HttpResponse(
         generate_vcard(member, contact_visibility=visibility), content_type="text/vcard"
     )
-    response["Content-Disposition"] = f'attachment; filename="{member.username}.vcf"'
+    response["Content-Disposition"] = f'attachment; filename="member-{member.pk}.vcf"'
     return response
 
 
@@ -426,10 +442,20 @@ def update_contact_visibility(request, member_id):
             )
         return redirect("members:member_view", member_id=member.id)
 
-    member.contact_visibility = {
-        field: "share" if request.POST.get(f"share_{field}") else "hide"
-        for field in ("email", "phone", "address")
-    }
+    contact_visibility = dict(member.contact_visibility or {})
+    for field in ("email", "phone", "address"):
+        key = f"visibility_{field}"
+        if key not in request.POST:
+            continue
+
+        preference = request.POST[key]
+        if preference not in {"inherit", "share", "hide"}:
+            return HttpResponse("Invalid contact visibility choice.", status=400)
+        if preference == "inherit":
+            contact_visibility.pop(field, None)
+        else:
+            contact_visibility[field] = preference
+    member.contact_visibility = contact_visibility
     member.save(update_fields=["contact_visibility"])
     messages.success(request, "Contact visibility preferences updated.")
     return redirect("members:member_view", member_id=member.id)
@@ -478,10 +504,14 @@ def emergency_contact_edit(request, member_id, contact_id=None):
 @active_member_required
 @require_http_methods(["GET", "POST"])
 def emergency_contact_delete(request, member_id, contact_id):
-    member = get_object_or_404(Member, pk=member_id)
-    contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
-    if request.user != member:
-        return render(request, "403.html", status=403)
+    with transaction.atomic():
+        members = Member.objects.all()
+        if request.method == "POST":
+            members = members.select_for_update()
+        member = get_object_or_404(members, pk=member_id)
+        if request.user != member:
+            return render(request, "403.html", status=403)
+        contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
 
     policy = get_member_profile_field_policy("emergency_contacts")
     if policy != "direct":
@@ -507,6 +537,9 @@ def emergency_contact_delete(request, member_id, contact_id):
         return redirect("members:member_view", member_id=member.id)
     if request.method == "POST" and form and form.is_valid():
         contact.delete()
+        if member.emergency_contact:
+            member.emergency_contact = ""
+            member.save(update_fields=["emergency_contact"])
         messages.success(request, "Emergency contact removed.")
         return redirect("members:member_view", member_id=member.id)
 
@@ -1575,9 +1608,13 @@ class CustomPasswordResetView(auth_views.PasswordResetView):
             parsed = urlparse(canonical_url)
             # Set extra_email_context with canonical domain/protocol
             # These will override Django's default protocol/domain in the email template
-            if not self.extra_email_context:
-                self.extra_email_context = {}
-            self.extra_email_context["protocol"] = parsed.scheme
-            self.extra_email_context["domain"] = parsed.netloc
+            email_context = dict(self.extra_email_context or {})
+            email_context.update(
+                {
+                    "protocol": parsed.scheme,
+                    "domain": parsed.netloc,
+                }
+            )
+            self.extra_email_context = email_context
 
         return super().form_valid(form)

@@ -1,10 +1,12 @@
+import json
 import re
 from collections import defaultdict
 
 from django.core.exceptions import ValidationError
-from import_export import resources
+from import_export import fields, resources
+from import_export.results import RowResult
 
-from .models import Member
+from .models import EmergencyContact, Member
 
 # Shared safe member CSV schema used by both import-export resource and
 # custom admin CSV action to avoid schema drift across export paths.
@@ -20,6 +22,8 @@ MEMBER_CSV_FIELDS = (
     "phone",
     "mobile_phone",
     "emergency_contact",
+    "emergency_contacts",
+    "contact_visibility",
     "membership_status",
     "date_joined",
     "private_glider_checkride_date",
@@ -49,9 +53,125 @@ MEMBER_CSV_FIELDS = (
     "private_notes",
 )
 
+EMERGENCY_CONTACT_CSV_FIELDS = (
+    "name",
+    "relationship",
+    "home_phone",
+    "mobile_phone",
+    "preferred_contact_method",
+    "preferred_contact_details",
+    "address",
+)
+
+
+def serialize_emergency_contacts(member):
+    """Serialize structured contacts as a JSON array for the member CSV."""
+    contacts = member.emergency_contacts.all()
+    return json.dumps(
+        [
+            {field: getattr(contact, field) for field in EMERGENCY_CONTACT_CSV_FIELDS}
+            for contact in contacts
+        ],
+        ensure_ascii=False,
+    )
+
+
+def parse_emergency_contacts(raw_value):
+    """Validate and normalize the structured contacts JSON column."""
+    if raw_value in (None, ""):
+        return []
+
+    try:
+        contacts = json.loads(raw_value)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("Emergency contacts must be a JSON array.") from exc
+
+    if not isinstance(contacts, list):
+        raise ValueError("Emergency contacts must be a JSON array.")
+
+    parsed_contacts = []
+    for index, contact in enumerate(contacts, start=1):
+        if not isinstance(contact, dict):
+            raise ValueError(f"Emergency contact {index} must be a JSON object.")
+
+        unknown_fields = set(contact) - set(EMERGENCY_CONTACT_CSV_FIELDS)
+        if unknown_fields:
+            raise ValueError(
+                f"Emergency contact {index} contains unsupported fields: "
+                f"{', '.join(sorted(unknown_fields))}."
+            )
+
+        name = contact.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"Emergency contact {index} must include a name.")
+
+        parsed_contact = {}
+        for field in EMERGENCY_CONTACT_CSV_FIELDS:
+            value = contact.get(field, "")
+            if not isinstance(value, str):
+                raise ValueError(
+                    f"Emergency contact {index} field '{field}' must be text."
+                )
+            parsed_contact[field] = value
+        parsed_contacts.append(parsed_contact)
+
+    return parsed_contacts
+
+
+def _validate_contact_visibility(visibility):
+    """Validate per-field contact sharing preferences."""
+    if not isinstance(visibility, dict):
+        raise ValueError("Contact visibility must be a JSON object.")
+
+    supported_fields = {"email", "phone", "address"}
+    unknown_fields = set(visibility) - supported_fields
+    if unknown_fields:
+        raise ValueError(
+            "Contact visibility contains unsupported fields: "
+            f"{', '.join(sorted(unknown_fields))}."
+        )
+
+    supported_preferences = {"inherit", "share", "hide"}
+    for field, preference in visibility.items():
+        if not isinstance(preference, str) or preference not in supported_preferences:
+            raise ValueError(
+                f"Contact visibility for '{field}' must be inherit, share, or hide."
+            )
+    return visibility
+
+
+def serialize_contact_visibility(member):
+    """Serialize validated per-field contact preferences as JSON."""
+    return json.dumps(
+        _validate_contact_visibility(member.contact_visibility),
+        ensure_ascii=False,
+    )
+
+
+def parse_contact_visibility(raw_value):
+    """Validate and normalize the contact visibility JSON column."""
+    if raw_value in (None, ""):
+        return {}
+
+    try:
+        visibility = json.loads(raw_value)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("Contact visibility must be a JSON object.") from exc
+
+    return _validate_contact_visibility(visibility)
+
 
 class MemberResource(resources.ModelResource):
     """Normalize imported member fields before persistence."""
+
+    emergency_contacts = fields.Field(
+        column_name="emergency_contacts",
+        readonly=True,
+    )
+    contact_visibility = fields.Field(
+        column_name="contact_visibility",
+        readonly=True,
+    )
 
     _SSA_NULL_TOKENS = {"", "0", "null", "none", "na", "n/a", "unknown"}
     _LEGACY_USERNAME_NULL_TOKENS = {"", "0", "null", "none", "na", "n/a", "unknown"}
@@ -59,6 +179,16 @@ class MemberResource(resources.ModelResource):
     class Meta:
         model = Member
         fields = MEMBER_CSV_FIELDS
+
+    def filter_export(self, queryset, **kwargs):
+        queryset = super().filter_export(queryset, **kwargs)
+        return queryset.prefetch_related("emergency_contacts")
+
+    def dehydrate_emergency_contacts(self, member):
+        return serialize_emergency_contacts(member)
+
+    def dehydrate_contact_visibility(self, member):
+        return serialize_contact_visibility(member)
 
     def before_import(self, dataset, **kwargs):
         """Preload usernames once to avoid per-row existence queries during import."""
@@ -177,6 +307,8 @@ class MemberResource(resources.ModelResource):
     def _append_suffix(base_username, counter):
         max_length = Member._meta.get_field("username").max_length
         suffix = str(counter)
+        if max_length is None:
+            return f"{base_username}{suffix}"
         truncated_base = base_username[: max_length - len(suffix)]
         return f"{truncated_base}{suffix}"
 
@@ -230,6 +362,13 @@ class MemberResource(resources.ModelResource):
 
     def before_import_row(self, row, **kwargs):
         """Treat placeholder SSA values as missing so unique constraint is not hit."""
+        if "emergency_contacts" in row:
+            contacts = parse_emergency_contacts(row["emergency_contacts"])
+            for contact in contacts:
+                EmergencyContact(**contact).full_clean(exclude=["member"])
+        if "contact_visibility" in row:
+            parse_contact_visibility(row["contact_visibility"])
+
         row["SSA_member_number"] = self._normalize_nullable_value(
             row.get("SSA_member_number"),
             self._SSA_NULL_TOKENS,
@@ -239,6 +378,36 @@ class MemberResource(resources.ModelResource):
             self._LEGACY_USERNAME_NULL_TOKENS,
         )
         row["username"] = self._normalize_username(row.get("username"))
+
+    def after_import_row(self, row, row_result, **kwargs):
+        """Replace related contacts when the CSV includes the JSON column."""
+        super().after_import_row(row, row_result, **kwargs)
+        if (
+            row_result.object_id is None
+            or row_result.import_type == RowResult.IMPORT_TYPE_DELETE
+        ):
+            return
+
+        has_emergency_contacts = "emergency_contacts" in row
+        has_contact_visibility = "contact_visibility" in row
+        if not has_emergency_contacts and not has_contact_visibility:
+            return
+
+        member = Member.objects.get(pk=row_result.object_id)
+        if has_emergency_contacts:
+            contacts = parse_emergency_contacts(row["emergency_contacts"])
+            replacement_contacts = [
+                EmergencyContact(member=member, **contact) for contact in contacts
+            ]
+            for contact in replacement_contacts:
+                contact.full_clean()
+            member.emergency_contacts.all().delete()
+            EmergencyContact.objects.bulk_create(replacement_contacts)
+        if has_contact_visibility:
+            member.contact_visibility = parse_contact_visibility(
+                row["contact_visibility"]
+            )
+            member.save(update_fields=["contact_visibility"])
 
     def before_save_instance(self, instance, row, **kwargs):
         """Enforce NULL (not empty string) for missing values on final save path."""

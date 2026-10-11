@@ -8,8 +8,11 @@ from django.urls import reverse
 
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
-from members.utils.permissions import can_view_contact_field, contact_field_visibility
-from members.utils.vcard_tools import generate_vcard_qr
+from members.utils.permissions import (
+    can_view_contact_field,
+    contact_field_visibility,
+)
+from members.utils.vcard_tools import generate_vcard, generate_vcard_qr
 from siteconfig.models import (
     MembershipStatus,
     SiteConfiguration,
@@ -115,6 +118,7 @@ def test_qr_vcard_omits_hidden_contact_fields():
         state_code="CA",
         state_freeform="",
         zip_code="93534",
+        country="US",
     )
     payload = {}
 
@@ -136,6 +140,32 @@ def test_qr_vcard_omits_hidden_contact_fields():
     assert "555-0100" in payload["vcard"]
     assert "555-0101" in payload["vcard"]
     assert "1 Hidden Way" not in payload["vcard"]
+
+
+def test_vcard_escapes_text_values_and_uses_crlf_line_endings():
+    member = SimpleNamespace(
+        first_name="Jane\nNOTE:Injected",
+        last_name="Doe;Smith, Jr.\\",
+        email="jane@example.com\r\nNOTE:Injected",
+        phone="555-0100",
+        mobile_phone="",
+        glider_rating="student",
+        address="1 Main St; Unit 2\nNOTE:Injected",
+        city="Lancaster",
+        state_code="CA",
+        state_freeform="",
+        zip_code="93534",
+        country="US",
+    )
+
+    vcard = generate_vcard(member)
+
+    assert "N:Doe\\;Smith\\, Jr.\\\\;Jane\\nNOTE:Injected;;;" in vcard
+    assert "EMAIL;TYPE=INTERNET,HOME:jane@example.com\\nNOTE:Injected" in vcard
+    assert "ADR;TYPE=HOME:;;1 Main St\\; Unit 2\\nNOTE:Injected;" in vcard
+    assert "\r\nNOTE:Injected" not in vcard
+    assert "\n" not in vcard.replace("\r\n", "")
+    assert vcard.endswith("\r\n")
 
 
 @pytest.mark.django_db
@@ -165,7 +195,52 @@ def test_directory_omits_hidden_email_from_content_and_data_attribute():
 
 
 @pytest.mark.django_db
-def test_member_can_update_contact_visibility():
+@pytest.mark.parametrize(
+    "viewer_privilege",
+    [
+        {"is_staff": True},
+        {"member_manager": True},
+        {"rostermeister": True},
+    ],
+)
+def test_directory_keeps_hidden_contact_fields_redacted_for_privileged_viewers(
+    viewer_privilege,
+):
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    viewer = Member.objects.create_user(
+        username="directory_viewer",
+        membership_status="Privacy Active",
+        **viewer_privilege,
+    )
+    Member.objects.create_user(
+        username="field_hidden_subject",
+        email="field-hidden@example.com",
+        phone="555-0100",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide", "phone": "hide"},
+    )
+    Member.objects.create_user(
+        username="fully_redacted_subject",
+        email="fully-redacted@example.com",
+        phone="555-0101",
+        membership_status="Privacy Active",
+        redact_contact=True,
+    )
+    client = Client()
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_list"))
+
+    assert response.status_code == 200
+    assert b"field-hidden@example.com" not in response.content
+    assert b"555-0100" not in response.content
+    assert b"fully-redacted@example.com" not in response.content
+    assert b"555-0101" not in response.content
+
+
+@pytest.mark.django_db
+def test_member_can_set_and_inherit_contact_visibility():
     MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
     # The endpoint is gated on the member self-service policy, so establish a
@@ -176,22 +251,134 @@ def test_member_can_update_contact_visibility():
         club_abbreviation="TC",
     )
     member = Member.objects.create_user(
-        username="privacy_member", membership_status="Privacy Active"
+        username="privacy_member",
+        membership_status="Privacy Active",
+        contact_visibility={"phone": "share"},
     )
     client = Client()
     client.force_login(member)
 
     response = client.post(
         reverse("members:update_contact_visibility", args=[member.id]),
-        {"share_email": "on", "share_address": "on"},
+        {
+            "visibility_email": "hide",
+            "visibility_phone": "share",
+            "visibility_address": "inherit",
+        },
     )
 
     assert response.status_code == 302
     member.refresh_from_db()
     assert member.contact_visibility == {
-        "email": "share",
-        "phone": "hide",
-        "address": "share",
+        "email": "hide",
+        "phone": "share",
+    }
+
+
+@pytest.mark.django_db
+def test_profile_privacy_controls_show_member_overrides():
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
+    member = Member.objects.create_user(
+        username="privacy_owner",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide", "phone": "share"},
+    )
+    client = Client()
+    client.force_login(member)
+
+    response = client.get(reverse("members:member_view", args=[member.id]))
+
+    assert response.status_code == 200
+    assert response.context["privacy_settings"] == [
+        {
+            "field": "email",
+            "label": "Email",
+            "preference": "hide",
+            "shared": False,
+        },
+        {
+            "field": "phone",
+            "label": "Phone numbers",
+            "preference": "share",
+            "shared": True,
+        },
+        {
+            "field": "address",
+            "label": "Postal address",
+            "preference": "inherit",
+            "shared": True,
+        },
+    ]
+    assert b'name="visibility_email" id="visibility_email"' in response.content
+    assert b'<option value="hide" selected>Hide</option>' in response.content
+    assert (
+        b'<option value="inherit" selected>Inherit club default</option>'
+        in response.content
+    )
+
+
+@pytest.mark.django_db
+def test_contact_visibility_rejects_unsupported_policy():
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
+    member = Member.objects.create_user(
+        username="invalid_privacy_member",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide"},
+    )
+    client = Client()
+    client.force_login(member)
+
+    response = client.post(
+        reverse("members:update_contact_visibility", args=[member.id]),
+        {"visibility_email": "public"},
+    )
+
+    assert response.status_code == 400
+    member.refresh_from_db()
+    assert member.contact_visibility == {"email": "hide"}
+
+
+@pytest.mark.django_db
+def test_staff_contact_legend_shows_regular_member_visibility():
+    viewer = Member.objects.create_user(
+        username="privacy_admin",
+        email="admin@example.com",
+        is_staff=True,
+        is_superuser=True,
+    )
+    subject = Member.objects.create_user(
+        username="hidden_member",
+        first_name="Hidden",
+        last_name="Member",
+        contact_visibility={"email": "hide"},
+    )
+    client = Client()
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_view", args=[subject.pk]))
+
+    assert response.status_code == 200
+    email_status = next(
+        status
+        for status in response.context["staff_contact_status"]
+        if status["label"] == "Email"
+    )
+    assert email_status == {
+        "label": "Email",
+        "shared": False,
+        "source": "member choice: Hide",
     }
 
 
@@ -316,3 +503,31 @@ def test_vcard_download_filters_contact_fields_for_regular_member():
     assert b"hidden@example.com" not in response.content
     assert b"555-0100" in response.content
     assert b"1 Hidden Way" not in response.content
+
+
+@pytest.mark.django_db
+def test_vcard_filename_does_not_disclose_email_username_for_hidden_email():
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    viewer = Member.objects.create_user(
+        username="vcard_viewer", membership_status="Privacy Active"
+    )
+    subject = Member.objects.create_user(
+        username="hidden@example.com",
+        first_name="Private",
+        last_name="Member",
+        email="hidden@example.com",
+        membership_status="Privacy Active",
+        contact_visibility={"email": "hide"},
+    )
+    client = Client()
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_vcard", args=[subject.pk]))
+
+    assert response.status_code == 200
+    assert "hidden@example.com" not in response["Content-Disposition"]
+    assert response["Content-Disposition"] == (
+        f'attachment; filename="member-{subject.pk}.vcf"'
+    )
+    assert b"hidden@example.com" not in response.content

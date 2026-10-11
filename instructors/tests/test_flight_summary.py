@@ -6,10 +6,15 @@ solo + with_instructor could exceed total flights due to a bug in
 how default values were applied using the totals accumulator.
 """
 
+from datetime import time
+
 import pytest
 from django.test import TestCase
 
-from instructors.utils import get_flight_summary_for_member
+from instructors.utils import (
+    get_flight_summary_for_member,
+    get_logbook_glider_time_summary,
+)
 from logsheet.models import Airfield, Flight, Glider, Logsheet, Towplane
 from members.models import Member
 
@@ -186,3 +191,57 @@ class TestGetFlightSummaryForMember(TestCase):
                 f"Glider {row['n_number']}: with_count({with_instructor}) > "
                 f"total_count({total})"
             )
+
+
+@pytest.mark.django_db
+class TestGliderTimeSummarySoloExcludesLegacyPassenger(TestCase):
+    """A flight carrying only a legacy passenger name must not count as solo.
+
+    Mirrors the classify_logbook_flight_minutes fix: solo time must be
+    suppressed whenever a resolved passenger name is present, including the
+    legacy_passenger_name fallback used by historical imports.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.pilot = Member.objects.create(
+            username="solo_legacy_pilot",
+            first_name="Solo",
+            last_name="Legacy",
+            email="solo_legacy@example.com",
+            membership_status="Full Member",
+        )
+        cls.glider = Glider.objects.create(
+            n_number="N55555",
+            make="Test",
+            model="SoloGlider",
+            club_owned=True,
+            is_active=True,
+        )
+        cls.airfield = Airfield.objects.create(name="Summary Field", identifier="KSUM")
+        cls.logsheet = Logsheet.objects.create(
+            log_date="2025-02-01",
+            airfield=cls.airfield,
+            created_by=cls.pilot,
+            finalized=True,
+        )
+        # No instructor, no passenger_id/passenger_name; only the legacy name.
+        Flight.objects.create(
+            logsheet=cls.logsheet,
+            pilot=cls.pilot,
+            glider=cls.glider,
+            legacy_passenger_name="Historical Occupant",
+            launch_time=time(10, 0),
+            landing_time=time(10, 30),
+        )
+
+    def test_legacy_passenger_flight_is_not_solo(self):
+        summary = get_logbook_glider_time_summary(self.pilot)
+        # The last row is the totals row.
+        (row,) = [r for r in summary if r["make_model"] != "Totals"]
+        # The flight is real and present in the totals...
+        assert row["total_count"] == 1
+        # ...but must not be tallied as solo time.
+        assert row["solo_count"] == 0
+        assert row["solo_m"] == 0
+        assert row["solo"] == "0:00"
