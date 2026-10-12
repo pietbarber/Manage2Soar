@@ -20,6 +20,7 @@ from .account_emails import send_account_setup_email
 from .models import (
     Badge,
     Biography,
+    EmergencyContact,
     KioskAccessLog,
     KioskToken,
     Member,
@@ -175,6 +176,11 @@ class MemberBadgeInline(admin.TabularInline):
     model = MemberBadge
     extra = 1  # Show one empty row to add a badge
     autocomplete_fields = ["badge"]  # Optional: if you have lots of badges
+
+
+class EmergencyContactInline(admin.TabularInline):
+    model = EmergencyContact
+    extra = 0
 
 
 #########################
@@ -375,7 +381,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
-    inlines = [MemberBadgeInline]
+    inlines = [MemberBadgeInline, EmergencyContactInline]
 
     list_display = (
         "last_name",

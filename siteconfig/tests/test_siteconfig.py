@@ -1,3 +1,4 @@
+import importlib
 import io
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
@@ -14,6 +15,7 @@ from siteconfig.models import (
     MembershipStatus,
     SiteConfiguration,
     default_member_profile_field_policies,
+    get_member_profile_field_policy,
     validate_member_profile_field_policies,
 )
 from utils.favicon import PWA_CLUB_ICON_NAME
@@ -29,19 +31,11 @@ User = get_user_model()
         {**default_member_profile_field_policies(), "unknown": "direct"},
         {
             **default_member_profile_field_policies(),
-            "username": "unsupported",
+            "email": "request",
         },
         {
             **default_member_profile_field_policies(),
-            "username": [],
-        },
-        {
-            **default_member_profile_field_policies(),
-            "password": "request",
-        },
-        {
-            **default_member_profile_field_policies(),
-            "profile_photo": "request",
+            "email": [],
         },
     ],
 )
@@ -52,6 +46,56 @@ def test_member_profile_policy_validator_rejects_invalid_maps(policies):
 
 def test_member_profile_policy_validator_accepts_complete_policy_map():
     validate_member_profile_field_policies(default_member_profile_field_policies())
+
+
+def test_member_profile_policy_defaults_and_migration_normalization_are_safe():
+    migration = importlib.import_module(
+        "siteconfig.migrations.0054_rebuild_member_profile_policies"
+    )
+
+    assert default_member_profile_field_policies() == {
+        "email": "disabled",
+        "emergency_contacts": "direct",
+        "profile_photo": "direct",
+        "biography": "direct",
+        "password": "direct",
+        "contact_visibility": "direct",
+    }
+    assert migration.normalize_member_profile_field_policies(
+        {"email": "request", "username": "direct", "biography": "disabled"}
+    ) == {
+        **default_member_profile_field_policies(),
+        "biography": "disabled",
+    }
+
+
+@pytest.mark.django_db
+def test_member_profile_policy_master_toggle_and_username_are_disabled():
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "email": "direct",
+        },
+    )
+
+    assert get_member_profile_field_policy("email", config) == "direct"
+    assert get_member_profile_field_policy("username", config) == "disabled"
+    config.member_profile_self_service_enabled = False
+    assert get_member_profile_field_policy("email", config) == "disabled"
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_admin_form_uses_direct_edit_toggles_only():
+    from siteconfig.admin import SiteConfigurationAdminForm
+
+    form = SiteConfigurationAdminForm()
+
+    assert "member_profile_field_policies" not in form.fields
+    assert form.fields["member_profile_email_direct_edit"].initial is False
+    assert form.fields["member_profile_password_direct_edit"].initial is True
 
 
 @pytest.mark.django_db

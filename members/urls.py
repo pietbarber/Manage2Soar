@@ -15,6 +15,7 @@ urlpatterns = [
     path("<int:member_id>/biography/", views.biography_view, name="biography_view"),
     path("tinymce/", include("tinymce.urls")),
     path("<int:member_id>/view/", views.member_view, name="member_view"),
+    path("account-settings/", views.account_settings, name="account_settings"),
     path("email/change/", views.request_email_change, name="request_email_change"),
     path(
         "email/confirm/<str:token>/",

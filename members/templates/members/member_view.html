@@ -155,7 +155,17 @@
                 <div>
                   <strong class="d-block">Email</strong>
                   {% if can_view_email %}
-                    {% if member.email and "@" in member.email %}
+                    {% if contact_requires_reveal.email %}
+                      <span class="text-muted fst-italic">Redacted</span>
+                      <button id="contact-email-reveal" type="button" class="btn btn-link btn-sm p-0 ms-2 contact-reveal-button" data-contact-reveal="contact-email-value" aria-controls="contact-email-value" aria-expanded="false">Reveal private email</button>
+                      <span id="contact-email-value" hidden>
+                        {% if member.email and "@" in member.email %}
+                          <a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>
+                        {% else %}
+                          <span class="text-muted">{{ member.email }}</span>
+                        {% endif %}
+                      </span>
+                    {% elif member.email and "@" in member.email %}
                       <a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>
                     {% else %}
                       <span class="text-muted">{{ member.email }}</span>
@@ -172,7 +182,17 @@
                 <div>
                   <strong class="d-block">Phone</strong>
                   {% if can_view_phone and phone_display %}
-                    {% if phone_link %}
+                    {% if contact_requires_reveal.phone %}
+                      <span class="text-muted fst-italic">Redacted</span>
+                      <button id="contact-phone-reveal" type="button" class="btn btn-link btn-sm p-0 ms-2 contact-reveal-button" data-contact-reveal="contact-phone-value" aria-controls="contact-phone-value" aria-expanded="false">Reveal private phone</button>
+                      <span id="contact-phone-value" hidden>
+                        {% if phone_link %}
+                          <a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a>
+                        {% else %}
+                          <span class="text-muted">{{ phone_display|format_us_phone }}</span>
+                        {% endif %}
+                      </span>
+                    {% elif phone_link %}
                       <a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a>
                     {% else %}
                       <span class="text-muted">{{ phone_display|format_us_phone }}</span>
@@ -190,7 +210,17 @@
                 <div>
                   <strong class="d-block">Mobile</strong>
                   {% if can_view_phone and mobile_display %}
-                    {% if mobile_link %}
+                    {% if contact_requires_reveal.phone %}
+                      <span class="text-muted fst-italic">Redacted</span>
+                      <button id="contact-mobile-reveal" type="button" class="btn btn-link btn-sm p-0 ms-2 contact-reveal-button" data-contact-reveal="contact-mobile-value" aria-controls="contact-mobile-value" aria-expanded="false">Reveal private mobile number</button>
+                      <span id="contact-mobile-value" hidden>
+                        {% if mobile_link %}
+                          <a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a>
+                        {% else %}
+                          <span class="text-muted">{{ mobile_display|format_us_phone }}</span>
+                        {% endif %}
+                      </span>
+                    {% elif mobile_link %}
                       <a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a>
                     {% else %}
                       <span class="text-muted">{{ mobile_display|format_us_phone }}</span>
@@ -209,11 +239,21 @@
                 <div>
                   <strong class="d-block">Address</strong>
                   {% if can_view_address and member.address %}
-                    <address class="mb-0">
-                      {{ member.address }}<br>
-                      {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
-                      {{ member.country }}
-                    </address>
+                    {% if contact_requires_reveal.address %}
+                      <span class="text-muted fst-italic">Redacted</span>
+                      <button id="contact-address-reveal" type="button" class="btn btn-link btn-sm p-0 ms-2 contact-reveal-button" data-contact-reveal="contact-address-value" aria-controls="contact-address-value" aria-expanded="false">Reveal private address</button>
+                      <address id="contact-address-value" class="mb-0" hidden>
+                        {{ member.address }}<br>
+                        {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
+                        {{ member.country }}
+                      </address>
+                    {% else %}
+                      <address class="mb-0">
+                        {{ member.address }}<br>
+                        {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
+                        {{ member.country }}
+                      </address>
+                    {% endif %}
                   {% else %}
                     <span class="text-muted fst-italic">Redacted</span>
                   {% endif %}
@@ -653,6 +693,16 @@
         setTimeout(function () { showRedactionModal(retries - 1); }, 100);
       }
     })(20);
+
+    document.querySelectorAll('[data-contact-reveal]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var value = document.getElementById(button.dataset.contactReveal);
+        if (!value) return;
+        value.hidden = false;
+        button.setAttribute('aria-expanded', 'true');
+        button.hidden = true;
+      });
+    });
 
     // Load qualification modal content via HTMX and show modal
     function loadQualificationModal(url) {

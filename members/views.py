@@ -299,6 +299,11 @@ def member_view(request, member_id):
         and get_member_profile_field_policy("contact_visibility", site_config)
         == "direct"
     )
+    privileged_contact_reveal = is_privileged_viewer(request.user) and not is_self
+    contact_requires_reveal = {
+        field: privileged_contact_reveal and not effective_contact_visibility[field]
+        for field in ("email", "phone", "address")
+    }
     qr_png = generate_vcard_qr(
         member,
         include_contact=can_view_personal,
@@ -340,17 +345,7 @@ def member_view(request, member_id):
 
     if is_self and request.method == "POST":
         if profile_photo_policy != "direct":
-            if profile_photo_policy == "request":
-                messages.warning(
-                    request,
-                    "Changing your profile photo requires approval by a member manager.",
-                )
-            else:
-                messages.error(
-                    request,
-                    "Profile photo updates are currently disabled by the club.",
-                )
-            return redirect("members:member_view", member_id=member.pk)
+            return render(request, "403.html", status=403)
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
             form.save()
@@ -371,6 +366,7 @@ def member_view(request, member_id):
         "can_view_email": contact_visibility["email"],
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
+        "contact_requires_reveal": contact_requires_reveal,
         "can_view_policy": can_view_policy,
         "privacy_sharing": (effective_contact_visibility if can_view_policy else None),
         "privacy_settings": (
@@ -412,7 +408,10 @@ def member_view(request, member_id):
         ),
         "form": form,
         "is_self": is_self,
-        "can_edit": can_edit and (not is_self or biography_policy == "direct"),
+        # Staff retain the existing management path regardless of a member's
+        # self-service policy.
+        "can_edit": request.user.is_superuser
+        or (is_self and biography_policy == "direct"),
         "can_change_password": is_self
         and get_member_profile_field_policy("password", site_config) == "direct",
         "can_update_emergency_contacts": is_self
@@ -449,6 +448,23 @@ def member_vcard(request, member_id):
 
 
 @active_member_required
+def account_settings(request):
+    site_config = SiteConfiguration.objects.first()
+    return render(
+        request,
+        "members/account_settings.html",
+        {
+            "can_change_email": get_member_profile_field_policy("email", site_config)
+            == "direct",
+            "can_change_password": get_member_profile_field_policy(
+                "password", site_config
+            )
+            == "direct",
+        },
+    )
+
+
+@active_member_required
 @require_http_methods(["POST"])
 def request_email_change(request):
     if get_member_profile_field_policy("email") != "direct":
@@ -459,11 +475,11 @@ def request_email_change(request):
         new_email = forms.EmailField().clean(new_email)
     except ValidationError:
         messages.error(request, "Enter a valid email address.")
-        return redirect("members:member_view", member_id=request.user.id)
+        return redirect("members:account_settings")
 
     if new_email == request.user.email.lower():
         messages.info(request, "That is already your current email address.")
-        return redirect("members:member_view", member_id=request.user.id)
+        return redirect("members:account_settings")
 
     request.user.pending_email = new_email
     request.user.pending_email_requested_at = timezone.now()
@@ -493,7 +509,7 @@ def request_email_change(request):
         ),
     )
     messages.success(request, "A confirmation link was sent to your new email address.")
-    return redirect("members:member_view", member_id=request.user.id)
+    return redirect("members:account_settings")
 
 
 @require_http_methods(["GET", "POST"])
@@ -552,17 +568,7 @@ def update_contact_visibility(request, member_id):
 
     policy = get_member_profile_field_policy("contact_visibility")
     if policy != "direct":
-        if policy == "request":
-            messages.warning(
-                request,
-                "Changing contact visibility requires approval by a member manager.",
-            )
-        else:
-            messages.error(
-                request,
-                "Updating contact visibility is currently disabled by the club.",
-            )
-        return redirect("members:member_view", member_id=member.id)
+        return render(request, "403.html", status=403)
 
     contact_visibility = dict(member.contact_visibility or {})
     for field in ("email", "phone", "address"):
@@ -592,17 +598,7 @@ def emergency_contact_edit(request, member_id, contact_id=None):
 
     policy = get_member_profile_field_policy("emergency_contacts")
     if policy != "direct":
-        if policy == "request":
-            messages.warning(
-                request,
-                "Emergency contact changes require approval by a member manager.",
-            )
-        else:
-            messages.error(
-                request,
-                "Emergency contact updates are currently disabled by the club.",
-            )
-        return redirect("members:member_view", member_id=member.id)
+        return render(request, "403.html", status=403)
 
     contact = None
     if contact_id is not None:
@@ -633,24 +629,15 @@ def emergency_contact_delete(request, member_id, contact_id):
         member = get_object_or_404(members, pk=member_id)
         if request.user != member:
             return render(request, "403.html", status=403)
-        contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
 
         # Keep the policy check, contact recount, and the delete mutation inside
         # the same transaction that holds the member row lock, so a concurrent
         # delete cannot slip through the "final contact" recount.
         policy = get_member_profile_field_policy("emergency_contacts")
         if policy != "direct":
-            if policy == "request":
-                messages.warning(
-                    request,
-                    "Removing emergency contacts requires approval by a member manager.",
-                )
-            else:
-                messages.error(
-                    request,
-                    "Emergency contact updates are currently disabled by the club.",
-                )
-            return redirect("members:member_view", member_id=member.id)
+            return render(request, "403.html", status=403)
+
+        contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
 
         is_last_contact = member.emergency_contacts.count() == 1
         form = (
@@ -734,16 +721,7 @@ def biography_view(request, member_id):
     if request.user == member:
         policy = get_member_profile_field_policy("biography")
         if policy != "direct":
-            if policy == "request":
-                messages.warning(
-                    request,
-                    "Biography changes require approval by a member manager.",
-                )
-            else:
-                messages.error(
-                    request, "Biography updates are currently disabled by the club."
-                )
-            return redirect("members:member_view", member_id=member.pk)
+            return render(request, "403.html", status=403)
 
     if request.method == "POST" and can_edit:
         form = BiographyForm(request.POST, request.FILES, instance=biography)
@@ -816,22 +794,19 @@ def set_password(request):
     member = request.user
     policy = get_member_profile_field_policy("password")
     if policy != "direct":
-        if policy == "request":
-            messages.warning(
-                request,
-                "Password changes require approval by a member manager.",
-            )
-        else:
-            messages.error(
-                request, "Password changes are currently disabled by the club."
-            )
-        return redirect("members:member_view", member_id=member.pk)
+        return render(request, "403.html", status=403)
 
     if request.method == "POST":
         form = SetPasswordForm(request.POST)
         if form.is_valid():
             member.set_password(form.cleaned_data["new_password1"])
             member.save()
+            _send_account_security_email(
+                member.email,
+                "Your Manage2Soar password changed",
+                "Your Manage2Soar password was changed. If you did not make this "
+                "change, contact a club manager immediately.",
+            )
             messages.success(request, "Password changed successfully.")
             return redirect("members:member_list")
     else:

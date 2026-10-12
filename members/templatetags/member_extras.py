@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 
 from members.utils.kiosk import is_kiosk_session as check_kiosk_session
 from members.utils.roles import get_member_role_metadata
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
 
 register = template.Library()
 
@@ -233,6 +233,12 @@ def can_view_personal_info_tag(context, member):
     request = context.get("request")
     user = getattr(request, "user", None) if request else None
     return can_view_personal_info(user, member)
+
+
+@register.simple_tag
+def can_self_edit_profile_field(field, site_config=None):
+    """Return whether the club permits direct member self-service for a field."""
+    return get_member_profile_field_policy(field, site_config) == "direct"
 
 
 @register.simple_tag(takes_context=True)

@@ -33,6 +33,50 @@ def make_email_token(member, email):
 
 
 @pytest.mark.django_db
+def test_account_settings_shows_direct_email_and_password_controls(client):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="account_settings",
+        email="current@example.com",
+        membership_status="Email Active",
+    )
+    member.pending_email = "pending@example.com"
+    member.save(update_fields=["pending_email"])
+    client.force_login(member)
+
+    response = client.get(reverse("members:account_settings"))
+
+    assert response.status_code == 200
+    assert reverse("members:request_email_change").encode() in response.content
+    assert reverse("members:set_password").encode() in response.content
+    assert b"pending@example.com" in response.content
+    assert b'name="username"' not in response.content
+
+
+@pytest.mark.django_db
+def test_account_settings_has_safe_empty_state_when_controls_are_disabled(client):
+    config = configure_email_changes()
+    policies = config.member_profile_field_policies
+    policies["email"] = "disabled"
+    policies["password"] = "disabled"
+    config.member_profile_field_policies = policies
+    config.save(update_fields=["member_profile_field_policies"])
+    member = Member.objects.create_user(
+        username="account_settings_disabled",
+        email="current@example.com",
+        membership_status="Email Active",
+    )
+    client.force_login(member)
+
+    response = client.get(reverse("members:account_settings"))
+
+    assert response.status_code == 200
+    assert b"does not currently allow self-service account changes" in response.content
+    assert reverse("members:request_email_change").encode() not in response.content
+    assert reverse("members:set_password").encode() not in response.content
+
+
+@pytest.mark.django_db
 def test_email_change_request_stores_pending_email_and_sends_confirmation(
     client, mailoutbox
 ):
@@ -49,6 +93,7 @@ def test_email_change_request_stores_pending_email_and_sends_confirmation(
     )
 
     assert response.status_code == 302
+    assert response.url == reverse("members:account_settings")
     member.refresh_from_db()
     assert member.email == "old@example.com"
     assert member.pending_email == "new@example.com"

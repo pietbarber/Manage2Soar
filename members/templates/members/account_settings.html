@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Account Settings{% endblock %}
+
+{% block content %}
+<div class="account-settings py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+      <h1 class="h2 mb-1">Account settings</h1>
+      <p class="text-muted mb-0">Manage the account details your club allows you to update.</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'members:member_view' member_id=user.pk %}">
+      <i class="bi bi-person me-1" aria-hidden="true"></i>View profile
+    </a>
+  </div>
+
+  <div class="row g-4">
+    {% if can_change_email %}
+    <div class="col-12 col-lg-6">
+      <section class="card h-100" aria-labelledby="email-settings-heading">
+        <div class="card-body">
+          <h2 class="h4" id="email-settings-heading">Email address</h2>
+          <p class="mb-1"><strong>Current email:</strong> {{ user.email|default:"Not set" }}</p>
+          {% if user.pending_email %}
+          <div class="alert alert-info mt-3 mb-3" role="status">
+            Confirmation is pending for <strong>{{ user.pending_email }}</strong>. Check that address for the confirmation link.
+          </div>
+          {% endif %}
+          <form method="post" action="{% url 'members:request_email_change' %}">
+            {% csrf_token %}
+            <label class="form-label" for="id_email">New email address</label>
+            <input class="form-control" type="email" name="email" id="id_email" autocomplete="email" required aria-describedby="email-help">
+            <div class="form-text" id="email-help">We will send a confirmation link to the new address.</div>
+            <button class="btn btn-primary mt-3" type="submit">Send confirmation link</button>
+          </form>
+        </div>
+      </section>
+    </div>
+    {% endif %}
+
+    {% if can_change_password %}
+    <div class="col-12 col-lg-6">
+      <section class="card h-100" aria-labelledby="password-settings-heading">
+        <div class="card-body">
+          <h2 class="h4" id="password-settings-heading">Password</h2>
+          <p class="text-muted">Set or change the password used to sign in to Manage2Soar.</p>
+          <a class="btn btn-outline-primary" href="{% url 'members:set_password' %}">
+            <i class="bi bi-key me-1" aria-hidden="true"></i>Change password
+          </a>
+        </div>
+      </section>
+    </div>
+    {% endif %}
+
+    {% if not can_change_email and not can_change_password %}
+    <div class="col-12">
+      <div class="alert alert-secondary mb-0" role="status">
+        Your club does not currently allow self-service account changes. Contact a club manager for help.
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

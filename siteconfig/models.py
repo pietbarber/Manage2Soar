@@ -15,12 +15,8 @@ from utils.favicon import generate_favicon_from_logo
 from utils.upload_entropy import upload_site_logo
 
 MEMBER_PROFILE_POLICY_FIELDS = (
-    "username",
     "email",
-    "phone",
-    "address",
     "emergency_contacts",
-    "nickname",
     "profile_photo",
     "biography",
     "password",
@@ -30,12 +26,8 @@ MEMBER_PROFILE_POLICY_FIELDS = (
 
 def default_member_profile_field_policies():
     return {
-        "username": "direct",
-        "email": "request",
-        "phone": "request",
-        "address": "request",
+        "email": "disabled",
         "emergency_contacts": "direct",
-        "nickname": "request",
         "profile_photo": "direct",
         "biography": "direct",
         "password": "direct",
@@ -49,14 +41,8 @@ def validate_member_profile_field_policies(value):
             "Profile field policies must define exactly the supported fields."
         )
 
-    allowed_policies = {"disabled", "direct", "request"}
     for field, policy in value.items():
-        allowed = (
-            {"disabled", "direct"}
-            if field in {"password", "profile_photo"}
-            else allowed_policies
-        )
-        if not isinstance(policy, str) or policy not in allowed:
+        if not isinstance(policy, str) or policy not in {"disabled", "direct"}:
             raise ValidationError(
                 "Invalid policy for %(field)s: %(policy)s.",
                 params={"field": field, "policy": policy},
@@ -64,14 +50,14 @@ def validate_member_profile_field_policies(value):
 
 
 def get_member_profile_field_policy(field, site_config=None):
+    if field not in MEMBER_PROFILE_POLICY_FIELDS:
+        return "disabled"
     if site_config is None:
         site_config = SiteConfiguration.objects.first()
     if not site_config or not site_config.member_profile_self_service_enabled:
         return "disabled"
     policy = site_config.member_profile_field_policies.get(field, "disabled")
-    if field in {"password", "profile_photo"} and policy == "request":
-        return "disabled"
-    return policy
+    return policy if policy in {"disabled", "direct"} else "disabled"
 
 
 class MailingListCriterion(models.TextChoices):

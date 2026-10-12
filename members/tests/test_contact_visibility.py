@@ -444,6 +444,39 @@ def test_staff_contact_legend_shows_regular_member_visibility():
 
 
 @pytest.mark.django_db
+def test_privileged_profile_hides_regular_member_private_values_until_revealed(client):
+    MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    viewer = Member.objects.create_user(
+        username="private_contact_staff",
+        email="staff@example.com",
+        is_staff=True,
+        membership_status="Privacy Active",
+    )
+    subject = Member.objects.create_user(
+        username="private_contact_member",
+        email="private@example.com",
+        phone="6615550100",
+        address="1 Private Way",
+        contact_visibility={"email": "hide", "phone": "hide", "address": "hide"},
+        membership_status="Privacy Active",
+    )
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_view", args=[subject.pk]))
+
+    assert response.status_code == 200
+    assert response.context["contact_requires_reveal"] == {
+        "email": True,
+        "phone": True,
+        "address": True,
+    }
+    assert b'id="contact-email-value" hidden' in response.content
+    assert b'id="contact-phone-value" hidden' in response.content
+    assert b'id="contact-address-value" class="mb-0" hidden' in response.content
+
+
+@pytest.mark.django_db
 def test_master_self_service_switch_blocks_member_edit_endpoints(client):
     MembershipStatus.objects.create(name="Privacy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
@@ -491,18 +524,18 @@ def test_master_self_service_switch_blocks_member_edit_endpoints(client):
     )
 
     assert all(
-        response.status_code == 302
+        response.status_code == 403
         for response in (
             profile_post,
             password_post,
             visibility_post,
             emergency_post,
             biography_post,
-            legacy_post,
         )
     )
+    assert legacy_post.status_code == 302
     member.refresh_from_db()
-    assert member.profile_photo.name == original_photo
+    assert member.profile_photo.name == (original_photo or "")
     assert member.contact_visibility == {}
     assert member.emergency_contacts.count() == 0
     assert not member.redact_contact
@@ -510,12 +543,11 @@ def test_master_self_service_switch_blocks_member_edit_endpoints(client):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("policy", ["disabled", "request"])
-def test_contact_visibility_endpoint_rejects_non_direct_policies(client, policy):
+def test_contact_visibility_endpoint_rejects_disabled_policy(client):
     MembershipStatus.objects.create(name="Policy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
     policies = default_member_profile_field_policies()
-    policies["contact_visibility"] = policy
+    policies["contact_visibility"] = "disabled"
     SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="testclub.com",
@@ -523,7 +555,7 @@ def test_contact_visibility_endpoint_rejects_non_direct_policies(client, policy)
         member_profile_field_policies=policies,
     )
     member = Member.objects.create_user(
-        username=f"policy_{policy}", membership_status="Policy Active"
+        username="disabled_policy", membership_status="Policy Active"
     )
     client.force_login(member)
 
@@ -532,7 +564,7 @@ def test_contact_visibility_endpoint_rejects_non_direct_policies(client, policy)
         {"visibility_email": "share"},
     )
 
-    assert response.status_code == 302
+    assert response.status_code == 403
     member.refresh_from_db()
     assert member.contact_visibility == {}
 

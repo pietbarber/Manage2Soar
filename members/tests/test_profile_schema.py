@@ -1,6 +1,11 @@
 import pytest
+from django.contrib import admin
 
-from members.admin import CustomMemberChangeForm
+from members.admin import (
+    CustomMemberChangeForm,
+    EmergencyContactInline,
+    MemberAdmin,
+)
 from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
 
@@ -76,3 +81,10 @@ def test_admin_contact_visibility_controls_preserve_inherit_share_and_hide():
         "share",
         "hide",
     ]
+
+
+def test_member_admin_registers_structured_emergency_contact_inline():
+    assert EmergencyContactInline in MemberAdmin.inlines
+    assert issubclass(EmergencyContactInline, admin.TabularInline)
+    assert EmergencyContactInline.model is EmergencyContact
+    assert EmergencyContactInline.extra == 0

@@ -321,3 +321,12 @@
     color: #212529;
     box-shadow: 0 2px 6px rgba(255, 193, 7, 0.3);
 }
+
+/* Account settings keeps optional controls balanced when one is unavailable. */
+.account-settings .card {
+    border-color: var(--bs-border-color);
+}
+
+.contact-reveal-button {
+    vertical-align: baseline;
+}
