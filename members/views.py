@@ -275,6 +275,11 @@ def member_view(request, member_id):
         field: contact_field_visibility(member, field, site_config)["shared"]
         for field in ("email", "phone", "address")
     }
+    mask_contact_values = is_privileged_viewer(request.user) and not is_self
+    redact_contact_fields = {
+        field: mask_contact_values and not effective_contact_visibility[field]
+        for field in ("email", "phone", "address")
+    }
     can_view_personal = can_view_personal_info_fn(request.user, member)
     can_view_policy = (
         is_self
@@ -353,6 +358,8 @@ def member_view(request, member_id):
         "can_view_email": contact_visibility["email"],
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
+        "redact_contact_fields": redact_contact_fields,
+        "has_staff_redactions": any(redact_contact_fields.values()),
         "can_view_policy": can_view_policy,
         "privacy_sharing": (effective_contact_visibility if can_view_policy else None),
         "privacy_settings": (

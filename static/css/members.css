@@ -99,6 +99,23 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
+.staff-reveal {
+    cursor: pointer;
+}
+
+.staff-reveal:hover .staff-redacted,
+.staff-reveal:focus .staff-redacted {
+    text-decoration: underline;
+}
+
+.staff-reveal.is-revealed .staff-redacted {
+    display: none;
+}
+
+.staff-reveal.is-revealed .staff-revealed {
+    display: inline !important;
+}
+
 .contact-info .list-group-item {
     border: none;
     padding: 0.75rem 0;

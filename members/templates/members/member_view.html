@@ -13,7 +13,7 @@
   {% get_siteconfig as siteconfig %}
   {% can_view_personal_info_tag member as can_view_personal %}
 
-  {% if member.redact_contact and request.user.member_manager %}
+  {% if has_staff_redactions %}
   <!-- Modal shown to member_managers to inform about redaction policy -->
   <div class="modal fade" id="redaction-alert-modal" tabindex="-1" aria-labelledby="redactionAlertLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -23,8 +23,8 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p>This member has chosen to redact their personal contact information on the public members directory.</p>
-          <p>As {{ siteconfig.membership_manager_title|default:'Member Meister' }}, you may view this information when necessary. Please exercise discretion when sharing or using it.</p>
+          <p>Some contact details are hidden by this member's privacy settings.</p>
+          <p>Click a <strong>Redacted</strong> field to reveal it temporarily. Please exercise discretion when sharing or using private information.</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Dismiss</button>
@@ -156,7 +156,7 @@
                   <strong class="d-block">Email</strong>
                   {% if can_view_email %}
                     {% if member.email and "@" in member.email %}
-                      <a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>
+                      {% if redact_contact_fields.email %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none"><a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a></span></span>{% else %}<a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>{% endif %}
                     {% else %}
                       <span class="text-muted">{{ member.email }}</span>
                     {% endif %}
@@ -173,9 +173,9 @@
                   <strong class="d-block">Phone</strong>
                   {% if can_view_phone and phone_display %}
                     {% if phone_link %}
-                      <a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a>
+                      {% if redact_contact_fields.phone %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none"><a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a></span></span>{% else %}<a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a>{% endif %}
                     {% else %}
-                      <span class="text-muted">{{ phone_display|format_us_phone }}</span>
+                      {% if redact_contact_fields.phone %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none">{{ phone_display|format_us_phone }}</span></span>{% else %}<span class="text-muted">{{ phone_display|format_us_phone }}</span>{% endif %}
                     {% endif %}
                   {% else %}
                     <span class="text-muted fst-italic">Redacted</span>
@@ -191,9 +191,9 @@
                   <strong class="d-block">Mobile</strong>
                   {% if can_view_phone and mobile_display %}
                     {% if mobile_link %}
-                      <a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a>
+                      {% if redact_contact_fields.phone %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none"><a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a></span></span>{% else %}<a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a>{% endif %}
                     {% else %}
-                      <span class="text-muted">{{ mobile_display|format_us_phone }}</span>
+                      {% if redact_contact_fields.phone %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none">{{ mobile_display|format_us_phone }}</span></span>{% else %}<span class="text-muted">{{ mobile_display|format_us_phone }}</span>{% endif %}
                     {% endif %}
                   {% else %}
                     <span class="text-muted fst-italic">Redacted</span>
@@ -209,11 +209,15 @@
                 <div>
                   <strong class="d-block">Address</strong>
                   {% if can_view_address and member.address %}
-                    <address class="mb-0">
+                    {% if redact_contact_fields.address %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><address class="staff-revealed d-none mb-0">
                       {{ member.address }}<br>
                       {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
                       {{ member.country }}
-                    </address>
+                    </address></span>{% else %}<address class="mb-0">
+                      {{ member.address }}<br>
+                      {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
+                      {{ member.country }}
+                    </address>{% endif %}
                   {% else %}
                     <span class="text-muted fst-italic">Redacted</span>
                   {% endif %}
@@ -225,24 +229,36 @@
       </div>
 
       {% if privacy_sharing and can_view_policy %}
-      <div class="card mb-4">
-        <div class="card-header"><i class="bi bi-shield-lock me-2"></i>Contact Privacy</div>
-        <form method="post" action="{% url 'members:update_contact_visibility' member.id %}" class="card-body">
-          {% csrf_token %}
-          <p class="small text-muted">Choose which contact details other regular members can see. Inherit uses the club default.</p>
-          {% for setting in privacy_settings %}
-          <div class="mb-3">
-            <label class="form-label" for="visibility_{{ setting.field }}">{{ setting.label }}</label>
-            <select class="form-select" name="visibility_{{ setting.field }}" id="visibility_{{ setting.field }}">
-              <option value="inherit"{% if setting.preference == "inherit" %} selected{% endif %}>Inherit club default</option>
-              <option value="share"{% if setting.preference == "share" %} selected{% endif %}>Share</option>
-              <option value="hide"{% if setting.preference == "hide" %} selected{% endif %}>Hide</option>
-            </select>
-            <small class="text-muted">Currently {% if setting.shared %}visible{% else %}hidden{% endif %} to regular members.</small>
+      <div class="modal fade" id="privacySettingsModal" tabindex="-1" aria-labelledby="privacySettingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="privacySettingsModalLabel"><i class="bi bi-shield-lock me-2"></i>Contact Privacy</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'members:update_contact_visibility' member.id %}">
+              {% csrf_token %}
+              <div class="modal-body">
+                <p class="text-muted">Choose whether each contact detail follows the club default or is shared or hidden.</p>
+                {% for setting in privacy_settings %}
+                <div class="mb-3">
+                  <label class="form-label" for="visibility_{{ setting.field }}">{{ setting.label }}</label>
+                  <select class="form-select" name="visibility_{{ setting.field }}" id="visibility_{{ setting.field }}">
+                    <option value="inherit"{% if setting.preference == "inherit" %} selected{% endif %}>Inherit club default</option>
+                    <option value="share"{% if setting.preference == "share" %} selected{% endif %}>Share</option>
+                    <option value="hide"{% if setting.preference == "hide" %} selected{% endif %}>Hide</option>
+                  </select>
+                  <small class="text-muted">Currently {% if setting.shared %}visible{% else %}hidden{% endif %} to regular members.</small>
+                </div>
+                {% endfor %}
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" type="submit"><i class="bi bi-check-circle me-1"></i>Save Privacy Settings</button>
+              </div>
+            </form>
           </div>
-          {% endfor %}
-          <button class="btn btn-sm btn-primary" type="submit">Save Privacy Settings</button>
-        </form>
+        </div>
       </div>
       {% endif %}
 
@@ -635,6 +651,17 @@
 {% endblock %}
 
 {% block extra_scripts %}
+  <script>
+    document.querySelectorAll('.staff-reveal').forEach((element) => {
+      element.addEventListener('click', () => element.classList.toggle('is-revealed'));
+      element.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          element.classList.toggle('is-revealed');
+        }
+      });
+    });
+  </script>
   <script>
     // Defensive modal auto-show for membership managers when viewing a redacted member.
     (function showRedactionModal(retries) {

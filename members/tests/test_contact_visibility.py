@@ -377,6 +377,8 @@ def test_profile_privacy_controls_show_member_overrides():
         },
     ]
     assert b'name="visibility_email" id="visibility_email"' in response.content
+    assert b"privacySettingsModal" in response.content
+    assert b"Privacy Settings" in response.content
     assert b'<option value="hide" selected>Hide</option>' in response.content
     assert (
         b'<option value="inherit" selected>Inherit club default</option>'
@@ -423,6 +425,7 @@ def test_staff_contact_legend_shows_regular_member_visibility():
         username="hidden_member",
         first_name="Hidden",
         last_name="Member",
+        email="hidden@example.com",
         contact_visibility={"email": "hide"},
     )
     client = Client()
@@ -441,6 +444,8 @@ def test_staff_contact_legend_shows_regular_member_visibility():
         "shared": False,
         "source": "member choice: Hide",
     }
+    assert b'class="staff-reveal"' in response.content
+    assert b"privacySettingsModal" not in response.content
 
 
 @pytest.mark.django_db
