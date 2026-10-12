@@ -17,6 +17,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -414,6 +415,8 @@ def member_view(request, member_id):
         or (is_self and biography_policy == "direct"),
         "can_change_password": is_self
         and get_member_profile_field_policy("password", site_config) == "direct",
+        "can_change_email": is_self
+        and get_member_profile_field_policy("email", site_config) == "direct",
         "can_update_emergency_contacts": is_self
         and emergency_contacts_policy == "direct",
         "biography": biography,
@@ -448,23 +451,6 @@ def member_vcard(request, member_id):
 
 
 @active_member_required
-def account_settings(request):
-    site_config = SiteConfiguration.objects.first()
-    return render(
-        request,
-        "members/account_settings.html",
-        {
-            "can_change_email": get_member_profile_field_policy("email", site_config)
-            == "direct",
-            "can_change_password": get_member_profile_field_policy(
-                "password", site_config
-            )
-            == "direct",
-        },
-    )
-
-
-@active_member_required
 @require_http_methods(["POST"])
 def request_email_change(request):
     if get_member_profile_field_policy("email") != "direct":
@@ -475,11 +461,11 @@ def request_email_change(request):
         new_email = forms.EmailField().clean(new_email)
     except ValidationError:
         messages.error(request, "Enter a valid email address.")
-        return redirect("members:account_settings")
+        return redirect("members:member_view", member_id=request.user.pk)
 
     if new_email == request.user.email.lower():
         messages.info(request, "That is already your current email address.")
-        return redirect("members:account_settings")
+        return redirect("members:member_view", member_id=request.user.pk)
 
     request.user.pending_email = new_email
     request.user.pending_email_requested_at = timezone.now()
@@ -491,25 +477,50 @@ def request_email_change(request):
     confirmation_url = request.build_absolute_uri(
         reverse("members:confirm_email_change", args=[token])
     )
-    DevModeEmailMultiAlternatives(
+    site_config = SiteConfiguration.objects.first()
+    context = {
+        "site_name": site_config.club_name if site_config else "Manage2Soar",
+        "new_email": new_email,
+        "confirmation_url": confirmation_url,
+    }
+    confirmation_message = DevModeEmailMultiAlternatives(
         subject="Confirm your Manage2Soar email address",
-        body=(
-            f"Confirm your new email address by visiting:\n\n{confirmation_url}\n\n"
-            "This link expires in 24 hours."
-        ),
+        body=render_to_string("members/emails/email_change_confirmation.txt", context),
         from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
         to=[new_email],
-    ).send()
-    _send_account_security_email(
-        request.user.email,
-        "Manage2Soar email change requested",
-        (
-            f"A request was made to change your Manage2Soar email address to "
-            f"{new_email}. If you did not make this request, contact a club manager."
-        ),
     )
+    confirmation_message.attach_alternative(
+        render_to_string("members/emails/email_change_confirmation.html", context),
+        "text/html",
+    )
+    confirmation_message.send()
+    security_message = DevModeEmailMultiAlternatives(
+        subject="Manage2Soar email change requested",
+        body=render_to_string(
+            "members/emails/email_change_security_notice.txt", context
+        ),
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[request.user.email],
+    )
+    security_message.attach_alternative(
+        render_to_string("members/emails/email_change_security_notice.html", context),
+        "text/html",
+    )
+    security_message.send()
     messages.success(request, "A confirmation link was sent to your new email address.")
-    return redirect("members:account_settings")
+    return redirect("members:email_change_requested")
+
+
+@active_member_required
+def email_change_requested(request):
+    if not request.user.pending_email:
+        return redirect("members:member_view", member_id=request.user.pk)
+
+    return render(
+        request,
+        "members/email_change_requested.html",
+        {"pending_email": request.user.pending_email},
+    )
 
 
 @require_http_methods(["GET", "POST"])
@@ -531,7 +542,7 @@ def confirm_email_change(request, token):
         return render(
             request,
             "members/confirm_email_change.html",
-            {"pending_email": member.pending_email},
+            {"member": member, "pending_email": member.pending_email},
         )
 
     with transaction.atomic():
@@ -547,14 +558,22 @@ def confirm_email_change(request, token):
         member.save(
             update_fields=["email", "pending_email", "pending_email_requested_at"]
         )
-    _send_account_security_email(
-        old_email,
-        "Your Manage2Soar email address changed",
-        (
-            f"Your Manage2Soar email address changed to {member.email}. "
-            "If you did not make this change, contact a club manager."
-        ),
+    site_config = SiteConfiguration.objects.first()
+    context = {
+        "site_name": site_config.club_name if site_config else "Manage2Soar",
+        "new_email": member.email,
+    }
+    completion_message = DevModeEmailMultiAlternatives(
+        subject="Your Manage2Soar email address changed",
+        body=render_to_string("members/emails/email_change_completed.txt", context),
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[old_email],
     )
+    completion_message.attach_alternative(
+        render_to_string("members/emails/email_change_completed.html", context),
+        "text/html",
+    )
+    completion_message.send()
     messages.success(request, "Your email address has been updated.")
     return redirect("members:member_view", member_id=member.id)
 

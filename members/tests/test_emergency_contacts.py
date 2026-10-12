@@ -283,6 +283,7 @@ def test_profile_reuses_site_configuration_for_all_policies(member, direct_polic
         "emergency_contacts",
         "contact_visibility",
         "password",
+        "email",
     ]
     site_configs = [call.args[1] for call in policy_lookup.call_args_list]
     assert site_configs[0] is not None

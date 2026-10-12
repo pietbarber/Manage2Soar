@@ -320,11 +320,6 @@
               <li><a class="dropdown-item" href="{% url 'members:member_view' member_id=user.pk %}">
                 <i class="fas fa-user me-1"></i> View my Profile
               </a></li>
-              {% if user.is_active_member %}
-              <li><a class="dropdown-item" href="{% url 'members:account_settings' %}">
-                <i class="fas fa-user-cog me-1"></i> Account Settings
-              </a></li>
-              {% endif %}
               {% can_self_edit_profile_field "biography" siteconfig as can_edit_biography %}
               {% if can_edit_biography %}
               <li><a class="dropdown-item" href="{% url 'members:biography_view' member_id=user.pk %}">

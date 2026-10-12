@@ -1,0 +1,7 @@
+Email change requested for {{ site_name }}
+
+A request was made to change your {{ site_name }} email address to {{ new_email }}.
+
+If you did not make this request, contact a club manager. Your current email address remains active until the new address is confirmed.
+
+This is an automated message from {{ site_name }}. Please do not reply to this email.
