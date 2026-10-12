@@ -10,22 +10,44 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="siteconfiguration",
-            name="glider_reservation_time_preferences",
-            field=models.JSONField(
-                blank=True,
-                default=siteconfig.models.default_glider_reservation_time_preferences,
-                help_text="Enabled preset time periods for glider reservations. Existing reservations keep their stored period even if a period is later disabled.",
-            ),
-        ),
-        migrations.AddField(
-            model_name="siteconfiguration",
-            name="glider_reservation_time_ranges",
-            field=models.JSONField(
-                blank=True,
-                default=siteconfig.models.default_glider_reservation_time_ranges,
-                help_text="Clock ranges for preset glider reservation periods, stored as HH:MM values.",
-            ),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql="""
+                        ALTER TABLE siteconfig_siteconfiguration
+                        ADD COLUMN IF NOT EXISTS glider_reservation_time_preferences
+                        jsonb NOT NULL DEFAULT
+                        '["morning", "midday", "afternoon", "full_day", "specific"]'::jsonb;
+
+                        ALTER TABLE siteconfig_siteconfiguration
+                        ADD COLUMN IF NOT EXISTS glider_reservation_time_ranges
+                        jsonb NOT NULL DEFAULT
+                        '{"morning": {"start": "10:00", "end": "12:00"},
+                          "midday": {"start": "12:00", "end": "14:00"},
+                          "afternoon": {"start": "14:00", "end": "16:00"}}'::jsonb;
+                    """,
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name="siteconfiguration",
+                    name="glider_reservation_time_preferences",
+                    field=models.JSONField(
+                        blank=True,
+                        default=siteconfig.models.default_glider_reservation_time_preferences,
+                        help_text="Enabled preset time periods for glider reservations. Existing reservations keep their stored period even if a period is later disabled.",
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="siteconfiguration",
+                    name="glider_reservation_time_ranges",
+                    field=models.JSONField(
+                        blank=True,
+                        default=siteconfig.models.default_glider_reservation_time_ranges,
+                        help_text="Clock ranges for preset glider reservation periods, stored as HH:MM values.",
+                    ),
+                ),
+            ],
         ),
     ]
