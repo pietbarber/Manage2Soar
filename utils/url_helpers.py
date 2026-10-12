@@ -153,3 +153,18 @@ def build_absolute_url(path, canonical=None):
     canonical = canonical.rstrip("/")
     path = path.lstrip("/")
     return f"{canonical}/{path}"
+
+
+def build_absolute_url_for_request(request, path):
+    """Build an absolute URL for an email link, preferring the canonical origin.
+
+    Falls back to the request's own scheme/host when the canonical origin is a
+    loopback address (e.g. an unconfigured local/dev server). This keeps links
+    in outbound emails clickable when testing locally, where the canonical
+    origin would otherwise be an unreachable localhost address.
+    """
+    canonical = get_canonical_url()
+    canonical_host = (urlparse(canonical).hostname or "").lower()
+    if _is_loopback_host(canonical_host):
+        return request.build_absolute_uri(path)
+    return build_absolute_url(path, canonical=canonical)

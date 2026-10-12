@@ -39,9 +39,13 @@ from siteconfig.forms import (
 )
 from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
 from utils.email import DevModeEmailMultiAlternatives, enforce_noreply_from_email
-from utils.url_helpers import build_absolute_url, get_canonical_url
+from utils.url_helpers import (
+    build_absolute_url,
+    build_absolute_url_for_request,
+    get_canonical_url,
+)
 
-from .decorators import active_member_required
+from .decorators import active_member_required, non_kiosk_member_required
 from .forms import (
     BiographyForm,
     DirectRecipientPasswordResetForm,
@@ -260,6 +264,7 @@ def member_list(request):
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     is_self = request.user == member
+    kiosk_session = is_kiosk_session(request)
     can_edit = is_self or request.user.is_superuser
 
     # Decide whether to show solo/checkride buttons
@@ -416,8 +421,10 @@ def member_view(request, member_id):
         "can_edit": request.user.is_superuser
         or (is_self and biography_policy == "direct"),
         "can_change_password": is_self
+        and not kiosk_session
         and get_member_profile_field_policy("password", site_config) == "direct",
         "can_change_email": is_self
+        and not kiosk_session
         and get_member_profile_field_policy("email", site_config) == "direct",
         "can_update_emergency_contacts": is_self
         and emergency_contacts_policy == "direct",
@@ -452,17 +459,16 @@ def member_vcard(request, member_id):
     return response
 
 
-@active_member_required
+@non_kiosk_member_required
 @require_http_methods(["POST"])
 def request_email_change(request):
-    if is_kiosk_session(request):
-        return render(request, "403.html", status=403)
     if get_member_profile_field_policy("email") != "direct":
         return render(request, "403.html", status=403)
 
     new_email = request.POST.get("email", "").strip().lower()
+    max_email_length = Member._meta.get_field("pending_email").max_length
     try:
-        new_email = forms.EmailField(max_length=254).clean(new_email)
+        new_email = forms.EmailField(max_length=max_email_length).clean(new_email)
     except ValidationError:
         messages.error(request, "Enter a valid email address.")
         return redirect("members:member_view", member_id=request.user.pk)
@@ -478,8 +484,8 @@ def request_email_change(request):
         {"member_id": request.user.pk, "email": new_email},
         salt="members.email-change",
     )
-    confirmation_url = build_absolute_url(
-        reverse("members:confirm_email_change", args=[token])
+    confirmation_url = build_absolute_url_for_request(
+        request, reverse("members:confirm_email_change", args=[token])
     )
     site_config = SiteConfiguration.objects.first()
     context = {
@@ -812,7 +818,7 @@ def home(request):
 # Redirects to home page on success.
 
 
-@active_member_required
+@non_kiosk_member_required
 def set_password(request):
     member = request.user
     policy = get_member_profile_field_policy("password")

@@ -142,6 +142,7 @@ def test_email_change_request_rejects_email_beyond_model_length(client, mailoutb
     overlong_email = (
         "a" * 60 + "@" + "b" * 63 + "." + "c" * 63 + "." + "d" * 63 + ".com"
     )
+    assert len(overlong_email) > 254
 
     response = client.post(
         reverse("members:request_email_change"), {"email": overlong_email}
@@ -175,6 +176,27 @@ def test_email_change_request_uses_canonical_url_in_confirmation(client, mailout
     assert expected_link in mailoutbox[0].body
     assert expected_link in mailoutbox[0].alternatives[0][0]
     assert "testserver/members/email/confirm/" not in mailoutbox[0].body
+
+
+@pytest.mark.django_db
+def test_email_change_confirmation_uses_request_host_on_local_servers(
+    client, mailoutbox, settings
+):
+    configure_email_changes()
+    settings.SITE_URL = ""
+    member = Member.objects.create_user(
+        username="email_local_host",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    client.force_login(member)
+
+    response = client.post(
+        reverse("members:request_email_change"), {"email": "new@example.com"}
+    )
+
+    assert response.status_code == 302
+    assert "http://testserver/members/email/confirm/" in mailoutbox[0].body
 
 
 @pytest.mark.django_db

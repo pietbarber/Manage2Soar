@@ -137,3 +137,64 @@ def test_email_change_control_is_not_shown_to_other_members(client):
     assert response.status_code == 200
     assert b"Change Email" not in response.content
     assert b"emailSettingsModal" not in response.content
+
+
+def _configure_direct_account_controls():
+    MembershipStatus.objects.create(name="Policy Member", is_active=True)
+    clear_active_membership_statuses_cache()
+    policies = default_member_profile_field_policies()
+    policies["email"] = "direct"
+    policies["password"] = "direct"
+    return SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+
+
+@pytest.mark.django_db
+def test_kiosk_session_hides_account_controls(client):
+    _configure_direct_account_controls()
+    member = Member.objects.create_user(
+        username="kiosk_role",
+        email="role@example.com",
+        password="password",
+        membership_status="Policy Member",
+    )
+    client.force_login(member)
+    session = client.session
+    session["is_kiosk_authenticated"] = True
+    session.save()
+
+    response = client.get(reverse("members:member_view", args=[member.pk]))
+
+    assert response.status_code == 200
+    assert reverse("members:set_password").encode() not in response.content
+    assert reverse("members:request_email_change").encode() not in response.content
+    assert b"emailSettingsModal" not in response.content
+
+
+@pytest.mark.django_db
+def test_kiosk_session_cannot_change_password(client):
+    _configure_direct_account_controls()
+    member = Member.objects.create_user(
+        username="kiosk_password",
+        email="role@example.com",
+        password="password",
+        membership_status="Policy Member",
+    )
+    client.force_login(member)
+    original_hash = member.password
+    session = client.session
+    session["is_kiosk_authenticated"] = True
+    session.save()
+
+    response = client.post(
+        reverse("members:set_password"),
+        {"new_password1": "NewStrongPass1", "new_password2": "NewStrongPass1"},
+    )
+
+    assert response.status_code == 403
+    member.refresh_from_db()
+    assert member.password == original_hash
