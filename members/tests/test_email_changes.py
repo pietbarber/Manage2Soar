@@ -108,6 +108,76 @@ def test_email_change_request_stores_pending_email_and_sends_confirmation(
 
 
 @pytest.mark.django_db
+def test_email_change_request_rejects_kiosk_session(client, mailoutbox):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_kiosk",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    client.force_login(member)
+    session = client.session
+    session["is_kiosk_authenticated"] = True
+    session.save()
+
+    response = client.post(
+        reverse("members:request_email_change"), {"email": "new@example.com"}
+    )
+
+    assert response.status_code == 403
+    member.refresh_from_db()
+    assert member.pending_email == ""
+    assert not mailoutbox
+
+
+@pytest.mark.django_db
+def test_email_change_request_rejects_email_beyond_model_length(client, mailoutbox):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_too_long",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    client.force_login(member)
+    overlong_email = (
+        "a" * 60 + "@" + "b" * 63 + "." + "c" * 63 + "." + "d" * 63 + ".com"
+    )
+
+    response = client.post(
+        reverse("members:request_email_change"), {"email": overlong_email}
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("members:member_view", args=[member.pk])
+    member.refresh_from_db()
+    assert member.pending_email == ""
+    assert not mailoutbox
+
+
+@pytest.mark.django_db
+def test_email_change_request_uses_canonical_url_in_confirmation(client, mailoutbox):
+    config = configure_email_changes()
+    config.canonical_url = "https://canonical.example.org"
+    config.save(update_fields=["canonical_url"])
+    member = Member.objects.create_user(
+        username="email_canonical",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    client.force_login(member)
+
+    response = client.post(
+        reverse("members:request_email_change"), {"email": "new@example.com"}
+    )
+
+    assert response.status_code == 302
+    expected_link = "https://canonical.example.org/members/email/confirm/"
+    assert expected_link in mailoutbox[0].body
+    assert expected_link in mailoutbox[0].alternatives[0][0]
+    assert "testserver/members/email/confirm/" not in mailoutbox[0].body
+
+
+@pytest.mark.django_db
 def test_email_change_requested_shows_pending_email(client):
     configure_email_changes()
     member = Member.objects.create_user(

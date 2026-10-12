@@ -28,6 +28,7 @@ from instructors.models import MemberQualification
 from members.utils import can_view_contact_field
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils import contact_field_visibility, is_privileged_viewer
+from members.utils.kiosk import is_kiosk_session
 from members.utils.membership import get_active_membership_statuses
 from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
@@ -454,12 +455,14 @@ def member_vcard(request, member_id):
 @active_member_required
 @require_http_methods(["POST"])
 def request_email_change(request):
+    if is_kiosk_session(request):
+        return render(request, "403.html", status=403)
     if get_member_profile_field_policy("email") != "direct":
         return render(request, "403.html", status=403)
 
     new_email = request.POST.get("email", "").strip().lower()
     try:
-        new_email = forms.EmailField().clean(new_email)
+        new_email = forms.EmailField(max_length=254).clean(new_email)
     except ValidationError:
         messages.error(request, "Enter a valid email address.")
         return redirect("members:member_view", member_id=request.user.pk)
@@ -475,7 +478,7 @@ def request_email_change(request):
         {"member_id": request.user.pk, "email": new_email},
         salt="members.email-change",
     )
-    confirmation_url = request.build_absolute_uri(
+    confirmation_url = build_absolute_url(
         reverse("members:confirm_email_change", args=[token])
     )
     site_config = SiteConfiguration.objects.first()
