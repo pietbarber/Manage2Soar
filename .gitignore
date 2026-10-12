@@ -190,6 +190,7 @@ email-tests/
 
 # Local scripts and sensitive data
 var/prod-snapshots/
+var/local-data/
 scripts/reset_spr_data.py
 membership.json
 managed-cert.yaml
