@@ -3,10 +3,13 @@ import logging
 import os
 from datetime import date
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.core import signing
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
@@ -15,6 +18,7 @@ from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -32,6 +36,7 @@ from siteconfig.forms import (
     VisitingPilotSignupForm,
 )
 from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
+from utils.email import DevModeEmailMultiAlternatives, enforce_noreply_from_email
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .decorators import active_member_required
@@ -57,6 +62,19 @@ from .utils.badge_utils import suppress_badge_board_legs, suppress_member_badge_
 from .utils.vcard_tools import generate_vcard, generate_vcard_qr
 
 logger = logging.getLogger(__name__)
+EMAIL_CHANGE_TOKEN_MAX_AGE = 60 * 60 * 24
+
+
+def _send_account_security_email(recipient, subject, body):
+    if not recipient:
+        return
+    DevModeEmailMultiAlternatives(
+        subject=subject,
+        body=body,
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[recipient],
+    ).send()
+
 
 try:
     from notifications.models import Notification
@@ -428,6 +446,121 @@ def member_vcard(request, member_id):
     )
     response["Content-Disposition"] = f'attachment; filename="member-{member.pk}.vcf"'
     return response
+
+
+@active_member_required
+@require_http_methods(["POST"])
+def request_email_change(request):
+    if get_member_profile_field_policy("email") != "direct":
+        return render(request, "403.html", status=403)
+
+    new_email = request.POST.get("email", "").strip().lower()
+    try:
+        new_email = forms.EmailField().clean(new_email)
+    except ValidationError:
+        messages.error(request, "Enter a valid email address.")
+        return redirect("members:member_view", member_id=request.user.id)
+
+    if new_email == request.user.email.lower():
+        messages.info(request, "That is already your current email address.")
+        return redirect("members:member_view", member_id=request.user.id)
+
+    if (
+        Member.objects.filter(email__iexact=new_email)
+        .exclude(pk=request.user.pk)
+        .exists()
+    ):
+        messages.error(request, "That email address is already in use.")
+        return redirect("members:member_view", member_id=request.user.id)
+
+    request.user.pending_email = new_email
+    request.user.pending_email_requested_at = timezone.now()
+    request.user.save(update_fields=["pending_email", "pending_email_requested_at"])
+    token = signing.dumps(
+        {"member_id": request.user.pk, "email": new_email},
+        salt="members.email-change",
+    )
+    confirmation_url = request.build_absolute_uri(
+        reverse("members:confirm_email_change", args=[token])
+    )
+    DevModeEmailMultiAlternatives(
+        subject="Confirm your Manage2Soar email address",
+        body=(
+            f"Confirm your new email address by visiting:\n\n{confirmation_url}\n\n"
+            "This link expires in 24 hours."
+        ),
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[new_email],
+    ).send()
+    _send_account_security_email(
+        request.user.email,
+        "Manage2Soar email change requested",
+        (
+            f"A request was made to change your Manage2Soar email address to "
+            f"{new_email}. If you did not make this request, contact a club manager."
+        ),
+    )
+    messages.success(request, "A confirmation link was sent to your new email address.")
+    return redirect("members:member_view", member_id=request.user.id)
+
+
+@require_http_methods(["GET", "POST"])
+def confirm_email_change(request, token):
+    try:
+        data = signing.loads(
+            token, salt="members.email-change", max_age=EMAIL_CHANGE_TOKEN_MAX_AGE
+        )
+    except signing.BadSignature:
+        return render(request, "403.html", status=403)
+
+    member = get_object_or_404(Member, pk=data.get("member_id"))
+    if member.pending_email != data.get("email"):
+        return render(request, "403.html", status=403)
+    if get_member_profile_field_policy("email") != "direct":
+        return render(request, "403.html", status=403)
+
+    if request.method == "GET":
+        return render(
+            request,
+            "members/confirm_email_change.html",
+            {"pending_email": member.pending_email},
+        )
+
+    try:
+        with transaction.atomic():
+            member = Member.objects.select_for_update().get(pk=member.pk)
+            if member.pending_email != data.get("email"):
+                return render(request, "403.html", status=403)
+            if get_member_profile_field_policy("email") != "direct":
+                return render(request, "403.html", status=403)
+            if (
+                Member.objects.filter(email__iexact=member.pending_email)
+                .exclude(pk=member.pk)
+                .exists()
+            ):
+                messages.error(request, "That email address is no longer available.")
+                return redirect("members:member_view", member_id=member.id)
+            old_email = member.email
+            member.email = member.pending_email
+            member.pending_email = ""
+            member.pending_email_requested_at = None
+            member.save(
+                update_fields=["email", "pending_email", "pending_email_requested_at"]
+            )
+    except IntegrityError:
+        messages.error(request, "That email address is no longer available.")
+        return redirect("members:member_view", member_id=member.id)
+
+    _send_account_security_email(
+        old_email,
+        "Your Manage2Soar email address changed",
+        (
+            f"Your Manage2Soar email address changed to {member.email}. "
+            "If you did not make this change, contact a club manager."
+        ),
+    )
+    messages.success(request, "Your email address has been updated.")
+    return redirect("members:member_view", member_id=member.id)
 
 
 @active_member_required

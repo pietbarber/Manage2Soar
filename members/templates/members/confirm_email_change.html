@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Email Change{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1>Confirm email change</h1>
+  <p>Confirm that you want to change your email address to <strong>{{ pending_email }}</strong>.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary">Confirm email change</button>
+  </form>
+</div>
+{% endblock %}
