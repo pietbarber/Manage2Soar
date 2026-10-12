@@ -298,6 +298,21 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Member Contact Visibility Defaults",
+            {
+                "fields": (
+                    "share_member_email_by_default",
+                    "share_member_phone_by_default",
+                    "share_member_address_by_default",
+                ),
+                "description": (
+                    "Default visibility for member contact details when a member "
+                    "has not set an individual preference."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Scheduling Options",
             {
                 "fields": (
@@ -454,6 +469,28 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "configure status + glider overrides so a junior status can be "
                     "<strong>$0.00/hr</strong> on selected gliders while other gliders keep "
                     "their normal rates."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Member Contact Privacy & Self-Service",
+            {
+                "fields": (
+                    "member_profile_self_service_enabled",
+                    "member_profile_field_policies",
+                ),
+                "description": (
+                    "Club-wide contact-privacy defaults and member self-service policy "
+                    "(Issue #1034). The three <strong>share_member_*_by_default</strong> "
+                    "toggles set the default for whether regular members can see each "
+                    "contact field; members can inherit the defaults or override them "
+                    "with a share/hide preference. "
+                    "<strong>member_profile_self_service_enabled</strong> is the "
+                    "master switch for member self-service profile edits, and "
+                    "<strong>member_profile_field_policies</strong> sets each field's "
+                    "policy (disabled/direct/request; password and profile photo do "
+                    "not support request mode)."
                 ),
                 "classes": ("collapse",),
             },

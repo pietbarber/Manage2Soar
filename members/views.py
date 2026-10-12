@@ -1,7 +1,7 @@
 import base64
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date
 
 from django import forms
 from django.conf import settings
@@ -14,25 +14,19 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
-from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
-from members.utils import (
-    can_view_contact_field,
-)
+from members.utils import can_view_contact_field
 from members.utils import can_view_personal_info as can_view_personal_info_fn
-from members.utils import (
-    contact_field_visibility,
-    is_privileged_viewer,
-)
+from members.utils import contact_field_visibility, is_privileged_viewer
 from members.utils.membership import get_active_membership_statuses
 from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
@@ -277,8 +271,25 @@ def member_view(request, member_id):
     # Decide whether to show solo/checkride buttons
     show_need_buttons = member.glider_rating not in ("private", "commercial")
 
+    site_config = SiteConfiguration.objects.first()
+
     # Biography logic
     biography = getattr(member, "biography", None)
+    profile_photo_policy = (
+        get_member_profile_field_policy("profile_photo", site_config)
+        if is_self
+        else "disabled"
+    )
+    biography_policy = (
+        get_member_profile_field_policy("biography", site_config)
+        if is_self
+        else "disabled"
+    )
+    emergency_contacts_policy = (
+        get_member_profile_field_policy("emergency_contacts", site_config)
+        if is_self
+        else "disabled"
+    )
 
     # Determine whether the requester can view personal info, and generate
     # a QR code accordingly (redacted QR omits contact fields).
@@ -289,6 +300,10 @@ def member_view(request, member_id):
     }
     contact_visibility = {
         field: can_view_contact_field(request.user, member, field, site_config)
+        for field in ("email", "phone", "address")
+    }
+    effective_contact_visibility = {
+        field: contact_field_visibility(member, field, site_config)["shared"]
         for field in ("email", "phone", "address")
     }
     can_view_personal = can_view_personal_info_fn(request.user, member)
@@ -395,7 +410,11 @@ def member_view(request, member_id):
         "emergency_contacts_editable": emergency_contacts_editable,
         "password_editable": password_editable,
         "is_self": is_self,
-        "can_edit": can_edit,
+        "can_edit": can_edit and (not is_self or biography_policy == "direct"),
+        "can_change_password": is_self
+        and get_member_profile_field_policy("password", site_config) == "direct",
+        "can_update_emergency_contacts": is_self
+        and emergency_contacts_policy == "direct",
         "biography": biography,
         "qualifications": qualifications,
         "member_badges": member_badges,
@@ -444,7 +463,7 @@ def member_vcard(request, member_id):
     response = HttpResponse(
         generate_vcard(member, contact_visibility=visibility), content_type="text/vcard"
     )
-    response["Content-Disposition"] = f'attachment; filename="{member.username}.vcf"'
+    response["Content-Disposition"] = f'attachment; filename="member-{member.pk}.vcf"'
     return response
 
 
@@ -574,10 +593,34 @@ def update_contact_visibility(request, member_id):
     if request.user != member:
         return render(request, "403.html", status=403)
 
-    member.contact_visibility = {
-        field: "share" if request.POST.get(f"share_{field}") else "hide"
-        for field in ("email", "phone", "address")
-    }
+    policy = get_member_profile_field_policy("contact_visibility")
+    if policy != "direct":
+        if policy == "request":
+            messages.warning(
+                request,
+                "Changing contact visibility requires approval by a member manager.",
+            )
+        else:
+            messages.error(
+                request,
+                "Updating contact visibility is currently disabled by the club.",
+            )
+        return redirect("members:member_view", member_id=member.id)
+
+    contact_visibility = dict(member.contact_visibility or {})
+    for field in ("email", "phone", "address"):
+        key = f"visibility_{field}"
+        if key not in request.POST:
+            continue
+
+        preference = request.POST[key]
+        if preference not in {"inherit", "share", "hide"}:
+            return HttpResponse("Invalid contact visibility choice.", status=400)
+        if preference == "inherit":
+            contact_visibility.pop(field, None)
+        else:
+            contact_visibility[field] = preference
+    member.contact_visibility = contact_visibility
     member.save(update_fields=["contact_visibility"])
     messages.success(request, "Contact visibility preferences updated.")
     return redirect("members:member_view", member_id=member.id)
@@ -614,25 +657,37 @@ def emergency_contact_edit(request, member_id, contact_id=None):
 @active_member_required
 @require_http_methods(["GET", "POST"])
 def emergency_contact_delete(request, member_id, contact_id):
-    if get_member_profile_field_policy("emergency_contacts") != "direct":
-        return render(request, "403.html", status=403)
-    member = get_object_or_404(Member, pk=member_id)
-    contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
-    if request.user != member:
-        return render(request, "403.html", status=403)
+    with transaction.atomic():
+        members = (
+            Member.objects.select_for_update()
+            if request.method == "POST"
+            else Member.objects.all()
+        )
+        member = get_object_or_404(members, pk=member_id)
+        if request.user != member:
+            return render(request, "403.html", status=403)
+        contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
+        if get_member_profile_field_policy("emergency_contacts") != "direct":
+            return render(request, "403.html", status=403)
 
-    is_last_contact = member.emergency_contacts.count() == 1
-    form = (
-        EmergencyContactDeclineForm(request.POST or None) if is_last_contact else None
-    )
-    if request.method == "POST" and not is_last_contact:
-        contact.delete()
-        messages.success(request, "Emergency contact removed.")
-        return redirect("members:member_view", member_id=member.id)
-    if request.method == "POST" and form and form.is_valid():
-        contact.delete()
-        messages.success(request, "Emergency contact removed.")
-        return redirect("members:member_view", member_id=member.id)
+        # Locking the member keeps the final-contact check and delete atomic.
+        is_last_contact = member.emergency_contacts.count() == 1
+        form = (
+            EmergencyContactDeclineForm(request.POST or None)
+            if is_last_contact
+            else None
+        )
+        if request.method == "POST" and not is_last_contact:
+            contact.delete()
+            messages.success(request, "Emergency contact removed.")
+            return redirect("members:member_view", member_id=member.id)
+        if request.method == "POST" and form and form.is_valid():
+            contact.delete()
+            if member.emergency_contact:
+                member.emergency_contact = ""
+                member.save(update_fields=["emergency_contact"])
+            messages.success(request, "Emergency contact removed.")
+            return redirect("members:member_view", member_id=member.id)
 
     return render(
         request,
@@ -647,126 +702,30 @@ def emergency_contact_delete(request, member_id, contact_id):
 
 
 @active_member_required
+@require_http_methods(["POST"])
 def toggle_redaction(request, member_id):
-    """Toggle the redact_contact flag for a member.
-
-    Only the member themselves or a superuser may perform this action.
-    The view accepts POST requests from the member profile form and redirects
-    back to the member view after updating the flag.
-    """
+    """Reject the retired full-contact redaction endpoint."""
     member = get_object_or_404(Member, pk=member_id)
-
-    # Only the member themselves or superusers may toggle this flag
     if request.user != member and not request.user.is_superuser:
         return render(request, "403.html", status=403)
 
-    if request.method == "POST":
-        member.redact_contact = not member.redact_contact
-        member.save()
-        # Create a notification for all member_managers so they are aware
-        # that a member has toggled their redaction flag.
-        try:
-            if Notification is not None:
-                # Build a human-friendly message. If the actor is the member themself
-                # we phrase it as 'Member X has hidden...'; if an admin toggled for
-                # someone else we include both actor and subject.
-                if request.user == member:
-                    actor_name = member.full_display_name
-                    action = "hidden" if member.redact_contact else "made visible"
-                    message = f"Member {actor_name} has {action} their personal contact information on the members site."
-                else:
-                    actor_name = request.user.full_display_name
-                    subject_name = member.full_display_name
-                    action = "hidden" if member.redact_contact else "made visible"
-                    message = f"{actor_name} has {action} personal contact information for member {subject_name}."
-
-                url = build_absolute_url(
-                    reverse("members:member_view", kwargs={"member_id": member.pk})
-                )
-
-                # Notify every user with member_manager privilege, but dedupe
-                # so we don't spam them if the same member toggles repeatedly.
-
-                # Notify member managers so club managers
-                # are alerted when a member toggles redaction.
-                member_managers = Member.objects.filter(member_manager=True)
-                # Dedupe window: configurable via settings.REDACTION_NOTIFICATION_DEDUPE_MINUTES
-                # (integer minutes). For backward compatibility, a settings value
-                # REDACTION_NOTIFICATION_DEDUPE_HOURS may be provided. Default = 60 minutes.
-                cutoff = None
-                # Prefer SiteConfiguration value when available
-                try:
-                    from siteconfig.models import SiteConfiguration
-
-                    sc = SiteConfiguration.objects.first()
-                    if sc and getattr(
-                        sc, "redaction_notification_dedupe_minutes", None
-                    ):
-                        cutoff = timezone.now() - timedelta(
-                            minutes=int(sc.redaction_notification_dedupe_minutes)
-                        )
-                except (ImportError, AttributeError, ValueError) as e:
-                    logging.warning(
-                        f"Failed to get redaction notification settings: {e}"
-                    )
-                    sc = None
-
-                if cutoff is None:
-                    try:
-                        minutes = getattr(
-                            settings, "REDACTION_NOTIFICATION_DEDUPE_MINUTES", None
-                        )
-                        if minutes is not None:
-                            cutoff = timezone.now() - timedelta(minutes=int(minutes))
-                        else:
-                            hours = getattr(
-                                settings, "REDACTION_NOTIFICATION_DEDUPE_HOURS", 1
-                            )
-                            cutoff = timezone.now() - timedelta(hours=float(hours))
-                    except (AttributeError, ValueError, TypeError) as e:
-                        logging.warning(
-                            f"Failed to parse redaction notification timing: {e}"
-                        )
-                        cutoff = timezone.now() - timedelta(hours=1)
-                try:
-                    # Avoid N+1 queries: fetch which member_manager user ids already
-                    # have a recent notification for this URL, then bulk-create
-                    # Notification objects for the remaining recipients.
-                    manager_ids = list(member_managers.values_list("id", flat=True))
-                    existing_user_ids = set(
-                        Notification.objects.filter(
-                            user_id__in=manager_ids, url=url, created_at__gte=cutoff
-                        ).values_list("user_id", flat=True)
-                    )
-
-                    to_create = []
-                    for rm in member_managers:
-                        if rm.pk in existing_user_ids:
-                            continue
-                        to_create.append(
-                            Notification(user=rm, message=message, url=url)
-                        )
-
-                    if to_create:
-                        Notification.objects.bulk_create(to_create)
-                except Exception as e:
-                    # Fail softly if notification logic fails for any reason
-                    logging.exception(f"Failed to create redaction notifications: {e}")
-        except Exception as e:
-            # Defensive: don't let notification failures break the toggle flow
-            logging.exception(
-                f"Notification system failed during redaction toggle: {e}"
-            )
-        if member.redact_contact:
-            messages.success(
-                request, "Your personal contact information is now redacted."
-            )
-        else:
-            messages.success(
-                request,
-                "Your personal contact information is now visible to other members.",
-            )
-
+    policy = get_member_profile_field_policy("contact_visibility")
+    if policy == "request":
+        messages.warning(
+            request,
+            "Changing contact visibility requires approval by a member manager.",
+        )
+    elif policy != "direct":
+        messages.error(
+            request,
+            "Updating contact visibility is currently disabled by the club.",
+        )
+    else:
+        messages.info(
+            request,
+            "The full-contact privacy control has been retired. "
+            "Use the per-field Contact Privacy settings instead.",
+        )
     return redirect("members:member_view", member_id=member.pk)
 
 
@@ -1779,9 +1738,13 @@ class CustomPasswordResetView(auth_views.PasswordResetView):
             parsed = urlparse(canonical_url)
             # Set extra_email_context with canonical domain/protocol
             # These will override Django's default protocol/domain in the email template
-            if not self.extra_email_context:
-                self.extra_email_context = {}
-            self.extra_email_context["protocol"] = parsed.scheme
-            self.extra_email_context["domain"] = parsed.netloc
+            email_context = dict(self.extra_email_context or {})
+            email_context.update(
+                {
+                    "protocol": parsed.scheme,
+                    "domain": parsed.netloc,
+                }
+            )
+            self.extra_email_context = email_context
 
         return super().form_valid(form)

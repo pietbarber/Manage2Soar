@@ -272,6 +272,12 @@ ansible-playbook -i inventory/gcp_app.yml \
 
 ### Run Database Migrations
 
+When enabled, the deployment role runs migrations from the new image in a
+single Kubernetes Job before applying the updated Deployment. This prevents new
+pods from receiving traffic against an unmigrated schema. New required columns
+must retain database defaults until all older application pods have been
+replaced, so those pods can continue inserting rows during the rollout.
+
 ```bash
 ansible-playbook -i inventory/gcp_app.yml \
   --vault-password-file ~/.ansible_vault_pass \
@@ -450,7 +456,7 @@ ansible-playbook ... --skip-tags docker
 |----------|---------|-------------|
 | `gke_build_image` | `true` | Build Docker image |
 | `gke_push_image` | `true` | Push to GCR |
-| `gke_run_migrations` | `false` | Run Django migrations |
+| `gke_run_migrations` | `false` | Run Django migrations in a pre-rollout Kubernetes Job |
 | `gke_collect_static` | `true` | Run collectstatic |
 | `gke_deploy_cronjobs` | `true` | Deploy CronJobs |
 | `gke_wait_for_rollout` | `true` | Wait for rollout |

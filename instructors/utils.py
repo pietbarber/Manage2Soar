@@ -371,7 +371,11 @@ def classify_logbook_flight_minutes(flight, member_id, rating_date):
             if is_logbook_rated_dual_flight(flight_date, rating_date):
                 pic_m += duration_m
         else:
-            if not flight.passenger_id and not flight.passenger_name:
+            if (
+                not flight.passenger_id
+                and not flight.passenger_name
+                and not flight.legacy_passenger_name
+            ):
                 solo_m += duration_m
             pic_m += duration_m
     elif is_instructor:
@@ -410,11 +414,14 @@ def get_logbook_glider_time_summary(member):
         | (Q(legacy_instructor_name__isnull=False) & ~Q(legacy_instructor_name=""))
     )
     dual_filter = Q(pilot=member) & instructor_present_filter
+    # Solo = no instructor AND no passenger of any kind (member, name, or legacy).
+    # legacy_passenger_name is nullable, so use the isnull/blank pattern.
     solo_filter = (
         Q(pilot=member)
         & ~instructor_present_filter
         & Q(passenger__isnull=True)
         & Q(passenger_name="")
+        & (Q(legacy_passenger_name__isnull=True) | Q(legacy_passenger_name=""))
     )
     instruction_given_filter = Q(instructor=member)
     total_filter = Q(pilot=member) | Q(instructor=member)

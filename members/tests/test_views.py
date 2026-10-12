@@ -6,13 +6,18 @@ from django.urls import reverse
 
 from members.models import Biography
 from members.utils.membership import clear_active_membership_statuses_cache
-from siteconfig.models import MembershipStatus
+from siteconfig.models import MembershipStatus, SiteConfiguration
 
 User = get_user_model()
 
 
 @pytest.mark.django_db
 def test_biography_view_shows_biography(client):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
     user = User.objects.create_user(
         username="jdoe",
         password="password",
@@ -42,6 +47,11 @@ def test_biography_view_returns_404_for_missing_user(client):
 
 @pytest.mark.django_db
 def test_set_password_get_shows_form(client, django_user_model):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
     user = django_user_model.objects.create_user(
         username="tester",
         password="oldpass",
@@ -80,6 +90,11 @@ def test_set_password_sends_security_notification(
 
 @pytest.mark.django_db
 def test_set_password_mismatched_passwords(client, django_user_model):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
     user = django_user_model.objects.create_user(
         username="tester2",
         password="initial",

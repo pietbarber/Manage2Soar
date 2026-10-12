@@ -13,10 +13,45 @@ from siteconfig.models import (
     MembershipGliderRentalRule,
     MembershipStatus,
     SiteConfiguration,
+    default_member_profile_field_policies,
+    validate_member_profile_field_policies,
 )
 from utils.favicon import PWA_CLUB_ICON_NAME
 
 User = get_user_model()
+
+
+@pytest.mark.parametrize(
+    "policies",
+    [
+        [],
+        "direct",
+        {**default_member_profile_field_policies(), "unknown": "direct"},
+        {
+            **default_member_profile_field_policies(),
+            "username": "unsupported",
+        },
+        {
+            **default_member_profile_field_policies(),
+            "username": [],
+        },
+        {
+            **default_member_profile_field_policies(),
+            "password": "request",
+        },
+        {
+            **default_member_profile_field_policies(),
+            "profile_photo": "request",
+        },
+    ],
+)
+def test_member_profile_policy_validator_rejects_invalid_maps(policies):
+    with pytest.raises(ValidationError):
+        validate_member_profile_field_policies(policies)
+
+
+def test_member_profile_policy_validator_accepts_complete_policy_map():
+    validate_member_profile_field_policies(default_member_profile_field_policies())
 
 
 @pytest.mark.django_db
@@ -50,6 +85,22 @@ def test_siteconfiguration_admin_form_visiting_pilot_status_is_dropdown():
 
     assert "Affiliate Member" in status_values
     assert "Full Member" in status_values
+
+
+def test_siteconfiguration_admin_exposes_member_contact_visibility_defaults():
+    from siteconfig.admin import SiteConfigurationAdmin
+
+    field_names = {
+        field
+        for _title, options in SiteConfigurationAdmin.fieldsets
+        for field in options["fields"]
+    }
+
+    assert {
+        "share_member_email_by_default",
+        "share_member_phone_by_default",
+        "share_member_address_by_default",
+    } <= field_names
 
 
 @pytest.mark.django_db

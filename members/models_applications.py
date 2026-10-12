@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
@@ -345,6 +346,20 @@ class MembershipApplication(models.Model):
         """Check if the applicant has any soaring/glider flight experience."""
         return (self.glider_flight_hours or 0) > 0
 
+    def clean(self):
+        """Require a name when emergency-contact details are provided."""
+        super().clean()
+        if not self.emergency_contact_name and (
+            self.emergency_contact_relationship or self.emergency_contact_phone
+        ):
+            raise ValidationError(
+                {
+                    "emergency_contact_name": (
+                        "Enter a name when providing emergency-contact details."
+                    )
+                }
+            )
+
     def can_be_approved(self):
         """Check if the application has all required information for approval."""
         required_fields = [
@@ -367,6 +382,16 @@ class MembershipApplication(models.Model):
             self.agrees_to_terms
             and self.agrees_to_safety_rules
             and self.agrees_to_financial_obligations
+        ):
+            return False
+
+        emergency_contact_data = (
+            self.emergency_contact_name
+            or self.emergency_contact_relationship
+            or self.emergency_contact_phone
+        )
+        if emergency_contact_data and not (
+            self.emergency_contact_name and self.emergency_contact_phone
         ):
             return False
 
@@ -397,6 +422,7 @@ class MembershipApplication(models.Model):
         # username collision between generate_username()'s exists() check and
         # the actual INSERT.  Cap retries to avoid an infinite loop if the
         # IntegrityError is caused by a different unique constraint.
+        member = None
         for _attempt in range(MAX_USERNAME_RETRIES):
             candidate_username = generate_username(self.first_name, self.last_name)
             try:
@@ -415,6 +441,9 @@ class MembershipApplication(models.Model):
                 if _attempt == MAX_USERNAME_RETRIES - 1:
                     raise  # username race, but exhausted retries
 
+        if member is None:
+            raise RuntimeError("Member account creation did not succeed.")
+
         # Set additional member fields from application
         member.middle_initial = self.middle_initial
         member.name_suffix = self.name_suffix
@@ -431,7 +460,9 @@ class MembershipApplication(models.Model):
         if self.pilot_certificate_number:
             member.pilot_certificate_number = self.pilot_certificate_number
         member.glider_rating = self.glider_rating
-        member.SSA_member_number = self.ssa_member_number
+        # Store None rather than "" so blank SSA numbers don't collide on the
+        # unique constraint.
+        member.SSA_member_number = self.ssa_member_number or None
 
         # Set initial membership status (configurable per club)
         config = SiteConfiguration.objects.first()

@@ -322,7 +322,7 @@
             </div>
           </div>
 
-          {% if request.user == member %}
+          {% if can_change_password %}
           <hr>
           <div class="d-flex justify-content-between align-items-center">
             <div>
@@ -355,7 +355,8 @@
                   </div>
                   {% if contact.home_phone %}<span class="me-3">Home: <a href="tel:{{ contact.home_phone }}">{{ contact.home_phone|format_us_phone }}</a></span>{% endif %}
                   {% if contact.mobile_phone %}<span class="me-3">Mobile: <a href="tel:{{ contact.mobile_phone }}">{{ contact.mobile_phone|format_us_phone }}</a></span>{% endif %}
-                  {% if contact.preferred_contact_details %}<span>Preferred: {{ contact.preferred_contact_details }}</span>{% endif %}
+                  {% if contact.preferred_contact_method %}<div>Preferred method: {{ contact.get_preferred_contact_method_display }}</div>{% endif %}
+                  {% if contact.preferred_contact_details %}<div>Additional preferred contact details: {{ contact.preferred_contact_details }}</div>{% endif %}
                   {% if contact.address %}<div class="mt-1">{{ contact.address|linebreaksbr }}</div>{% endif %}
                 </div>
                 {% endfor %}
@@ -626,91 +627,6 @@
 </div>
 
 </div>
-<!-- Privacy Controls -->
-{% if request.user == member %}
-<div class="container-fluid mt-4">
-  <div class="card border-warning">
-    <div class="card-header bg-warning text-dark">
-      <h5 class="mb-0">
-        <i class="bi bi-shield-exclamation me-2"></i>Privacy Controls
-      </h5>
-    </div>
-    <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
-          <h6 class="mb-1">Contact Information Visibility</h6>
-          <p class="text-muted mb-0">
-            {% if member.redact_contact %}
-            Your contact details are currently <strong>hidden</strong> from other members.
-            {% else %}
-            Your contact details are currently <strong>visible</strong> to other members.
-            {% endif %}
-          </p>
-        </div>
-        <button type="button" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %} btn-modern" data-bs-toggle="modal" data-bs-target="#redactConfirmModal">
-          <i class="bi bi-{% if member.redact_contact %}eye{% else %}eye-slash{% endif %} me-2"></i>
-          {% if member.redact_contact %}Make Visible{% else %}Hide Details{% endif %}
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Redaction confirmation modal -->
-<div class="modal fade" id="redactConfirmModal" tabindex="-1" aria-labelledby="redactConfirmModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="redactConfirmModalLabel">
-          <i class="bi bi-shield-exclamation me-2"></i>
-          {% if member.redact_contact %}Make your details visible?{% else %}Hide your contact details?{% endif %}
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        {% if member.redact_contact %}
-        <div class="alert alert-info">
-          <i class="bi bi-info-circle me-2"></i>
-          If you proceed, your personal contact details will be visible to other members again.
-        </div>
-        {% else %}
-        <div class="alert alert-warning">
-          <i class="bi bi-exclamation-triangle me-2"></i>
-          If you proceed, your personal contact details will be hidden from other members. Club officers and administrators will still be able to see this information when necessary.
-        </div>
-        {% endif %}
-
-        <h6 class="mt-3">What will be affected:</h6>
-        <ul class="list-unstyled">
-          <li><i class="bi bi-envelope me-2 text-primary"></i>Email address</li>
-          <li><i class="bi bi-telephone me-2 text-success"></i>Phone and mobile numbers</li>
-          <li><i class="bi bi-geo-alt me-2 text-warning"></i>Postal address</li>
-          <li><i class="bi bi-qr-code me-2 text-info"></i>QR contact card</li>
-        </ul>
-
-        <div class="alert alert-light border">
-          <small class="text-muted">
-            <i class="bi bi-info-circle me-1"></i>
-            You can change this setting at any time from your profile page.
-          </small>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <form method="post" action="{% url 'members:toggle_redaction' member.id %}" class="d-inline">
-          {% csrf_token %}
-          <button type="submit" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %}">
-            <i class="bi bi-{% if member.redact_contact %}eye{% else %}eye-slash{% endif %} me-2"></i>
-            {% if member.redact_contact %}Make Visible{% else %}Hide My Contact Details{% endif %}
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
-
-{% endif %}
-
 <!-- Qualification Assignment Modal (available to all instructors) -->
 <div class="modal fade" id="qualification-modal" tabindex="-1" aria-labelledby="qualification-modal-label" aria-hidden="true">
   <div class="modal-dialog modal-lg">

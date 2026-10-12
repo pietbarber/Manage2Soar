@@ -24,6 +24,9 @@ erDiagram
         string club_zip_code
         string club_country
         string club_phone
+        boolean share_member_email_by_default
+        boolean share_member_phone_by_default
+        boolean share_member_address_by_default
         text operations_info
         boolean schedule_instructors
         boolean schedule_tow_pilots
@@ -53,6 +56,8 @@ erDiagram
         boolean visiting_pilot_require_rating
         string visiting_pilot_token
         datetime visiting_pilot_token_created
+        boolean member_profile_self_service_enabled
+        json member_profile_field_policies
     }
 
     MembershipStatus {
@@ -99,6 +104,7 @@ erDiagram
 - **Key Features:** Singleton model (only one instance allowed), complete contact form customization, configurable role titles, scheduling toggles, club address/location management, visiting pilot security token lifecycle, surge threshold configuration
 - **Billing master switch (Issue #982):** `billing_app_enabled` controls whether tenant billing workflows are active at all. When disabled, billing views and member personal-charge endpoints are gated, and logsheet finalization skips ledger posting/cost-freezing.
 - **Contact Fields:** `contact_welcome_text`, `contact_response_info`, complete address fields, `club_phone`, `operations_info`
+- **Member Contact Sharing Defaults:** `share_member_email_by_default`, `share_member_phone_by_default`, and `share_member_address_by_default` control regular-member visibility when a member has no explicit per-field preference. All three default to `True`.
 - **Role Titles:** All staff positions configurable (Duty Officer, Instructor, Tow Pilot, etc.)
 - **Operational Settings:** Scheduling preferences, reservation controls, towplane rental permissions, notification settings
 - **Billing Settings:**
@@ -109,6 +115,8 @@ erDiagram
 - **Instructor Surge Email:** `instructors_email` is notified when a duty instructor accepts 3 or more students on a single day (Issue #646). This is a separate mechanism from the ops-intent surge thresholds in terms of its trigger source — it fires from `InstructionSlot` acceptances, not ops-intent sign-up counts — but both paths share the same `DutyAssignment.surge_notified` suppression flag, so only the first mechanism to fire will send an email for a given assignment date.
 - **Instruction Request Window (Issue #648):** `restrict_instruction_requests_window` (boolean, default False) enables a configurable advance-request limit. When enabled, `instruction_request_max_days_ahead` (integer, default 14) controls how many days in advance a student may submit an instruction request. The restriction is enforced both in the UI (the form is hidden and a notice with the open date is shown) and server-side (a POST is rejected with an error message). Clubs without this rule leave the toggle disabled.
 - **Visiting Pilot Features:** Complete workflow configuration, security token management, auto-approval settings, validation requirements
+- **Member Contact Privacy (Issue #1034):** `share_member_email_by_default`, `share_member_phone_by_default`, and `share_member_address_by_default` set the club-wide default for whether regular members can see each field on another member's profile. A member's own `contact_visibility` preference (`share`/`hide`) overrides these defaults.
+- **Member Profile Self-Service (Issue #1034):** `member_profile_self_service_enabled` is the master switch for member self-service profile edits. `member_profile_field_policies` is a JSON map with exactly the supported fields (`username`, `email`, `phone`, `address`, `emergency_contacts`, `nickname`, `profile_photo`, `biography`, `password`, `contact_visibility`). Values are `disabled`, `direct`, or `request`, except `password` and `profile_photo`, which support only `disabled` and `direct`. `get_member_profile_field_policy()` resolves the effective policy.
 - **Usage:** Accessed via template tags and admin interface, enables multi-club deployment with club-specific branding and contact handling
 
 ## MembershipStatus

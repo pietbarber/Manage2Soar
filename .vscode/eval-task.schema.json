@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Waza eval task (permissive)",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "inputs": { "type": "object" },
+    "expected": { "type": "object" },
+    "graders": { "type": "array" }
+  },
+  "additionalProperties": true
+}

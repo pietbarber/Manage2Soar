@@ -49,6 +49,21 @@ erDiagram
         string pilot_certificate_number
         date private_glider_checkride_date
         string home_club
+        json contact_visibility
+    }
+
+    EmergencyContact {
+        int id PK
+        int member_id FK
+        string name
+        string relationship "nullable/optional"
+        string home_phone "nullable/optional"
+        string mobile_phone "nullable/optional"
+        string preferred_contact_method "home_phone/mobile_phone/email/other"
+        string preferred_contact_details "nullable/optional"
+        text address "nullable/optional"
+        datetime created_at
+        datetime updated_at
     }
 
     MembershipApplication {
@@ -157,6 +172,7 @@ erDiagram
 
     Badge ||--o{ Badge : parent_badge
     Member ||--o| Biography : has_biography
+    Member ||--o{ EmergencyContact : emergency_contacts
     Member ||--o{ MemberBadge : earned_badges
     Badge ||--o{ MemberBadge : awarded_to_members
     Member ||--o{ Member : last_updated_by
@@ -166,7 +182,6 @@ erDiagram
     KioskToken o|--o{ KioskAccessLog : access_logs
     Member ||--o{ SafetyReport : submitted_reports
     Member ||--o{ SafetyReport : reviewed_by
-
     SafetyReport {
         int id PK
         int reporter_id FK "nullable for anonymous"
@@ -196,11 +211,19 @@ Values that do not fit the controlled choices are retained in
 - Stores all member profile data, authentication info, and group/role logic.
 - Methods for profile image, display name, group syncing, and status.
 - Includes `home_club` field for visiting pilots from other soaring clubs.
+- Stores per-field email, phone, and address visibility preferences in `contact_visibility`.
 - Can be linked to a `MembershipApplication` that created the account.
 - **Performance Optimization (Issue #285)**: Added database indexes on `membership_status` and `(last_name, first_name)` for faster filtering and sorting in logsheet operations.
 - **Photo Thumbnails (Issue #286)**: Added `profile_photo_medium` (200x200) and `profile_photo_small` (64x64) fields for optimized page loading. Thumbnails are auto-generated when photos are uploaded via admin. URL properties (`profile_image_url_medium`, `profile_image_url_small`) provide graceful fallback chains.
+- **Contact Privacy (Issue #1034)**: `contact_visibility` is a JSON map of per-field sharing preferences (`email`, `phone`, `address`) where `share` and `hide` override the club default; unset values fall back to the `share_member_*_by_default` site configuration. The legacy `redact_contact=True` value is migrated to `hide` for all three fields.
 
 See also: [Redaction of Personal Contact Information](redaction.md)
+
+### `EmergencyContact`
+- Structured emergency contact for a member (Issue #1035), the source of truth for emergency contacts.
+- Linked to `Member` via `member` FK (`related_name="emergency_contacts"`); a member may have zero or many.
+- All contact fields (`name` required, the rest optional) plus a `preferred_contact_method` choice and free-form `preferred_contact_details`.
+- Replaces the legacy free-text `Member.emergency_contact`, which remains display-only during migration.
 
 ### `MembershipApplication`
 - Stores membership applications from non-logged-in users (Issue #245).
@@ -209,6 +232,11 @@ See also: [Redaction of Personal Contact Information](redaction.md)
 - Links to `Member` account upon approval via `member_account` field.
 - Includes waitlist management with position tracking.
 - Administrative notes and review tracking for membership managers.
+
+### `EmergencyContact`
+- Stores an optional structured emergency contact for a member.
+- Linked to `Member`; members may have multiple contacts.
+- Records contact details and a preferred contact method.
 
 ### `Biography`
 - Stores member biographies, including rich text and upload path logic.

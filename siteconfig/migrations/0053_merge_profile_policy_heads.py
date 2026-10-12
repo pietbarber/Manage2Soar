@@ -1,29 +1,52 @@
-from django.db import migrations
+from django.db import migrations, models
+
+import siteconfig.models
 
 
-def convert_request_policies(apps, schema_editor):
+PROFILE_POLICY_DEFAULTS = {
+    "username": "disabled",
+    "email": "disabled",
+    "emergency_contacts": "direct",
+    "profile_photo": "direct",
+    "biography": "direct",
+    "password": "direct",
+    "contact_visibility": "direct",
+}
+
+
+def normalize_profile_policies(apps, schema_editor):
     SiteConfiguration = apps.get_model("siteconfig", "SiteConfiguration")
-    unsupported_direct_fields = {"email", "phone", "address", "nickname"}
+    fields = tuple(PROFILE_POLICY_DEFAULTS)
     for config in SiteConfiguration.objects.all().iterator():
-        policies = config.member_profile_field_policies or {}
-        normalized = {
-            field: (
-                "disabled"
-                if field in unsupported_direct_fields
-                else "direct"
-                if policy == "request"
-                else policy
-            )
-            for field, policy in policies.items()
-        }
-        if normalized != policies:
+        existing = config.member_profile_field_policies or {}
+        normalized = {}
+        for field in fields:
+            policy = existing.get(field, PROFILE_POLICY_DEFAULTS[field])
+            if policy == "request":
+                policy = "disabled" if field in {"username", "email"} else "direct"
+            if policy not in {"disabled", "direct"}:
+                policy = PROFILE_POLICY_DEFAULTS[field]
+            normalized[field] = policy
+        if normalized != existing:
             config.member_profile_field_policies = normalized
             config.save(update_fields=["member_profile_field_policies"])
 
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("siteconfig", "0052_siteconfiguration_member_profile_field_policies_and_more"),
+        ("siteconfig", "0053_siteconfiguration_profile_policies"),
     ]
 
-    operations = [migrations.RunPython(convert_request_policies, migrations.RunPython.noop)]
+    operations = [
+        migrations.RunPython(normalize_profile_policies, migrations.RunPython.noop),
+        migrations.AlterField(
+            model_name="siteconfiguration",
+            name="member_profile_field_policies",
+            field=models.JSONField(
+                db_default=PROFILE_POLICY_DEFAULTS,
+                default=siteconfig.models.default_member_profile_field_policies,
+                help_text="Per-field member profile policies.",
+                validators=[siteconfig.models.validate_member_profile_field_policies],
+            ),
+        ),
+    ]

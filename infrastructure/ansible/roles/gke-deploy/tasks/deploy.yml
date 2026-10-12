@@ -20,6 +20,115 @@
   run_once: true
   register: deployment_template
 
+- name: Generate migration job name
+  ansible.builtin.set_fact:
+    gke_migration_job_name: >-
+      migrate-{{ (gke_namespace ~ ':' ~ (gke_computed_image_tag | trim) ~ ':' ~
+      ansible_date_time.iso8601_micro) | hash('sha256') | truncate(16, true, '') }}
+  delegate_to: localhost
+  run_once: true
+  when: gke_run_migrations | bool
+  tags: [migrations]
+
+- name: Create temporary migration job manifest
+  ansible.builtin.tempfile:
+    state: file
+    path: /tmp
+    prefix: "k8s-migration-{{ gke_namespace }}-"
+    suffix: .yml
+  delegate_to: localhost
+  run_once: true
+  register: migration_job_manifest
+  when: gke_run_migrations | bool
+  tags: [migrations]
+
+- name: Generate and apply migration job
+  block:
+    - name: Generate migration job manifest
+      ansible.builtin.template:
+        src: k8s-migration-job.yml.j2
+        dest: "{{ migration_job_manifest.path }}"
+        mode: "0644"
+
+    - name: Apply migration job
+      ansible.builtin.command:
+        cmd: kubectl apply -f "{{ migration_job_manifest.path }}"
+      register: migration_job_apply
+      changed_when: "'created' in migration_job_apply.stdout"
+  always:
+    - name: Clean up migration job manifest
+      ansible.builtin.file:
+        path: "{{ migration_job_manifest.path }}"
+        state: absent
+  delegate_to: localhost
+  run_once: true
+  when: gke_run_migrations | bool
+  tags: [migrations]
+
+- name: Wait for migration job to finish
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - job
+      - "{{ gke_migration_job_name }}"
+      - -n
+      - "{{ gke_namespace }}"
+      - -o
+      - json
+  delegate_to: localhost
+  run_once: true
+  register: migration_job_status
+  changed_when: false
+  failed_when: false
+  until: >-
+    migration_job_status.rc == 0
+    and
+    (
+      (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int > 0
+      or
+      (
+        (migration_job_status.stdout | from_json).get('status', {}).get('conditions', [])
+        | selectattr('type', 'equalto', 'Failed')
+        | selectattr('status', 'equalto', 'True')
+        | list
+        | length > 0
+      )
+    )
+  retries: "{{ (gke_rollout_timeout | int / 5) | int }}"
+  delay: 5
+  when: gke_run_migrations | bool
+  tags: [migrations]
+
+- name: Read migration job logs when it did not succeed
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - logs
+      - job/{{ gke_migration_job_name }}
+      - -n
+      - "{{ gke_namespace }}"
+  delegate_to: localhost
+  run_once: true
+  register: migration_job_logs
+  changed_when: false
+  failed_when: false
+  when:
+    - gke_run_migrations | bool
+    - (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int == 0
+  tags: [migrations]
+
+- name: Fail deployment when migration job did not succeed
+  ansible.builtin.fail:
+    msg: |
+      The pre-rollout migration job {{ gke_migration_job_name }} did not succeed.
+      Migration output:
+      {{ migration_job_logs.stdout | default('No job logs were available.') }}
+  when:
+    - gke_run_migrations | bool
+    - (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int == 0
+  tags: [migrations]
+
 - name: Apply deployment configuration
   ansible.builtin.command:
     cmd: kubectl apply -f /tmp/k8s-deployment-{{ gke_namespace }}.yml
@@ -120,37 +229,6 @@
     - gke_wait_for_rollout | bool
     - rollout_result.rc is defined
     - rollout_result.rc != 0
-  delegate_to: localhost
-  run_once: true
-
-# ============================================================
-# DATABASE MIGRATIONS (OPTIONAL)
-# ============================================================
-# WARNING: Running migrations in multi-pod deployments (gke_replicas > 1) may cause
-# race conditions if multiple pods attempt to run migrations simultaneously. This task
-# uses 'kubectl exec deployment/...' which targets a single pod, reducing (but not
-# eliminating) the risk. For production multi-pod deployments, consider running migrations
-# as a separate Job or initContainer to ensure only one migration runs at a time.
-
-- name: Run database migrations
-  ansible.builtin.command:
-    cmd: >
-      kubectl exec deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --
-      python manage.py migrate --noinput
-  delegate_to: localhost
-  run_once: true
-  when: gke_run_migrations | bool
-  register: migrate_result
-  retries: "{{ gke_management_command_retries | int }}"
-  delay: "{{ gke_management_command_retry_delay | int }}"
-  until: migrate_result.rc == 0
-
-- name: Display migration result
-  ansible.builtin.debug:
-    msg: "{{ migrate_result.stdout_lines }}"
-  when:
-    - gke_run_migrations | bool
-    - migrate_result.stdout_lines is defined
   delegate_to: localhost
   run_once: true
 

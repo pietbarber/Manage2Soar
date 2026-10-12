@@ -37,10 +37,23 @@ def default_member_profile_field_policies():
     }
 
 
-def get_member_profile_field_policy(field):
+def validate_member_profile_field_policies(value):
+    if not isinstance(value, dict) or set(value) != set(MEMBER_PROFILE_POLICY_FIELDS):
+        raise ValidationError(
+            "Profile field policies must define exactly the supported fields."
+        )
+    for field, policy in value.items():
+        if policy not in {"disabled", "direct"}:
+            raise ValidationError(
+                "Invalid policy for %(field)s: %(policy)s.",
+                params={"field": field, "policy": policy},
+            )
+
+
+def get_member_profile_field_policy(field, site_config=None):
     if field not in MEMBER_PROFILE_POLICY_FIELDS:
         return "disabled"
-    config = SiteConfiguration.objects.first()
+    config = site_config or SiteConfiguration.objects.first()
     if not config:
         # Preserve the pre-policy behavior until a site configuration exists.
         return default_member_profile_field_policies().get(field, "disabled")
@@ -48,8 +61,6 @@ def get_member_profile_field_policy(field):
         return "disabled"
     policy = config.member_profile_field_policies.get(field, "disabled")
     if policy not in {"direct", "disabled"}:
-        return "disabled"
-    if field in {"password", "profile_photo"} and policy == "request":
         return "disabled"
     return policy
 
@@ -294,10 +305,13 @@ class SiteConfiguration(models.Model):
     )
     member_profile_self_service_enabled = models.BooleanField(
         default=True,
+        db_default=True,
         help_text="Allow members to update or request changes to configured profile fields.",
     )
     member_profile_field_policies = models.JSONField(
         default=default_member_profile_field_policies,
+        db_default=default_member_profile_field_policies(),
+        validators=[validate_member_profile_field_policies],
         help_text="Per-field member profile policies.",
     )
     contact_welcome_text = models.TextField(
@@ -1073,7 +1087,7 @@ class SiteConfiguration(models.Model):
                         )
             cache.delete("pwa_club_icon_url")
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:
         """Override delete to clear cache."""
         from django.core.cache import cache
 
@@ -1085,7 +1099,7 @@ class SiteConfiguration(models.Model):
                 "duty_default_max_assignments_per_month",
             ]
         )
-        super().delete(*args, **kwargs)
+        return super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"Site Configuration for {self.club_name}"
@@ -1133,7 +1147,7 @@ class MembershipStatus(models.Model):
         transaction.on_commit(clear_active_membership_statuses_cache)
         return result
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:
         """Override delete to prevent deletion if members are using this status."""
         # Import here to avoid circular imports
         try:
@@ -1152,10 +1166,11 @@ class MembershipStatus(models.Model):
             # During migrations, Member model might not be available
             pass
 
-        super().delete(*args, **kwargs)
+        result = super().delete(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
         transaction.on_commit(clear_active_membership_statuses_cache)
+        return result
 
     @classmethod
     def get_active_statuses(cls):

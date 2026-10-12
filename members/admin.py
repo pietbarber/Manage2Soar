@@ -28,7 +28,12 @@ from .models import (
     VisitingPilotVisit,
 )
 from .models_applications import MembershipApplication
-from .resources import MEMBER_CSV_FIELDS, MemberResource
+from .resources import (
+    MEMBER_CSV_FIELDS,
+    MemberResource,
+    serialize_contact_visibility,
+    serialize_emergency_contacts,
+)
 from .utils.image_processing import generate_profile_thumbnails
 from .utils.permissions import contact_field_visibility
 
@@ -343,12 +348,23 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         response["Content-Disposition"] = "attachment; filename=members_export.csv"
         writer = csv.writer(response)
         writer.writerow(fields)
-        for member in queryset:
-            row = [getattr(member, f, "") for f in fields]
+        for member in queryset.prefetch_related("emergency_contacts"):
+            row = [
+                (
+                    serialize_emergency_contacts(member)
+                    if field == "emergency_contacts"
+                    else (
+                        serialize_contact_visibility(member)
+                        if field == "contact_visibility"
+                        else getattr(member, field, "")
+                    )
+                )
+                for field in fields
+            ]
             writer.writerow(row)
         return response
 
-    readonly_fields = ("profile_photo_preview",)
+    readonly_fields = ("profile_photo_preview", "redact_contact")
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
@@ -371,8 +387,11 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         "rostermeister",
         ActiveStatusFilter,
     )
-    # Allow quick inline editing of membership status and redaction flag
-    list_editable = ("membership_status", "redact_contact")
+    # Allow quick inline editing of membership status. `redact_contact` is
+    # retired as a writable flag (see contact-privacy retirement): it is exposed
+    # read-only so admins can still inspect it but cannot set the legacy
+    # full-redaction override that members have no UI/endpoint to clear.
+    list_editable = ("membership_status",)
     # Allow filtering by redact flag in the admin sidebar
     list_filter = list_filter + ("redact_contact",)
 

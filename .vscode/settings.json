@@ -3,14 +3,12 @@
     "python.testing.pytestEnabled": true,
     "makefile.configureOnOpen": false,
     "docker.lsp.experimental.scout.criticalHighVulnerabilities": true,
-    "python.analysis.typeCheckingMode": "basic",
-    "python.analysis.diagnosticSeverityOverrides": {
-        "reportAttributeAccessIssue": "none",
-        "reportGeneralTypeIssues": "warning"
-    },
     "[html]": {
         "html.format.wrapLineLength": 0,
         "editor.formatOnSave": false
+    },
+    "yaml.schemas": {
+        "./.vscode/eval-task.schema.json": ".github/evals/**/tasks/*.yaml"
     },
     "files.associations": {
         ".bandit": "yaml",

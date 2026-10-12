@@ -102,6 +102,25 @@ class MembershipApplicationModelTests:
         )
         assert app.can_be_approved()
 
+    def test_can_be_approved_rejects_incomplete_emergency_contact(self):
+        app = MembershipApplication(
+            first_name="John",
+            last_name="Doe",
+            email="john@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        assert not app.can_be_approved()
+
     def test_approve_application_creates_member(self):
         """Test that approving an application creates a member account."""
         app = MembershipApplication.objects.create(
@@ -274,6 +293,65 @@ class MembershipApplicationFormTests:
         form = MembershipApplicationForm(data=form_data)
         assert form.is_valid()
 
+    def test_valid_form_without_emergency_contact(self):
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+
+        assert form.is_valid()
+        assert all(
+            not form.fields[field].required
+            for field in (
+                "emergency_contact_name",
+                "emergency_contact_relationship",
+                "emergency_contact_phone",
+            )
+        )
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("emergency_contact_relationship", "Spouse"),
+            ("emergency_contact_phone", "555-987-6543"),
+        ],
+    )
+    def test_form_requires_name_when_emergency_contact_details_are_provided(
+        self, field, value
+    ):
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+            field: value,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+
+        assert not form.is_valid()
+        assert "emergency_contact_name" in form.errors
+
     def test_missing_required_fields(self):
         """Test form validation with missing required fields."""
         form_data = {
@@ -308,6 +386,55 @@ class MembershipApplicationFormTests:
         form = MembershipApplicationForm(data=form_data)
         assert not form.is_valid()
         assert "email" in form.errors
+
+    def test_application_without_emergency_contact_is_valid(self):
+        """Emergency contact details are optional and must not block submission."""
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "emergency_contact_name": "",
+            "emergency_contact_relationship": "",
+            "emergency_contact_phone": "",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+        assert form.is_valid()
+        assert form.instance.can_be_approved()
+
+    def test_emergency_contact_details_require_name_and_phone(self):
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "emergency_contact_name": "",
+            "emergency_contact_relationship": "Spouse",
+            "emergency_contact_phone": "",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+
+        assert not form.is_valid()
+        assert "emergency_contact_name" in form.errors
+        assert "emergency_contact_phone" in form.errors
 
 
 class MembershipApplicationViewTests(TestCase):
@@ -1158,3 +1285,34 @@ class MembershipApplicationIntegrationTests:
         assert app.member_account == member
         assert app.reviewed_by == manager
         assert app.reviewed_at is not None
+
+
+class ApprovalBlankSSANumberTests(TestCase):
+    """SSA_member_number is unique, so blank applicant values must become NULL."""
+
+    def _make_application(self, first_name, email):
+        return MembershipApplication.objects.create(
+            first_name=first_name,
+            last_name="Tester",
+            email=email,
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn to fly gliders",
+            ssa_member_number="",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+    def test_approving_multiple_applicants_with_blank_ssa_number(self):
+        first = self._make_application("Ann", "ann@example.com").approve_application()
+        second = self._make_application("Bob", "bob@example.com").approve_application()
+
+        self.assertIsNone(first.SSA_member_number)
+        self.assertIsNone(second.SSA_member_number)

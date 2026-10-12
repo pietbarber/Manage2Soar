@@ -1,4 +1,34 @@
 from django.conf import settings
+from django.db import transaction
+
+CONTACT_FIELDS = ("email", "phone", "address")
+
+
+def _reconcile_legacy_contact_redaction(subject_member):
+    if not getattr(subject_member, "redact_contact", False):
+        return
+
+    def migrate_preferences(member):
+        visibility = getattr(member, "contact_visibility", None)
+        visibility = dict(visibility) if isinstance(visibility, dict) else {}
+        visibility.update({field: "hide" for field in CONTACT_FIELDS})
+        member.contact_visibility = visibility
+        member.redact_contact = False
+
+    state = getattr(subject_member, "_state", None)
+    if state is None or not getattr(subject_member, "pk", None):
+        migrate_preferences(subject_member)
+        return
+
+    manager = subject_member.__class__._default_manager
+    with transaction.atomic(using=state.db):
+        member = manager.using(state.db).select_for_update().get(pk=subject_member.pk)
+        if member.redact_contact:
+            migrate_preferences(member)
+            member.save(update_fields=["contact_visibility", "redact_contact"])
+
+        subject_member.contact_visibility = member.contact_visibility
+        subject_member.redact_contact = member.redact_contact
 
 
 def is_privileged_viewer(user):
@@ -24,15 +54,20 @@ def is_privileged_viewer(user):
 
 
 def can_view_personal_info(viewer, subject_member):
-    if not getattr(subject_member, "redact_contact", False):
+    _reconcile_legacy_contact_redaction(subject_member)
+    if viewer == subject_member or is_privileged_viewer(viewer):
         return True
-    return is_privileged_viewer(viewer)
+    return any(
+        contact_field_visibility(subject_member, field)["shared"]
+        for field in CONTACT_FIELDS
+    )
 
 
 def can_view_contact_field(viewer, subject_member, field, site_config=None):
     """Return whether a viewer may see one contact field on a member profile."""
     if field not in {"email", "phone", "address"}:
         raise ValueError(f"Unsupported contact field: {field}")
+    _reconcile_legacy_contact_redaction(subject_member)
     if viewer == subject_member or is_privileged_viewer(viewer):
         return True
     if getattr(subject_member, "redact_contact", False):
@@ -45,6 +80,7 @@ def contact_field_visibility(subject_member, field, site_config=None):
     """Return effective regular-member visibility and its source."""
     if field not in {"email", "phone", "address"}:
         raise ValueError(f"Unsupported contact field: {field}")
+    _reconcile_legacy_contact_redaction(subject_member)
     if getattr(subject_member, "redact_contact", False):
         return {"shared": False, "source": "legacy full redaction"}
 
