@@ -251,6 +251,15 @@ class Member(AbstractUser):
         blank=True,
         help_text="Per-field contact sharing preferences: inherit, share, or hide.",
     )
+    pending_email = models.EmailField(
+        blank=True,
+        help_text="Email address awaiting member confirmation.",
+    )
+    pending_email_requested_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the pending email confirmation was requested.",
+    )
 
     @property
     def profile_image_url(self):
