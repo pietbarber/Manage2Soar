@@ -147,7 +147,7 @@
           <div class="d-flex justify-content-between align-items-start gap-3">
             <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Contact Information</h5>
             <div class="d-flex flex-column align-items-end gap-2">
-              {% if privacy_sharing %}
+              {% if privacy_sharing and can_view_policy %}
               <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#privacySettingsModal">
                 <i class="bi bi-shield-lock me-1"></i>Privacy Settings
               </button>
@@ -236,7 +236,7 @@
         </div>
       </div>
 
-      {% if privacy_sharing %}
+      {% if privacy_sharing and can_view_policy %}
       <div class="modal fade" id="privacySettingsModal" tabindex="-1" aria-labelledby="privacySettingsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
@@ -247,10 +247,18 @@
             <form method="post" action="{% url 'members:update_contact_visibility' member.id %}">
               {% csrf_token %}
               <div class="modal-body">
-                <p class="text-muted">Choose which contact details other regular members can see.</p>
-                <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" role="switch" name="share_email" id="profile_share_email"{% if privacy_sharing.email %} checked{% endif %}><label class="form-check-label" for="profile_share_email"><i class="bi bi-envelope me-2"></i>Share email</label></div>
-                <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" role="switch" name="share_phone" id="profile_share_phone"{% if privacy_sharing.phone %} checked{% endif %}><label class="form-check-label" for="profile_share_phone"><i class="bi bi-telephone me-2"></i>Share phone numbers</label></div>
-                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" name="share_address" id="profile_share_address"{% if privacy_sharing.address %} checked{% endif %}><label class="form-check-label" for="profile_share_address"><i class="bi bi-geo-alt me-2"></i>Share postal address</label></div>
+                <p class="text-muted">Choose whether each contact detail follows the club default or is shared or hidden.</p>
+                {% for setting in privacy_settings %}
+                <div class="mb-3">
+                  <label class="form-label" for="visibility_{{ setting.field }}">{{ setting.label }}</label>
+                  <select class="form-select" name="visibility_{{ setting.field }}" id="visibility_{{ setting.field }}">
+                    <option value="inherit"{% if setting.preference == "inherit" %} selected{% endif %}>Inherit club default</option>
+                    <option value="share"{% if setting.preference == "share" %} selected{% endif %}>Share</option>
+                    <option value="hide"{% if setting.preference == "hide" %} selected{% endif %}>Hide</option>
+                  </select>
+                  <small class="text-muted">Currently {% if setting.shared %}visible{% else %}hidden{% endif %} to regular members.</small>
+                </div>
+                {% endfor %}
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

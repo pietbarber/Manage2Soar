@@ -12,13 +12,13 @@ from django.core import signing
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -36,7 +36,7 @@ from siteconfig.forms import (
     VisitingPilotSignupForm,
 )
 from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
-from utils.email import enforce_noreply_from_email
+from utils.email import DevModeEmailMultiAlternatives, enforce_noreply_from_email
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .decorators import active_member_required
@@ -69,7 +69,7 @@ EMAIL_CHANGE_TOKEN_MAX_AGE = 60 * 60 * 24
 def _send_account_security_email(recipient, subject, body):
     if not recipient:
         return
-    EmailMultiAlternatives(
+    DevModeEmailMultiAlternatives(
         subject=subject,
         body=body,
         from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
@@ -259,22 +259,8 @@ def member_list(request):
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     is_self = request.user == member
-    can_edit = request.user.is_superuser or (
-        is_self and get_member_profile_field_policy("biography") == "direct"
-    )
-    profile_photo_policy = get_member_profile_field_policy("profile_photo")
-    emergency_contacts_editable = (
-        get_member_profile_field_policy("emergency_contacts") == "direct"
-    )
-    password_editable = get_member_profile_field_policy("password") == "direct"
-
-    # Decide whether to show solo/checkride buttons
-    show_need_buttons = member.glider_rating not in ("private", "commercial")
-
     site_config = SiteConfiguration.objects.first()
 
-    # Biography logic
-    biography = getattr(member, "biography", None)
     profile_photo_policy = (
         get_member_profile_field_policy("profile_photo", site_config)
         if is_self
@@ -290,10 +276,28 @@ def member_view(request, member_id):
         if is_self
         else "disabled"
     )
+    contact_visibility_policy = (
+        get_member_profile_field_policy("contact_visibility", site_config)
+        if is_self
+        else "disabled"
+    )
+    password_policy = (
+        get_member_profile_field_policy("password", site_config)
+        if is_self
+        else "disabled"
+    )
+    can_edit = request.user.is_superuser or (is_self and biography_policy == "direct")
+    emergency_contacts_editable = emergency_contacts_policy == "direct"
+    password_editable = password_policy == "direct"
+
+    # Decide whether to show solo/checkride buttons
+    show_need_buttons = member.glider_rating not in ("private", "commercial")
+
+    # Biography logic
+    biography = getattr(member, "biography", None)
 
     # Determine whether the requester can view personal info, and generate
     # a QR code accordingly (redacted QR omits contact fields).
-    site_config = SiteConfiguration.objects.first()
     regular_contact_visibility = {
         field: contact_field_visibility(member, field, site_config)
         for field in ("email", "phone", "address")
@@ -313,6 +317,7 @@ def member_view(request, member_id):
         for field in ("email", "phone", "address")
     }
     has_staff_redactions = any(redact_contact_fields.values())
+    can_view_policy = contact_visibility_policy == "direct"
     qr_visibility = {
         field: True if is_self else regular_contact_visibility[field]["shared"]
         for field in ("email", "phone", "address")
@@ -386,8 +391,27 @@ def member_view(request, member_id):
                 field: regular_contact_visibility[field]["shared"]
                 for field in ("email", "phone", "address")
             }
-            if is_self
-            and get_member_profile_field_policy("contact_visibility") == "direct"
+            if can_view_policy
+            else None
+        ),
+        "can_view_policy": can_view_policy,
+        "privacy_settings": (
+            [
+                {
+                    "field": field,
+                    "label": label,
+                    "preference": (member.contact_visibility or {}).get(
+                        field, "inherit"
+                    ),
+                    "shared": regular_contact_visibility[field]["shared"],
+                }
+                for field, label in (
+                    ("email", "Email"),
+                    ("phone", "Phone numbers"),
+                    ("address", "Postal address"),
+                )
+            ]
+            if can_view_policy
             else None
         ),
         "staff_contact_status": (
@@ -411,8 +435,7 @@ def member_view(request, member_id):
         "password_editable": password_editable,
         "is_self": is_self,
         "can_edit": can_edit and (not is_self or biography_policy == "direct"),
-        "can_change_password": is_self
-        and get_member_profile_field_policy("password", site_config) == "direct",
+        "can_change_password": password_editable,
         "can_update_emergency_contacts": is_self
         and emergency_contacts_policy == "direct",
         "biography": biography,
@@ -499,7 +522,7 @@ def request_email_change(request):
     confirmation_url = request.build_absolute_uri(
         reverse("members:confirm_email_change", args=[token])
     )
-    message = EmailMultiAlternatives(
+    message = DevModeEmailMultiAlternatives(
         subject="Confirm your Manage2Soar email address",
         body=(
             f"Confirm your new email address by visiting:\n\n{confirmation_url}\n\n"
@@ -542,11 +565,12 @@ def update_username(request):
             )
         messages.success(request, "Your username has been updated.")
     else:
-        messages.error(request, form.errors.get("username", ["Invalid username."])[0])
+        username_error = form.errors.get("username", ["Invalid username."])[0]
+        messages.error(request, str(username_error))
     return redirect("members:member_view", member_id=request.user.id)
 
 
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "POST"])
 def confirm_email_change(request, token):
     try:
         data = signing.loads(
@@ -557,21 +581,42 @@ def confirm_email_change(request, token):
     member = get_object_or_404(Member, pk=data.get("member_id"))
     if member.pending_email != data.get("email"):
         return render(request, "403.html", status=403)
-    if (
-        Member.objects.filter(email__iexact=member.pending_email)
-        .exclude(pk=member.pk)
-        .exists()
-    ):
-        member.pending_email = ""
-        member.pending_email_requested_at = None
-        member.save(update_fields=["pending_email", "pending_email_requested_at"])
+
+    if get_member_profile_field_policy("email") != "direct":
+        return render(request, "403.html", status=403)
+
+    if request.method == "GET":
+        return render(
+            request,
+            "members/confirm_email_change.html",
+            {"member": member, "pending_email": member.pending_email, "token": token},
+        )
+
+    try:
+        with transaction.atomic():
+            member = Member.objects.select_for_update().get(pk=member.pk)
+            if get_member_profile_field_policy("email") != "direct":
+                return render(request, "403.html", status=403)
+            if member.pending_email != data.get("email"):
+                return render(request, "403.html", status=403)
+            if (
+                Member.objects.filter(email__iexact=member.pending_email)
+                .exclude(pk=member.pk)
+                .exists()
+            ):
+                messages.error(request, "That email address is no longer available.")
+                return redirect("members:member_view", member_id=member.id)
+            old_email = member.email
+            member.email = member.pending_email
+            member.pending_email = ""
+            member.pending_email_requested_at = None
+            member.save(
+                update_fields=["email", "pending_email", "pending_email_requested_at"]
+            )
+    except IntegrityError:
         messages.error(request, "That email address is no longer available.")
         return redirect("members:member_view", member_id=member.id)
-    old_email = member.email
-    member.email = member.pending_email
-    member.pending_email = ""
-    member.pending_email_requested_at = None
-    member.save(update_fields=["email", "pending_email", "pending_email_requested_at"])
+
     _send_account_security_email(
         old_email,
         "Your Manage2Soar email address changed",

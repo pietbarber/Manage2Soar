@@ -6,6 +6,7 @@ from django.db.models.query import QuerySet
 from django.test import Client, RequestFactory
 from django.urls import reverse
 
+from members.admin import EmergencyContactInline, MemberAdmin
 from members.models import EmergencyContact, Member
 from members.views import member_view
 from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
@@ -37,6 +38,10 @@ def direct_policy():
     policies["emergency_contacts"] = "direct"
     config.save(update_fields=["member_profile_field_policies"])
     return config
+
+
+def test_member_admin_includes_emergency_contact_inline():
+    assert EmergencyContactInline in MemberAdmin.inlines
 
 
 @pytest.fixture

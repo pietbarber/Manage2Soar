@@ -43,7 +43,7 @@ def validate_member_profile_field_policies(value):
             "Profile field policies must define exactly the supported fields."
         )
     for field, policy in value.items():
-        if policy not in {"disabled", "direct"}:
+        if not isinstance(policy, str) or policy not in {"disabled", "direct"}:
             raise ValidationError(
                 "Invalid policy for %(field)s: %(policy)s.",
                 params={"field": field, "policy": policy},
@@ -306,7 +306,7 @@ class SiteConfiguration(models.Model):
     member_profile_self_service_enabled = models.BooleanField(
         default=True,
         db_default=True,
-        help_text="Allow members to update or request changes to configured profile fields.",
+        help_text="Allow members to edit configured profile fields directly.",
     )
     member_profile_field_policies = models.JSONField(
         default=default_member_profile_field_policies,

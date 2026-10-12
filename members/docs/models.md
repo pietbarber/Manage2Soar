@@ -10,6 +10,8 @@ erDiagram
         int id PK
         string username UK
         string email
+        string pending_email
+        datetime pending_email_requested_at
         string first_name
         string last_name
         string middle_initial
@@ -209,6 +211,7 @@ Values that do not fit the controlled choices are retained in
 ### `Member`
 - Extends Django's `AbstractUser`.
 - Stores all member profile data, authentication info, and group/role logic.
+- Stores `pending_email` and `pending_email_requested_at` while a new email address awaits confirmation.
 - Methods for profile image, display name, group syncing, and status.
 - Includes `home_club` field for visiting pilots from other soaring clubs.
 - Stores per-field email, phone, and address visibility preferences in `contact_visibility`.

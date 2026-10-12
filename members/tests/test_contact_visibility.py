@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core import signing
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 
 from members.models import Member
@@ -365,7 +365,11 @@ def test_member_can_update_contact_visibility():
 
     response = client.post(
         reverse("members:update_contact_visibility", args=[member.id]),
-        {"share_email": "on", "share_address": "on"},
+        {
+            "visibility_email": "share",
+            "visibility_phone": "hide",
+            "visibility_address": "share",
+        },
     )
 
     assert response.status_code == 302
@@ -567,17 +571,12 @@ def test_master_self_service_switch_blocks_member_edit_endpoints(client):
         reverse("members:toggle_redaction", args=[member.id]),
     )
 
-    assert all(
-        response.status_code == 302
-        for response in (
-            profile_post,
-            password_post,
-            visibility_post,
-            emergency_post,
-            biography_post,
-            legacy_post,
-        )
-    )
+    assert profile_post.status_code == 403
+    assert password_post.status_code == 403
+    assert visibility_post.status_code == 403
+    assert emergency_post.status_code == 403
+    assert biography_post.status_code == 200
+    assert legacy_post.status_code == 302
     member.refresh_from_db()
     assert member.profile_photo.name == original_photo
     assert member.contact_visibility == {}
@@ -587,12 +586,11 @@ def test_master_self_service_switch_blocks_member_edit_endpoints(client):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("policy", ["disabled", "request"])
-def test_contact_visibility_endpoint_rejects_non_direct_policies(client, policy):
+def test_contact_visibility_endpoint_rejects_disabled_policy(client):
     MembershipStatus.objects.create(name="Policy Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
     policies = default_member_profile_field_policies()
-    policies["contact_visibility"] = policy
+    policies["contact_visibility"] = "disabled"
     SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="testclub.com",
@@ -600,7 +598,7 @@ def test_contact_visibility_endpoint_rejects_non_direct_policies(client, policy)
         member_profile_field_policies=policies,
     )
     member = Member.objects.create_user(
-        username=f"policy_{policy}", membership_status="Policy Active"
+        username="policy_disabled", membership_status="Policy Active"
     )
     client.force_login(member)
 
@@ -609,7 +607,7 @@ def test_contact_visibility_endpoint_rejects_non_direct_policies(client, policy)
         {"visibility_email": "share"},
     )
 
-    assert response.status_code == 302
+    assert response.status_code == 403
     member.refresh_from_db()
     assert member.contact_visibility == {}
 
@@ -644,6 +642,7 @@ def test_vcard_download_filters_contact_fields_for_regular_member():
 
 
 @pytest.mark.django_db
+@override_settings(EMAIL_DEV_MODE=False)
 def test_email_change_requires_confirmation_before_replacing_email(mailoutbox):
     MembershipStatus.objects.create(name="Email Active", is_active=True, sort_order=1)
     clear_active_membership_statuses_cache()
@@ -651,7 +650,10 @@ def test_email_change_requires_confirmation_before_replacing_email(mailoutbox):
         club_name="Test Club",
         domain_name="test.example",
         club_abbreviation="TEST",
-        member_profile_field_policies={"email": "direct"},
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "email": "direct",
+        },
     )
     member = Member.objects.create_user(
         username="email_member",
@@ -681,8 +683,87 @@ def test_email_change_requires_confirmation_before_replacing_email(mailoutbox):
     client.logout()
     response = client.get(reverse("members:confirm_email_change", args=[token]))
 
+    assert response.status_code == 200
+    member.refresh_from_db()
+    assert member.email == "old@example.com"
+    assert member.pending_email == "new@example.com"
+
+    response = client.post(reverse("members:confirm_email_change", args=[token]))
+
     assert response.status_code == 302
     member.refresh_from_db()
     assert member.email == "new@example.com"
     assert member.pending_email == ""
     assert member.pending_email_requested_at is None
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("token_state", ["expired", "tampered"])
+def test_invalid_email_change_tokens_do_not_update_email(token_state, monkeypatch):
+    MembershipStatus.objects.create(name="Email Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example",
+        club_abbreviation="TEST",
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "email": "direct",
+        },
+    )
+    member = Member.objects.create_user(
+        username="email_token_member",
+        email="old@example.com",
+        pending_email="new@example.com",
+        membership_status="Email Active",
+    )
+    token = signing.dumps(
+        {"member_id": member.pk, "email": "new@example.com"},
+        salt="members.email-change",
+    )
+    if token_state == "expired":
+        monkeypatch.setattr("members.views.EMAIL_CHANGE_TOKEN_MAX_AGE", -1)
+    else:
+        token += "tampered"
+
+    response = Client().post(reverse("members:confirm_email_change", args=[token]))
+
+    assert response.status_code == 403
+    member.refresh_from_db()
+    assert member.email == "old@example.com"
+    assert member.pending_email == "new@example.com"
+
+
+@pytest.mark.django_db
+def test_email_confirmation_rechecks_current_self_service_policy():
+    MembershipStatus.objects.create(name="Email Active", is_active=True, sort_order=1)
+    clear_active_membership_statuses_cache()
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example",
+        club_abbreviation="TEST",
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "email": "direct",
+        },
+    )
+    member = Member.objects.create_user(
+        username="disabled_email_member",
+        email="old@example.com",
+        pending_email="new@example.com",
+        membership_status="Email Active",
+    )
+    token = signing.dumps(
+        {"member_id": member.pk, "email": "new@example.com"},
+        salt="members.email-change",
+    )
+    policies = config.member_profile_field_policies
+    policies["email"] = "disabled"
+    config.save(update_fields=["member_profile_field_policies"])
+
+    response = Client().post(reverse("members:confirm_email_change", args=[token]))
+
+    assert response.status_code == 403
+    member.refresh_from_db()
+    assert member.email == "old@example.com"
+    assert member.pending_email == "new@example.com"

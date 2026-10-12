@@ -14,12 +14,11 @@ Each supported member-editable field has one policy:
 | --- | --- |
 | Disabled | No member control is shown; direct endpoint access is rejected. |
 | Direct | A valid submitted value updates the profile immediately. |
-| Request approval | The member submits a change request; a member manager must approve it before it updates the profile. |
 
-Staff-created information requests are different from member-created change
-requests: valid member responses to staff requests apply automatically. A staff
-request asking for an email address is the exception: the new email remains
-pending until the member verifies it.
+Member-originated approval requests and staff-created information requests are
+future work in Phase 4. The current implementation supports only `disabled`
+and `direct` field policies. Email changes use direct member self-service with
+confirmation at the new address; they do not use a manager approval request.
 
 Password and profile-photo changes support only `disabled` and `direct`.
 Passwords must never be retained in a request record, and uploaded photos need
@@ -32,8 +31,8 @@ an explicit attachment workflow before approval requests can be supported.
 * Contact visibility applies independently to email, phone, and postal address.
 * The same visibility decision is used by profile pages, directory output,
   vCards, and QR contact cards.
-* Profile requests retain the requested fields, submitted values, status,
-  source, reviewer, timestamps, and audit events.
+* Future profile requests will retain the requested fields, submitted values,
+  status, source, reviewer, timestamps, and audit events.
 
 ## Phase 0: Stable Baseline
 
@@ -58,12 +57,11 @@ Verification gate:
 1. Render structured contacts with click-to-call links.
 2. Implement direct add, edit, and remove flows.
 3. Require `NO EMERGENCY CONTACT` before removing the final contact.
-4. Support approval requests for member-originated contact changes.
-5. Ensure an approved edit updates its target contact rather than duplicating it.
+4. Ensure an edit updates its target contact rather than duplicating it.
 
 Verification gate:
 
-* Add, edit, remove, final-contact decline, direct, and request-policy tests pass.
+* Add, edit, remove, and final-contact decline tests pass.
 
 ## Phase 3: Contact Privacy and Contact Cards
 
@@ -95,8 +93,8 @@ Verification gate:
 
 ## Phase 5: Field-by-Field Policy Integration
 
-Integrate one field at a time. Do not start the next field until all three
-applicable policy modes pass their tests.
+Integrate one field at a time. The current implementation supports direct and
+disabled policies. Request approval remains future work in Phase 4.
 
 Order:
 
@@ -113,26 +111,24 @@ Order:
 ## Phase 6: Username Completion
 
 1. Validate format, uniqueness, and no-op submissions.
-2. Make request-policy UI explicitly say `Request Username Change`.
-3. Auto-complete valid staff-requested username changes.
-4. Send distinct security emails to the member and active member managers on
+2. Validate and apply direct username changes.
+3. Send distinct security emails to the member and active member managers on
    every completed username change.
 
 Verification gate:
 
-* Direct, request, disabled, staff-requested, approval, email-recipient, and
-  no-op tests pass.
+* Direct, disabled, email-recipient, and no-op tests pass. Approval and
+  staff-requested username changes remain future work.
 
 ## Test Matrix
 
 | Area | Required checks |
 | --- | --- |
-| Every policy field | disabled control and endpoint rejection; direct update; request remains pending |
-| Staff request | valid response applies once; invalid response stays open |
-| Member request | submission does not alter source data; manager approval applies once |
+| Every current policy field | disabled control and endpoint rejection; direct update |
+| Future request workflow | valid staff response applies once; member request remains pending until manager approval |
 | Privacy | profile, directory, QR, and vCard agree; hidden data is absent from markup |
-| Emergency contacts | add, edit, remove, final decline, request approval, no duplicate on edit |
-| Username | format, collision, no-op, each policy, audit events, member and manager email |
+| Emergency contacts | add, edit, remove, final decline, no duplicate on edit |
+| Username | format, collision, no-op, direct/disabled policy, audit events, member and manager email |
 | Email | verification token, expiry, resend, old address unchanged until verification |
 | Notifications | recipient set, URL, duplicate suppression where required, command idempotence |
 

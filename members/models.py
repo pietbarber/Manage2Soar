@@ -92,6 +92,15 @@ class Biography(models.Model):
 
 
 class Member(AbstractUser):
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                models.functions.Lower("email"),
+                condition=~Q(email=""),
+                name="members_member_email_ci_unique",
+            ),
+        ]
+
     pending_email = models.EmailField(blank=True)
     pending_email_requested_at = models.DateTimeField(blank=True, null=True)
 

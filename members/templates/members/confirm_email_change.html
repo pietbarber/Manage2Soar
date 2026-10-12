@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Email Change{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header"><h1 class="h4 mb-0">Confirm your email address</h1></div>
+        <div class="card-body">
+          <p>Confirm changing the email address for {{ member.get_full_name|default:member.username }} to <strong>{{ pending_email }}</strong>.</p>
+          <form method="post">
+            {% csrf_token %}
+            <button class="btn btn-primary" type="submit">Confirm email address</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
