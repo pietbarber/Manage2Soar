@@ -407,17 +407,18 @@ class MembershipApplicationForm(forms.ModelForm):
         contact_relationship = cleaned_data.get("emergency_contact_relationship")
         contact_phone = cleaned_data.get("emergency_contact_phone")
 
-        if contact_name or contact_relationship or contact_phone:
-            if not contact_name:
-                self.add_error(
-                    "emergency_contact_name",
-                    "Enter the emergency contact's name when providing contact details.",
-                )
-            if not contact_phone:
-                self.add_error(
-                    "emergency_contact_phone",
-                    "Enter a phone number when providing emergency contact details.",
-                )
+        emergency_contact_fields = {
+            "emergency_contact_name": contact_name,
+            "emergency_contact_relationship": contact_relationship,
+            "emergency_contact_phone": contact_phone,
+        }
+        if any(emergency_contact_fields.values()) and not all(
+            emergency_contact_fields.values()
+        ):
+            error = "Provide the emergency contact's name, relationship, and phone number, or leave all three blank."
+            for field, value in emergency_contact_fields.items():
+                if not value:
+                    self.add_error(field, error)
 
         # Validate agreement checkboxes
         if not cleaned_data.get("agrees_to_terms"):

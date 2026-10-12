@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
@@ -1316,3 +1317,74 @@ class ApprovalBlankSSANumberTests(TestCase):
 
         self.assertIsNone(first.SSA_member_number)
         self.assertIsNone(second.SSA_member_number)
+
+
+def _valid_application_form_data(**contact_data):
+    return {
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "john@example.com",
+        "phone": "555-123-4567",
+        "address_line1": "123 Main St",
+        "city": "Anytown",
+        "state": "CA",
+        "zip_code": "12345",
+        "soaring_goals": "I want to learn gliding",
+        "agrees_to_terms": True,
+        "agrees_to_safety_rules": True,
+        "agrees_to_financial_obligations": True,
+        **contact_data,
+    }
+
+
+@pytest.mark.django_db
+def test_partial_emergency_contact_is_rejected_with_clear_errors():
+    form = MembershipApplicationForm(
+        data=_valid_application_form_data(
+            emergency_contact_name="Jane Doe",
+            emergency_contact_phone="555-987-6543",
+        )
+    )
+
+    assert not form.is_valid()
+    assert (
+        "Provide the emergency contact's name"
+        in form.errors.as_data()["emergency_contact_relationship"][0].message
+    )
+    assert "emergency_contact_relationship" in form.errors
+
+
+@pytest.mark.django_db
+def test_empty_emergency_contact_is_valid():
+    form = MembershipApplicationForm(data=_valid_application_form_data())
+
+    assert form.is_valid()
+
+
+@pytest.mark.django_db
+def test_model_rejects_partial_emergency_contact():
+    app = MembershipApplication(
+        **_valid_application_form_data(
+            emergency_contact_name="Jane Doe",
+            emergency_contact_phone="555-987-6543",
+        )
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        app.full_clean()
+
+    assert "emergency_contact_relationship" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_partial_emergency_contact_cannot_be_approved():
+    app = MembershipApplication(
+        **_valid_application_form_data(
+            emergency_contact_name="Jane Doe",
+            emergency_contact_phone="555-987-6543",
+        )
+    )
+
+    assert not app.can_be_approved()
+    with pytest.raises(ValueError, match="cannot be approved"):
+        app.approve_application()

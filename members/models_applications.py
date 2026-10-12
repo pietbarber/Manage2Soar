@@ -347,16 +347,29 @@ class MembershipApplication(models.Model):
         return (self.glider_flight_hours or 0) > 0
 
     def clean(self):
-        """Require a name when emergency-contact details are provided."""
+        """Require all emergency-contact fields when any are provided."""
         super().clean()
-        if not self.emergency_contact_name and (
-            self.emergency_contact_relationship or self.emergency_contact_phone
-        ):
+        emergency_contact_fields = (
+            self.emergency_contact_name,
+            self.emergency_contact_relationship,
+            self.emergency_contact_phone,
+        )
+        if any(emergency_contact_fields) and not all(emergency_contact_fields):
             raise ValidationError(
                 {
-                    "emergency_contact_name": (
-                        "Enter a name when providing emergency-contact details."
+                    field: (
+                        "Provide the emergency contact's name, relationship, and phone "
+                        "number, or leave all three blank."
                     )
+                    for field, value in zip(
+                        (
+                            "emergency_contact_name",
+                            "emergency_contact_relationship",
+                            "emergency_contact_phone",
+                        ),
+                        emergency_contact_fields,
+                    )
+                    if not value
                 }
             )
 
@@ -390,8 +403,12 @@ class MembershipApplication(models.Model):
             or self.emergency_contact_relationship
             or self.emergency_contact_phone
         )
-        if emergency_contact_data and not (
-            self.emergency_contact_name and self.emergency_contact_phone
+        if emergency_contact_data and not all(
+            (
+                self.emergency_contact_name,
+                self.emergency_contact_relationship,
+                self.emergency_contact_phone,
+            )
         ):
             return False
 
