@@ -189,6 +189,7 @@ cython_debug/
 email-tests/
 
 # Local scripts and sensitive data
+var/prod-snapshots/
 scripts/reset_spr_data.py
 membership.json
 managed-cert.yaml
