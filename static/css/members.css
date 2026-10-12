@@ -112,6 +112,23 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
+.staff-reveal {
+    cursor: pointer;
+}
+
+.staff-reveal:hover .staff-redacted,
+.staff-reveal:focus .staff-redacted {
+    text-decoration: underline;
+}
+
+.staff-reveal.is-revealed .staff-redacted {
+    display: none;
+}
+
+.staff-reveal.is-revealed .staff-revealed {
+    display: inline !important;
+}
+
 .contact-info .list-group-item {
     border: none;
     padding: 0.75rem 0;
@@ -333,13 +350,4 @@
     background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
     color: #212529;
     box-shadow: 0 2px 6px rgba(255, 193, 7, 0.3);
-}
-
-/* Account settings keeps optional controls balanced when one is unavailable. */
-.account-settings .card {
-    border-color: var(--bs-border-color);
-}
-
-.contact-reveal-button {
-    vertical-align: baseline;
 }

@@ -30,27 +30,33 @@ class TestMemberContactPrivacyRevealE2E(DjangoPlaywrightTestCase):
         self.login(username=self.viewer.username)
         self.page.goto(f"{self.live_server_url}/members/{self.subject.pk}/view/")
 
-        email_value = self.page.locator("#contact-email-value")
-        phone_value = self.page.locator("#contact-phone-value")
-        address_value = self.page.locator("#contact-address-value")
-        assert not email_value.is_visible()
-        assert not phone_value.is_visible()
-        assert not address_value.is_visible()
-
-        self.page.locator("#contact-email-reveal").click()
-        assert email_value.is_visible()
+        redaction_modal = self.page.locator("#redaction-alert-modal")
+        redaction_modal.wait_for(state="visible")
         assert (
-            self.page.locator("#contact-email-reveal").get_attribute("aria-expanded")
-            == "true"
+            "Click a Redacted field to reveal it temporarily."
+            in redaction_modal.inner_text()
         )
-        assert not self.page.locator("#contact-email-reveal").is_visible()
+        redaction_modal.get_by_role("button", name="Dismiss").click()
+        redaction_modal.wait_for(state="hidden")
 
-        phone_button = self.page.locator("#contact-phone-reveal")
-        phone_button.focus()
+        reveals = self.page.locator(".staff-reveal")
+        assert reveals.count() == 3
+        assert not reveals.nth(0).locator(".staff-revealed").is_visible()
+        assert not reveals.nth(1).locator(".staff-revealed").is_visible()
+        assert not reveals.nth(2).locator(".staff-revealed").is_visible()
+
+        reveals.nth(0).click()
+        assert "is-revealed" in (reveals.nth(0).get_attribute("class") or "")
+        assert reveals.nth(0).locator(".staff-revealed").is_visible()
+
+        phone_reveal = reveals.nth(1)
+        phone_reveal.focus()
         self.page.keyboard.press("Enter")
-        assert phone_value.is_visible()
+        assert "is-revealed" in (phone_reveal.get_attribute("class") or "")
+        assert phone_reveal.locator(".staff-revealed").is_visible()
 
-        address_button = self.page.locator("#contact-address-reveal")
-        address_button.focus()
+        address_reveal = reveals.nth(2)
+        address_reveal.focus()
         self.page.keyboard.press("Space")
-        assert address_value.is_visible()
+        assert "is-revealed" in (address_reveal.get_attribute("class") or "")
+        assert address_reveal.locator(".staff-revealed").is_visible()

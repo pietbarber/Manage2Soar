@@ -300,9 +300,9 @@ def member_view(request, member_id):
         and get_member_profile_field_policy("contact_visibility", site_config)
         == "direct"
     )
-    privileged_contact_reveal = is_privileged_viewer(request.user) and not is_self
-    contact_requires_reveal = {
-        field: privileged_contact_reveal and not effective_contact_visibility[field]
+    mask_contact_values = is_privileged_viewer(request.user) and not is_self
+    redact_contact_fields = {
+        field: mask_contact_values and not effective_contact_visibility[field]
         for field in ("email", "phone", "address")
     }
     qr_png = generate_vcard_qr(
@@ -367,7 +367,8 @@ def member_view(request, member_id):
         "can_view_email": contact_visibility["email"],
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
-        "contact_requires_reveal": contact_requires_reveal,
+        "redact_contact_fields": redact_contact_fields,
+        "has_staff_redactions": any(redact_contact_fields.values()),
         "can_view_policy": can_view_policy,
         "privacy_sharing": (effective_contact_visibility if can_view_policy else None),
         "privacy_settings": (

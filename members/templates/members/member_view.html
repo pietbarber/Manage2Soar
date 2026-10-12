@@ -13,7 +13,7 @@
   {% get_siteconfig as siteconfig %}
   {% can_view_personal_info_tag member as can_view_personal %}
 
-  {% if member.redact_contact and request.user.member_manager %}
+  {% if has_staff_redactions %}
   <!-- Modal shown to member_managers to inform about redaction policy -->
   <div class="modal fade" id="redaction-alert-modal" tabindex="-1" aria-labelledby="redactionAlertLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -23,8 +23,8 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p>This member has chosen to redact their personal contact information on the public members directory.</p>
-          <p>As {{ siteconfig.membership_manager_title|default:'Member Meister' }}, you may view this information when necessary. Please exercise discretion when sharing or using it.</p>
+          <p>Some contact details are hidden by this member's privacy settings.</p>
+          <p>Click a <strong>Redacted</strong> field to reveal it temporarily. Please exercise discretion when sharing or using private information.</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Dismiss</button>
@@ -166,18 +166,8 @@
                 <div>
                   <strong class="d-block">Email</strong>
                   {% if can_view_email %}
-                    {% if contact_requires_reveal.email %}
-                      <span class="text-muted fst-italic">Redacted</span>
-                      <button id="contact-email-reveal" type="button" class="btn btn-link btn-sm p-0 ms-2 contact-reveal-button" data-contact-reveal="contact-email-value" aria-controls="contact-email-value" aria-expanded="false">Reveal private email</button>
-                      <span id="contact-email-value" hidden>
-                        {% if member.email and "@" in member.email %}
-                          <a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>
-                        {% else %}
-                          <span class="text-muted">{{ member.email }}</span>
-                        {% endif %}
-                      </span>
-                    {% elif member.email and "@" in member.email %}
-                      <a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>
+                    {% if member.email and "@" in member.email %}
+                      {% if redact_contact_fields.email %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none"><a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a></span></span>{% else %}<a href="mailto:{{ member.email }}" class="text-decoration-none">{{ member.email }}</a>{% endif %}
                     {% else %}
                       <span class="text-muted">{{ member.email }}</span>
                     {% endif %}
@@ -193,20 +183,10 @@
                 <div>
                   <strong class="d-block">Phone</strong>
                   {% if can_view_phone and phone_display %}
-                    {% if contact_requires_reveal.phone %}
-                      <span class="text-muted fst-italic">Redacted</span>
-                      <button id="contact-phone-reveal" type="button" class="btn btn-link btn-sm p-0 ms-2 contact-reveal-button" data-contact-reveal="contact-phone-value" aria-controls="contact-phone-value" aria-expanded="false">Reveal private phone</button>
-                      <span id="contact-phone-value" hidden>
-                        {% if phone_link %}
-                          <a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a>
-                        {% else %}
-                          <span class="text-muted">{{ phone_display|format_us_phone }}</span>
-                        {% endif %}
-                      </span>
-                    {% elif phone_link %}
-                      <a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a>
+                    {% if phone_link %}
+                      {% if redact_contact_fields.phone %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none"><a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a></span></span>{% else %}<a href="tel:{{ phone_display }}" class="text-decoration-none">{{ phone_display|format_us_phone }}</a>{% endif %}
                     {% else %}
-                      <span class="text-muted">{{ phone_display|format_us_phone }}</span>
+                      {% if redact_contact_fields.phone %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none">{{ phone_display|format_us_phone }}</span></span>{% else %}<span class="text-muted">{{ phone_display|format_us_phone }}</span>{% endif %}
                     {% endif %}
                   {% else %}
                     <span class="text-muted fst-italic">Redacted</span>
@@ -221,20 +201,10 @@
                 <div>
                   <strong class="d-block">Mobile</strong>
                   {% if can_view_phone and mobile_display %}
-                    {% if contact_requires_reveal.phone %}
-                      <span class="text-muted fst-italic">Redacted</span>
-                      <button id="contact-mobile-reveal" type="button" class="btn btn-link btn-sm p-0 ms-2 contact-reveal-button" data-contact-reveal="contact-mobile-value" aria-controls="contact-mobile-value" aria-expanded="false">Reveal private mobile number</button>
-                      <span id="contact-mobile-value" hidden>
-                        {% if mobile_link %}
-                          <a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a>
-                        {% else %}
-                          <span class="text-muted">{{ mobile_display|format_us_phone }}</span>
-                        {% endif %}
-                      </span>
-                    {% elif mobile_link %}
-                      <a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a>
+                    {% if mobile_link %}
+                      {% if redact_contact_fields.phone %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none"><a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a></span></span>{% else %}<a href="tel:{{ mobile_display }}" class="text-decoration-none">{{ mobile_display|format_us_phone }}</a>{% endif %}
                     {% else %}
-                      <span class="text-muted">{{ mobile_display|format_us_phone }}</span>
+                      {% if redact_contact_fields.phone %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><span class="staff-revealed d-none">{{ mobile_display|format_us_phone }}</span></span>{% else %}<span class="text-muted">{{ mobile_display|format_us_phone }}</span>{% endif %}
                     {% endif %}
                   {% else %}
                     <span class="text-muted fst-italic">Redacted</span>
@@ -250,21 +220,15 @@
                 <div>
                   <strong class="d-block">Address</strong>
                   {% if can_view_address and member.address %}
-                    {% if contact_requires_reveal.address %}
-                      <span class="text-muted fst-italic">Redacted</span>
-                      <button id="contact-address-reveal" type="button" class="btn btn-link btn-sm p-0 ms-2 contact-reveal-button" data-contact-reveal="contact-address-value" aria-controls="contact-address-value" aria-expanded="false">Reveal private address</button>
-                      <address id="contact-address-value" class="mb-0" hidden>
-                        {{ member.address }}<br>
-                        {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
-                        {{ member.country }}
-                      </address>
-                    {% else %}
-                      <address class="mb-0">
-                        {{ member.address }}<br>
-                        {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
-                        {{ member.country }}
-                      </address>
-                    {% endif %}
+                    {% if redact_contact_fields.address %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><address class="staff-revealed d-none mb-0">
+                      {{ member.address }}<br>
+                      {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
+                      {{ member.country }}
+                    </address></span>{% else %}<address class="mb-0">
+                      {{ member.address }}<br>
+                      {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
+                      {{ member.country }}
+                    </address>{% endif %}
                   {% else %}
                     <span class="text-muted fst-italic">Redacted</span>
                   {% endif %}
@@ -751,6 +715,17 @@
 
 {% block extra_scripts %}
   <script>
+    document.querySelectorAll('.staff-reveal').forEach((element) => {
+      element.addEventListener('click', () => element.classList.toggle('is-revealed'));
+      element.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          element.classList.toggle('is-revealed');
+        }
+      });
+    });
+  </script>
+  <script>
     // Defensive modal auto-show for membership managers when viewing a redacted member.
     (function showRedactionModal(retries) {
       try {
@@ -768,16 +743,6 @@
         setTimeout(function () { showRedactionModal(retries - 1); }, 100);
       }
     })(20);
-
-    document.querySelectorAll('[data-contact-reveal]').forEach(function (button) {
-      button.addEventListener('click', function () {
-        var value = document.getElementById(button.dataset.contactReveal);
-        if (!value) return;
-        value.hidden = false;
-        button.setAttribute('aria-expanded', 'true');
-        button.hidden = true;
-      });
-    });
 
     // Load qualification modal content via HTMX and show modal
     function loadQualificationModal(url) {

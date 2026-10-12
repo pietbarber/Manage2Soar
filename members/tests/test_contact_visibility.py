@@ -466,14 +466,17 @@ def test_privileged_profile_hides_regular_member_private_values_until_revealed(c
     response = client.get(reverse("members:member_view", args=[subject.pk]))
 
     assert response.status_code == 200
-    assert response.context["contact_requires_reveal"] == {
+    assert response.context["redact_contact_fields"] == {
         "email": True,
         "phone": True,
         "address": True,
     }
-    assert b'id="contact-email-value" hidden' in response.content
-    assert b'id="contact-phone-value" hidden' in response.content
-    assert b'id="contact-address-value" class="mb-0" hidden' in response.content
+    assert response.context["has_staff_redactions"] is True
+    assert response.content.count(b'class="staff-reveal"') == 3
+    assert b'<span class="staff-redacted">Redacted</span>' in response.content
+    assert b'<span class="staff-revealed d-none">' in response.content
+    assert b'<address class="staff-revealed d-none mb-0">' in response.content
+    assert b"contact-email-reveal" not in response.content
 
 
 @pytest.mark.django_db
