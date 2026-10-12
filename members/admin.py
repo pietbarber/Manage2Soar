@@ -187,6 +187,28 @@ class MemberBadgeInline(admin.TabularInline):
 
 # This form is referenced by MemberAdmin via the 'form' attribute.
 class CustomMemberChangeForm(UserChangeForm):
+    CONTACT_VISIBILITY_CHOICES = (
+        ("inherit", "Use club default"),
+        ("share", "Share"),
+        ("hide", "Hide"),
+    )
+
+    contact_visibility_email = forms.ChoiceField(
+        label="Email visibility",
+        choices=CONTACT_VISIBILITY_CHOICES,
+        help_text="Controls visibility to regular members.",
+    )
+    contact_visibility_phone = forms.ChoiceField(
+        label="Phone visibility",
+        choices=CONTACT_VISIBILITY_CHOICES,
+        help_text="Controls visibility to regular members.",
+    )
+    contact_visibility_address = forms.ChoiceField(
+        label="Address visibility",
+        choices=CONTACT_VISIBILITY_CHOICES,
+        help_text="Controls visibility to regular members.",
+    )
+
     class Meta:
         model = Member
         fields = (
@@ -198,6 +220,29 @@ class CustomMemberChangeForm(UserChangeForm):
             "instructor",
             "towpilot",
         )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        visibility = self.instance.contact_visibility or {}
+        for field in ("email", "phone", "address"):
+            self.fields[f"contact_visibility_{field}"].initial = (
+                "hide"
+                if self.instance.redact_contact
+                else visibility.get(field, "inherit")
+            )
+
+    def save(self, commit=True):
+        member = super().save(commit=False)
+        member.contact_visibility = {
+            field: self.cleaned_data[f"contact_visibility_{field}"]
+            for field in ("email", "phone", "address")
+            if self.cleaned_data[f"contact_visibility_{field}"] != "inherit"
+        }
+        # Admin edits are now stored in the per-field privacy model.
+        member.redact_contact = False
+        if commit:
+            member.save()
+        return member
 
 
 #########################
@@ -350,10 +395,8 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         "rostermeister",
         ActiveStatusFilter,
     )
-    # Allow quick inline editing of membership status. `redact_contact` is
-    # retired as a writable flag (see contact-privacy retirement): it is exposed
-    # read-only so admins can still inspect it but cannot set the legacy
-    # full-redaction override that members have no UI/endpoint to clear.
+    # The legacy full-redaction flag remains read-only; privacy changes use the
+    # per-field controls in the member form below.
     list_editable = ("membership_status",)
     # Allow filtering by redact flag in the admin sidebar
     list_filter = list_filter + ("redact_contact",)
@@ -416,6 +459,9 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "glider_rating",
                     "private_notes",
                     "public_notes",
+                    "contact_visibility_email",
+                    "contact_visibility_phone",
+                    "contact_visibility_address",
                     "redact_contact",
                 )
             },
