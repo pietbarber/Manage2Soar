@@ -65,25 +65,6 @@ class MailingListAdminForm(forms.ModelForm):
 class SiteConfigurationAdminForm(forms.ModelForm):
     """Admin form with period-neutral reservation cap wording."""
 
-    member_profile_email_direct_edit = forms.BooleanField(
-        required=False, label="Members may edit email directly"
-    )
-    member_profile_emergency_contacts_direct_edit = forms.BooleanField(
-        required=False, label="Members may edit emergency contacts directly"
-    )
-    member_profile_profile_photo_direct_edit = forms.BooleanField(
-        required=False, label="Members may edit profile photo directly"
-    )
-    member_profile_biography_direct_edit = forms.BooleanField(
-        required=False, label="Members may edit biography directly"
-    )
-    member_profile_password_direct_edit = forms.BooleanField(
-        required=False, label="Members may edit password directly"
-    )
-    member_profile_contact_visibility_direct_edit = forms.BooleanField(
-        required=False, label="Members may edit contact visibility directly"
-    )
-
     class Meta:
         model = SiteConfiguration
         fields = "__all__"
@@ -93,8 +74,11 @@ class SiteConfigurationAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         policies = self.instance.member_profile_field_policies or {}
         for field in MEMBER_PROFILE_POLICY_FIELDS:
-            self.fields[f"member_profile_{field}_direct_edit"].initial = (
-                policies.get(field) == "direct"
+            self.fields[f"profile_policy_{field}"] = forms.BooleanField(
+                required=False,
+                label=field.replace("_", " ").title(),
+                help_text="Allow members to edit this field directly.",
+                initial=policies.get(field) == "direct",
             )
         reservation_cap_field = self.fields.get("max_reservations_per_year")
         if reservation_cap_field:
@@ -156,7 +140,7 @@ class SiteConfigurationAdminForm(forms.ModelForm):
             self.instance.member_profile_field_policies = {
                 field: (
                     "direct"
-                    if self.cleaned_data.get(f"member_profile_{field}_direct_edit")
+                    if self.cleaned_data.get(f"profile_policy_{field}")
                     else "disabled"
                 )
                 for field in MEMBER_PROFILE_POLICY_FIELDS
@@ -235,6 +219,21 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "operations_info",
                 ),
                 "description": "Contact form and location information for visitors",
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Member Profile Self-Service",
+            {
+                "fields": ("member_profile_self_service_enabled",)
+                + tuple(
+                    f"profile_policy_{field_name}"
+                    for field_name in MEMBER_PROFILE_POLICY_FIELDS
+                ),
+                "description": (
+                    "Configure which profile fields members may edit directly. "
+                    "Collapsed by default to keep the site settings page compact."
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -415,32 +414,6 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
-            "Member Contact Privacy & Self-Service",
-            {
-                "fields": (
-                    "member_profile_self_service_enabled",
-                    "member_profile_email_direct_edit",
-                    "member_profile_emergency_contacts_direct_edit",
-                    "member_profile_profile_photo_direct_edit",
-                    "member_profile_biography_direct_edit",
-                    "member_profile_password_direct_edit",
-                    "member_profile_contact_visibility_direct_edit",
-                ),
-                "description": (
-                    "Club-wide contact-privacy defaults and member self-service policy "
-                    "(Issue #1034). The three <strong>share_member_*_by_default</strong> "
-                    "toggles set the default for whether regular members can see each "
-                    "contact field; members can inherit the defaults or override them "
-                    "with a share/hide preference. "
-                    "<strong>member_profile_self_service_enabled</strong> is the "
-                    "master switch for member self-service profile edits. Each checkbox "
-                    "allows direct edits for that field; unchecked fields are disabled. "
-                    "Usernames remain staff-managed."
-                ),
-                "classes": ("collapse",),
-            },
-        ),
-        (
             "Visiting Pilot Management",
             {
                 "fields": (
@@ -608,7 +581,7 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
         queryset.delete()
         messages.success(
             request,
-            f'Successfully deleted membership statuses: {", ".join(deleted_names)}.',
+            f"Successfully deleted membership statuses: {', '.join(deleted_names)}.",
         )
 
     admin_helper_message = (

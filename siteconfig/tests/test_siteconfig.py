@@ -88,14 +88,78 @@ def test_member_profile_policy_master_toggle_and_username_are_disabled():
 
 
 @pytest.mark.django_db
-def test_siteconfiguration_admin_form_uses_direct_edit_toggles_only():
+def test_siteconfiguration_admin_form_uses_compact_direct_policy_checkboxes():
     from siteconfig.admin import SiteConfigurationAdminForm
 
     form = SiteConfigurationAdminForm()
 
     assert "member_profile_field_policies" not in form.fields
-    assert form.fields["member_profile_email_direct_edit"].initial is False
-    assert form.fields["member_profile_password_direct_edit"].initial is True
+    assert {
+        "profile_policy_email",
+        "profile_policy_emergency_contacts",
+        "profile_policy_profile_photo",
+        "profile_policy_biography",
+        "profile_policy_password",
+        "profile_policy_contact_visibility",
+    } <= form.fields.keys()
+    assert [
+        form.fields[field].label
+        for field in (
+            "profile_policy_email",
+            "profile_policy_emergency_contacts",
+            "profile_policy_profile_photo",
+            "profile_policy_biography",
+            "profile_policy_password",
+            "profile_policy_contact_visibility",
+        )
+    ] == [
+        "Email",
+        "Emergency Contacts",
+        "Profile Photo",
+        "Biography",
+        "Password",
+        "Contact Visibility",
+    ]
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_admin_form_saves_direct_edit_policies_and_master_switch():
+    from siteconfig.admin import SiteConfigurationAdminForm
+
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "emergency_contacts": "direct",
+        },
+    )
+    unbound_form = SiteConfigurationAdminForm(instance=config)
+    data = dict(unbound_form.initial)
+    data.update(
+        {
+            "member_profile_self_service_enabled": "on",
+            "profile_policy_email": "on",
+            "profile_policy_emergency_contacts": "on",
+            "profile_policy_password": "on",
+        }
+    )
+
+    form = SiteConfigurationAdminForm(data=data, instance=config)
+
+    assert form.is_valid(), form.errors
+    form.save()
+    config.refresh_from_db()
+    assert config.member_profile_self_service_enabled is True
+    assert config.member_profile_field_policies == {
+        "email": "direct",
+        "emergency_contacts": "direct",
+        "profile_photo": "disabled",
+        "biography": "disabled",
+        "password": "direct",
+        "contact_visibility": "disabled",
+    }
 
 
 @pytest.mark.django_db
@@ -145,6 +209,33 @@ def test_siteconfiguration_admin_exposes_member_contact_visibility_defaults():
         "share_member_phone_by_default",
         "share_member_address_by_default",
     } <= field_names
+
+
+def test_siteconfiguration_admin_self_service_fieldset_matches_original_shape():
+    from siteconfig.admin import SiteConfigurationAdmin
+
+    fieldsets = dict(SiteConfigurationAdmin.fieldsets)
+    titles = [title for title, _options in SiteConfigurationAdmin.fieldsets]
+    self_service = fieldsets["Member Profile Self-Service"]
+
+    assert (
+        titles.index("Member Profile Self-Service")
+        == titles.index("Contact Information") + 1
+    )
+    assert "collapse" in self_service.get("classes", ())
+    assert self_service["fields"] == (
+        "member_profile_self_service_enabled",
+        "profile_policy_email",
+        "profile_policy_emergency_contacts",
+        "profile_policy_profile_photo",
+        "profile_policy_biography",
+        "profile_policy_password",
+        "profile_policy_contact_visibility",
+    )
+    assert self_service["description"] == (
+        "Configure which profile fields members may edit directly. "
+        "Collapsed by default to keep the site settings page compact."
+    )
 
 
 @pytest.mark.django_db
