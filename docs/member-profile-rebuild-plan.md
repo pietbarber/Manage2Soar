@@ -14,12 +14,14 @@ Each supported member-editable field has one policy:
 | --- | --- |
 | Disabled | No member control is shown; direct endpoint access is rejected. |
 | Direct | A valid submitted value updates the profile immediately. |
-| Request approval | The member submits a change request; a member manager must approve it before it updates the profile. |
 
-Staff-created information requests are different from member-created change
-requests: valid member responses to staff requests apply automatically. A staff
-request asking for an email address is the exception: the new email remains
-pending until the member verifies it.
+The rebuild supports only `disabled` and `direct`. A stored `request` policy is
+reserved for future investigation; no member-manager approval workflow is part
+of this rebuild.
+
+Email is the exception to immediate persistence: a direct email change is held
+in `pending_email` with `pending_email_requested_at` until the member verifies
+the new address.
 
 Password and profile-photo changes support only `disabled` and `direct`.
 Passwords must never be retained in a request record, and uploaded photos need
@@ -28,12 +30,15 @@ an explicit attachment workflow before approval requests can be supported.
 ### Supported Data
 
 * Structured emergency contacts are the source of truth; legacy free-text data
-  remains display-only during migration.
+  remains display-only during migration. Admin/member management and structured
+  export operate on `EmergencyContact` records.
 * Contact visibility applies independently to email, phone, and postal address.
+  An omitted key is the effective `inherit` state; explicit `share` and `hide`
+  values override the site defaults.
 * The same visibility decision is used by profile pages, directory output,
   vCards, and QR contact cards.
-* Profile requests retain the requested fields, submitted values, status,
-  source, reviewer, timestamps, and audit events.
+* Profile changes in this rebuild use direct or disabled policies; no
+  member-created approval-request record or manager-review workflow is required.
 
 ## Phase 0: Stable Baseline
 
@@ -44,7 +49,7 @@ an explicit attachment workflow before approval requests can be supported.
 
 1. Add the `EmergencyContact` model and application-to-member mapping.
 2. Add per-field `Member.contact_visibility` data.
-3. Add contact-sharing defaults to site configuration.
+3. Add contact-sharing defaults and direct/disabled profile policies to site configuration.
 4. Write data migrations and legacy fallbacks.
 
 Verification gate:
@@ -56,14 +61,13 @@ Verification gate:
 ## Phase 2: Emergency Contacts
 
 1. Render structured contacts with click-to-call links.
-2. Implement direct add, edit, and remove flows.
+2. Implement direct add, edit, and remove flows, including admin management.
 3. Require `NO EMERGENCY CONTACT` before removing the final contact.
-4. Support approval requests for member-originated contact changes.
-5. Ensure an approved edit updates its target contact rather than duplicating it.
+4. Ensure an edited contact updates its target record rather than duplicating it.
 
 Verification gate:
 
-* Add, edit, remove, final-contact decline, direct, and request-policy tests pass.
+* Add, edit, remove, final-contact decline, direct, and disabled-policy tests pass.
 
 ## Phase 3: Contact Privacy and Contact Cards
 
@@ -79,60 +83,29 @@ Verification gate:
 * Role-based tests cover member, privileged staff, and public directory output.
 * Rendered HTML and vCards contain no hidden values.
 
-## Phase 4: Information Request Workflow
+## Phase 4: Field-by-Field Policy Integration
 
-1. Build staff request list, create, detail, and review screens.
-2. Build member action-needed indicators and a response screen.
-3. Add audit events, due dates, overdue reminders, and manager notifications.
-4. Make valid staff-request responses apply automatically.
-5. Keep member-originated approval requests pending until manager completion.
-
-Verification gate:
-
-* Tests cover requested, submitted, completed, declined, rejected, cancelled,
-  and overdue statuses.
-* Applying a request is idempotent.
-
-## Phase 5: Field-by-Field Policy Integration
-
-Integrate one field at a time. Do not start the next field until all three
-applicable policy modes pass their tests.
+Integrate one field at a time. Do not start the next field until both supported
+policy modes pass their tests.
 
 Order:
 
-1. Username
-2. Phone
-3. Address
-4. Nickname
-5. Emergency contacts
-6. Contact visibility
-7. Biography
-8. Email verification
-9. Profile photo and password direct/disabled controls
-
-## Phase 6: Username Completion
-
-1. Validate format, uniqueness, and no-op submissions.
-2. Make request-policy UI explicitly say `Request Username Change`.
-3. Auto-complete valid staff-requested username changes.
-4. Send distinct security emails to the member and active member managers on
-   every completed username change.
-
-Verification gate:
-
-* Direct, request, disabled, staff-requested, approval, email-recipient, and
-  no-op tests pass.
+1. Phone
+2. Address
+3. Nickname
+4. Emergency contacts
+5. Contact visibility
+6. Biography
+7. Email verification
+8. Profile photo and password direct/disabled controls
 
 ## Test Matrix
 
 | Area | Required checks |
 | --- | --- |
-| Every policy field | disabled control and endpoint rejection; direct update; request remains pending |
-| Staff request | valid response applies once; invalid response stays open |
-| Member request | submission does not alter source data; manager approval applies once |
+| Every policy field | disabled control and endpoint rejection; direct update |
 | Privacy | profile, directory, QR, and vCard agree; hidden data is absent from markup |
-| Emergency contacts | add, edit, remove, final decline, request approval, no duplicate on edit |
-| Username | format, collision, no-op, each policy, audit events, member and manager email |
+| Emergency contacts | structured add, edit, remove, admin management, final decline, no duplicate on edit |
 | Email | verification token, expiry, resend, old address unchanged until verification |
 | Notifications | recipient set, URL, duplicate suppression where required, command idempotence |
 
@@ -143,3 +116,12 @@ Verification gate:
 * One focused test module per behavior, not only manual shell checks.
 * No unrelated formatting, cleanup, or media-path changes in profile-work PRs.
 * Update the project graph after each completed phase.
+
+## Out Of Scope
+
+* Username self-editing is deferred for future investigation.
+* Member-manager approval workflows and request-policy behavior are deferred;
+  this rebuild does not implement them.
+* Global email uniqueness is not enforced. Existing upstream behavior allows
+  multiple member accounts to share an email; any change requires separate
+  investigation across login, reset, imports, and visiting-pilot lookup.
