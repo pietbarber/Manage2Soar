@@ -67,6 +67,22 @@ def test_siteconfiguration_admin_form_timezone_is_dropdown_with_iana_help():
     assert "iana.org/time-zones" in timezone_field.help_text
 
 
+def test_siteconfiguration_admin_form_reservation_time_periods_are_checkboxes():
+    from siteconfig.admin import SiteConfigurationAdminForm
+
+    form = SiteConfigurationAdminForm()
+    field = form.fields["glider_reservation_time_preferences"]
+    presets_toggle = form.fields["glider_reservation_presets_mode"]
+
+    assert presets_toggle.widget.__class__.__name__ == "CheckboxInput"
+    assert presets_toggle.label == "Enable preset time slots"
+    assert field.widget.__class__.__name__ == "CheckboxSelectMultiple"
+    assert ("morning", "Morning (first flights)") in list(field.choices)
+    assert form.fields["glider_reservation_morning_start"].initial == "10:00"
+    assert form.fields["glider_reservation_morning_end"].initial == "12:00"
+    assert "Existing reservations" in field.help_text
+
+
 @pytest.mark.django_db
 def test_siteconfiguration_admin_form_visiting_pilot_status_is_dropdown():
     """visiting_pilot_status should render as a dropdown of MembershipStatus names (Issue #1017)."""
@@ -157,6 +173,58 @@ def test_siteconfiguration_club_timezone_rejects_invalid_iana_key():
         config.full_clean()
 
     assert "club_timezone" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_reservation_time_preferences_default_to_all_presets():
+    config = SiteConfiguration.objects.create(
+        club_name="Reservation Club",
+        domain_name="example.org",
+        club_abbreviation="RC",
+    )
+
+    assert config.glider_reservation_time_preferences == [
+        "morning",
+        "midday",
+        "afternoon",
+        "full_day",
+        "specific",
+    ]
+    assert config.glider_reservation_time_ranges == {
+        "morning": {"start": "10:00", "end": "12:00"},
+        "midday": {"start": "12:00", "end": "14:00"},
+        "afternoon": {"start": "14:00", "end": "16:00"},
+    }
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_rejects_invalid_reservation_time_preferences():
+    config = SiteConfiguration(
+        club_name="Reservation Club",
+        domain_name="example.org",
+        club_abbreviation="RC",
+        glider_reservation_time_preferences=["morning", "moonlight"],
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        config.full_clean()
+
+    assert "glider_reservation_time_preferences" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_rejects_invalid_reservation_time_ranges():
+    config = SiteConfiguration(
+        club_name="Reservation Club",
+        domain_name="example.org",
+        club_abbreviation="RC",
+        glider_reservation_time_ranges={"morning": {"start": "12:00", "end": "10:00"}},
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        config.full_clean()
+
+    assert "glider_reservation_time_ranges" in exc_info.value.message_dict
 
 
 @pytest.mark.django_db
@@ -774,10 +842,14 @@ class TestPwaIconBackfill:
         ctx_manager.__enter__ = lambda s: io.BytesIO(logo_bytes)
         ctx_manager.__exit__ = MagicMock(return_value=False)
 
-        with patch.object(config.club_logo, "open", return_value=ctx_manager), patch(
-            "django.core.files.storage.default_storage.exists", return_value=False
-        ), patch(
-            "django.core.files.storage.default_storage.save", side_effect=fake_save
+        with (
+            patch.object(config.club_logo, "open", return_value=ctx_manager),
+            patch(
+                "django.core.files.storage.default_storage.exists", return_value=False
+            ),
+            patch(
+                "django.core.files.storage.default_storage.save", side_effect=fake_save
+            ),
         ):
             config.save()
 
@@ -815,10 +887,14 @@ class TestPwaIconBackfill:
         ctx_manager.__enter__ = lambda s: io.BytesIO(logo_bytes)
         ctx_manager.__exit__ = MagicMock(return_value=False)
 
-        with patch.object(config.club_logo, "open", return_value=ctx_manager), patch(
-            "django.core.files.storage.default_storage.exists", return_value=True
-        ), patch(
-            "django.core.files.storage.default_storage.save", side_effect=fake_save
+        with (
+            patch.object(config.club_logo, "open", return_value=ctx_manager),
+            patch(
+                "django.core.files.storage.default_storage.exists", return_value=True
+            ),
+            patch(
+                "django.core.files.storage.default_storage.save", side_effect=fake_save
+            ),
         ):
             config.save()
 
@@ -845,10 +921,14 @@ class TestPwaIconBackfill:
         def fake_delete(name):
             deleted_files.append(name)
 
-        with patch(
-            "django.core.files.storage.default_storage.exists", return_value=True
-        ), patch(
-            "django.core.files.storage.default_storage.delete", side_effect=fake_delete
+        with (
+            patch(
+                "django.core.files.storage.default_storage.exists", return_value=True
+            ),
+            patch(
+                "django.core.files.storage.default_storage.delete",
+                side_effect=fake_delete,
+            ),
         ):
             # Clear the logo
             config.club_logo = None

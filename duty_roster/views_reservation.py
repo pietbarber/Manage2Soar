@@ -485,7 +485,7 @@ def reservation_time_availability(request):
             "label": label,
             "available": value not in unavailable,
         }
-        for value, label in GliderReservation.TIME_PREFERENCE_CHOICES
+        for value, label in GliderReservation.get_configured_time_preference_choices()
     ]
     return JsonResponse({"choices": choices})
 

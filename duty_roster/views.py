@@ -949,10 +949,10 @@ def _agenda_reservation_period(reservation):
     """Return a display label and stable vertical sort key for an agenda slot."""
     slot_order = {
         "full_day": 0,
-        "morning": 1,
-        "midday": 2,
-        "afternoon": 3,
-        "specific": 4,
+        "morning": 2,
+        "midday": 3,
+        "afternoon": 4,
+        "specific": 5,
     }
     if reservation.time_preference == "specific" and reservation.start_time:
         start_label = reservation.start_time.strftime("%I:%M %p").lstrip("0")
@@ -960,11 +960,14 @@ def _agenda_reservation_period(reservation):
         if reservation.end_time:
             end_label = reservation.end_time.strftime("%I:%M %p").lstrip("0")
             label = f"{start_label}–{end_label}"
-        return label, (
-            slot_order["specific"],
-            reservation.start_time,
-            reservation.end_time or dt_time.max,
-        )
+        return label, (1, reservation.start_time, reservation.end_time or dt_time.max)
+
+    configured_range = GliderReservation.get_configured_time_preference_range(
+        reservation.time_preference
+    )
+    if configured_range:
+        start_time, end_time = configured_range
+        return reservation.get_time_preference_display(), (1, start_time, end_time)
 
     return reservation.get_time_preference_display(), (
         slot_order.get(reservation.time_preference, 5),

@@ -1,4 +1,5 @@
 import logging
+from datetime import time
 from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -72,6 +73,20 @@ def get_member_profile_field_policy(field, site_config=None):
     if field in {"password", "profile_photo"} and policy == "request":
         return "disabled"
     return policy
+
+
+def default_glider_reservation_time_preferences():
+    """Return enabled preset glider reservation periods for new configs."""
+    return ["morning", "midday", "afternoon", "full_day", "specific"]
+
+
+def default_glider_reservation_time_ranges():
+    """Return default clock ranges for preset glider reservation periods."""
+    return {
+        "morning": {"start": "10:00", "end": "12:00"},
+        "midday": {"start": "12:00", "end": "14:00"},
+        "afternoon": {"start": "14:00", "end": "16:00"},
+    }
 
 
 class MailingListCriterion(models.TextChoices):
@@ -563,6 +578,21 @@ class SiteConfiguration(models.Model):
         default=0,
         help_text="Maximum number of glider reservations a member can make per calendar month. Set to 0 for unlimited (default: 0).",
     )
+    glider_reservation_time_preferences = models.JSONField(
+        default=default_glider_reservation_time_preferences,
+        blank=True,
+        help_text=(
+            "Enabled preset time periods for glider reservations. "
+            "Existing reservations keep their stored period even if a period is later disabled."
+        ),
+    )
+    glider_reservation_time_ranges = models.JSONField(
+        default=default_glider_reservation_time_ranges,
+        blank=True,
+        help_text=(
+            "Clock ranges for preset glider reservation periods, stored as HH:MM values."
+        ),
+    )
 
     # Towplane rental options
     allow_towplane_rental = models.BooleanField(
@@ -966,6 +996,47 @@ class SiteConfiguration(models.Model):
                 errors["club_timezone"] = (
                     "Enter a valid IANA timezone (for example, America/New_York)."
                 )
+
+        valid_reservation_periods = set(default_glider_reservation_time_preferences())
+        configured_reservation_periods = self.glider_reservation_time_preferences or []
+        invalid_reservation_periods = [
+            period
+            for period in configured_reservation_periods
+            if period not in valid_reservation_periods
+        ]
+        if invalid_reservation_periods:
+            errors["glider_reservation_time_preferences"] = (
+                "Invalid reservation time periods: "
+                f"{', '.join(invalid_reservation_periods)}"
+            )
+
+        valid_range_periods = set(default_glider_reservation_time_ranges())
+        configured_ranges = self.glider_reservation_time_ranges or {}
+        invalid_range_periods = [
+            period for period in configured_ranges if period not in valid_range_periods
+        ]
+        if invalid_range_periods:
+            errors["glider_reservation_time_ranges"] = (
+                "Invalid reservation time range periods: "
+                f"{', '.join(invalid_range_periods)}"
+            )
+        else:
+            for period, range_config in configured_ranges.items():
+                start_value = range_config.get("start", "")
+                end_value = range_config.get("end", "")
+                try:
+                    start_time = time.fromisoformat(start_value)
+                    end_time = time.fromisoformat(end_value)
+                except (TypeError, ValueError):
+                    errors["glider_reservation_time_ranges"] = (
+                        "Reservation time ranges must use HH:MM values."
+                    )
+                    break
+                if end_time <= start_time:
+                    errors["glider_reservation_time_ranges"] = (
+                        "Reservation time range end times must be after start times."
+                    )
+                    break
 
         if errors:
             raise ValidationError(errors)

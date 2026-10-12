@@ -4,7 +4,7 @@ from django import forms
 from django.contrib import admin
 from django.utils.html import format_html
 
-from duty_roster.models import DutyRoleDefinition
+from duty_roster.models import DutyRoleDefinition, GliderReservation
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -15,6 +15,7 @@ from .models import (
     MembershipGliderRentalRule,
     MembershipStatus,
     SiteConfiguration,
+    default_glider_reservation_time_ranges,
 )
 
 
@@ -64,9 +65,49 @@ class MailingListAdminForm(forms.ModelForm):
 class SiteConfigurationAdminForm(forms.ModelForm):
     """Admin form with period-neutral reservation cap wording."""
 
+    RESERVATION_TIME_RANGE_FIELDS = {
+        "morning": ("Morning start", "Morning end"),
+        "midday": ("Midday start", "Midday end"),
+        "afternoon": ("Afternoon start", "Afternoon end"),
+    }
+
+    glider_reservation_time_preferences = forms.MultipleChoiceField(
+        choices=GliderReservation.TIME_PREFERENCE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Reservation time periods",
+        help_text=(
+            "Preset periods members may choose when reserving gliders. "
+            "Existing reservations are not changed if a period is disabled."
+        ),
+    )
+
+    glider_reservation_presets_mode = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Enable preset time slots",
+        help_text=(
+            "Allow members to choose preset periods like Morning, Midday, and Afternoon. "
+            "When disabled, members can only choose Specific Time."
+        ),
+    )
+
     class Meta:
         model = SiteConfiguration
-        fields = "__all__"
+        exclude = ["glider_reservation_time_ranges"]
+
+    for period, (start_label, end_label) in RESERVATION_TIME_RANGE_FIELDS.items():
+        locals()[f"glider_reservation_{period}_start"] = forms.TimeField(
+            required=False,
+            label=start_label,
+            widget=forms.TimeInput(attrs={"type": "time"}),
+        )
+        locals()[f"glider_reservation_{period}_end"] = forms.TimeField(
+            required=False,
+            label=end_label,
+            widget=forms.TimeInput(attrs={"type": "time"}),
+        )
+    del period, start_label, end_label
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -124,6 +165,82 @@ class SiteConfigurationAdminForm(forms.ModelForm):
                 label=visiting_pilot_status_field.label,
                 help_text=visiting_pilot_status_field.help_text,
             )
+
+        # Initialize preset toggle based on whether any non-specific preset is enabled.
+        configured = getattr(self.instance, "glider_reservation_time_preferences", None)
+        configured_periods = configured or [
+            v for v, _ in GliderReservation.TIME_PREFERENCE_CHOICES
+        ]
+        presets_enabled = any(period != "specific" for period in configured_periods)
+        self.fields["glider_reservation_presets_mode"].initial = presets_enabled
+
+        # If presets disabled, hide time-range inputs server-side for clarity
+        if not presets_enabled:
+            for period in self.RESERVATION_TIME_RANGE_FIELDS:
+                self.fields[f"glider_reservation_{period}_start"].widget = (
+                    forms.HiddenInput()
+                )
+                self.fields[f"glider_reservation_{period}_end"].widget = (
+                    forms.HiddenInput()
+                )
+
+        configured_ranges = (
+            getattr(self.instance, "glider_reservation_time_ranges", None)
+            or default_glider_reservation_time_ranges()
+        )
+        for period in self.RESERVATION_TIME_RANGE_FIELDS:
+            range_config = configured_ranges.get(period, {})
+            self.fields[f"glider_reservation_{period}_start"].initial = (
+                range_config.get("start")
+            )
+            self.fields[f"glider_reservation_{period}_end"].initial = range_config.get(
+                "end"
+            )
+
+    def clean_glider_reservation_time_preferences(self):
+        return self.cleaned_data["glider_reservation_time_preferences"]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        presets_enabled = cleaned_data.get("glider_reservation_presets_mode")
+        if not presets_enabled:
+            cleaned_data["glider_reservation_time_preferences"] = ["specific"]
+        elif not cleaned_data.get("glider_reservation_time_preferences"):
+            raise forms.ValidationError("Select at least one reservation time period.")
+
+        selected_periods = set(
+            cleaned_data.get("glider_reservation_time_preferences") or []
+        )
+
+        ranges = {}
+        for period in self.RESERVATION_TIME_RANGE_FIELDS:
+            start_value = cleaned_data.get(f"glider_reservation_{period}_start")
+            end_value = cleaned_data.get(f"glider_reservation_{period}_end")
+            if period in selected_periods and (not start_value or not end_value):
+                raise forms.ValidationError(
+                    f"{period.title()} reservations need both a start and end time."
+                )
+            if start_value and end_value:
+                if end_value <= start_value:
+                    raise forms.ValidationError(
+                        f"{period.title()} reservation end time must be after the start time."
+                    )
+                ranges[period] = {
+                    "start": start_value.strftime("%H:%M"),
+                    "end": end_value.strftime("%H:%M"),
+                }
+
+        cleaned_data["glider_reservation_time_ranges"] = ranges
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.glider_reservation_time_ranges = self.cleaned_data.get(
+            "glider_reservation_time_ranges", {}
+        )
+        if commit:
+            instance.save()
+        return instance
 
 
 class DutyRoleDefinitionInline(admin.TabularInline):
@@ -339,10 +456,41 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "max_reservations_per_year",
                     "reservation_limit_period",
                     "max_reservations_per_month",
+                    # time-range fields moved into 'Reservation Presets' fieldset
                     "allow_towplane_rental",
                     "waive_tow_fee_on_retrieve",
                     "waive_rental_fee_on_retrieve",
                     "redaction_notification_dedupe_minutes",
+                ),
+                "description": (
+                    "Configure glider reservation limits, enabled preset periods, "
+                    "and the clock ranges shown to members for Morning, Midday, and Afternoon."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Reservation Presets",
+            {
+                "fields": (
+                    "glider_reservation_presets_mode",
+                    "glider_reservation_time_preferences",
+                    (
+                        "glider_reservation_morning_start",
+                        "glider_reservation_morning_end",
+                    ),
+                    (
+                        "glider_reservation_midday_start",
+                        "glider_reservation_midday_end",
+                    ),
+                    (
+                        "glider_reservation_afternoon_start",
+                        "glider_reservation_afternoon_end",
+                    ),
+                ),
+                "description": (
+                    "Control whether club preset time slots are available and which preset periods are enabled. "
+                    "When presets are disabled, the clock ranges below are hidden from the admin form."
                 ),
                 "classes": ("collapse",),
             },
@@ -566,7 +714,7 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
         queryset.delete()
         messages.success(
             request,
-            f'Successfully deleted membership statuses: {", ".join(deleted_names)}.',
+            f"Successfully deleted membership statuses: {', '.join(deleted_names)}.",
         )
 
     admin_helper_message = (

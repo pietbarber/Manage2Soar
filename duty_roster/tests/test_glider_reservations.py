@@ -608,6 +608,58 @@ class TestGliderReservationValidation:
             reservation.clean()
         assert "reserved for the full day" in str(exc_info.value).lower()
 
+    def test_specific_time_conflicts_with_preset_range(
+        self, site_config, member, glider, future_date
+    ):
+        """Specific reservations should conflict with overlapping preset ranges."""
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="badge",
+            time_preference="morning",
+        )
+
+        reservation = GliderReservation(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="specific",
+            start_time=time(11, 0),
+            end_time=time(12, 30),
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            reservation.clean()
+        assert "conflicting reservation" in str(exc_info.value).lower()
+
+    def test_preset_conflicts_with_existing_specific_time(
+        self, site_config, member, glider, future_date
+    ):
+        """Preset reservations should conflict with overlapping specific reservations."""
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="specific",
+            start_time=time(11, 30),
+            end_time=time(13, 0),
+        )
+
+        reservation = GliderReservation(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="badge",
+            time_preference="midday",
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            reservation.clean()
+        assert "conflicting specific reservation" in str(exc_info.value).lower()
+
     def test_allows_reservation_with_expired_maintenance_deadline_warning_only(
         self, site_config, member, glider, future_date
     ):
@@ -666,6 +718,61 @@ class TestGliderReservationForm:
         glider_pks = [g.pk for g in form.fields["glider"].queryset]
         assert single_seat_glider.pk in glider_pks
         assert glider.pk not in glider_pks  # Two-seater should be filtered out
+
+    def test_form_uses_configured_time_preferences(self, site_config, member, glider):
+        """Test that the reservation form only shows configured preset periods."""
+        site_config.glider_reservation_time_preferences = ["morning", "afternoon"]
+        site_config.save()
+
+        form = GliderReservationForm(member=member)
+
+        assert list(form.fields["time_preference"].choices) == [
+            ("morning", "Morning (first flights) (10:00 AM-12:00 PM)"),
+            ("afternoon", "Afternoon (2:00 PM-4:00 PM)"),
+        ]
+
+    def test_form_preserves_existing_disabled_time_preference_when_editing(
+        self, site_config, member, glider, future_date
+    ):
+        """Existing reservations remain editable after their period is disabled."""
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="midday",
+        )
+        site_config.glider_reservation_time_preferences = ["morning", "afternoon"]
+        site_config.save()
+
+        form = GliderReservationForm(instance=reservation, member=member)
+
+        assert ("midday", "Midday (12:00 PM-2:00 PM)") in list(
+            form.fields["time_preference"].choices
+        )
+
+    def test_configured_time_preference_display_includes_range(
+        self, site_config, member, glider, future_date
+    ):
+        """Reservation display labels include admin-configured preset times."""
+        site_config.glider_reservation_time_ranges = {
+            "morning": {"start": "09:30", "end": "11:15"},
+            "midday": {"start": "12:00", "end": "14:00"},
+            "afternoon": {"start": "14:00", "end": "16:00"},
+        }
+        site_config.save()
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        assert (
+            reservation.get_time_preference_display()
+            == "Morning (first flights) (9:30 AM-11:15 AM)"
+        )
 
     def test_form_validates_past_date(self, site_config, member, glider):
         """Test form rejects past dates."""
@@ -959,6 +1066,27 @@ class TestGliderReservationViews:
         )
         assert edit_response.status_code == 200
         assert all(choice["available"] for choice in edit_response.json()["choices"])
+
+    def test_reservation_time_availability_endpoint_uses_configured_periods(
+        self, client, site_config, member, glider, future_date
+    ):
+        site_config.glider_reservation_time_preferences = ["morning", "afternoon"]
+        site_config.save()
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_time_availability")
+
+        response = client.get(
+            url,
+            {"date": future_date.isoformat(), "glider": glider.pk},
+        )
+
+        assert response.status_code == 200
+        choices = response.json()["choices"]
+        assert [choice["value"] for choice in choices] == [
+            "morning",
+            "afternoon",
+        ]
+        assert choices[0]["label"] == "Morning (first flights) (10:00 AM-12:00 PM)"
 
     def test_reservation_cancel_view(
         self, client, site_config, member, glider, future_date
@@ -1721,8 +1849,6 @@ class TestConcurrentReservations:
         self, site_config, member, glider, future_date
     ):
         """Test that yearly limit check uses database locking to prevent race conditions."""
-        from django.db import transaction
-
         # Create reservations up to one below the limit (use different days to avoid conflicts)
         for i in range(site_config.max_reservations_per_year - 1):
             GliderReservation.objects.create(

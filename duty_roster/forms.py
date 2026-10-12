@@ -2,7 +2,7 @@ import calendar
 from datetime import date
 
 from django import forms
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from tinymce.widgets import TinyMCE
 
@@ -851,6 +851,27 @@ class GliderReservationForm(forms.ModelForm):
             available_gliders = available_gliders.filter(seats=1)
 
         self.fields["glider"].queryset = available_gliders
+        time_preference_choices = (
+            GliderReservation.get_configured_time_preference_choices(config=config)
+        )
+        if (
+            self.instance
+            and self.instance.pk
+            and self.instance.time_preference
+            and self.instance.time_preference
+            not in {value for value, _label in time_preference_choices}
+        ):
+            legacy_choices = dict(GliderReservation.TIME_PREFERENCE_CHOICES)
+            time_preference_choices.append(
+                (
+                    self.instance.time_preference,
+                    legacy_choices.get(
+                        self.instance.time_preference,
+                        self.instance.time_preference,
+                    ),
+                )
+            )
+        self.fields["time_preference"].choices = time_preference_choices
 
         # Make start_time and end_time not required (they're only for specific time preference)
         self.fields["start_time"].required = False
@@ -874,6 +895,25 @@ class GliderReservationForm(forms.ModelForm):
         start_time = cleaned_data.get("start_time")
         end_time = cleaned_data.get("end_time")
         date = cleaned_data.get("date")
+
+        if time_preference:
+            config = SiteConfiguration.objects.first()
+            configured_preferences = (
+                GliderReservation.get_configured_time_preference_values(config=config)
+            )
+            unchanged_instance_preference = (
+                self.instance
+                and self.instance.pk
+                and time_preference == self.instance.time_preference
+            )
+            if (
+                time_preference not in configured_preferences
+                and not unchanged_instance_preference
+            ):
+                self.add_error(
+                    "time_preference",
+                    "That reservation time period is not currently available.",
+                )
 
         # Validate time requirement for specific time preference
         if time_preference == "specific" and not start_time:

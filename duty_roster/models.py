@@ -1,4 +1,5 @@
 import re
+from datetime import time
 from decimal import Decimal
 
 import bleach
@@ -1043,6 +1044,7 @@ class GliderReservation(models.Model):
         ("full_day", "Full Day"),
         ("specific", "Specific Time"),
     ]
+    TIME_RANGE_PREFERENCES = {"morning", "midday", "afternoon"}
     time_preference = models.CharField(
         max_length=20,
         choices=TIME_PREFERENCE_CHOICES,
@@ -1119,6 +1121,19 @@ class GliderReservation(models.Model):
     def is_trainer(self):
         """Check if the reserved glider is a trainer (2-seater)."""
         return self.glider and self.glider.seats >= 2
+
+    @staticmethod
+    def _format_time_range_label(start_value, end_value):
+        """Return a compact human label for stored HH:MM range values."""
+        try:
+            start_time = time.fromisoformat(start_value)
+            end_time = time.fromisoformat(end_value)
+        except (TypeError, ValueError):
+            return ""
+
+        start_label = start_time.strftime("%I:%M %p").lstrip("0")
+        end_label = end_time.strftime("%I:%M %p").lstrip("0")
+        return f"{start_label}-{end_label}"
 
     @classmethod
     def get_member_yearly_count(cls, member, year=None):
@@ -1212,6 +1227,95 @@ class GliderReservation(models.Model):
         )
 
     @classmethod
+    def get_configured_time_preference_choices(cls, config=None):
+        """Return enabled reservation time choices from site configuration."""
+        if config is None:
+            config = SiteConfiguration.objects.first()
+
+        configured_preferences = (
+            getattr(config, "glider_reservation_time_preferences", None)
+            if config
+            else None
+        )
+        choices_by_value = dict(cls.TIME_PREFERENCE_CHOICES)
+        range_config_by_value = (
+            getattr(config, "glider_reservation_time_ranges", None) if config else None
+        ) or {}
+        if not configured_preferences:
+            configured_preferences = [
+                value for value, _label in cls.TIME_PREFERENCE_CHOICES
+            ]
+
+        return [
+            (
+                value,
+                cls.get_configured_time_preference_label(
+                    value,
+                    choices_by_value=choices_by_value,
+                    range_config_by_value=range_config_by_value,
+                ),
+            )
+            for value in configured_preferences
+            if value in choices_by_value
+        ] or list(cls.TIME_PREFERENCE_CHOICES)
+
+    @classmethod
+    def get_configured_time_preference_label(
+        cls, value, choices_by_value=None, range_config_by_value=None, config=None
+    ):
+        """Return a display label for a preset period, including configured times."""
+        choices_by_value = choices_by_value or dict(cls.TIME_PREFERENCE_CHOICES)
+        if range_config_by_value is None:
+            if config is None:
+                config = SiteConfiguration.objects.first()
+            range_config_by_value = (
+                getattr(config, "glider_reservation_time_ranges", None)
+                if config
+                else None
+            ) or {}
+
+        label = choices_by_value.get(value, value)
+        if value not in cls.TIME_RANGE_PREFERENCES:
+            return label
+
+        range_config = range_config_by_value.get(value, {})
+        range_label = cls._format_time_range_label(
+            range_config.get("start"), range_config.get("end")
+        )
+        if not range_label:
+            return label
+        return f"{label} ({range_label})"
+
+    @classmethod
+    def get_configured_time_preference_range(cls, value, config=None):
+        """Return configured start/end time objects for a preset period."""
+        if value not in cls.TIME_RANGE_PREFERENCES:
+            return None
+        if config is None:
+            config = SiteConfiguration.objects.first()
+        range_config_by_value = (
+            getattr(config, "glider_reservation_time_ranges", None) if config else None
+        ) or {}
+        range_config = range_config_by_value.get(value, {})
+        try:
+            return (
+                time.fromisoformat(range_config.get("start")),
+                time.fromisoformat(range_config.get("end")),
+            )
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def get_configured_time_preference_values(cls, config=None):
+        """Return enabled reservation time preference codes."""
+        return {
+            value
+            for value, _label in cls.get_configured_time_preference_choices(
+                config=config
+            )
+        }
+
+    @classmethod
     def get_unavailable_time_preferences(
         cls, glider, reservation_date, exclude_pk=None
     ):
@@ -1225,12 +1329,16 @@ class GliderReservation(models.Model):
             conflicts = conflicts.exclude(pk=exclude_pk)
 
         reserved_preferences = set(conflicts.values_list("time_preference", flat=True))
-        all_preferences = {value for value, _label in cls.TIME_PREFERENCE_CHOICES}
+        all_preferences = cls.get_configured_time_preference_values()
         if "full_day" in reserved_preferences:
             return all_preferences
         if reserved_preferences:
             reserved_preferences.add("full_day")
         return reserved_preferences
+
+    def get_time_preference_display(self):
+        """Return configured reservation period label for this reservation."""
+        return self.get_configured_time_preference_label(self.time_preference)
 
     @classmethod
     def can_member_reserve(cls, member, year=None, month=None, config=None):
@@ -1353,15 +1461,89 @@ class GliderReservation(models.Model):
                             f"Glider {self.glider} is reserved for the full day on {self.date}."
                         )
                 else:
-                    # Check for overlapping time preferences
+                    # Check for overlapping time preferences and specific-time overlaps
                     if conflicts.filter(time_preference="full_day").exists():
                         raise ValidationError(
                             f"Glider {self.glider} is reserved for the full day on {self.date}."
                         )
-                    if conflicts.filter(time_preference=self.time_preference).exists():
-                        raise ValidationError(
-                            f"Glider {self.glider} is already reserved for {self.get_time_preference_display()} on {self.date}."
-                        )
+
+                    # helper: check overlap between two time intervals
+                    def _times_overlap(s1, e1, s2, e2):
+                        # s1,e1 and s2,e2 are time objects or None
+                        if s1 is None and s2 is None:
+                            return True
+                        if e1 is None and e2 is None:
+                            # both points or open-ended, consider equal start as conflict
+                            return s1 == s2
+                        if e1 is None:
+                            # treat as point at s1
+                            if s2 and e2:
+                                return s2 <= s1 < e2
+                            return s1 == s2
+                        if e2 is None:
+                            if s1 and e1:
+                                return s1 <= s2 < e1
+                            return s1 == s2
+                        # both have ranges
+                        return s1 < e2 and s2 < e1
+
+                    # iterate conflicts and perform detailed checks
+                    for c in conflicts:
+                        # full day already handled above
+                        if c.time_preference == "full_day":
+                            raise ValidationError(
+                                f"Glider {self.glider} is reserved for the full day on {self.date}."
+                            )
+
+                        # if both are specific-time, compare exact ranges/points
+                        if (
+                            self.time_preference == "specific"
+                            and c.time_preference == "specific"
+                        ):
+                            s1, e1 = self.start_time, self.end_time
+                            s2, e2 = c.start_time, c.end_time
+                            if _times_overlap(s1, e1, s2, e2):
+                                raise ValidationError(
+                                    f"Glider {self.glider} has a conflicting specific reservation on {self.date}."
+                                )
+
+                        # if self is specific and conflict is preset range
+                        elif (
+                            self.time_preference == "specific"
+                            and c.time_preference in cls.TIME_RANGE_PREFERENCES
+                        ):
+                            pref_range = cls.get_configured_time_preference_range(
+                                c.time_preference
+                            )
+                            if pref_range:
+                                s1, e1 = self.start_time, self.end_time
+                                s2, e2 = pref_range
+                                if _times_overlap(s1, e1, s2, e2):
+                                    raise ValidationError(
+                                        f"Glider {self.glider} has a conflicting reservation ({c.get_time_preference_display()}) on {self.date}."
+                                    )
+
+                        # if self is preset and conflict is specific
+                        elif (
+                            c.time_preference == "specific"
+                            and self.time_preference in cls.TIME_RANGE_PREFERENCES
+                        ):
+                            pref_range = cls.get_configured_time_preference_range(
+                                self.time_preference
+                            )
+                            if pref_range:
+                                s1, e1 = pref_range
+                                s2, e2 = c.start_time, c.end_time
+                                if _times_overlap(s1, e1, s2, e2):
+                                    raise ValidationError(
+                                        f"Glider {self.glider} has a conflicting specific reservation on {self.date}."
+                                    )
+
+                        # if both are same preset string, conflict
+                        elif c.time_preference == self.time_preference:
+                            raise ValidationError(
+                                f"Glider {self.glider} is already reserved for {self.get_time_preference_display()} on {self.date}."
+                            )
 
     def cancel(self, reason=""):
         """Cancel this reservation."""
