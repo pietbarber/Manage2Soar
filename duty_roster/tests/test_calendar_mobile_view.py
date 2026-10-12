@@ -7,7 +7,7 @@ from django.urls import reverse
 from duty_roster.models import DutyAssignment, GliderReservation, InstructionSlot
 from logsheet.models import Glider
 from members.models import Member
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import MembershipStatus, SiteConfiguration
 
 
 @pytest.fixture(autouse=True)
@@ -156,6 +156,50 @@ def test_agenda_quick_actions_show_disabled_plan_to_fly_when_instruction_exists(
     assert "Plan to Fly" in content
     assert "You already requested instruction for this day." in content
     assert "Review Student Requests" not in content
+
+
+@pytest.mark.django_db
+def test_agenda_hides_duty_phone_when_per_field_preference_is_hidden(client):
+    MembershipStatus.objects.update_or_create(
+        name="Full Member",
+        defaults={"is_active": True},
+    )
+
+    viewer = Member.objects.create_user(
+        username="agenda_privacy_viewer",
+        email="agenda_privacy_viewer@example.com",
+        password="testpass",
+        membership_status="Full Member",
+    )
+    instructor = Member.objects.create_user(
+        username="agenda_privacy_instructor",
+        email="agenda_privacy_instructor@example.com",
+        password="testpass",
+        first_name="Privacy",
+        last_name="Instructor",
+        phone="555-0101",
+        contact_visibility={"phone": "hide"},
+        redact_contact=True,
+        membership_status="Full Member",
+    )
+    day = date.today() + timedelta(days=7)
+    DutyAssignment.objects.create(date=day, instructor=instructor)
+
+    client.force_login(viewer)
+    response = client.get(
+        reverse(
+            "duty_roster:duty_calendar_month",
+            kwargs={"year": day.year, "month": day.month},
+        )
+        + "?view=agenda"
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Privacy Instructor" in content
+    assert "555-0101" not in content
+    instructor.refresh_from_db()
+    assert not instructor.redact_contact
 
 
 @pytest.mark.django_db

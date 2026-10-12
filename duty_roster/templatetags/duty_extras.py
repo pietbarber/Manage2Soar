@@ -1,6 +1,7 @@
 from django import template
 
 from duty_roster.models import DutyRosterMessage
+from members.utils.permissions import contact_field_visibility
 
 register = template.Library()
 
@@ -8,6 +9,11 @@ register = template.Library()
 @register.filter
 def dict_get(d, key):
     return d.get(key)
+
+
+@register.simple_tag
+def contact_field_is_shared(member, field, site_config=None):
+    return contact_field_visibility(member, field, site_config)["shared"]
 
 
 @register.simple_tag
