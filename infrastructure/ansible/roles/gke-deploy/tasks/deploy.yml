@@ -82,14 +82,18 @@
   changed_when: false
   failed_when: false
   until: >-
-    (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int > 0
-    or
+    migration_job_status.rc == 0
+    and
     (
-      (migration_job_status.stdout | from_json).get('status', {}).get('conditions', [])
-      | selectattr('type', 'equalto', 'Failed')
-      | selectattr('status', 'equalto', 'True')
-      | list
-      | length > 0
+      (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int > 0
+      or
+      (
+        (migration_job_status.stdout | from_json).get('status', {}).get('conditions', [])
+        | selectattr('type', 'equalto', 'Failed')
+        | selectattr('status', 'equalto', 'True')
+        | list
+        | length > 0
+      )
     )
   retries: "{{ (gke_rollout_timeout | int / 5) | int }}"
   delay: 5

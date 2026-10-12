@@ -119,20 +119,6 @@ erDiagram
         int member_account_id FK
     }
 
-    EmergencyContact {
-        int id PK
-        int member_id FK
-        string name
-        string relationship
-        string home_phone
-        string mobile_phone
-        string preferred_contact_method
-        string preferred_contact_details
-        text address
-        datetime created_at
-        datetime updated_at
-    }
-
     Biography {
         int id PK
         int member_id FK
@@ -196,8 +182,6 @@ erDiagram
     KioskToken o|--o{ KioskAccessLog : access_logs
     Member ||--o{ SafetyReport : submitted_reports
     Member ||--o{ SafetyReport : reviewed_by
-    Member ||--o{ EmergencyContact : emergency_contacts
-
     SafetyReport {
         int id PK
         int reporter_id FK "nullable for anonymous"
