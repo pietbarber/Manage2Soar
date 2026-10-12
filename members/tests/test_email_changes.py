@@ -116,6 +116,30 @@ def test_email_confirmation_post_changes_email():
 
 
 @pytest.mark.django_db
+def test_email_confirmation_allows_an_email_shared_by_another_member():
+    configure_email_changes()
+    Member.objects.create_user(
+        username="existing_shared_email",
+        email="shared@example.com",
+        membership_status="Email Active",
+    )
+    member = Member.objects.create_user(
+        username="email_shared",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    member.pending_email = "shared@example.com"
+    member.save(update_fields=["pending_email"])
+    token = make_email_token(member, member.pending_email)
+
+    response = Client().post(reverse("members:confirm_email_change", args=[token]))
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.email == "shared@example.com"
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("token_suffix", ["tampered", "expired"])
 def test_invalid_email_confirmation_does_not_change_email(token_suffix, monkeypatch):
     configure_email_changes()

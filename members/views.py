@@ -465,14 +465,6 @@ def request_email_change(request):
         messages.info(request, "That is already your current email address.")
         return redirect("members:member_view", member_id=request.user.id)
 
-    if (
-        Member.objects.filter(email__iexact=new_email)
-        .exclude(pk=request.user.pk)
-        .exists()
-    ):
-        messages.error(request, "That email address is already in use.")
-        return redirect("members:member_view", member_id=request.user.id)
-
     request.user.pending_email = new_email
     request.user.pending_email_requested_at = timezone.now()
     request.user.save(update_fields=["pending_email", "pending_email_requested_at"])
@@ -526,31 +518,19 @@ def confirm_email_change(request, token):
             {"pending_email": member.pending_email},
         )
 
-    try:
-        with transaction.atomic():
-            member = Member.objects.select_for_update().get(pk=member.pk)
-            if member.pending_email != data.get("email"):
-                return render(request, "403.html", status=403)
-            if get_member_profile_field_policy("email") != "direct":
-                return render(request, "403.html", status=403)
-            if (
-                Member.objects.filter(email__iexact=member.pending_email)
-                .exclude(pk=member.pk)
-                .exists()
-            ):
-                messages.error(request, "That email address is no longer available.")
-                return redirect("members:member_view", member_id=member.id)
-            old_email = member.email
-            member.email = member.pending_email
-            member.pending_email = ""
-            member.pending_email_requested_at = None
-            member.save(
-                update_fields=["email", "pending_email", "pending_email_requested_at"]
-            )
-    except IntegrityError:
-        messages.error(request, "That email address is no longer available.")
-        return redirect("members:member_view", member_id=member.id)
-
+    with transaction.atomic():
+        member = Member.objects.select_for_update().get(pk=member.pk)
+        if member.pending_email != data.get("email"):
+            return render(request, "403.html", status=403)
+        if get_member_profile_field_policy("email") != "direct":
+            return render(request, "403.html", status=403)
+        old_email = member.email
+        member.email = member.pending_email
+        member.pending_email = ""
+        member.pending_email_requested_at = None
+        member.save(
+            update_fields=["email", "pending_email", "pending_email_requested_at"]
+        )
     _send_account_security_email(
         old_email,
         "Your Manage2Soar email address changed",
