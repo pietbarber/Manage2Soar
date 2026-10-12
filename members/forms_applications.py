@@ -198,19 +198,19 @@ class MembershipApplicationForm(forms.ModelForm):
             "emergency_contact_name": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Full Name",
+                    "placeholder": "Full Name (optional)",
                 }
             ),
             "emergency_contact_relationship": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "e.g., Spouse, Parent, Sibling",
+                    "placeholder": "e.g., Spouse, Parent, Sibling (optional)",
                 }
             ),
             "emergency_contact_phone": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "(555) 123-4567",
+                    "placeholder": "(555) 123-4567 (optional)",
                 }
             ),
             # Aviation Experience
@@ -400,7 +400,24 @@ class MembershipApplicationForm(forms.ModelForm):
 
     def clean(self):
         """Validate form data and handle conditional requirements."""
-        cleaned_data = super().clean()
+        super().clean()
+        cleaned_data = self.cleaned_data
+
+        contact_name = cleaned_data.get("emergency_contact_name")
+        contact_relationship = cleaned_data.get("emergency_contact_relationship")
+        contact_phone = cleaned_data.get("emergency_contact_phone")
+
+        if contact_name or contact_relationship or contact_phone:
+            if not contact_name:
+                self.add_error(
+                    "emergency_contact_name",
+                    "Enter the emergency contact's name when providing contact details.",
+                )
+            if not contact_phone:
+                self.add_error(
+                    "emergency_contact_phone",
+                    "Enter a phone number when providing emergency contact details.",
+                )
 
         # Validate agreement checkboxes
         if not cleaned_data.get("agrees_to_terms"):
@@ -568,7 +585,8 @@ class MembershipApplicationReviewForm(forms.ModelForm):
 
     def clean(self):
         """Validate review form data."""
-        cleaned_data = super().clean()
+        super().clean()
+        cleaned_data = self.cleaned_data
         review_action = cleaned_data.get("review_action")
         admin_notes = cleaned_data.get("admin_notes", "").strip()
 

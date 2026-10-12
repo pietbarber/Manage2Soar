@@ -1,0 +1,45 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ gke_migration_job_name }}
+  namespace: {{ gke_namespace }}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: {{ gke_rollout_timeout | int }}
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: {{ gke_image_name }}:{{ gke_computed_image_tag | trim }}
+          imagePullPolicy: Always
+          workingDir: /app
+          command: ["python", "manage.py", "migrate", "--noinput"]
+{% if gke_gcp_sa_key_file is defined and gke_gcp_sa_key_file | length > 0 %}
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: {{ gke_gcp_credentials_path }}
+          volumeMounts:
+            - name: gcp-sa-key
+              mountPath: {{ gke_gcp_credentials_path }}
+              subPath: {{ gke_gcp_credentials_filename }}
+              readOnly: true
+{% endif %}
+          envFrom:
+            - secretRef:
+                name: {{ gke_secret_name }}
+          resources:
+            requests:
+              memory: "{{ gke_memory_request }}"
+              cpu: "{{ gke_cpu_request }}"
+            limits:
+              memory: "{{ gke_memory_limit }}"
+              cpu: "{{ gke_cpu_limit }}"
+{% if gke_gcp_sa_key_file is defined and gke_gcp_sa_key_file | length > 0 %}
+      volumes:
+        - name: gcp-sa-key
+          secret:
+            secretName: {{ gke_gcp_sa_secret_name }}
+{% endif %}

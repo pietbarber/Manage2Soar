@@ -75,7 +75,7 @@
           <img src="{% static 'images/default-avatar-large.png' %}" class="profile-photo img-fluid" alt="Default Avatar">
           {% endif %}
 
-          {% if is_self %}
+          {% if form %}
           <!-- Modern Profile Photo Upload Section -->
           <div class="card mt-4 shadow-sm border-0">
             <div class="card-header bg-primary text-white py-2">
@@ -224,7 +224,7 @@
         </div>
       </div>
 
-      {% if privacy_sharing %}
+      {% if privacy_sharing and can_view_policy %}
       <div class="card mb-4">
         <div class="card-header"><i class="bi bi-shield-lock me-2"></i>Contact Privacy</div>
         <form method="post" action="{% url 'members:update_contact_visibility' member.id %}" class="card-body">
@@ -306,7 +306,7 @@
             </div>
           </div>
 
-          {% if request.user == member %}
+          {% if can_change_password %}
           <hr>
           <div class="d-flex justify-content-between align-items-center">
             <div>
@@ -335,7 +335,7 @@
                 <div{% if not forloop.last %} class="mb-3 pb-3 border-bottom"{% endif %}>
                   <div class="d-flex justify-content-between gap-3">
                     <strong>{{ contact.name }}</strong>{% if contact.relationship %} ({{ contact.relationship }}){% endif %}
-                    {% if is_self %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'members:emergency_contact_edit' member.id contact.id %}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit {{ contact.name }}</span></a>{% endif %}
+                    {% if can_update_emergency_contacts %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'members:emergency_contact_edit' member.id contact.id %}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit {{ contact.name }}</span></a>{% endif %}
                   </div>
                   {% if contact.home_phone %}<span class="me-3">Home: <a href="tel:{{ contact.home_phone }}">{{ contact.home_phone|format_us_phone }}</a></span>{% endif %}
                   {% if contact.mobile_phone %}<span class="me-3">Mobile: <a href="tel:{{ contact.mobile_phone }}">{{ contact.mobile_phone|format_us_phone }}</a></span>{% endif %}
@@ -349,7 +349,7 @@
               {% else %}
                 <span class="text-muted fst-italic">No emergency contact information provided</span>
               {% endif %}
-              {% if is_self %}<div class="mt-3"><a class="btn btn-outline-primary btn-sm" href="{% url 'members:emergency_contact_add' member.id %}"><i class="bi bi-plus-circle me-1"></i>Add Emergency Contact</a></div>{% endif %}
+              {% if can_update_emergency_contacts %}<div class="mt-3"><a class="btn btn-outline-primary btn-sm" href="{% url 'members:emergency_contact_add' member.id %}"><i class="bi bi-plus-circle me-1"></i>Add Emergency Contact</a></div>{% endif %}
             </div>
           </div>
         </div>
@@ -611,93 +611,6 @@
 </div>
 
 </div>
-<!-- Privacy Controls -->
-{% if request.user == member %}
-<div class="container-fluid mt-4">
-  <div class="card border-warning">
-    <div class="card-header bg-warning text-dark">
-      <h5 class="mb-0">
-        <i class="bi bi-shield-exclamation me-2"></i>Privacy Controls
-      </h5>
-    </div>
-    <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
-          <h6 class="mb-1">Contact Information Visibility</h6>
-          <p class="text-muted mb-0">Current visibility to regular members:</p>
-          <div class="small">
-            <span class="badge {% if privacy_sharing.email %}bg-success{% else %}bg-secondary{% endif %}">Email: {% if privacy_sharing.email %}visible{% else %}private{% endif %}</span>
-            <span class="badge {% if privacy_sharing.phone %}bg-success{% else %}bg-secondary{% endif %}">Phone: {% if privacy_sharing.phone %}visible{% else %}private{% endif %}</span>
-            <span class="badge {% if privacy_sharing.address %}bg-success{% else %}bg-secondary{% endif %}">Address: {% if privacy_sharing.address %}visible{% else %}private{% endif %}</span>
-          </div>
-          <p class="text-muted small mb-0 mt-1">
-            The control below applies or removes full redaction. Removing it restores your per-field choices and club defaults; fields set to Hide remain private.
-          </p>
-        </div>
-        <button type="button" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %} btn-modern" data-bs-toggle="modal" data-bs-target="#redactConfirmModal">
-          <i class="bi bi-{% if member.redact_contact %}eye{% else %}eye-slash{% endif %} me-2"></i>
-          {% if member.redact_contact %}Restore Sharing Choices{% else %}Hide All Contact Details{% endif %}
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Redaction confirmation modal -->
-<div class="modal fade" id="redactConfirmModal" tabindex="-1" aria-labelledby="redactConfirmModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="redactConfirmModalLabel">
-          <i class="bi bi-shield-exclamation me-2"></i>
-          {% if member.redact_contact %}Restore your sharing choices?{% else %}Hide all your contact details?{% endif %}
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        {% if member.redact_contact %}
-        <div class="alert alert-info">
-          <i class="bi bi-info-circle me-2"></i>
-          If you proceed, full redaction will be removed. Visibility will follow your per-field choices and club defaults; fields set to Hide will remain private.
-        </div>
-        {% else %}
-        <div class="alert alert-warning">
-          <i class="bi bi-exclamation-triangle me-2"></i>
-          If you proceed, your personal contact details will be hidden from other members. Club officers and administrators will still be able to see this information when necessary.
-        </div>
-        {% endif %}
-
-        <h6 class="mt-3">What will be affected:</h6>
-        <ul class="list-unstyled">
-          <li><i class="bi bi-envelope me-2 text-primary"></i>Email address</li>
-          <li><i class="bi bi-telephone me-2 text-success"></i>Phone and mobile numbers</li>
-          <li><i class="bi bi-geo-alt me-2 text-warning"></i>Postal address</li>
-          <li><i class="bi bi-qr-code me-2 text-info"></i>QR contact card</li>
-        </ul>
-
-        <div class="alert alert-light border">
-          <small class="text-muted">
-            <i class="bi bi-info-circle me-1"></i>
-            You can change this setting at any time from your profile page.
-          </small>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <form method="post" action="{% url 'members:toggle_redaction' member.id %}" class="d-inline">
-          {% csrf_token %}
-          <button type="submit" class="btn {% if member.redact_contact %}btn-success{% else %}btn-danger{% endif %}">
-            <i class="bi bi-{% if member.redact_contact %}eye{% else %}eye-slash{% endif %} me-2"></i>
-            {% if member.redact_contact %}Restore Sharing Choices{% else %}Hide All Contact Details{% endif %}
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
-
-{% endif %}
-
 <!-- Qualification Assignment Modal (available to all instructors) -->
 <div class="modal fade" id="qualification-modal" tabindex="-1" aria-labelledby="qualification-modal-label" aria-hidden="true">
   <div class="modal-dialog modal-lg">

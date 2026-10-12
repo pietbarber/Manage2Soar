@@ -102,6 +102,25 @@ class MembershipApplicationModelTests:
         )
         assert app.can_be_approved()
 
+    def test_can_be_approved_rejects_incomplete_emergency_contact(self):
+        app = MembershipApplication(
+            first_name="John",
+            last_name="Doe",
+            email="john@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        assert not app.can_be_approved()
+
     def test_approve_application_creates_member(self):
         """Test that approving an application creates a member account."""
         app = MembershipApplication.objects.create(
@@ -367,6 +386,55 @@ class MembershipApplicationFormTests:
         form = MembershipApplicationForm(data=form_data)
         assert not form.is_valid()
         assert "email" in form.errors
+
+    def test_application_without_emergency_contact_is_valid(self):
+        """Emergency contact details are optional and must not block submission."""
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "emergency_contact_name": "",
+            "emergency_contact_relationship": "",
+            "emergency_contact_phone": "",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+        assert form.is_valid()
+        assert form.instance.can_be_approved()
+
+    def test_emergency_contact_details_require_name_and_phone(self):
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "emergency_contact_name": "",
+            "emergency_contact_relationship": "Spouse",
+            "emergency_contact_phone": "",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+
+        assert not form.is_valid()
+        assert "emergency_contact_name" in form.errors
+        assert "emergency_contact_phone" in form.errors
 
 
 class MembershipApplicationViewTests(TestCase):

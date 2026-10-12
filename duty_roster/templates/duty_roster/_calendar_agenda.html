@@ -29,12 +29,12 @@
               {% endif %}
             </div>
             <div class="card-body">
+              {% get_siteconfig as config %}
               {% if not assignment.confirmed and not assignment.is_confirmed %}
                 <div class="alert alert-warning d-flex align-items-center mb-3">
                   <i class="fas fa-exclamation-triangle me-2"></i>
                   <div>
                     <strong>Not Confirmed</strong>
-                    {% get_siteconfig as config %}
                     {% if not assignment.tow_pilot %}
                       <br>Missing: {{ config.towpilot_title|default:'Tow Pilot' }}
                     {% endif %}
@@ -48,7 +48,6 @@
               {# High-demand banner removed per Issue #948 — avoids discouraging student signups #}
 
               <div class="row">
-                {% get_siteconfig as config %}
                 {% if assignment.instructor %}
                   <div class="col-md-6 mb-3">
                     <div class="duty-role-card bg-success bg-opacity-10 border border-success rounded p-3">
@@ -57,7 +56,8 @@
                         {{ config.instructor_title|default:'Instructor' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.instructor.full_display_name }}</p>
-                      {% if assignment.instructor.phone and user.is_authenticated and user.is_active_member and not assignment.instructor.redact_contact %}
+                      {% contact_field_is_shared assignment.instructor "phone" config as instructor_phone_shared %}
+                      {% if assignment.instructor.phone and user.is_authenticated and user.is_active_member and instructor_phone_shared %}
                         <small class="text-muted">{{ assignment.instructor.phone }}</small>
                       {% endif %}
 
@@ -99,7 +99,8 @@
                         {{ config.towpilot_title|default:'Tow Pilot' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.tow_pilot.full_display_name }}</p>
-                      {% if assignment.tow_pilot.phone and user.is_authenticated and user.is_active_member and not assignment.tow_pilot.redact_contact %}
+                      {% contact_field_is_shared assignment.tow_pilot "phone" config as tow_pilot_phone_shared %}
+                      {% if assignment.tow_pilot.phone and user.is_authenticated and user.is_active_member and tow_pilot_phone_shared %}
                         <small class="text-muted">{{ assignment.tow_pilot.phone }}</small>
                       {% endif %}
                     </div>
@@ -114,7 +115,8 @@
                         {{ config.duty_officer_title|default:'Duty Officer' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.duty_officer.full_display_name }}</p>
-                      {% if assignment.duty_officer.phone and user.is_authenticated and user.is_active_member and not assignment.duty_officer.redact_contact %}
+                      {% contact_field_is_shared assignment.duty_officer "phone" config as duty_officer_phone_shared %}
+                      {% if assignment.duty_officer.phone and user.is_authenticated and user.is_active_member and duty_officer_phone_shared %}
                         <small class="text-muted">{{ assignment.duty_officer.phone }}</small>
                       {% endif %}
                     </div>
@@ -129,7 +131,8 @@
                         {{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.assistant_duty_officer.full_display_name }}</p>
-                      {% if assignment.assistant_duty_officer.phone and user.is_authenticated and user.is_active_member and not assignment.assistant_duty_officer.redact_contact %}
+                      {% contact_field_is_shared assignment.assistant_duty_officer "phone" config as assistant_duty_officer_phone_shared %}
+                      {% if assignment.assistant_duty_officer.phone and user.is_authenticated and user.is_active_member and assistant_duty_officer_phone_shared %}
                         <small class="text-muted">{{ assignment.assistant_duty_officer.phone }}</small>
                       {% endif %}
                     </div>
@@ -144,7 +147,8 @@
                         {{ config.surge_instructor_title|default:'Surge Instructor' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.surge_instructor.full_display_name }}</p>
-                      {% if assignment.surge_instructor.phone and user.is_authenticated and user.is_active_member and not assignment.surge_instructor.redact_contact %}
+                      {% contact_field_is_shared assignment.surge_instructor "phone" config as surge_instructor_phone_shared %}
+                      {% if assignment.surge_instructor.phone and user.is_authenticated and user.is_active_member and surge_instructor_phone_shared %}
                         <small class="text-muted">{{ assignment.surge_instructor.phone }}</small>
                       {% endif %}
                     </div>
@@ -159,7 +163,8 @@
                         {{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.surge_tow_pilot.full_display_name }}</p>
-                      {% if assignment.surge_tow_pilot.phone and user.is_authenticated and user.is_active_member and not assignment.surge_tow_pilot.redact_contact %}
+                      {% contact_field_is_shared assignment.surge_tow_pilot "phone" config as surge_tow_pilot_phone_shared %}
+                      {% if assignment.surge_tow_pilot.phone and user.is_authenticated and user.is_active_member and surge_tow_pilot_phone_shared %}
                         <small class="text-muted">{{ assignment.surge_tow_pilot.phone }}</small>
                       {% endif %}
                     </div>
@@ -175,7 +180,8 @@
                           {{ dynamic_role.label }}
                         </h6>
                         <p class="mb-0 fw-bold">{{ dynamic_role.member.full_display_name }}</p>
-                        {% if dynamic_role.member.phone and user.is_authenticated and user.is_active_member and not dynamic_role.member.redact_contact %}
+                        {% contact_field_is_shared dynamic_role.member "phone" config as dynamic_role_phone_shared %}
+                        {% if dynamic_role.member.phone and user.is_authenticated and user.is_active_member and dynamic_role_phone_shared %}
                           <small class="text-muted">{{ dynamic_role.member.phone }}</small>
                         {% endif %}
                       </div>

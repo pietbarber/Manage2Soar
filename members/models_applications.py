@@ -385,6 +385,16 @@ class MembershipApplication(models.Model):
         ):
             return False
 
+        emergency_contact_data = (
+            self.emergency_contact_name
+            or self.emergency_contact_relationship
+            or self.emergency_contact_phone
+        )
+        if emergency_contact_data and not (
+            self.emergency_contact_name and self.emergency_contact_phone
+        ):
+            return False
+
         return True
 
     def approve_application(self, reviewed_by=None):

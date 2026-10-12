@@ -14,6 +14,65 @@ from tinymce.models import HTMLField
 from utils.favicon import generate_favicon_from_logo
 from utils.upload_entropy import upload_site_logo
 
+MEMBER_PROFILE_POLICY_FIELDS = (
+    "username",
+    "email",
+    "phone",
+    "address",
+    "emergency_contacts",
+    "nickname",
+    "profile_photo",
+    "biography",
+    "password",
+    "contact_visibility",
+)
+
+
+def default_member_profile_field_policies():
+    return {
+        "username": "direct",
+        "email": "request",
+        "phone": "request",
+        "address": "request",
+        "emergency_contacts": "direct",
+        "nickname": "request",
+        "profile_photo": "direct",
+        "biography": "direct",
+        "password": "direct",
+        "contact_visibility": "direct",
+    }
+
+
+def validate_member_profile_field_policies(value):
+    if not isinstance(value, dict) or set(value) != set(MEMBER_PROFILE_POLICY_FIELDS):
+        raise ValidationError(
+            "Profile field policies must define exactly the supported fields."
+        )
+
+    allowed_policies = {"disabled", "direct", "request"}
+    for field, policy in value.items():
+        allowed = (
+            {"disabled", "direct"}
+            if field in {"password", "profile_photo"}
+            else allowed_policies
+        )
+        if not isinstance(policy, str) or policy not in allowed:
+            raise ValidationError(
+                "Invalid policy for %(field)s: %(policy)s.",
+                params={"field": field, "policy": policy},
+            )
+
+
+def get_member_profile_field_policy(field, site_config=None):
+    if site_config is None:
+        site_config = SiteConfiguration.objects.first()
+    if not site_config or not site_config.member_profile_self_service_enabled:
+        return "disabled"
+    policy = site_config.member_profile_field_policies.get(field, "disabled")
+    if field in {"password", "profile_photo"} and policy == "request":
+        return "disabled"
+    return policy
+
 
 class MailingListCriterion(models.TextChoices):
     """Available criteria for mailing list membership."""
@@ -252,6 +311,17 @@ class SiteConfiguration(models.Model):
     share_member_address_by_default = models.BooleanField(
         default=True,
         help_text="Share member addresses by default unless a member changes it.",
+    )
+    member_profile_self_service_enabled = models.BooleanField(
+        default=True,
+        db_default=True,
+        help_text="Allow members to update or request changes to configured profile fields.",
+    )
+    member_profile_field_policies = models.JSONField(
+        default=default_member_profile_field_policies,
+        db_default=default_member_profile_field_policies(),
+        validators=[validate_member_profile_field_policies],
+        help_text="Per-field member profile policies.",
     )
     contact_welcome_text = models.TextField(
         blank=True,
@@ -1026,7 +1096,7 @@ class SiteConfiguration(models.Model):
                         )
             cache.delete("pwa_club_icon_url")
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:
         """Override delete to clear cache."""
         from django.core.cache import cache
 
@@ -1038,7 +1108,7 @@ class SiteConfiguration(models.Model):
                 "duty_default_max_assignments_per_month",
             ]
         )
-        super().delete(*args, **kwargs)
+        return super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"Site Configuration for {self.club_name}"
@@ -1086,7 +1156,7 @@ class MembershipStatus(models.Model):
         transaction.on_commit(clear_active_membership_statuses_cache)
         return result
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:
         """Override delete to prevent deletion if members are using this status."""
         # Import here to avoid circular imports
         try:
@@ -1105,10 +1175,11 @@ class MembershipStatus(models.Model):
             # During migrations, Member model might not be available
             pass
 
-        super().delete(*args, **kwargs)
+        result = super().delete(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
         transaction.on_commit(clear_active_membership_statuses_cache)
+        return result
 
     @classmethod
     def get_active_statuses(cls):

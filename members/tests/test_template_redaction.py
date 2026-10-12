@@ -2,6 +2,7 @@ import pytest
 from django.urls import reverse
 
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -28,7 +29,12 @@ def test_redacted_member_shows_redacted_for_non_privileged_client(client):
 
 
 @pytest.mark.django_db
-def test_removing_full_redaction_explains_field_visibility_restoration(client):
+def test_profile_uses_per_field_controls_without_legacy_redaction(client):
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
     member = Member.objects.create(
         username="redaction_owner",
         email="owner@example.com",
@@ -42,7 +48,6 @@ def test_removing_full_redaction_explains_field_visibility_restoration(client):
     content = response.content.decode("utf-8")
 
     assert response.status_code == 200
-    assert "Restore Sharing Choices" in content
-    assert "per-field choices and club defaults" in content
-    assert "fields set to Hide will remain private" in content
-    assert "will be visible to other members again" not in content
+    assert 'name="visibility_email"' in content
+    assert "Restore Sharing Choices" not in content
+    assert "redactConfirmModal" not in content
