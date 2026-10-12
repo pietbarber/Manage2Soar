@@ -1,5 +1,6 @@
 import pytest
 
+from members.admin import CustomMemberChangeForm
 from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
 
@@ -56,3 +57,22 @@ def test_approved_application_creates_structured_emergency_contact():
     assert contact.relationship == "Parent"
     assert contact.mobile_phone == "555-0201"
     assert member.emergency_contact is None
+
+
+@pytest.mark.django_db
+def test_admin_contact_visibility_controls_preserve_inherit_share_and_hide():
+    member = Member.objects.create_user(
+        username="admin_visibility",
+        contact_visibility={"email": "hide", "phone": "share"},
+    )
+
+    form = CustomMemberChangeForm(instance=member)
+
+    assert form.fields["contact_visibility_email"].initial == "hide"
+    assert form.fields["contact_visibility_phone"].initial == "share"
+    assert form.fields["contact_visibility_address"].initial == "inherit"
+    assert [choice[0] for choice in form.CONTACT_VISIBILITY_CHOICES] == [
+        "inherit",
+        "share",
+        "hide",
+    ]
