@@ -40,6 +40,7 @@ def reverse_migrate_legacy_contact_redaction(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("members", "0030_merge_20261005_2055"),
+        ("members", "0027_member_contact_visibility_and_more"),
     ]
 
     operations = [
