@@ -54,13 +54,13 @@
             </p>
           </div>
         </div>
+        {% if request.user.is_superuser or request.user.member_manager %}
         <div class="profile-action-buttons">
-          {% if request.user.is_superuser or request.user.member_manager %}
           <a href="{% url 'admin:members_member_change' member.id %}" class="btn btn-light btn-modern">
             <i class="bi bi-pencil-square me-2"></i>Edit Member
           </a>
-          {% endif %}
         </div>
+        {% endif %}
       </div>
     </div>
   </div>

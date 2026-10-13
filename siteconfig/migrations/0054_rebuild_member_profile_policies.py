@@ -20,8 +20,8 @@ def normalize_member_profile_field_policies(policies):
     return {
         field: policies.get(field)
         if policies.get(field) in {"disabled", "direct"}
-        else default
-        for field, default in DEFAULT_POLICIES.items()
+        else "disabled"
+        for field in DEFAULT_POLICIES
     }
 
 

@@ -204,7 +204,7 @@ import json
 import sys
 
 print(json.dumps({"argv": [
-    "tar", "-C", sys.argv[1], "--ignore-failed-read", "-czf", sys.argv[2],
+    "tar", "-C", sys.argv[1], "-czf", sys.argv[2],
     "profile_photos", "generated_avatars",
 ]}))
 ' "$REMOTE_MEDIA_ROOT" "$REMOTE_PROFILE_MEDIA_ARCHIVE_PATH")"
