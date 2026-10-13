@@ -220,11 +220,11 @@
                 <div>
                   <strong class="d-block">Address</strong>
                   {% if can_view_address and member.address %}
-                    {% if redact_contact_fields.address %}<span class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><address class="staff-revealed d-none mb-0">
+                    {% if redact_contact_fields.address %}<div class="staff-reveal" tabindex="0" role="button" title="Click to reveal"><span class="staff-redacted">Redacted</span><address class="staff-revealed d-none mb-0">
                       {{ member.address }}<br>
                       {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
                       {{ member.country }}
-                    </address></span>{% else %}<address class="mb-0">
+                    </address></div>{% else %}<address class="mb-0">
                       {{ member.address }}<br>
                       {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
                       {{ member.country }}

@@ -129,6 +129,10 @@
     display: inline !important;
 }
 
+.staff-reveal.is-revealed address.staff-revealed {
+    display: block !important;
+}
+
 .contact-info .list-group-item {
     border: none;
     padding: 0.75rem 0;
