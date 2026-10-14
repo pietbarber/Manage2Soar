@@ -179,7 +179,7 @@ def test_email_change_request_uses_canonical_url_in_confirmation(client, mailout
 
 
 @pytest.mark.django_db
-def test_email_change_confirmation_uses_request_host_on_local_servers(
+def test_email_change_confirmation_uses_configured_domain_on_local_servers(
     client, mailoutbox, settings
 ):
     configure_email_changes()
@@ -196,7 +196,7 @@ def test_email_change_confirmation_uses_request_host_on_local_servers(
     )
 
     assert response.status_code == 302
-    assert "http://testserver/members/email/confirm/" in mailoutbox[0].body
+    assert "http://localhost:8001/members/email/confirm/" in mailoutbox[0].body
 
 
 @pytest.mark.django_db
@@ -218,6 +218,26 @@ def test_email_change_requested_shows_pending_email(client):
     assert b"new@example.com" in response.content
     assert b"24 hours" in response.content
     assert b"Back to My Profile" in response.content
+
+
+@pytest.mark.django_db
+def test_email_change_requested_rejects_kiosk_session(client):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_requested_kiosk",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    member.pending_email = "new@example.com"
+    member.save(update_fields=["pending_email"])
+    client.force_login(member)
+    session = client.session
+    session["is_kiosk_authenticated"] = True
+    session.save()
+
+    response = client.get(reverse("members:email_change_requested"))
+
+    assert response.status_code == 403
 
 
 @pytest.mark.django_db
@@ -313,7 +333,9 @@ def test_email_confirmation_post_requires_csrf():
 
 
 @pytest.mark.django_db
-def test_email_confirmation_post_changes_email(mailoutbox):
+def test_email_confirmation_post_changes_email(
+    mailoutbox, django_capture_on_commit_callbacks
+):
     configure_email_changes()
     member = Member.objects.create_user(
         username="email_post", email="old@example.com", membership_status="Email Active"
@@ -322,7 +344,8 @@ def test_email_confirmation_post_changes_email(mailoutbox):
     member.save(update_fields=["pending_email"])
     token = make_email_token(member, member.pending_email)
 
-    response = Client().post(reverse("members:confirm_email_change", args=[token]))
+    with django_capture_on_commit_callbacks(execute=True):
+        response = Client().post(reverse("members:confirm_email_change", args=[token]))
 
     assert response.status_code == 302
     assert response.url == reverse("members:member_view", args=[member.pk])

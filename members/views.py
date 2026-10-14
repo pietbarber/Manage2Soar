@@ -41,7 +41,6 @@ from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
 from utils.email import DevModeEmailMultiAlternatives, enforce_noreply_from_email
 from utils.url_helpers import (
     build_absolute_url,
-    build_absolute_url_for_request,
     get_canonical_url,
 )
 
@@ -484,8 +483,8 @@ def request_email_change(request):
         {"member_id": request.user.pk, "email": new_email},
         salt="members.email-change",
     )
-    confirmation_url = build_absolute_url_for_request(
-        request, reverse("members:confirm_email_change", args=[token])
+    confirmation_url = build_absolute_url(
+        reverse("members:confirm_email_change", args=[token])
     )
     site_config = SiteConfiguration.objects.first()
     context = {
@@ -521,7 +520,7 @@ def request_email_change(request):
     return redirect("members:email_change_requested")
 
 
-@active_member_required
+@non_kiosk_member_required
 def email_change_requested(request):
     if not request.user.pending_email:
         return redirect("members:member_view", member_id=request.user.pk)
@@ -583,7 +582,7 @@ def confirm_email_change(request, token):
         render_to_string("members/emails/email_change_completed.html", context),
         "text/html",
     )
-    completion_message.send()
+    transaction.on_commit(lambda: completion_message.send(), robust=True)
     messages.success(request, "Your email address has been updated.")
     return redirect("members:member_view", member_id=member.id)
 

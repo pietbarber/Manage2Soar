@@ -64,8 +64,22 @@ def test_member_profile_policy_defaults_and_migration_normalization_are_safe():
     assert migration.normalize_member_profile_field_policies(
         {"email": "request", "username": "direct", "biography": "disabled"}
     ) == {
-        **default_member_profile_field_policies(),
+        **{field: "disabled" for field in default_member_profile_field_policies()},
         "biography": "disabled",
+    }
+    assert migration.legacy_member_profile_field_policies(
+        {"email": "direct", "biography": "direct"}
+    ) == {
+        "username": "disabled",
+        "email": "direct",
+        "phone": "request",
+        "address": "request",
+        "emergency_contacts": "disabled",
+        "nickname": "request",
+        "profile_photo": "disabled",
+        "biography": "direct",
+        "password": "disabled",
+        "contact_visibility": "disabled",
     }
 
 

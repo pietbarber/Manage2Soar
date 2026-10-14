@@ -39,6 +39,37 @@ def normalize_profile_policies(apps, schema_editor):
             )
 
 
+def legacy_member_profile_field_policies(policies):
+    if not isinstance(policies, dict):
+        policies = {}
+    return {
+        "username": "disabled",
+        "email": policies.get("email", "disabled"),
+        "phone": "request",
+        "address": "request",
+        "emergency_contacts": policies.get("emergency_contacts", "disabled"),
+        "nickname": "request",
+        "profile_photo": policies.get("profile_photo", "disabled"),
+        "biography": policies.get("biography", "disabled"),
+        "password": policies.get("password", "disabled"),
+        "contact_visibility": policies.get("contact_visibility", "disabled"),
+    }
+
+
+def restore_legacy_member_profile_field_policies(apps, schema_editor):
+    """Restore the ten-key policy shape expected by migration 0053."""
+    SiteConfiguration = apps.get_model("siteconfig", "SiteConfiguration")
+    for config in SiteConfiguration.objects.all().only(
+        "pk", "member_profile_field_policies"
+    ):
+        legacy_policies = legacy_member_profile_field_policies(
+            config.member_profile_field_policies
+        )
+        SiteConfiguration.objects.filter(pk=config.pk).update(
+            member_profile_field_policies=legacy_policies
+        )
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("siteconfig", "0053_siteconfiguration_profile_policies"),
@@ -55,5 +86,7 @@ class Migration(migrations.Migration):
                 validators=[siteconfig.models.validate_member_profile_field_policies],
             ),
         ),
-        migrations.RunPython(normalize_profile_policies, migrations.RunPython.noop),
+        migrations.RunPython(
+            normalize_profile_policies, restore_legacy_member_profile_field_policies
+        ),
     ]
