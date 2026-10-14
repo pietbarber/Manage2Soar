@@ -78,7 +78,7 @@ def test_member_profile_hides_account_controls_when_disabled(client):
 
 @pytest.mark.django_db
 def test_email_change_request_stores_pending_email_and_sends_confirmation(
-    client, mailoutbox
+    client, mailoutbox, django_capture_on_commit_callbacks
 ):
     configure_email_changes()
     member = Member.objects.create_user(
@@ -88,9 +88,10 @@ def test_email_change_request_stores_pending_email_and_sends_confirmation(
     )
     client.force_login(member)
 
-    response = client.post(
-        reverse("members:request_email_change"), {"email": "New@Example.com"}
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client.post(
+            reverse("members:request_email_change"), {"email": "New@Example.com"}
+        )
 
     assert response.status_code == 302
     assert response.url == reverse("members:email_change_requested")
@@ -156,7 +157,9 @@ def test_email_change_request_rejects_email_beyond_model_length(client, mailoutb
 
 
 @pytest.mark.django_db
-def test_email_change_request_uses_canonical_url_in_confirmation(client, mailoutbox):
+def test_email_change_request_uses_canonical_url_in_confirmation(
+    client, mailoutbox, django_capture_on_commit_callbacks
+):
     config = configure_email_changes()
     config.canonical_url = "https://canonical.example.org"
     config.save(update_fields=["canonical_url"])
@@ -167,9 +170,10 @@ def test_email_change_request_uses_canonical_url_in_confirmation(client, mailout
     )
     client.force_login(member)
 
-    response = client.post(
-        reverse("members:request_email_change"), {"email": "new@example.com"}
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client.post(
+            reverse("members:request_email_change"), {"email": "new@example.com"}
+        )
 
     assert response.status_code == 302
     expected_link = "https://canonical.example.org/members/email/confirm/"
@@ -180,7 +184,7 @@ def test_email_change_request_uses_canonical_url_in_confirmation(client, mailout
 
 @pytest.mark.django_db
 def test_email_change_confirmation_uses_configured_domain_on_local_servers(
-    client, mailoutbox, settings
+    client, mailoutbox, settings, django_capture_on_commit_callbacks
 ):
     configure_email_changes()
     settings.SITE_URL = ""
@@ -191,9 +195,10 @@ def test_email_change_confirmation_uses_configured_domain_on_local_servers(
     )
     client.force_login(member)
 
-    response = client.post(
-        reverse("members:request_email_change"), {"email": "new@example.com"}
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client.post(
+            reverse("members:request_email_change"), {"email": "new@example.com"}
+        )
 
     assert response.status_code == 302
     assert "http://localhost:8001/members/email/confirm/" in mailoutbox[0].body

@@ -137,7 +137,9 @@ def test_set_password_mismatched_passwords(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_set_password_sends_security_notification(client, django_user_model):
+def test_set_password_sends_security_notification(
+    client, django_user_model, django_capture_on_commit_callbacks
+):
     MembershipStatus.objects.get_or_create(
         name="Full Member", defaults={"is_active": True, "sort_order": 1}
     )
@@ -156,10 +158,14 @@ def test_set_password_sends_security_notification(client, django_user_model):
     client.force_login(user)
 
     with patch("members.views._send_account_security_email") as send_email:
-        response = client.post(
-            reverse("members:set_password"),
-            {"new_password1": "new-password-123", "new_password2": "new-password-123"},
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            response = client.post(
+                reverse("members:set_password"),
+                {
+                    "new_password1": "new-password-123",
+                    "new_password2": "new-password-123",
+                },
+            )
 
     assert response.status_code == 302
     user.refresh_from_db()

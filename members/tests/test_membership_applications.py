@@ -79,6 +79,7 @@ class MembershipApplicationModelTests:
             state="CA",
             zip_code="12345",
             emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
             emergency_contact_phone="555-987-6543",
             # Missing agreements
         )

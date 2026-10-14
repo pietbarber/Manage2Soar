@@ -158,23 +158,45 @@ mkdir -p "$SNAPSHOT_DIR"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 SNAPSHOT_PATH="${SNAPSHOT_DIR}/${REMOTE_DB}-production-${TIMESTAMP}.pgdump"
 PARTIAL_SNAPSHOT_PATH="${SNAPSHOT_PATH}.partial"
-REMOTE_SNAPSHOT_PATH="/tmp/${REMOTE_DB}-local-refresh-${TIMESTAMP}.pgdump"
+REMOTE_TEMP_DIR=""
+REMOTE_SNAPSHOT_PATH=""
 PROFILE_MEDIA_ARCHIVE_PATH="${SNAPSHOT_DIR}/${REMOTE_DB}-profile-media-${TIMESTAMP}.tar.gz"
 PARTIAL_PROFILE_MEDIA_ARCHIVE_PATH="${PROFILE_MEDIA_ARCHIVE_PATH}.partial"
-REMOTE_PROFILE_MEDIA_ARCHIVE_PATH="/tmp/${REMOTE_DB}-profile-media-${TIMESTAMP}.tar.gz"
+REMOTE_PROFILE_MEDIA_ARCHIVE_PATH=""
 
 cleanup() {
   rm -f "$PARTIAL_SNAPSHOT_PATH"
   rm -f "$PARTIAL_PROFILE_MEDIA_ARCHIVE_PATH"
   [[ -z "${MEDIA_STAGING_DIR:-}" ]] || rm -rf "$MEDIA_STAGING_DIR"
-  (
+  if [[ -n "$REMOTE_TEMP_DIR" ]]; then
+    (
     cd "$ANSIBLE_DIR"
     "$ANSIBLE_BIN" "${ANSIBLE_COMMAND_ARGS[@]}" --become \
       -m ansible.builtin.shell \
-      -a "rm -f '${REMOTE_SNAPSHOT_PATH}' '${REMOTE_PROFILE_MEDIA_ARCHIVE_PATH}'" >/dev/null 2>&1
-  ) || true
+      -a "rm -rf -- '${REMOTE_TEMP_DIR}'" >/dev/null 2>&1
+    ) || true
+  fi
 }
 trap cleanup EXIT
+
+REMOTE_TEMP_DIR="$(
+  (
+    cd "$ANSIBLE_DIR"
+    "$ANSIBLE_BIN" "${ANSIBLE_COMMAND_ARGS[@]}" --become --become-user postgres \
+      -m ansible.builtin.tempfile \
+      -a "state=directory prefix=manage2soar-refresh- mode=0700" -o
+  ) | "$PYTHON_BIN" -c '
+import json
+import sys
+
+output = sys.stdin.read().strip()
+payload = json.loads(output[output.rfind("{"):])
+print(payload["path"])
+'
+  )"
+[[ "$REMOTE_TEMP_DIR" == /* ]] || die "Could not allocate a secure remote temporary directory."
+REMOTE_SNAPSHOT_PATH="${REMOTE_TEMP_DIR}/${REMOTE_DB}-local-refresh.pgdump"
+REMOTE_PROFILE_MEDIA_ARCHIVE_PATH="${REMOTE_TEMP_DIR}/${REMOTE_DB}-profile-media.tar.gz"
 
 printf 'Creating production snapshot from %s:%s...\n' "$PROD_SSH_HOST" "$REMOTE_DB"
 (
@@ -183,6 +205,12 @@ printf 'Creating production snapshot from %s:%s...\n' "$PROD_SSH_HOST" "$REMOTE_
     -m ansible.builtin.shell \
     -a "umask 077 && pg_dump -Fc --dbname=${REMOTE_DB} > ${REMOTE_SNAPSHOT_PATH}"
 ) || die "Production snapshot creation failed."
+(
+  cd "$ANSIBLE_DIR"
+  "$ANSIBLE_BIN" "${ANSIBLE_COMMAND_ARGS[@]}" --become \
+    -m ansible.builtin.command \
+    -a "chmod 600 '${REMOTE_SNAPSHOT_PATH}'"
+) || die "Production snapshot permission hardening failed."
 
 (
   cd "$ANSIBLE_DIR"
@@ -214,6 +242,12 @@ print(json.dumps({"argv": [
       -m ansible.builtin.command \
       -a "$remote_media_archive_args"
   ) || die "Production profile-media archive creation failed."
+  (
+    cd "$ANSIBLE_DIR"
+    "$ANSIBLE_BIN" "${ANSIBLE_COMMAND_ARGS[@]}" --become \
+      -m ansible.builtin.command \
+      -a "chmod 600 '${REMOTE_PROFILE_MEDIA_ARCHIVE_PATH}'"
+  ) || die "Production profile-media archive permission hardening failed."
   (
     cd "$ANSIBLE_DIR"
     "$ANSIBLE_BIN" "${ANSIBLE_COMMAND_ARGS[@]}" --become \
@@ -256,7 +290,6 @@ if "$UPDATE_MEDIA"; then
   MEDIA_STAGING_DIR=""
 fi
 
-trap - EXIT
 if "$UPDATE_MEDIA"; then
   printf 'Local database %s and profile media refreshed successfully. Snapshots retained at %s and %s\n' \
     "$LOCAL_DB" "$SNAPSHOT_PATH" "$PROFILE_MEDIA_ARCHIVE_PATH"

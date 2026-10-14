@@ -253,6 +253,8 @@ class Member(AbstractUser):
     )
     pending_email = models.EmailField(
         blank=True,
+        default="",
+        db_default="",
         help_text="Email address awaiting member confirmation.",
     )
     pending_email_requested_at = models.DateTimeField(

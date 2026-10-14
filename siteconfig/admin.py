@@ -65,6 +65,14 @@ class MailingListAdminForm(forms.ModelForm):
 class SiteConfigurationAdminForm(forms.ModelForm):
     """Admin form with period-neutral reservation cap wording."""
 
+    for field_name in MEMBER_PROFILE_POLICY_FIELDS:
+        locals()[f"profile_policy_{field_name}"] = forms.BooleanField(
+            required=False,
+            label=field_name.replace("_", " ").title(),
+            help_text="Allow members to edit this field directly.",
+        )
+    del field_name
+
     class Meta:
         model = SiteConfiguration
         fields = "__all__"
@@ -74,11 +82,8 @@ class SiteConfigurationAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         policies = self.instance.member_profile_field_policies or {}
         for field in MEMBER_PROFILE_POLICY_FIELDS:
-            self.fields[f"profile_policy_{field}"] = forms.BooleanField(
-                required=False,
-                label=field.replace("_", " ").title(),
-                help_text="Allow members to edit this field directly.",
-                initial=policies.get(field) == "direct",
+            self.fields[f"profile_policy_{field}"].initial = (
+                policies.get(field) == "direct"
             )
         reservation_cap_field = self.fields.get("max_reservations_per_year")
         if reservation_cap_field:

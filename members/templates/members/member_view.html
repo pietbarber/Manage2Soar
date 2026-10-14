@@ -716,9 +716,11 @@
 {% block extra_scripts %}
   <script>
     document.querySelectorAll('.staff-reveal').forEach((element) => {
-      element.addEventListener('click', () => element.classList.toggle('is-revealed'));
+      element.addEventListener('click', (event) => {
+        if (!event.target.closest('a')) element.classList.toggle('is-revealed');
+      });
       element.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
+        if (event.target === element && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
           element.classList.toggle('is-revealed');
         }

@@ -12,6 +12,8 @@ class Migration(migrations.Migration):
             name="pending_email",
             field=models.EmailField(
                 blank=True,
+                default="",
+                db_default="",
                 help_text="Email address awaiting member confirmation.",
                 max_length=254,
             ),

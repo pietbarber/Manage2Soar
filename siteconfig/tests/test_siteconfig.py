@@ -137,6 +137,25 @@ def test_siteconfiguration_admin_form_uses_compact_direct_policy_checkboxes():
 
 
 @pytest.mark.django_db
+def test_siteconfiguration_admin_page_loads(client, django_user_model):
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+    )
+    admin_user = django_user_model.objects.create_superuser(
+        username="siteconfig_admin_page",
+        email="admin@example.org",
+        password="test-password",
+    )
+    client.force_login(admin_user)
+
+    response = client.get(f"/admin/siteconfig/siteconfiguration/{config.pk}/change/")
+
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
 def test_siteconfiguration_admin_form_saves_direct_edit_policies_and_master_switch():
     from siteconfig.admin import SiteConfigurationAdminForm
 

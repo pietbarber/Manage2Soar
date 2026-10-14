@@ -161,6 +161,17 @@ def test_member_managers_has_member_crud_permissions():
 
 
 @pytest.mark.django_db
+def test_member_managers_has_emergency_contact_permissions():
+    for codename in (
+        "add_emergencycontact",
+        "change_emergencycontact",
+        "delete_emergencycontact",
+        "view_emergencycontact",
+    ):
+        assert _has_perm("Member Managers", "members", "emergencycontact", codename)
+
+
+@pytest.mark.django_db
 def test_member_managers_has_cms_sitefeedback_permissions():
     assert _has_perm("Member Managers", "cms", "sitefeedback", "add_sitefeedback")
     assert _has_perm("Member Managers", "cms", "sitefeedback", "view_sitefeedback")

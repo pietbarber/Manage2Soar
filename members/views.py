@@ -515,7 +515,7 @@ def request_email_change(request):
         render_to_string("members/emails/email_change_security_notice.html", context),
         "text/html",
     )
-    security_message.send()
+    transaction.on_commit(lambda: security_message.send(), robust=True)
     messages.success(request, "A confirmation link was sent to your new email address.")
     return redirect("members:email_change_requested")
 
@@ -829,11 +829,14 @@ def set_password(request):
         if form.is_valid():
             member.set_password(form.cleaned_data["new_password1"])
             member.save()
-            _send_account_security_email(
-                member.email,
-                "Your Manage2Soar password changed",
-                "Your Manage2Soar password was changed. If you did not make this "
-                "change, contact a club manager immediately.",
+            transaction.on_commit(
+                lambda: _send_account_security_email(
+                    member.email,
+                    "Your Manage2Soar password changed",
+                    "Your Manage2Soar password was changed. If you did not make this "
+                    "change, contact a club manager immediately.",
+                ),
+                robust=True,
             )
             messages.success(request, "Password changed successfully.")
             return redirect("members:member_list")
