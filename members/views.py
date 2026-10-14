@@ -476,6 +476,14 @@ def request_email_change(request):
         messages.info(request, "That is already your current email address.")
         return redirect("members:member_view", member_id=request.user.pk)
 
+    if (
+        Member.objects.filter(email__iexact=new_email)
+        .exclude(pk=request.user.pk)
+        .exists()
+    ):
+        messages.error(request, "That email address is already used by another member.")
+        return redirect("members:member_view", member_id=request.user.pk)
+
     request.user.pending_email = new_email
     request.user.pending_email_requested_at = timezone.now()
     request.user.save(update_fields=["pending_email", "pending_email_requested_at"])
@@ -560,13 +568,33 @@ def confirm_email_change(request, token):
             return render(request, "403.html", status=403)
         if get_member_profile_field_policy("email") != "direct":
             return render(request, "403.html", status=403)
+        if (
+            Member.objects.filter(email__iexact=member.pending_email)
+            .exclude(pk=member.pk)
+            .exists()
+        ):
+            messages.error(
+                request, "That email address is already used by another member."
+            )
+            return redirect("members:member_view", member_id=member.pk)
         old_email = member.email
         member.email = member.pending_email
         member.pending_email = ""
         member.pending_email_requested_at = None
-        member.save(
-            update_fields=["email", "pending_email", "pending_email_requested_at"]
-        )
+        try:
+            with transaction.atomic():
+                member.save(
+                    update_fields=[
+                        "email",
+                        "pending_email",
+                        "pending_email_requested_at",
+                    ]
+                )
+        except IntegrityError:
+            messages.error(
+                request, "That email address is already used by another member."
+            )
+            return redirect("members:member_view", member_id=member.pk)
     site_config = SiteConfiguration.objects.first()
     context = {
         "site_name": site_config.club_name if site_config else "Manage2Soar",

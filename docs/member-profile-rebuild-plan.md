@@ -122,6 +122,6 @@ Order:
 * Username self-editing is deferred for future investigation.
 * Member-manager approval workflows and request-policy behavior are deferred;
   this rebuild does not implement them.
-* Global email uniqueness is not enforced. Existing upstream behavior allows
-  multiple member accounts to share an email; any change requires separate
-  investigation across login, reset, imports, and visiting-pilot lookup.
+* Email uniqueness is enforced for nonblank addresses by the profile self-service
+  work. The database constraint is case-insensitive, and the migration stops with
+  the conflicting member IDs if existing duplicate addresses require resolution.

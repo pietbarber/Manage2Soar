@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.functions import Lower
 from tinymce.models import HTMLField
 
 from members.constants.membership import MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
@@ -449,6 +450,17 @@ class Member(AbstractUser):
 
         # 5) now safe to touch M2M
         transaction.on_commit(self._sync_groups)
+
+    class Meta:
+        verbose_name = "user"
+        verbose_name_plural = "users"
+        constraints = [
+            models.UniqueConstraint(
+                Lower("email"),
+                condition=~Q(email=""),
+                name="member_unique_nonblank_email_ci",
+            )
+        ]
 
     ##################################
     #  def __str__

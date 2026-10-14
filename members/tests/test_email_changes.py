@@ -1,5 +1,6 @@
 import pytest
 from django.core import signing
+from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
 
@@ -366,9 +367,11 @@ def test_email_confirmation_post_changes_email(
 
 
 @pytest.mark.django_db
-def test_email_confirmation_allows_an_email_shared_by_another_member():
+def test_email_change_request_rejects_an_email_used_by_another_member(
+    client, mailoutbox
+):
     configure_email_changes()
-    Member.objects.create_user(
+    existing = Member.objects.create_user(
         username="existing_shared_email",
         email="shared@example.com",
         membership_status="Email Active",
@@ -378,15 +381,61 @@ def test_email_confirmation_allows_an_email_shared_by_another_member():
         email="old@example.com",
         membership_status="Email Active",
     )
-    member.pending_email = "shared@example.com"
+    client.force_login(member)
+
+    response = client.post(
+        reverse("members:request_email_change"), {"email": existing.email}
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("members:member_view", args=[member.pk])
+    member.refresh_from_db()
+    assert member.pending_email == ""
+    assert not mailoutbox
+
+
+@pytest.mark.django_db
+def test_member_email_constraint_is_case_insensitive():
+    configure_email_changes()
+    Member.objects.create_user(
+        username="case_email_existing",
+        email="CaseEmail@example.com",
+        membership_status="Email Active",
+    )
+
+    with pytest.raises(IntegrityError):
+        Member.objects.create_user(
+            username="case_email_duplicate",
+            email="caseemail@EXAMPLE.com",
+            membership_status="Email Active",
+        )
+
+
+@pytest.mark.django_db
+def test_email_confirmation_rejects_race_with_existing_member(mailoutbox):
+    configure_email_changes()
+    existing = Member.objects.create_user(
+        username="existing_confirmed_email",
+        email="shared@example.com",
+        membership_status="Email Active",
+    )
+    member = Member.objects.create_user(
+        username="email_confirm_conflict",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    member.pending_email = existing.email
     member.save(update_fields=["pending_email"])
     token = make_email_token(member, member.pending_email)
 
     response = Client().post(reverse("members:confirm_email_change", args=[token]))
 
     assert response.status_code == 302
+    assert response.url == reverse("members:member_view", args=[member.pk])
     member.refresh_from_db()
-    assert member.email == "shared@example.com"
+    assert member.email == "old@example.com"
+    assert member.pending_email == "shared@example.com"
+    assert not mailoutbox
 
 
 @pytest.mark.django_db
