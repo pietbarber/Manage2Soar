@@ -63,12 +63,12 @@ def billing_app_required(view_func):
 
 ### `treasurer_required`
 
-**Location**: `billing/views.py`
+**Location**: `billing/decorators.py`
 
 **Purpose**: Restricts access to treasurer-only billing views. Users must be either a superuser or have the `treasurer` flag set on their Member profile.
 
 ```python
-from billing.views import treasurer_required
+from billing.decorators import treasurer_required
 
 @treasurer_required
 def ledger_list(request):
@@ -107,6 +107,23 @@ def treasurer_required(view_func):
 
 This project uses `members.Member` as `AUTH_USER_MODEL` (subclassing `AbstractUser`).
 The `treasurer` flag is defined directly on that user model and accessed as `request.user.treasurer`.
+
+---
+
+### `club_accounting_required`
+
+**Location**: `billing/decorators.py`
+
+**Purpose**: Gates the club books views (Club Finances menu). When
+`SiteConfiguration.club_accounting_enabled` is off, it redirects to Member
+Billing with an informational message. Club books views apply it after the
+billing and treasurer checks, through `ledger_views.club_books_view`:
+
+```python
+billing_app_required(treasurer_required(club_accounting_required(view)))
+```
+
+So a non-treasurer always gets a 403, whether or not the books are enabled.
 
 ---
 
@@ -156,7 +173,8 @@ If authorized → view executes
 | App | Decorator | Purpose | Location |
 |-----|-----------|---------|----------|
 | **billing** | `billing_app_required` | App-level gate | `billing/decorators.py` |
-| **billing** | `treasurer_required` | Role-based gate | `billing/views.py` |
+| **billing** | `treasurer_required` | Role-based gate | `billing/decorators.py` |
+| **billing** | `club_accounting_required` | Club books gate | `billing/decorators.py` |
 | **members** | `active_member_required` | Membership status gate | `members/decorators.py` |
 | **members** | `safety_officer_required` | Safety role gate | `members/decorators.py` |
 | **instructors** | `instructor_required` | Instructor role gate | `instructors/decorators.py` |

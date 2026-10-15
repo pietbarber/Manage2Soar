@@ -8,6 +8,7 @@ This directory contains comprehensive documentation for the **billing** Django a
 - [Data Models](models.md) - Detailed model relationships and constraints
 - [View Functions](views.md) - View functions, forms, and URL routes
 - [Decorators](decorators.md) - Authentication and authorization decorators
+- [Club Books (General Ledger)](general-ledger.md) - Opt-in double-entry club books under the Club Finances menu
 - [Development Guide](development.md) - How to work with the billing app
 - [API Reference](api.md) - Service-layer entry points and usage patterns
 - [Testing Guide](testing.md) - Test layout, fixtures, and validation commands
@@ -20,6 +21,7 @@ The billing app handles:
 - Flight charge allocation from Logsheet data
 - Manual charges and payments
 - Financial statement generation
+- Opt-in double-entry club books: bank accounts, expenses, income, transfers ([details](general-ledger.md))
 
 ### Enable Billing App
 
@@ -34,14 +36,18 @@ billing_app_enabled = True
 2. **BillingPeriod** - Monthly state tracking (open/closed)
 3. **LedgerEntry** - Individual transactions (charges, payments, reversals)
 4. **FlightChargeSnapshot** - Frozen allocation evidence from flights
+5. **Account / JournalEntry / JournalLine** - The club's chart of accounts and balanced, immutable journal entries
 
 ## File Index
 
 | File | Purpose |
 |------|---------|
 | `admin.py` | Django admin configuration |
-| `decorators.py` | Billing app enablement decorator |
-| `exceptions.py` | Custom exceptions (BillingDisabledError) |
+| `decorators.py` | Billing, treasurer, and club-accounting gate decorators |
+| `exceptions.py` | Custom exceptions (BillingDisabledError, ClubAccountingDisabledError) |
+| `ledger_services.py` | Club books posting, reversal, balances, `verify_books` |
+| `ledger_forms.py` | Club books forms |
+| `ledger_views.py` | Club books views (Club Finances menu) |
 | `forms.py` | Web forms for charges/payments |
 | `management/commands/` | Cron jobs (period closing) |
 | `migrations/` | Database schema migrations |

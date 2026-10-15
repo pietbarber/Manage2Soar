@@ -1,0 +1,22 @@
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+  <div>
+    <p class="text-uppercase text-muted small mb-1">Club Finances</p>
+    <h1 class="h3 mb-0">{{ heading }}</h1>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:club_ledger' %}"><i class="bi bi-journal-text me-1"></i>Club Ledger</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:chart_of_accounts' %}"><i class="bi bi-list-columns me-1"></i>Accounts</a>
+    <div class="dropdown">
+      <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-plus-lg me-1"></i>Record
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{% url 'billing:record_expense' %}">Expense</a></li>
+        <li><a class="dropdown-item" href="{% url 'billing:record_income' %}">Income</a></li>
+        <li><a class="dropdown-item" href="{% url 'billing:cash_transfer' %}">Transfer between accounts</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{% url 'billing:general_journal' %}">General journal entry</a></li>
+      </ul>
+    </div>
+  </div>
+</div>

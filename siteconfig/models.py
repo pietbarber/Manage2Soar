@@ -606,6 +606,22 @@ class SiteConfiguration(models.Model):
             "when this master switch is enabled."
         ),
     )
+    club_accounting_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Enable the treasurer's double-entry club books (chart of accounts, "
+            "club ledger, expenses, income, and transfers) under the Club "
+            "Finances menu. Requires the billing app."
+        ),
+    )
+    club_accounting_start_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text=(
+            "First day covered by the club books. Only the opening entry may be "
+            "dated on this day; every other entry must be dated after it."
+        ),
+    )
     billing_period_close_policy = models.CharField(
         max_length=32,
         choices=tuple(BillingPeriodClosePolicy.choices),
@@ -983,6 +999,11 @@ class SiteConfiguration(models.Model):
                 errors["club_timezone"] = (
                     "Enter a valid IANA timezone (for example, America/New_York)."
                 )
+
+        if self.club_accounting_enabled and not self.billing_app_enabled:
+            errors["club_accounting_enabled"] = (
+                "Club accounting requires the billing app to be enabled."
+            )
 
         if errors:
             raise ValidationError(errors)

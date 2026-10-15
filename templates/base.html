@@ -218,6 +218,27 @@
             </ul>
           </li>
 
+          {% if siteconfig and siteconfig.billing_app_enabled and siteconfig.club_accounting_enabled %}
+          {% if user.treasurer or user.is_superuser %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="clubFinancesDropdown" role="button" data-bs-toggle="dropdown"
+              aria-expanded="false">
+              Club Finances
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="clubFinancesDropdown">
+              <li><a class="dropdown-item" href="{% url 'billing:club_ledger' %}"><i class="bi bi-journal-text me-1"></i> Club Ledger</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'billing:record_expense' %}"><i class="bi bi-box-arrow-up-right me-1"></i> Record Expense</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:record_income' %}"><i class="bi bi-box-arrow-in-down-left me-1"></i> Record Income</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:cash_transfer' %}"><i class="bi bi-arrow-left-right me-1"></i> Transfer Between Accounts</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:general_journal' %}"><i class="bi bi-pencil-square me-1"></i> General Journal Entry</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'billing:chart_of_accounts' %}"><i class="bi bi-list-columns me-1"></i> Chart of Accounts</a></li>
+            </ul>
+          </li>
+          {% endif %}
+          {% endif %}
+
           <!-- Resources (CMS) - moved into Members dropdown -->
 
           {% if user.is_authenticated and user.instructor %}

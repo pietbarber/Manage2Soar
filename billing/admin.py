@@ -1,9 +1,12 @@
 from django.contrib import admin
 
 from billing.models import (
+    Account,
     BillingPeriod,
     BillingPeriodEvent,
     FlightChargeSnapshot,
+    JournalEntry,
+    JournalLine,
     Ledger,
     LedgerEntry,
 )
@@ -50,3 +53,39 @@ class FlightChargeSnapshotAdmin(admin.ModelAdmin):
     list_filter = ("allocation_rule", "allocation_version")
     search_fields = ("flight__id", "billed_member__username")
     readonly_fields = tuple(field.name for field in FlightChargeSnapshot._meta.fields)
+
+
+@admin.register(Account)
+class AccountAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "type", "is_cash", "system_role", "is_active")
+    list_filter = ("type", "is_cash", "is_active")
+    search_fields = ("code", "name")
+    actions = None
+
+    def has_delete_permission(self, request, obj=None):
+        return obj is not None and not obj.system_role
+
+
+class JournalLineInline(admin.TabularInline):
+    model = JournalLine
+    can_delete = False
+    extra = 0
+    readonly_fields = ("account", "debit", "credit", "member", "memo")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(JournalEntry)
+class JournalEntryAdmin(admin.ModelAdmin):
+    list_display = ("id", "date", "memo", "source", "created_by")
+    list_filter = ("source", "date")
+    search_fields = ("memo", "payee", "reference", "source_key")
+    readonly_fields = tuple(field.name for field in JournalEntry._meta.fields)
+    inlines = (JournalLineInline,)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
