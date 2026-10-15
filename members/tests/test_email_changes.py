@@ -1,8 +1,10 @@
 import pytest
+from django.conf import settings
 from django.core import signing
 from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
+from social_core.pipeline.user import user_details
 
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
@@ -364,6 +366,21 @@ def test_email_confirmation_post_changes_email(
     assert "new@example.com" in mailoutbox[0].body
     assert mailoutbox[0].alternatives[0][1] == "text/html"
     assert "new@example.com" in mailoutbox[0].alternatives[0][0]
+
+    class GoogleLoginStrategy:
+        @staticmethod
+        def setting(name, default=None, **kwargs):
+            return getattr(settings, f"SOCIAL_AUTH_{name}", default)
+
+    assert "email" in settings.SOCIAL_AUTH_PROTECTED_USER_FIELDS
+    user_details(
+        GoogleLoginStrategy(),
+        {"email": "old@example.com"},
+        backend="google-oauth2",
+        user=member,
+    )
+    member.refresh_from_db()
+    assert member.email == "new@example.com"
 
 
 @pytest.mark.django_db

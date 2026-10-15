@@ -34,3 +34,6 @@ class TestMemberEmailChangeE2E(DjangoPlaywrightTestCase):
             f"{self.live_server_url}/members/email/change/requested/"
         )
         assert "Check Your Email" in self.page.locator("body").inner_text()
+        assert "new@example.com" in self.page.locator("body").inner_text()
+        self.member.refresh_from_db()
+        assert self.member.pending_email == "new@example.com"
