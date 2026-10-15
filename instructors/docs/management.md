@@ -80,6 +80,57 @@ python manage.py import_legacy_syllabus --dir=legacy_syllabus/
 
 ---
 
+## `seed_instruction_reports`
+
+**Filename:** `seed_instruction_reports.py`
+**Purpose:** Companion to `logsheet`'s `seed_sample_data`. Finds every dual
+(training) flight in the local dev database and creates, for each unique
+(student, instructor, date) combination:
+
+* one `InstructionReport` with a short pilot-themed instructor essay, and
+* 2–4 `LessonScore` rows that simulate realistic training progression —
+  a student works through the syllabus in `sort_key` order, new lessons
+  start at score `"1"` (Introduced), and previously-flown lessons are bumped
+  to `"2"` (Practiced) and then `"3"` (Solo Standard) as they accumulate
+  repeats.
+
+**Safety (defense in depth, mirrors `seed_sample_data`):**
+
+* **Dry-run by default** — without `--run`, the command only prints what it
+  would do and exits.
+* **Localhost guard** — even with `--run`, it refuses to proceed unless the
+  default DB host is `localhost` / `127.0.0.1` (or `--i-meant-it` is passed).
+* **Idempotent** — clears previously-seeded reports (reports whose student is
+  a seeded `@email.invalid` member) and then regenerates. `--skip-wipe`
+  appends instead.
+* Runs inside a single transaction.
+* The `notify_student_on_instruction_report` and `instruction_report_saved`
+  signals are disconnected during seeding; the `StudentProgressSnapshot` is
+  refreshed once per student at the end.
+
+**Usage:**
+
+```bash
+python manage.py seed_instruction_reports              # DRY RUN (prints only)
+python manage.py seed_instruction_reports --run        # wipe + regenerate
+python manage.py seed_instruction_reports --run --seed 42    # reproducible
+```
+
+**Options:**
+
+* `--run`: REQUIRED to actually write data (dry-run by default).
+* `--skip-wipe`: Append instead of clearing previously-seeded reports.
+* `--i-meant-it`: Override the localhost-only safety guard.
+* `--seed <int>`: Optional RNG seed for reproducible essay/score data.
+
+**Prerequisites:**
+
+* `seed_sample_data` must have been run first (dual flights must exist).
+* The syllabus (`TrainingPhase` + `TrainingLesson`) must already be loaded
+  (e.g. via `import_legacy_syllabus`).
+
+---
+
 ### General Tips
 
 * Always run with `--dry-run` first if available.

@@ -5,6 +5,51 @@ This page documents all custom Django management commands in `logsheet/managemen
 
 ---
 
+## seed_sample_data
+
+Seeds realistic **sample data into the LOCAL dev database** (members, fleet, and
+three seasons of flights) for testing and demo purposes.
+
+```bash
+# DRY RUN — prints what it would do, writes nothing (safe to run anywhere):
+python manage.py seed_sample_data
+
+# Actually seed the database:
+python manage.py seed_sample_data --run                  # wipe previously-seeded data, then regenerate
+python manage.py seed_sample_data --run --skip-wipe      # append instead of clearing
+python manage.py seed_sample_data --run --members-only   # members + fleet only (no flights)
+python manage.py seed_sample_data --run --seed 42        # fixed RNG seed (reproducible flights)
+```
+
+### What it creates
+- **24 members** (22 men / 2 women) in Northern Virginia: 4 instructors (commercial),
+  6 tow pilots (commercial), 7 students, 7 private-rated pilots, and 1 member manager
+  (private-rated). All use `firstname.lastname@email.invalid` emails, 703/571 phones,
+  and the shared dev password **`SoarDev-2026!`**.
+- **Fleet**: 2× SGS 2-33 trainers ($40.00/hr), 1× SGS 1-26 ($25.00/hr),
+  2 tow planes (Pawnee + SuperCub), and 3 privately-owned gliders (no rental rate).
+- **Aero tow charge schemes** on both tow planes: $25.00 hookup, $0.00 for 0–1000 ft,
+  $1.00 per 100 ft for 1000–5000 ft.
+- **Three seasons** (2024, 2025, 2026→Oct) of weekend, April–November flights honoring
+  the club's patterns: training duals, student solos, rated flights, SGS 1-26
+  (private-pilots-only), and long private XC soars (after 12:30, ~3 h, 3000 ft).
+  A student pilot may solo only after logging **40 duals**; student-solo slots
+  rolled before any student reaches that threshold become extra training duals.
+
+### Safety (defense in depth)
+- **Dry-run by default**: without `--run` the command only prints what it would
+  do and exits — it writes nothing. You must explicitly pass `--run` to modify
+  the database, so a casual `python manage.py seed_sample_data` is harmless.
+- **Localhost guard**: even with `--run`, it refuses to proceed unless the
+  default DB host is `localhost`/`127.0.0.1` (or `--i-meant-it` is passed), so
+  it cannot touch production by accident.
+- **Idempotent**: by default it clears previously-seeded sample data (identified by
+  `@email.invalid` members and the fixed sample N-numbers) before regenerating.
+- Runs inside a single transaction and leaves all flights **unfinalized**, so no
+  billing, maintenance, or email side effects are produced.
+
+---
+
 ## Legacy Database Reference
 
 When importing historical data, the following legacy tables are used as sources:
