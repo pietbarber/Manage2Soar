@@ -1,7 +1,7 @@
 import base64
 import logging
 import os
-from datetime import date
+from datetime import date, timedelta
 
 from django import forms
 from django.conf import settings
@@ -39,10 +39,7 @@ from siteconfig.forms import (
 )
 from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
 from utils.email import DevModeEmailMultiAlternatives, enforce_noreply_from_email
-from utils.url_helpers import (
-    build_absolute_url,
-    get_canonical_url,
-)
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .decorators import active_member_required, non_kiosk_member_required
 from .forms import (
@@ -484,11 +481,19 @@ def request_email_change(request):
         messages.error(request, "That email address is already used by another member.")
         return redirect("members:member_view", member_id=request.user.pk)
 
+    requested_at = timezone.now()
+    previous_requested_at = request.user.pending_email_requested_at
+    if previous_requested_at and requested_at <= previous_requested_at:
+        requested_at = previous_requested_at + timedelta(microseconds=1)
     request.user.pending_email = new_email
-    request.user.pending_email_requested_at = timezone.now()
+    request.user.pending_email_requested_at = requested_at
     request.user.save(update_fields=["pending_email", "pending_email_requested_at"])
     token = signing.dumps(
-        {"member_id": request.user.pk, "email": new_email},
+        {
+            "member_id": request.user.pk,
+            "email": new_email,
+            "requested_at": requested_at.isoformat(),
+        },
         salt="members.email-change",
     )
     confirmation_url = build_absolute_url(
@@ -528,6 +533,15 @@ def request_email_change(request):
     return redirect("members:email_change_requested")
 
 
+def _email_change_request_matches(member, data):
+    requested_at = member.pending_email_requested_at
+    return (
+        member.pending_email == data.get("email")
+        and requested_at is not None
+        and requested_at.isoformat() == data.get("requested_at")
+    )
+
+
 @non_kiosk_member_required
 def email_change_requested(request):
     if not request.user.pending_email:
@@ -550,7 +564,7 @@ def confirm_email_change(request, token):
         return render(request, "403.html", status=403)
 
     member = get_object_or_404(Member, pk=data.get("member_id"))
-    if member.pending_email != data.get("email"):
+    if not _email_change_request_matches(member, data):
         return render(request, "403.html", status=403)
     if get_member_profile_field_policy("email") != "direct":
         return render(request, "403.html", status=403)
@@ -564,7 +578,7 @@ def confirm_email_change(request, token):
 
     with transaction.atomic():
         member = Member.objects.select_for_update().get(pk=member.pk)
-        if member.pending_email != data.get("email"):
+        if not _email_change_request_matches(member, data):
             return render(request, "403.html", status=403)
         if get_member_profile_field_policy("email") != "direct":
             return render(request, "403.html", status=403)

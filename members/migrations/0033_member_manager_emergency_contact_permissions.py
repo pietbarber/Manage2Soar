@@ -1,6 +1,5 @@
 from django.db import migrations
 
-
 PERMISSIONS = (
     "add_emergencycontact",
     "change_emergencycontact",
@@ -38,4 +37,9 @@ def add_member_manager_permissions(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [("members", "0032_member_pending_email")]
 
-    operations = [migrations.RunPython(add_member_manager_permissions)]
+    operations = [
+        migrations.RunPython(
+            add_member_manager_permissions,
+            reverse_code=migrations.RunPython.noop,
+        )
+    ]

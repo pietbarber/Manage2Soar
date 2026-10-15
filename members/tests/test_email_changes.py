@@ -1,9 +1,12 @@
+from datetime import timedelta
+
 import pytest
 from django.conf import settings
 from django.core import signing
 from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 from social_core.pipeline.user import user_details
 
 from members.models import Member
@@ -29,10 +32,30 @@ def configure_email_changes():
 
 
 def make_email_token(member, email):
+    if member.pending_email_requested_at is None:
+        member.pending_email_requested_at = timezone.now()
+        member.save(update_fields=["pending_email_requested_at"])
     return signing.dumps(
-        {"member_id": member.pk, "email": email},
+        {
+            "member_id": member.pk,
+            "email": email,
+            "requested_at": member.pending_email_requested_at.isoformat(),
+        },
         salt="members.email-change",
     )
+
+
+def set_pending_email(member, email):
+    requested_at = timezone.now()
+    if (
+        member.pending_email_requested_at
+        and requested_at <= member.pending_email_requested_at
+    ):
+        requested_at = member.pending_email_requested_at + timedelta(microseconds=1)
+    member.pending_email = email
+    member.pending_email_requested_at = requested_at
+    member.save(update_fields=["pending_email", "pending_email_requested_at"])
+    return make_email_token(member, email)
 
 
 @pytest.mark.django_db
@@ -381,6 +404,84 @@ def test_email_confirmation_post_changes_email(
     )
     member.refresh_from_db()
     assert member.email == "new@example.com"
+
+
+@pytest.mark.django_db
+def test_email_confirmation_rejects_superseded_token_after_address_is_requested_again():
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_superseded",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    old_token = set_pending_email(member, "reused@example.com")
+    set_pending_email(member, "intermediate@example.com")
+    current_token = set_pending_email(member, "reused@example.com")
+    client = Client()
+
+    assert (
+        client.get(
+            reverse("members:confirm_email_change", args=[old_token])
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            reverse("members:confirm_email_change", args=[old_token])
+        ).status_code
+        == 403
+    )
+    response = client.post(
+        reverse("members:confirm_email_change", args=[current_token])
+    )
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.email == "reused@example.com"
+
+
+@pytest.mark.django_db
+def test_email_confirmation_rejects_consumed_token_after_address_is_requested_again():
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_consumed",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    client = Client()
+    consumed_token = set_pending_email(member, "reused@example.com")
+
+    assert (
+        client.post(
+            reverse("members:confirm_email_change", args=[consumed_token])
+        ).status_code
+        == 302
+    )
+    member.refresh_from_db()
+    intermediate_token = set_pending_email(member, "intermediate@example.com")
+    assert (
+        client.post(
+            reverse("members:confirm_email_change", args=[intermediate_token])
+        ).status_code
+        == 302
+    )
+    member.refresh_from_db()
+    current_token = set_pending_email(member, "reused@example.com")
+
+    assert (
+        client.post(
+            reverse("members:confirm_email_change", args=[consumed_token])
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            reverse("members:confirm_email_change", args=[current_token])
+        ).status_code
+        == 302
+    )
+    member.refresh_from_db()
+    assert member.email == "reused@example.com"
 
 
 @pytest.mark.django_db

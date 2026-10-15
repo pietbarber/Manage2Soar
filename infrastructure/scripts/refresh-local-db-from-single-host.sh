@@ -184,7 +184,7 @@ REMOTE_TEMP_DIR="$(
     cd "$ANSIBLE_DIR"
     "$ANSIBLE_BIN" "${ANSIBLE_COMMAND_ARGS[@]}" --become --become-user postgres \
       -m ansible.builtin.tempfile \
-      -a "state=directory prefix=manage2soar-refresh- mode=0700" -o
+      -a "state=directory prefix=manage2soar-refresh-" -o
   ) | "$PYTHON_BIN" -c '
 import json
 import sys
