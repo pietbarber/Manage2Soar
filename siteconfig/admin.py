@@ -397,6 +397,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             {
                 "fields": (
                     "billing_app_enabled",
+                    "club_accounting_enabled",
+                    "club_accounting_start_date",
                     "billing_rules_enabled",
                     "instructor_time_charges_enabled",
                     "billing_pricing_mode",

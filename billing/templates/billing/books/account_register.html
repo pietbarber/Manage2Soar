@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}{{ account.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  {% with heading=account.name %}{% include "billing/books/_header.html" %}{% endwith %}
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-muted small">{{ account.code }} · {{ account.get_type_display }}{% if account.is_cash %} · Cash or bank{% endif %}{% if account.system_role %} · {{ account.get_system_role_display }}{% endif %}</div>
+        {% if account.description %}<div>{{ account.description }}</div>{% endif %}
+        <a class="small" href="{% url 'billing:account_edit' account.pk %}">Edit account</a>
+      </div>
+      <div class="text-end">
+        <div class="text-muted small">Balance{% if end %} on {{ end|date:"Y-m-d" }}{% endif %}</div>
+        <div class="display-6 mb-0">${{ register.closing_balance|floatformat:"2g" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1" for="{{ form.start.id_for_label }}">From</label>
+      {{ form.start|add_class:"form-control form-control-sm" }}
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1" for="{{ form.end.id_for_label }}">To</label>
+      {{ form.end|add_class:"form-control form-control-sm" }}
+    </div>
+    <div class="col-12 col-md-6 d-flex gap-2">
+      <button class="btn btn-sm btn-outline-primary" type="submit">Show</button>
+      <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'billing:account_register_csv' account.pk %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"><i class="bi bi-download me-1"></i>CSV</a>
+    </div>
+  </form>
+  <p class="small text-muted">Showing {% if start %}from {{ start|date:"Y-m-d" }}{% else %}all dates{% endif %}{% if end %} to {{ end|date:"Y-m-d" }}{% endif %}. Newest first.</p>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+      <thead>
+        <tr>
+          <th class="text-start" scope="col">Date</th>
+          <th class="text-start" scope="col">Description</th>
+          <th class="text-start" scope="col">Other accounts</th>
+          <th scope="col" class="text-end">Increase</th>
+          <th scope="col" class="text-end">Decrease</th>
+          <th scope="col" class="text-end">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="text-start text-nowrap">{{ row.entry.date|date:"Y-m-d" }}</td>
+          <td class="text-start">
+            <a href="{% url 'billing:journal_detail' row.entry.pk %}">{{ row.entry.memo }}</a>
+            {% if row.entry.payee or row.line.member %}<div class="small text-muted">{{ row.entry.payee }}{% if row.line.member %}{{ row.line.member.get_full_name|default:row.line.member.username }}{% endif %}</div>{% endif %}
+          </td>
+          <td class="text-start small">{{ row.other_accounts|join:", " }}</td>
+          <td class="text-end">{% if row.increase %}${{ row.increase|floatformat:"2g" }}{% endif %}</td>
+          <td class="text-end">{% if row.decrease %}${{ row.decrease|floatformat:"2g" }}{% endif %}</td>
+          <td class="text-end">${{ row.balance|floatformat:"2g" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-start text-muted">No activity in this range.</td></tr>
+        {% endfor %}
+        <tr class="table-light">
+          <td class="text-start" colspan="5">Opening balance{% if start %} before {{ start|date:"Y-m-d" }}{% endif %}</td>
+          <td class="text-end">${{ register.opening_balance|floatformat:"2g" }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

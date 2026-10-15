@@ -356,3 +356,241 @@ class FlightChargeSnapshot(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Flight charge snapshots cannot be deleted.")
+
+
+class Account(models.Model):
+    """One account in the club's double-entry chart of accounts."""
+
+    class Type(models.TextChoices):
+        ASSET = "asset", "Asset"
+        LIABILITY = "liability", "Liability"
+        EQUITY = "equity", "Equity"
+        INCOME = "income", "Income"
+        EXPENSE = "expense", "Expense"
+
+    class Role(models.TextChoices):
+        MEMBER_RECEIVABLES = "member_receivables", "Member receivables"
+        UNDEPOSITED_FUNDS = "undeposited_funds", "Undeposited funds"
+        GENERAL_FUND = "general_fund", "General fund"
+        OPENING_BALANCE_EQUITY = "opening_balance_equity", "Opening balance equity"
+        TOW_REVENUE = "tow_revenue", "Tow revenue"
+        RENTAL_REVENUE = "rental_revenue", "Glider rental revenue"
+        INSTRUCTION_REVENUE = "instruction_revenue", "Instruction revenue"
+        DEFAULT_CHARGE_REVENUE = "default_charge_revenue", "Default charge revenue"
+        GUEST_FLIGHT_REVENUE = "guest_flight_revenue", "Guest flight revenue"
+        MEMBER_CREDITS = "member_credits", "Member credits and discounts"
+        BAD_DEBT = "bad_debt", "Bad debt and write-offs"
+
+    DEBIT_NORMAL_TYPES = frozenset({Type.ASSET, Type.EXPENSE})
+    ROLE_TYPES = {
+        Role.MEMBER_RECEIVABLES: {Type.ASSET},
+        Role.UNDEPOSITED_FUNDS: {Type.ASSET},
+        Role.GENERAL_FUND: {Type.EQUITY},
+        Role.OPENING_BALANCE_EQUITY: {Type.EQUITY},
+        Role.TOW_REVENUE: {Type.INCOME},
+        Role.RENTAL_REVENUE: {Type.INCOME},
+        Role.INSTRUCTION_REVENUE: {Type.INCOME},
+        Role.DEFAULT_CHARGE_REVENUE: {Type.INCOME},
+        Role.GUEST_FLIGHT_REVENUE: {Type.INCOME},
+        Role.MEMBER_CREDITS: {Type.EXPENSE, Type.INCOME},
+        Role.BAD_DEBT: {Type.EXPENSE},
+    }
+
+    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=100)
+    type = models.CharField(max_length=10, choices=Type.choices)
+    is_cash = models.BooleanField(
+        default=False,
+        verbose_name="Cash or bank account",
+        help_text="A bank or cash account that money can be deposited to or paid from.",
+    )
+    system_role = models.CharField(
+        max_length=32, choices=Role.choices, blank=True, null=True, unique=True
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Active")
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("code",)
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(is_cash=True) | models.Q(type="asset"),
+                name="billing_account_cash_is_asset",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.code} {self.name}"
+
+    @property
+    def is_debit_normal(self):
+        return self.type in self.DEBIT_NORMAL_TYPES
+
+    def clean(self):
+        super().clean()
+        if self.is_cash and self.type != self.Type.ASSET:
+            raise ValidationError("Only asset accounts can be cash accounts.")
+        if self.system_role and self.type not in self.ROLE_TYPES[self.system_role]:
+            raise ValidationError(
+                f"The {self.get_system_role_display()} role needs a "
+                f"{' or '.join(sorted(self.ROLE_TYPES[self.system_role]))} account."
+            )
+        if self.system_role and not self.is_active:
+            raise ValidationError("System accounts cannot be deactivated.")
+        if self.system_role == self.Role.MEMBER_RECEIVABLES and self.is_cash:
+            raise ValidationError("Member receivables cannot be a cash account.")
+        if self.pk:
+            previous = Account.objects.filter(pk=self.pk).values("type").first()
+            if previous and previous["type"] != self.type and self.lines.exists():
+                raise ValidationError(
+                    "An account with posted entries cannot change type."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.system_role:
+            raise ValidationError("System accounts cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+
+class ServiceOnlyManager(models.Manager):
+    def bulk_create(self, *args, **kwargs):
+        raise ValidationError(
+            "Journal records must be posted through the ledger service."
+        )
+
+
+class JournalEntry(models.Model):
+    """An immutable, balanced double-entry transaction in the club books."""
+
+    class Source(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        MEMBER_POSTING = "member_posting", "Member posting"
+        OPENING = "opening", "Opening balances"
+        REVERSAL = "reversal", "Reversal"
+        RECURRING = "recurring", "Recurring"
+
+    date = models.DateField()
+    memo = models.CharField(max_length=255)
+    payee = models.CharField(max_length=150, blank=True)
+    reference = models.CharField(max_length=100, blank=True)
+    internal_note = models.TextField(blank=True)
+    source = models.CharField(max_length=20, choices=Source.choices)
+    member_entry = models.OneToOneField(
+        LedgerEntry,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="journal_entry",
+    )
+    reverses = models.OneToOneField(
+        "self",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="reversal",
+    )
+    source_key = models.CharField(max_length=160, blank=True, null=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_journal_entries",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = ServiceOnlyManager()
+
+    class Meta:
+        ordering = ("date", "created_at", "id")
+        verbose_name_plural = "journal entries"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source_key",),
+                condition=models.Q(source_key__isnull=False),
+                name="billing_journal_source_key_unique",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(source="reversal")
+                | models.Q(reverses__isnull=False),
+                name="billing_journal_reversal_has_original",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("date", "created_at", "id"), name="billing_journal_date_idx"
+            ),
+        ]
+
+    def __str__(self):
+        return f"Journal entry #{self.pk} ({self.date}): {self.memo}"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Posted journal entries cannot be edited.")
+        if not getattr(self, "_service_created", False):
+            raise ValidationError(
+                "Journal entries must be posted through the ledger service."
+            )
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Posted journal entries cannot be deleted.")
+
+
+class JournalLine(models.Model):
+    """One debit or credit line of a journal entry."""
+
+    entry = models.ForeignKey(
+        JournalEntry, on_delete=models.PROTECT, related_name="lines"
+    )
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="lines")
+    debit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    member = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="journal_lines",
+    )
+    memo = models.CharField(max_length=255, blank=True)
+    objects = ServiceOnlyManager()
+
+    class Meta:
+        ordering = ("entry", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(debit__gt=0, credit=0) | models.Q(debit=0, credit__gt=0)
+                ),
+                name="billing_journal_line_one_side",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("account", "entry"), name="billing_jline_account_idx"),
+        ]
+
+    def __str__(self):
+        side = f"Dr {self.debit}" if self.debit else f"Cr {self.credit}"
+        return f"{self.account}: {side}"
+
+    @property
+    def signed_amount(self):
+        """Debit-positive amount, the usual trial-balance convention."""
+        return self.debit - self.credit
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Posted journal lines cannot be edited.")
+        if not getattr(self, "_service_created", False):
+            raise ValidationError(
+                "Journal lines must be posted through the ledger service."
+            )
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Posted journal lines cannot be deleted.")

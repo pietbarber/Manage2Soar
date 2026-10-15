@@ -1,0 +1,6 @@
+{% if problems %}
+<div class="alert alert-danger" role="alert">
+  <strong>The club books need attention.</strong>
+  <ul class="mb-0">{% for problem in problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
