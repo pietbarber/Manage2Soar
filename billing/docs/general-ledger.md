@@ -143,3 +143,185 @@ These phases are planned but not yet built:
    dashboard.
 3. **Later.** A bills/payables workflow, recurring transactions, reserve funds,
    and bank reconciliation.
+
+## Appendix: Double-Entry Bookkeeping Info
+
+This appendix is for a treasurer who has kept books on a spreadsheet or
+checkbook register but has not used double-entry before. You don't need an
+accounting background to use Club Finances, but the screens make more sense once
+you know the handful of ideas below.
+
+### The one idea
+
+Every transaction is recorded **twice**: once for where the money came from or
+what it was for, and once for where it went. The two records always have the
+same total. A checkbook register (single-entry bookkeeping) records only one
+side ("$450 out of checking"). Double-entry also records the other side
+("...for aircraft maintenance"). That second side is what lets the club answer
+"how much did we spend on aircraft maintenance this year?" without digging
+through bank statements or searching a spreadsheet.
+
+In so doing, the Accounting Equation is balanced:
+
+> **Assets = Liabilities + Equity**
+
+(Many clubs are likely nonprofits. Technically, for nonprofits, **Equity** is
+renamed **Net Assets**. To avoid repeating "assets", this appendix uses
+**Equity**.)
+
+The two sides of each transaction are called **debit** and **credit**. Ignore
+any meaning those words have at your bank. In bookkeeping they only mean
+*left side* and *right side* of the entry. For every entry:
+
+> **total debits = total credits**
+
+The books refuse to save an entry that doesn't balance. If you can't make it
+balance, the usual cause is that you've left out a side of the transaction.
+
+### The five kinds of account
+
+Every account in the chart of accounts is one of five types. The type decides
+which side makes the balance go **up**:
+
+| Type | What it is | Examples | Increases with |
+|---|---|---|---|
+| **Asset** | Things the club has | Checking, savings, cash box, Undeposited Funds, Member Receivables | Debit |
+| **Liability** | Things the club owes | Accounts Payable | Credit |
+| **Equity** | The club's net worth: what's left after liabilities | General Fund, Opening Balance Equity | Credit |
+| **Income** | Money earned | Dues, Tow Revenue, Donations | Credit |
+| **Expense** | Money spent | Field Rent, Fuel, Insurance | Debit |
+
+Debit-normal accounts (assets and expenses) grow on the left. Credit-normal
+accounts (liabilities, equity, income) grow on the right. This is why a
+screen will show "Checking: $3,200" and "Dues: $3,200" as positive numbers even
+though one is debited and the other is credited: the app displays each balance
+in its account's normal direction.
+
+Income and expense are temporary buckets that feed into **Equity**. Income
+raises it, expenses lower it. Over a year, the difference (income minus
+expenses) is the surplus or deficit that lands in the General Fund.
+
+### Worked examples
+
+Each row is one line of a journal entry. These are all things you can do from
+the Club Finances menu.
+
+**Paying a bill: $500 of field rent from checking** (*Record expense*)
+
+| Account | Debit | Credit |
+|---|---:|---:|
+| Field Rent (expense) | 500.00 | |
+| Checking (asset) | | 500.00 |
+
+Expenses went up (debit) and the checking balance went down (credit).
+
+**Receiving a donation: $200 deposited to checking** (*Record income*)
+
+| Account | Debit | Credit |
+|---|---:|---:|
+| Checking (asset) | 200.00 | |
+| Donations (income) | | 200.00 |
+
+**Moving money between accounts: $1,000 from checking to savings** (*Cash transfer*)
+
+| Account | Debit | Credit |
+|---|---:|---:|
+| Savings (asset) | 1,000.00 | |
+| Checking (asset) | | 1,000.00 |
+
+No income or expense is involved; money only changed pockets.
+
+**Receiving a bill you haven't paid yet: $600 of insurance** (*General journal*)
+
+| Account | Debit | Credit |
+|---|---:|---:|
+| Insurance (expense) | 600.00 | |
+| Accounts Payable (liability) | | 600.00 |
+
+The expense is recorded when you incur it. When you later pay the bill,
+debit Accounts Payable and credit Checking. Insurance is not charged a
+second time.
+
+**Setting up the books: opening balances** (the opening entry)
+
+| Account | Debit | Credit |
+|---|---:|---:|
+| Checking (asset) | 5,000.00 | |
+| Savings (asset) | 12,000.00 | |
+| Opening Balance Equity (equity) | | 17,000.00 |
+
+When the books start, the club already has money. The opening entry debits each
+bank account for its starting balance and credits equity for the total, so the
+entry balances. Once the go-live wizard (Roadmap, phase 1) exists, it will post
+this with the General Fund as the balancing figure.
+
+### Member accounts
+
+Member ledgers are a **subledger**: a detailed list behind one control
+account, **Member Receivables** (*receivable* means the club expects to
+receive this money from members). The control account's balance should equal
+the sum of what members owe. This is why the app forbids manual entries to it:
+if you could post to it by hand, it would drift away from the member ledgers.
+(`JournalLine.member` splits the balance per member.)
+
+When a member is charged, the flow works like this:
+
+| Account | Debit | Credit |
+|---|---:|---:|
+| Member Receivables (asset) | 60.00 | |
+| Tow Revenue (income) | | 60.00 |
+
+The club has earned revenue and is owed money. When the member pays, Member
+Receivables is credited and cash (or Undeposited Funds) is debited. Both
+legs are planned for the member-ledger integration (Roadmap, phase 1).
+
+### Mistakes: reverse, don't edit
+
+Journal entries can never be changed or deleted, even by a superuser (the
+database itself rejects it). An auditor can then trust that last year's books
+are the same books they saw last year.
+
+To fix a mistake, **reverse** the entry from its detail page. This posts a new
+entry with every debit and credit swapped, and links the two. Then post the
+correct entry. Both the mistake and the correction stay visible in the history,
+which is the point. A reversal needs a date and a reason, and should be dated
+in the period you're correcting if that period is still open.
+
+### Habits that keep the books clean
+
+- **Record the transaction when it happens**, with the date it happened, not
+  the date you got around to entering it. The books refuse future dates and
+  dates in closed billing periods.
+- **Use the memo, payee and reference fields.** Put the check number or invoice
+  number in the reference. A future treasurer, or an auditor, will thank you.
+- **Pick the most specific account.** If nothing fits, add an account (*Chart
+  of accounts → New*) rather than using a catch-all. Rename accounts freely; the
+  type is locked once an account has entries, so choose it carefully.
+- **Don't delete accounts you've stopped using; deactivate them.** History
+  stays intact and the account stops appearing in new entries.
+- **Compare the books to the bank statement every month.** The bank's ending
+  balance should equal the ledger balance for that account on the same date,
+  after allowing for checks or deposits still in transit. Differences are
+  usually a missed transaction, a typo, or a bank fee. Automated reconciliation
+  is on the roadmap; until then, use the account register and compare line by
+  line.
+- **Run `verify_books` after any unusual work.** It checks that every entry
+  balances and that member postings and control accounts are consistent. A clean
+  run exits zero.
+
+### Glossary
+
+| Term | Meaning |
+|---|---|
+| Chart of accounts | The list of all accounts the club uses. |
+| Journal entry | One transaction: a date, a description, and balanced lines. |
+| Line | One debit or credit to a single account within an entry. |
+| General journal | The free-form entry screen, for anything the simple forms don't cover. |
+| Register | One account's lines in date order with a running balance (like a checkbook register). |
+| Trial balance | Every account's balance listed together; total debits must equal total credits. |
+| Control account / subledger | A summary account (Member Receivables) backed by a detailed list (the member ledgers). |
+| Contra account | An account that offsets another, with the opposite normal balance. |
+| Accrual | Recording income or expense when it is earned or incurred, not when cash moves. |
+| General Fund | The club's accumulated net worth: the equity account where each year's surplus or deficit ends up. |
+| Opening Balance Equity | A temporary equity account that balances the opening entry. |
+| Undeposited Funds | Payments received but not yet deposited at the bank. |
