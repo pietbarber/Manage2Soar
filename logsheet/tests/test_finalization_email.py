@@ -475,6 +475,7 @@ class TestSendFinalizationSummaryEmail:
             operations_summary="<p>Great flying day.</p>",
         )
 
+    @override_settings(EMAIL_DEV_MODE=False)
     @patch("logsheet.utils.finalization_email.send_mail")
     def test_email_sent_to_active_members(self, mock_send):
         Member.objects.create_user(
@@ -500,6 +501,35 @@ class TestSendFinalizationSummaryEmail:
         called_addresses = {r[0] for r in all_recipients}
         assert "do@example.com" in called_addresses
         assert "member2@example.com" in called_addresses
+
+    @override_settings(
+        EMAIL_DEV_MODE=True,
+        EMAIL_DEV_MODE_REDIRECT_TO=(
+            "dev1@example.com,dev2@example.com,dev3@example.com,dev4@example.com"
+        ),
+    )
+    @patch("utils.email.django_send_mail")
+    def test_dev_mode_batches_individual_member_recipients(self, mock_send):
+        Member.objects.create_user(
+            username="active2",
+            password="testpassword",
+            membership_status="Full Member",
+            is_active=True,
+            email="member2@example.com",
+        )
+
+        send_finalization_summary_email(self.logsheet)
+
+        mock_send.assert_called_once()
+        send_kwargs = mock_send.call_args.kwargs
+        assert send_kwargs["recipient_list"] == [
+            "dev1@example.com",
+            "dev2@example.com",
+            "dev3@example.com",
+            "dev4@example.com",
+        ]
+        assert "do@example.com" in send_kwargs["subject"]
+        assert "member2@example.com" in send_kwargs["subject"]
 
     @patch("logsheet.utils.finalization_email.send_mail")
     def test_email_uses_members_mailing_list_when_configured(self, mock_send):
@@ -573,6 +603,7 @@ class TestSendFinalizationSummaryEmail:
         recipient_list = mock_send.call_args.kwargs.get("recipient_list", [])
         assert recipient_list == ["members@demo.manage2soar.com"]
 
+    @override_settings(EMAIL_DEV_MODE=False)
     @patch("logsheet.utils.finalization_email.send_mail")
     def test_falls_back_to_individual_delivery_when_domain_invalid(self, mock_send):
         Member.objects.create_user(
@@ -614,6 +645,7 @@ class TestSendFinalizationSummaryEmail:
         assert "do@example.com" in recipients
         assert "member6@example.com" in recipients
 
+    @override_settings(EMAIL_DEV_MODE=False)
     @patch("logsheet.utils.finalization_email.send_mail")
     def test_email_excludes_inactive_membership_status(self, mock_send):
         Member.objects.create_user(

@@ -33,7 +33,7 @@ from logsheet.models import FinalizationEmailOutbox
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import MailingList, SiteConfiguration
-from utils.email import send_mail
+from utils.email import get_dev_mode_info, send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
@@ -711,22 +711,27 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
             "logsheet/emails/logsheet_summary_email.txt", context
         )
 
+        dev_mode, _ = get_dev_mode_info()
+        recipient_batches = (
+            [recipients] if dev_mode else [[recipient] for recipient in recipients]
+        )
+        if dev_mode:
+            delivery_mode = f"{delivery_mode}-dev-mode-batch"
+
         sent_count = 0
         failure_count = 0
-        # Open a single SMTP connection for all sends.
-        # For mailing-list mode there is one send; for fallback mode this
-        # retains efficient reuse across many individual sends.
+        # Open one SMTP connection for the batch or individual member sends.
         with get_connection() as connection:
-            for recipient in recipients:
+            for recipient_list in recipient_batches:
                 # Individual mode sends one-per-member so addresses are not
-                # disclosed to each other via To:. Mailing-list mode has a
-                # single recipient alias.
+                # disclosed to each other via To:. In dev mode, send one
+                # redirected copy with all original recipients in its subject.
                 try:
                     send_mail(
                         subject=subject,
                         message=text_message,
                         from_email=from_email,
-                        recipient_list=[recipient],
+                        recipient_list=recipient_list,
                         html_message=html_message,
                         connection=connection,
                     )
@@ -734,12 +739,14 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
                 except Exception:
                     failure_count += 1
                     logger.exception(
-                        "Failed to send finalization summary email for logsheet %s to %s.",
+                        "Failed to send finalization summary email for logsheet %s "
+                        "to %d original recipient(s).",
                         logsheet.pk,
-                        recipient,
+                        len(recipient_list),
                     )
         logger.info(
-            "Finalization summary email for logsheet %s: mode=%s sent to %d recipient(s), %d failure(s).",
+            "Finalization summary email for logsheet %s: mode=%s sent %d email(s), "
+            "%d failure(s).",
             logsheet.pk,
             delivery_mode,
             sent_count,
@@ -747,7 +754,7 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
         )
         if raise_on_failure and failure_count > 0:
             raise FinalizationEmailDeliveryError(
-                f"Failed to deliver {failure_count} recipient email(s) for logsheet {logsheet.pk}."
+                f"Failed to send {failure_count} email(s) for logsheet {logsheet.pk}."
             )
         return (sent_count, failure_count)
     except Exception:
