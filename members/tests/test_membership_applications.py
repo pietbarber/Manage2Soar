@@ -157,6 +157,35 @@ class MembershipApplicationModelTests:
         assert app.status == "approved"
         assert app.member_account == member
 
+    def test_approve_application_allows_existing_member_email(self):
+        """Approving an application may create another account sharing an email."""
+        Member.objects.create_user(
+            username="existing_shared_email",
+            email="shared@example.com",
+        )
+        app = MembershipApplication.objects.create(
+            first_name="Jane",
+            last_name="Doe",
+            email="shared@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Alex Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn to fly gliders",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        member = app.approve_application()
+
+        assert member.email == "shared@example.com"
+        assert Member.objects.filter(email__iexact="shared@example.com").count() == 2
+
     def test_add_to_waitlist(self):
         """Test adding an application to the waitlist."""
         app = MembershipApplication.objects.create(
@@ -1360,6 +1389,18 @@ def test_empty_emergency_contact_is_valid():
     form = MembershipApplicationForm(data=_valid_application_form_data())
 
     assert form.is_valid()
+
+
+@pytest.mark.django_db
+def test_membership_application_accepts_an_existing_member_email():
+    Member.objects.create_user(
+        username="existing_application_email",
+        email="john@example.com",
+    )
+
+    form = MembershipApplicationForm(data=_valid_application_form_data())
+
+    assert form.is_valid(), form.errors
 
 
 @pytest.mark.django_db

@@ -211,6 +211,7 @@ Values that do not fit the controlled choices are retained in
 ### `Member`
 - Extends Django's `AbstractUser`.
 - Stores all member profile data, authentication info, and group/role logic.
+- Email addresses are not unique; multiple member accounts may share an address, while usernames identify individual accounts.
 - Methods for profile image, display name, group syncing, and status.
 - Includes `home_club` field for visiting pilots from other soaring clubs.
 - Stores per-field email, phone, and address visibility preferences in `contact_visibility`.

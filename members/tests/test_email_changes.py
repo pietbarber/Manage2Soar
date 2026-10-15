@@ -3,7 +3,6 @@ from datetime import timedelta
 import pytest
 from django.conf import settings
 from django.core import signing
-from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -485,7 +484,7 @@ def test_email_confirmation_rejects_consumed_token_after_address_is_requested_ag
 
 
 @pytest.mark.django_db
-def test_email_change_request_rejects_an_email_used_by_another_member(
+def test_email_change_request_allows_an_email_used_by_another_member(
     client, mailoutbox
 ):
     configure_email_changes()
@@ -506,14 +505,14 @@ def test_email_change_request_rejects_an_email_used_by_another_member(
     )
 
     assert response.status_code == 302
-    assert response.url == reverse("members:member_view", args=[member.pk])
+    assert response.url == reverse("members:email_change_requested")
     member.refresh_from_db()
-    assert member.pending_email == ""
-    assert not mailoutbox
+    assert member.pending_email == existing.email
+    assert mailoutbox[0].to == [existing.email]
 
 
 @pytest.mark.django_db
-def test_member_email_constraint_is_case_insensitive():
+def test_members_can_share_email_addresses_case_insensitively():
     configure_email_changes()
     Member.objects.create_user(
         username="case_email_existing",
@@ -521,16 +520,19 @@ def test_member_email_constraint_is_case_insensitive():
         membership_status="Email Active",
     )
 
-    with pytest.raises(IntegrityError):
-        Member.objects.create_user(
-            username="case_email_duplicate",
-            email="caseemail@EXAMPLE.com",
-            membership_status="Email Active",
-        )
+    Member.objects.create_user(
+        username="case_email_duplicate",
+        email="caseemail@EXAMPLE.com",
+        membership_status="Email Active",
+    )
+
+    assert Member.objects.filter(email__iexact="caseemail@example.com").count() == 2
 
 
 @pytest.mark.django_db
-def test_email_confirmation_rejects_race_with_existing_member(mailoutbox):
+def test_email_confirmation_allows_an_address_used_by_another_member(
+    mailoutbox, django_capture_on_commit_callbacks
+):
     configure_email_changes()
     existing = Member.objects.create_user(
         username="existing_confirmed_email",
@@ -546,14 +548,15 @@ def test_email_confirmation_rejects_race_with_existing_member(mailoutbox):
     member.save(update_fields=["pending_email"])
     token = make_email_token(member, member.pending_email)
 
-    response = Client().post(reverse("members:confirm_email_change", args=[token]))
+    with django_capture_on_commit_callbacks(execute=True):
+        response = Client().post(reverse("members:confirm_email_change", args=[token]))
 
     assert response.status_code == 302
     assert response.url == reverse("members:member_view", args=[member.pk])
     member.refresh_from_db()
-    assert member.email == "old@example.com"
-    assert member.pending_email == "shared@example.com"
-    assert not mailoutbox
+    assert member.email == existing.email
+    assert member.pending_email == ""
+    assert mailoutbox[0].to == ["old@example.com"]
 
 
 @pytest.mark.django_db

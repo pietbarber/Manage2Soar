@@ -367,18 +367,9 @@ class MembershipApplicationForm(forms.ModelForm):
         self.fields["pilot_certificate_number"].required = False
 
     def clean_email(self):
-        """Validate email and ensure it's not already in use."""
+        """Validate email and prevent duplicate pending applications."""
         email = self.cleaned_data.get("email")
         if email:
-            # Check if email is already used by an existing member
-            from members.models import Member
-
-            if Member.objects.filter(email__iexact=email).exists():
-                raise ValidationError(
-                    "This email address is already registered. If you already have an account, "
-                    "please log in instead of submitting a new application."
-                )
-
             # Check if there's already a pending application with this email
             existing_app = MembershipApplication.objects.filter(
                 email__iexact=email,

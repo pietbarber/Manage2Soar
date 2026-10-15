@@ -452,7 +452,7 @@ class MembershipApplication(models.Model):
                 break
             except IntegrityError:
                 # Only retry if this was a username race.  Any other constraint
-                # violation (e.g. duplicate email) should propagate immediately.
+                # violation should propagate immediately.
                 if not Member.objects.filter(username=candidate_username).exists():
                     raise
                 if _attempt == MAX_USERNAME_RETRIES - 1:

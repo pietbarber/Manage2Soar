@@ -163,7 +163,7 @@ erDiagram
     Member {
         int id PK
         string username UK
-        string email UK
+        string email
         string first_name
         string last_name
         string nickname
@@ -198,6 +198,9 @@ erDiagram
     Member ||--o{ MemberBadge : earns
     Badge ||--o{ MemberBadge : awarded
 ```
+
+Member usernames are unique account identifiers, but email addresses may be
+shared by multiple member accounts.
 
 ## Key Integration Points
 
