@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Chart of Accounts{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  {% with heading="Chart of Accounts" %}{% include "billing/books/_header.html" %}{% endwith %}
+  {% include "billing/books/_problems.html" %}
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <p class="text-muted mb-0">
+      {% if start_date %}Books start {{ start_date|date:"Y-m-d" }}.{% else %}No books start date is set yet.{% endif %}
+      Balances are shown in each account's normal direction.
+    </p>
+    <a class="btn btn-sm btn-outline-primary" href="{% url 'billing:account_create' %}"><i class="bi bi-plus-lg me-1"></i>Add account</a>
+  </div>
+
+  {% for group in groups %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-transparent d-flex justify-content-between">
+      <h2 class="h6 mb-0">{{ group.label }}</h2>
+      <span class="fw-semibold">${{ group.total|floatformat:"2g" }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <tbody>
+          {% for row in group.rows %}
+          <tr{% if not row.account.is_active %} class="text-muted"{% endif %}>
+            <td class="text-start">
+              <span class="text-muted me-2">{{ row.account.code }}</span><a href="{% url 'billing:account_register' row.account.pk %}">{{ row.account.name }}</a>
+              {% if row.account.is_cash %}<span class="badge text-bg-success ms-1">Cash</span>{% endif %}
+              {% if row.account.system_role %}<span class="badge text-bg-secondary ms-1" title="Used automatically by the books">{{ row.account.get_system_role_display }}</span>{% endif %}
+              {% if not row.account.is_active %}<span class="badge text-bg-light ms-1">Inactive</span>{% endif %}
+            </td>
+            <td class="text-end text-nowrap" style="width: 8rem">${{ row.balance|floatformat:"2g" }}</td>
+            <td class="text-end" style="width: 3rem"><a class="btn btn-sm btn-link" href="{% url 'billing:account_edit' row.account.pk %}" aria-label="Edit {{ row.account.name }}"><i class="bi bi-pencil"></i></a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-start text-muted">No {{ group.label|lower }} accounts.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

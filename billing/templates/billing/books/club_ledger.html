@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}Club Ledger{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  {% with heading="Club Ledger" %}{% include "billing/books/_header.html" %}{% endwith %}
+  {% include "billing/books/_problems.html" %}
+
+  <div class="row g-3 mb-4">
+    {% for row in cash_rows %}
+    <div class="col-sm-6 col-lg-3">
+      <a class="card border-0 shadow-sm h-100 text-decoration-none text-body" href="{% url 'billing:account_register' row.account.pk %}">
+        <div class="card-body">
+          <div class="text-muted small">{{ row.account.name }}</div>
+          <div class="h4 mb-0 {% if row.balance < 0 %}text-danger{% endif %}">${{ row.balance|floatformat:"2g" }}</div>
+        </div>
+      </a>
+    </div>
+    {% empty %}
+    <div class="col-12">
+      <div class="alert alert-info mb-0">
+        No bank or cash accounts yet. <a href="{% url 'billing:account_create' %}">Add one</a> to start recording deposits and payments.
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1" for="{{ form.start.id_for_label }}">From</label>
+      {{ form.start|add_class:"form-control form-control-sm" }}
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1" for="{{ form.end.id_for_label }}">To</label>
+      {{ form.end|add_class:"form-control form-control-sm" }}
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label small mb-1" for="{{ form.account.id_for_label }}">Account</label>
+      {{ form.account|add_class:"form-select form-select-sm" }}
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1" for="{{ form.source.id_for_label }}">Source</label>
+      {{ form.source|add_class:"form-select form-select-sm" }}
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1" for="{{ form.q.id_for_label }}">Search</label>
+      {{ form.q|add_class:"form-control form-control-sm"|attr:"placeholder:Description, payee, ref" }}
+    </div>
+    <div class="col-12 d-flex gap-2">
+      <button class="btn btn-sm btn-outline-primary" type="submit">Filter</button>
+      <a class="btn btn-sm btn-link" href="{% url 'billing:club_ledger' %}">Clear</a>
+      <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'billing:club_ledger_csv' %}{% if querystring %}?{{ querystring }}{% endif %}"><i class="bi bi-download me-1"></i>CSV</a>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th class="text-start" scope="col">Date</th>
+          <th class="text-start" scope="col">Description</th>
+          <th class="text-start" scope="col">Account</th>
+          <th scope="col" class="text-end">Debit</th>
+          <th scope="col" class="text-end">Credit</th>
+        </tr>
+      </thead>
+      {% for entry in page %}
+      <tbody class="border-top">
+        {% for line in entry.lines.all %}
+        <tr{% if entry.source == "reversal" or entry.reversal %} class="text-muted"{% endif %}>
+          {% if forloop.first %}
+          <td rowspan="{{ entry.lines.all|length }}" class="text-start text-nowrap align-top">{{ entry.date|date:"Y-m-d" }}</td>
+          <td rowspan="{{ entry.lines.all|length }}" class="text-start align-top">
+            <a href="{% url 'billing:journal_detail' entry.pk %}">{{ entry.memo }}</a>
+            <div class="small text-muted">
+              #{{ entry.pk }} · {{ entry.get_source_display }}{% if entry.payee %} · {{ entry.payee }}{% endif %}{% if entry.reference %} · Ref {{ entry.reference }}{% endif %}
+            </div>
+          </td>
+          {% endif %}
+          <td class="text-start {% if line.credit %}ps-4{% endif %}">
+            <a class="text-reset" href="{% url 'billing:account_register' line.account.pk %}">{{ line.account.name }}</a>{% if line.member %} <span class="small text-muted">({{ line.member.get_full_name|default:line.member.username }})</span>{% endif %}
+          </td>
+          <td class="text-end">{% if line.debit %}${{ line.debit|floatformat:"2g" }}{% endif %}</td>
+          <td class="text-end">{% if line.credit %}${{ line.credit|floatformat:"2g" }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% empty %}
+      <tbody><tr><td colspan="5" class="text-start text-muted">No journal entries match.</td></tr></tbody>
+      {% endfor %}
+    </table>
+  </div>
+
+  {% if page.paginator.num_pages > 1 %}
+  <nav aria-label="Club ledger pages">
+    <ul class="pagination pagination-sm">
+      {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page.previous_page_number }}">Newer</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page.number }} of {{ page.paginator.num_pages }}</span></li>
+      {% if page.has_next %}<li class="page-item"><a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page.next_page_number }}">Older</a></li>{% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

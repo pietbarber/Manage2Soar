@@ -1,17 +1,15 @@
 import csv
 from datetime import date
-from functools import wraps
 
 from django.contrib import messages
-from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import ValidationError
 from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from billing.decorators import billing_app_required
+from billing.decorators import billing_app_required, treasurer_required
 from billing.forms import (
     GuestRemittanceForm,
     ManualEntryForm,
@@ -33,18 +31,6 @@ from billing.services import (
 )
 from members.models import Member
 from utils.csv import sanitize_csv_cell
-
-
-def treasurer_required(view_func):
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect_to_login(request.get_full_path())
-        if not (request.user.is_superuser or request.user.treasurer):
-            return HttpResponseForbidden("Treasurer access is required.")
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
 
 
 @billing_app_required

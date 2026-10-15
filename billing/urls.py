@@ -1,6 +1,6 @@
 from django.urls import path
 
-from billing import views
+from billing import ledger_views, views
 
 app_name = "billing"
 
@@ -29,5 +29,39 @@ urlpatterns = [
         "entries/<int:entry_id>/remit/",
         views.remit_guest_payment_entry,
         name="guest_payment_remit",
+    ),
+    # Club books (double-entry general ledger) under the Club Finances menu.
+    path("books/", ledger_views.club_ledger, name="club_ledger"),
+    path("books/export/", ledger_views.club_ledger_csv, name="club_ledger_csv"),
+    path("books/accounts/", ledger_views.chart_of_accounts, name="chart_of_accounts"),
+    path("books/accounts/new/", ledger_views.account_edit, name="account_create"),
+    path(
+        "books/accounts/<int:account_id>/",
+        ledger_views.account_register_view,
+        name="account_register",
+    ),
+    path(
+        "books/accounts/<int:account_id>/export/",
+        ledger_views.account_register_csv,
+        name="account_register_csv",
+    ),
+    path(
+        "books/accounts/<int:account_id>/edit/",
+        ledger_views.account_edit,
+        name="account_edit",
+    ),
+    path("books/expense/", ledger_views.record_expense, name="record_expense"),
+    path("books/income/", ledger_views.record_income, name="record_income"),
+    path("books/transfer/", ledger_views.cash_transfer, name="cash_transfer"),
+    path("books/journal/", ledger_views.general_journal, name="general_journal"),
+    path(
+        "books/entries/<int:entry_id>/",
+        ledger_views.journal_detail,
+        name="journal_detail",
+    ),
+    path(
+        "books/entries/<int:entry_id>/reverse/",
+        ledger_views.journal_reverse,
+        name="journal_reverse",
     ),
 ]

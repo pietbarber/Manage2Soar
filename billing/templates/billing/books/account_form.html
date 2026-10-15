@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}{% if account %}Edit {{ account.name }}{% else %}Add account{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 640px">
+  <a href="{% url 'billing:chart_of_accounts' %}" class="btn btn-link ps-0 text-decoration-none">&larr; Chart of Accounts</a>
+  <h1 class="h3 mb-3">{% if account %}Edit {{ account }}{% else %}Add account{% endif %}</h1>
+  {% if account.system_role %}
+  <div class="alert alert-secondary small">This account is the books' <strong>{{ account.get_system_role_display }}</strong> account. You can rename or renumber it, but not deactivate it or change its type.</div>
+  {% endif %}
+  <form method="post" class="card border-0 shadow-sm">
+    <div class="card-body">
+      {% csrf_token %}
+      {% include "billing/books/_form_errors.html" %}
+      {% for field in form %}{% include "billing/books/_field.html" %}{% endfor %}
+      <button class="btn btn-primary" type="submit">Save account</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

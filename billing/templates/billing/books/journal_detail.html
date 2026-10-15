@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}Journal entry #{{ entry.pk }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 900px">
+  {% include "billing/books/_header.html" %}
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <h2 class="h5">{{ entry.memo }}</h2>
+      <dl class="row small mb-0">
+        <dt class="col-sm-3">Date</dt><dd class="col-sm-9">{{ entry.date|date:"Y-m-d" }}</dd>
+        <dt class="col-sm-3">Source</dt><dd class="col-sm-9">{{ entry.get_source_display }}</dd>
+        {% if entry.payee %}<dt class="col-sm-3">Payee</dt><dd class="col-sm-9">{{ entry.payee }}</dd>{% endif %}
+        {% if entry.reference %}<dt class="col-sm-3">Reference</dt><dd class="col-sm-9">{{ entry.reference }}</dd>{% endif %}
+        {% if entry.member_entry %}<dt class="col-sm-3">Member ledger</dt><dd class="col-sm-9"><a href="{% url 'billing:ledger_detail' entry.member_entry.ledger.member_id %}">{{ entry.member_entry.ledger.member }}</a></dd>{% endif %}
+        {% if entry.internal_note %}<dt class="col-sm-3">Internal note</dt><dd class="col-sm-9">{{ entry.internal_note|linebreaksbr }}</dd>{% endif %}
+        <dt class="col-sm-3">Posted by</dt><dd class="col-sm-9">{{ entry.created_by.get_full_name|default:entry.created_by.username }} on {{ entry.created_at|date:"Y-m-d H:i" }}</dd>
+        {% if entry.reverses %}<dt class="col-sm-3">Reverses</dt><dd class="col-sm-9"><a href="{% url 'billing:journal_detail' entry.reverses.pk %}">#{{ entry.reverses.pk }} {{ entry.reverses.memo }}</a></dd>{% endif %}
+        {% if reversal %}<dt class="col-sm-3">Reversed by</dt><dd class="col-sm-9"><a href="{% url 'billing:journal_detail' reversal.pk %}">#{{ reversal.pk }}</a> on {{ reversal.date|date:"Y-m-d" }}</dd>{% endif %}
+      </dl>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead><tr><th class="text-start" scope="col">Account</th><th class="text-start" scope="col">Memo</th><th scope="col" class="text-end">Debit</th><th scope="col" class="text-end">Credit</th></tr></thead>
+      <tbody>
+        {% for line in lines %}
+        <tr>
+          <td class="text-start {% if line.credit %}ps-4{% endif %}"><a class="text-reset" href="{% url 'billing:account_register' line.account.pk %}">{{ line.account }}</a>{% if line.member %} <span class="small text-muted">({{ line.member.get_full_name|default:line.member.username }})</span>{% endif %}</td>
+          <td class="text-start small">{{ line.memo }}</td>
+          <td class="text-end">{% if line.debit %}${{ line.debit|floatformat:"2g" }}{% endif %}</td>
+          <td class="text-end">{% if line.credit %}${{ line.credit|floatformat:"2g" }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if can_reverse %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <h2 class="h6">Reverse this entry</h2>
+      <p class="small text-muted">Posted entries can't be edited. A reversal posts the mirror image, so the original and its reversal cancel out. Then record the corrected entry.</p>
+      <form method="post" action="{% url 'billing:journal_reverse' entry.pk %}" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <div class="col-md-3">
+          <label class="form-label small" for="{{ reverse_form.date.id_for_label }}">Reversal date</label>
+          {{ reverse_form.date|add_class:"form-control form-control-sm" }}
+        </div>
+        <div class="col-md-7">
+          <label class="form-label small" for="{{ reverse_form.reason.id_for_label }}">Reason</label>
+          {{ reverse_form.reason|add_class:"form-control form-control-sm"|attr:"rows:1" }}
+        </div>
+        <div class="col-md-2"><button class="btn btn-sm btn-outline-danger w-100" type="submit">Reverse</button></div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
