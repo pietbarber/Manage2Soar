@@ -470,27 +470,32 @@ def request_email_change(request):
         messages.error(request, "Enter a valid email address.")
         return redirect("members:member_view", member_id=request.user.pk)
 
-    if new_email == request.user.email.lower():
-        messages.info(request, "That is already your current email address.")
-        return redirect("members:member_view", member_id=request.user.pk)
+    with transaction.atomic():
+        member = Member.objects.select_for_update().get(pk=request.user.pk)
+        if get_member_profile_field_policy("email") != "direct":
+            return render(request, "403.html", status=403)
+        if new_email == member.email.lower():
+            messages.info(request, "That is already your current email address.")
+            return redirect("members:member_view", member_id=member.pk)
 
-    requested_at = timezone.now()
-    previous_requested_at = request.user.pending_email_requested_at
-    if previous_requested_at and requested_at <= previous_requested_at:
-        requested_at = previous_requested_at + timedelta(microseconds=1)
-    request.user.pending_email = new_email
-    request.user.pending_email_requested_at = requested_at
-    request.user.save(update_fields=["pending_email", "pending_email_requested_at"])
-    token = signing.dumps(
-        {
-            "member_id": request.user.pk,
-            "email": new_email,
-            "requested_at": requested_at.isoformat(),
-            "current_email": request.user.email,
-            "password_fingerprint": _email_change_password_fingerprint(request.user),
-        },
-        salt="members.email-change",
-    )
+        requested_at = timezone.now()
+        previous_requested_at = member.pending_email_requested_at
+        if previous_requested_at and requested_at <= previous_requested_at:
+            requested_at = previous_requested_at + timedelta(microseconds=1)
+        member.pending_email = new_email
+        member.pending_email_requested_at = requested_at
+        member.save(update_fields=["pending_email", "pending_email_requested_at"])
+        current_email = member.email
+        token = signing.dumps(
+            {
+                "member_id": member.pk,
+                "email": new_email,
+                "requested_at": requested_at.isoformat(),
+                "current_email": current_email,
+                "password_fingerprint": _email_change_password_fingerprint(member),
+            },
+            salt="members.email-change",
+        )
     confirmation_url = build_absolute_url(
         reverse("members:confirm_email_change", args=[token])
     )
@@ -517,7 +522,7 @@ def request_email_change(request):
             "members/emails/email_change_security_notice.txt", context
         ),
         from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
-        to=[request.user.email],
+        to=[current_email],
     )
     security_message.attach_alternative(
         render_to_string("members/emails/email_change_security_notice.html", context),

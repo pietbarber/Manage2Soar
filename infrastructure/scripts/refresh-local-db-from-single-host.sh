@@ -261,8 +261,11 @@ fi
 
 if "$KEEP_LOCAL_BACKUP"; then
   LOCAL_BACKUP_PATH="${SNAPSHOT_DIR}/${LOCAL_DB}-before-refresh-${TIMESTAMP}.pgdump"
-  if psql --username="$LOCAL_DB_OWNER" --dbname=postgres --tuples-only --no-align \
-    --command="SELECT 1 FROM pg_database WHERE datname = '${LOCAL_DB}'" | grep -qx 1; then
+  local_database_exists="$(
+    psql --username="$LOCAL_DB_OWNER" --dbname=postgres --tuples-only --no-align \
+      --command="SELECT 1 FROM pg_database WHERE datname = '${LOCAL_DB}'"
+  )" || die "Could not check whether local database ${LOCAL_DB} exists; refusing to continue."
+  if [[ "$local_database_exists" == "1" ]]; then
     printf 'Saving current local database to %s...\n' "$LOCAL_BACKUP_PATH"
     pg_dump --username="$LOCAL_DB_OWNER" --format=custom --file="$LOCAL_BACKUP_PATH" "$LOCAL_DB"
   else

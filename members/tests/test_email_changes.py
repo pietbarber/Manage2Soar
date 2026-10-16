@@ -1,10 +1,13 @@
+import re
 from datetime import timedelta
 
 import pytest
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.contrib.sessions.middleware import SessionMiddleware
 from django.core import signing
-from django.test import Client
+from django.test import Client, RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes
@@ -14,7 +17,7 @@ from social_core.pipeline.user import user_details
 from members.admin import CustomMemberChangeForm
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
-from members.views import _email_change_password_fingerprint
+from members.views import _email_change_password_fingerprint, request_email_change
 from siteconfig.models import (
     MembershipStatus,
     SiteConfiguration,
@@ -138,6 +141,45 @@ def test_email_change_request_stores_pending_email_and_sends_confirmation(
     assert mailoutbox[1].to == ["old@example.com"]
     assert mailoutbox[1].alternatives[0][1] == "text/html"
     assert b"Security Notice" in mailoutbox[1].alternatives[0][0].encode()
+
+
+@pytest.mark.django_db
+def test_email_change_request_uses_locked_member_state(
+    mailoutbox, django_capture_on_commit_callbacks
+):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_request_stale_state",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    stale_member = Member.objects.get(pk=member.pk)
+    member.email = "confirmed@example.com"
+    member.save(update_fields=["email"])
+
+    request = RequestFactory().post(
+        reverse("members:request_email_change"), {"email": "new@example.com"}
+    )
+    request.user = stale_member
+    SessionMiddleware(lambda req: None).process_request(request)
+    request.session.save()
+    request._messages = FallbackStorage(request)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        response = request_email_change(request)
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.pending_email == "new@example.com"
+    confirmation_token = re.search(
+        r"/members/email/confirm/([A-Za-z0-9_.:-]+)", mailoutbox[0].body
+    ).group(1)
+    token_data = signing.loads(confirmation_token, salt="members.email-change")
+    assert token_data["current_email"] == "confirmed@example.com"
+    assert token_data["password_fingerprint"] == _email_change_password_fingerprint(
+        member
+    )
+    assert mailoutbox[1].to == ["confirmed@example.com"]
 
 
 @pytest.mark.django_db
