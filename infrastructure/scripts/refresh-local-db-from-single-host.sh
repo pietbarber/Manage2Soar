@@ -29,6 +29,9 @@ PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
 ANSIBLE_VAULT_PASSWORD_FILE="${HOME}/.ansible_vault_pass"
 LOCAL_ENV_FILE="${REPO_ROOT}/.env"
 SNAPSHOT_DIR="${SNAPSHOT_DIR:-${REPO_ROOT}/var/prod-snapshots}"
+if [[ "$SNAPSHOT_DIR" != /* ]]; then
+  SNAPSHOT_DIR="${PWD}/${SNAPSHOT_DIR}"
+fi
 ASSUME_YES=false
 KEEP_LOCAL_BACKUP=false
 DRY_RUN=false
@@ -80,7 +83,8 @@ get_env_value() {
 
 ANSIBLE_INVENTORY_ARGS=(--playbook-dir "$ANSIBLE_DIR" -i "$ANSIBLE_INVENTORY" --list --export)
 ANSIBLE_INVENTORY_ARGS+=(--vault-password-file "$ANSIBLE_VAULT_PASSWORD_FILE")
-ANSIBLE_COMMAND_ARGS=(-i "$ANSIBLE_INVENTORY" single_host --vault-password-file "$ANSIBLE_VAULT_PASSWORD_FILE")
+ANSIBLE_COMMAND_ARGS=(--playbook-dir "$ANSIBLE_DIR" -i "$ANSIBLE_INVENTORY" single_host)
+ANSIBLE_COMMAND_ARGS+=(--vault-password-file "$ANSIBLE_VAULT_PASSWORD_FILE")
 
 mapfile -t inventory_values < <(
   cd "$ANSIBLE_DIR"
