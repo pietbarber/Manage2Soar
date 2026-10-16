@@ -2,14 +2,19 @@ from datetime import timedelta
 
 import pytest
 from django.conf import settings
+from django.contrib.auth.tokens import default_token_generator
 from django.core import signing
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from social_core.pipeline.user import user_details
 
+from members.admin import CustomMemberChangeForm
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
+from members.views import _email_change_password_fingerprint
 from siteconfig.models import (
     MembershipStatus,
     SiteConfiguration,
@@ -39,6 +44,8 @@ def make_email_token(member, email):
             "member_id": member.pk,
             "email": email,
             "requested_at": member.pending_email_requested_at.isoformat(),
+            "current_email": member.email,
+            "password_fingerprint": _email_change_password_fingerprint(member),
         },
         salt="members.email-change",
     )
@@ -378,7 +385,7 @@ def test_email_confirmation_post_changes_email(
         response = Client().post(reverse("members:confirm_email_change", args=[token]))
 
     assert response.status_code == 302
-    assert response.url == reverse("members:member_view", args=[member.pk])
+    assert response["Location"] == reverse("members:member_view", args=[member.pk])
     member.refresh_from_db()
     assert member.email == "new@example.com"
     assert member.pending_email == ""
@@ -437,6 +444,83 @@ def test_email_confirmation_rejects_superseded_token_after_address_is_requested_
     assert response.status_code == 302
     member.refresh_from_db()
     assert member.email == "reused@example.com"
+
+
+@pytest.mark.django_db
+def test_password_reset_invalidates_pending_email_confirmation(client):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_reset_password",
+        email="old@example.com",
+        password="old-password-123",
+        membership_status="Email Active",
+    )
+    token = set_pending_email(member, "pending@example.com")
+
+    uid = urlsafe_base64_encode(force_bytes(member.pk))
+    reset_token = default_token_generator.make_token(member)
+    reset_url = reverse(
+        "password_reset_confirm", kwargs={"uidb64": uid, "token": reset_token}
+    )
+    reset_response = client.get(reset_url, follow=True)
+    assert reset_response.status_code == 200
+    password_form_url = reset_response.redirect_chain[-1][0]
+
+    response = client.post(
+        password_form_url,
+        {
+            "new_password1": "A-new-strong-password-123!",
+            "new_password2": "A-new-strong-password-123!",
+        },
+    )
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.check_password("A-new-strong-password-123!")
+    assert (
+        client.post(reverse("members:confirm_email_change", args=[token])).status_code
+        == 403
+    )
+    member.refresh_from_db()
+    assert member.email == "old@example.com"
+    assert member.pending_email == "pending@example.com"
+
+
+@pytest.mark.django_db
+def test_admin_email_change_invalidates_pending_email_confirmation(client):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_admin_change",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    token = set_pending_email(member, "pending@example.com")
+    form = CustomMemberChangeForm(
+        data={
+            "username": member.username,
+            "email": "admin-updated@example.com",
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+            "membership_status": member.membership_status,
+            "instructor": member.instructor,
+            "towpilot": member.towpilot,
+            "contact_visibility_email": "inherit",
+            "contact_visibility_phone": "inherit",
+            "contact_visibility_address": "inherit",
+        },
+        instance=member,
+    )
+
+    assert form.is_valid(), form.errors
+    form.save()
+
+    assert (
+        client.post(reverse("members:confirm_email_change", args=[token])).status_code
+        == 403
+    )
+    member.refresh_from_db()
+    assert member.email == "admin-updated@example.com"
+    assert member.pending_email == "pending@example.com"
 
 
 @pytest.mark.django_db
@@ -552,7 +636,7 @@ def test_email_confirmation_allows_an_address_used_by_another_member(
         response = Client().post(reverse("members:confirm_email_change", args=[token]))
 
     assert response.status_code == 302
-    assert response.url == reverse("members:member_view", args=[member.pk])
+    assert response["Location"] == reverse("members:member_view", args=[member.pk])
     member.refresh_from_db()
     assert member.email == existing.email
     assert member.pending_email == ""

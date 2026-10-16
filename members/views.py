@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -485,6 +486,8 @@ def request_email_change(request):
             "member_id": request.user.pk,
             "email": new_email,
             "requested_at": requested_at.isoformat(),
+            "current_email": request.user.email,
+            "password_fingerprint": _email_change_password_fingerprint(request.user),
         },
         salt="members.email-change",
     )
@@ -525,12 +528,23 @@ def request_email_change(request):
     return redirect("members:email_change_requested")
 
 
+def _email_change_password_fingerprint(member):
+    return salted_hmac(
+        "members.email-change.password-state",
+        member.password,
+        algorithm="sha256",
+    ).hexdigest()
+
+
 def _email_change_request_matches(member, data):
     requested_at = member.pending_email_requested_at
     return (
         member.pending_email == data.get("email")
         and requested_at is not None
         and requested_at.isoformat() == data.get("requested_at")
+        and member.email == data.get("current_email")
+        and _email_change_password_fingerprint(member)
+        == data.get("password_fingerprint")
     )
 
 
