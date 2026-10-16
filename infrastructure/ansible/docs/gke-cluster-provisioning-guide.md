@@ -119,7 +119,7 @@ gke_machine_type: "e2-medium"
 gke_initial_node_count: 1   # from gke_sizing.yml (Phase 1 of #1042)
 gke_enable_autoscaling: true
 gke_min_nodes: 1
-gke_max_nodes: 3            # from gke_sizing.yml (Phase 1 of #1042)
+gke_max_nodes: 5            # from gke_sizing.yml; restored for workload headroom
 ```
 
 > **Node sizing source of truth:** `gke_initial_node_count`, `gke_min_nodes`, and `gke_max_nodes` are defined in the committed [`gke_sizing.yml`](../gke_sizing.yml) file (next to `playbooks/`), which the playbook imports via play-level `vars_files`. It takes precedence over the gitignored `inventory/gcp_cluster.yml`. Edit `gke_sizing.yml` and open a PR to change node sizing — see [Phase 1 of #1042](https://github.com/pietbarber/Manage2Soar/issues/1042).
@@ -252,7 +252,7 @@ Notes:
 |----------|---------|-------------|
 | `gke_enable_autoscaling` | `true` | Enable node autoscaling |
 | `gke_min_nodes` | `1` (from `gke_sizing.yml`) | Minimum nodes |
-| `gke_max_nodes` | `3` (from `gke_sizing.yml`) | Maximum nodes |
+| `gke_max_nodes` | `5` (from `gke_sizing.yml`) | Maximum nodes |
 | `gke_use_spot_vms` | `false` | Use spot/preemptible VMs |
 
 > Node counts (`gke_initial_node_count`, `gke_min_nodes`, `gke_max_nodes`) are set in [`gke_sizing.yml`](../gke_sizing.yml) — the committed source of truth (Phase 1 of #1042) — which overrides the gitignored inventory.

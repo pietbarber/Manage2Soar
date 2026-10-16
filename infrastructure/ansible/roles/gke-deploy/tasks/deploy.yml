@@ -118,12 +118,59 @@
     - (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int == 0
   tags: [migrations]
 
+- name: Describe migration job when it did not succeed
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - describe
+      - job
+      - "{{ gke_migration_job_name }}"
+      - -n
+      - "{{ gke_namespace }}"
+  delegate_to: localhost
+  run_once: true
+  register: migration_job_description
+  changed_when: false
+  failed_when: false
+  when:
+    - gke_run_migrations | bool
+    - (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int == 0
+  tags: [migrations]
+
+- name: Describe migration pods when the job did not succeed
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - describe
+      - pods
+      - -n
+      - "{{ gke_namespace }}"
+      - -l
+      - "job-name={{ gke_migration_job_name }}"
+  delegate_to: localhost
+  run_once: true
+  register: migration_pod_description
+  changed_when: false
+  failed_when: false
+  when:
+    - gke_run_migrations | bool
+    - (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int == 0
+  tags: [migrations]
+
 - name: Fail deployment when migration job did not succeed
   ansible.builtin.fail:
     msg: |
       The pre-rollout migration job {{ gke_migration_job_name }} did not succeed.
-      Migration output:
-      {{ migration_job_logs.stdout | default('No job logs were available.') }}
+      Migration logs (stdout):
+      {{ migration_job_logs.stdout | default('') | trim | default('No stdout was returned.', true) }}
+      Migration logs (stderr):
+      {{ migration_job_logs.stderr | default('') | trim | default('No stderr was returned.', true) }}
+      Job diagnostics:
+      {{ migration_job_description.stdout | default('') | trim | default('kubectl describe job returned no output.', true) }}
+      {{ migration_job_description.stderr | default('') | trim }}
+      Pod diagnostics:
+      {{ migration_pod_description.stdout | default('') | trim | default('kubectl describe pods returned no output.', true) }}
+      {{ migration_pod_description.stderr | default('') | trim }}
   when:
     - gke_run_migrations | bool
     - (migration_job_status.stdout | from_json).get('status', {}).get('succeeded', 0) | int == 0
