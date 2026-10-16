@@ -754,7 +754,7 @@ def send_finalization_summary_email(logsheet, raise_on_failure=False):
         )
         if raise_on_failure and failure_count > 0:
             raise FinalizationEmailDeliveryError(
-                f"Failed to send {failure_count} email(s) for logsheet {logsheet.pk}."
+                f"Failed to deliver {failure_count} email(s) for logsheet {logsheet.pk}."
             )
         return (sent_count, failure_count)
     except Exception:
