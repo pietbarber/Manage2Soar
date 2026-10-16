@@ -88,11 +88,16 @@ python manage.py import_legacy_syllabus --dir=legacy_syllabus/
 (student, instructor, date) combination:
 
 * one `InstructionReport` with a short pilot-themed instructor essay, and
-* 2–4 `LessonScore` rows that simulate realistic training progression —
-  a student works through the syllabus in `sort_key` order, new lessons
-  start at score `"1"` (Introduced), and previously-flown lessons are bumped
-  to `"2"` (Practiced) and then `"3"` (Solo Standard) as they accumulate
-  repeats.
+* `LessonScore` rows that simulate realistic training progression, tied to
+  the student's first solo flight:
+  * **Before the first solo** — the student works through the syllabus in
+    `sort_key` order (new lessons start at `"1"` and are bumped to `"2"` then
+    `"3"` as they accumulate repeats). The last pre-solo report is finalized
+    so that **every solo-required (`far_requirement`) lesson is at least
+    `"3"`**, i.e. the student reaches **100% solo_progress** by their first
+    solo.
+  * **After the first solo** — dual-flight reports score 2–4 lessons at
+    `"4"` (Checkride Standard), reflecting the post-solo / checkride phase.
 
 **Safety (defense in depth, mirrors `seed_sample_data`):**
 

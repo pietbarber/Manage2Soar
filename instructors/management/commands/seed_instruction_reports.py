@@ -5,10 +5,17 @@ local dev database — identified by ``instructor IS NOT NULL`` — and creates,
 for each unique (student, instructor, date) combination:
 
 - one ``InstructionReport`` with a short pilot-themed instructor essay, and
-- 2–4 ``LessonScore`` rows that simulate realistic training progression:
-  a student works through the syllabus in order, new lessons start at
-  score "1" (Introduced), and previously-flown lessons are bumped to
-  "2" (Practiced) and then "3" (Solo Standard) as they accumulate repeats.
+- ``LessonScore`` rows that simulate realistic training progression, tied to
+  the student's first solo flight:
+  * **Before the first solo** the student works through the syllabus in
+    order — new lessons start at "1" (Introduced) and are bumped to
+    "2" (Practiced) then "3" (Solo Standard) as they accumulate repeats.
+    The last pre-solo report is finalized so that **every solo-required
+    (``far_requirement``) lesson is at least "3"**, i.e. the student reaches
+    **100% solo_progress** by the time they fly their first solo.
+  * **After the first solo** the student's dual-flight reports score 2–4
+    lessons at **"4" (Checkride Standard)**, reflecting the post-solo /
+    checkride phase of training.
 
 Safety (defense in depth, mirrors ``seed_sample_data``):
 - **Dry-run by default**: without ``--run`` the command only prints what it
@@ -162,6 +169,21 @@ def _make_report_text(rnd: random.Random) -> str:
     return "".join(f"<p>{s}</p>" for s in sentences)
 
 
+def _pick_post_solo_lessons(
+    rnd: random.Random, lessons: list, seen_counts: dict
+) -> list:
+    """Pick the 2–4 lessons to score at "4" on a post-first-solo dual flight.
+
+    Prefers lessons the student has already been exposed to (the ones being
+    brought up to checkride standard); falls back to any syllabus lesson if
+    the student has no prior exposures yet.
+    """
+    wanted = 2 + rnd.randint(0, 2)  # 2..4
+    pool = [l for l in lessons if seen_counts.get(l.id, 0) > 0] or list(lessons)
+    take = min(wanted, len(pool))
+    return rnd.sample(pool, take) if take else []
+
+
 class Command(BaseCommand):
     help = (
         "Seed instruction reports + lesson scores for dual training flights "
@@ -305,8 +327,12 @@ class Command(BaseCommand):
                 "(one per student/instructor/date)\n"
             )
             self.stdout.write(
-                "  • 2–4 lesson scores per report, simulating training "
-                "progression (scores 1 → 2 → 3)\n"
+                "  • Pre-solo reports: 1 → 2 → 3, solo-ready (100% of "
+                "solo-required lessons at ≥3) before the first solo\n"
+            )
+            self.stdout.write(
+                "  • Post-solo reports: 2–4 lessons scored at 4 "
+                "(Checkride Standard)\n"
             )
             self.stdout.write(
                 f"  • Pilot-themed instructor essays (3–4 sentences each)\n"
@@ -361,20 +387,47 @@ class Command(BaseCommand):
             total_scores = 0
 
             for student_id, student_sessions in per_student.items():
+                # Find the student's first solo flight (if any) so we can tie
+                # the scoring to their training timeline.
+                first_solo_date = (
+                    Flight.objects.filter(pilot_id=student_id, flight_type="solo")
+                    .order_by("logsheet__log_date")
+                    .values_list("logsheet__log_date", flat=True)
+                    .first()
+                )
+                # Index of the last dual session on-or-before the first solo.
+                # A dual on the solo day is still part of pre-solo training
+                # (it's the training that leads up to the solo), so it is
+                # capped at "3" and carries the solo-readiness pass; only
+                # sessions strictly AFTER the first solo score "4". If the
+                # student never solos, every session is pre-solo and the final
+                # one carries the solo-readiness pass.
+                if first_solo_date is None:
+                    last_pre_solo_index = len(student_sessions) - 1
+                else:
+                    pre = [
+                        i
+                        for i, s in enumerate(student_sessions)
+                        if s["report_date"] <= first_solo_date
+                    ]
+                    last_pre_solo_index = max(pre) if pre else -1
+
                 seen_counts = {}
                 syllabus_cursor = 0
                 student_reports = 0
                 student_scores = 0
                 highest_score_seen = "0"
 
+                def _record(score):
+                    nonlocal total_scores, student_scores, highest_score_seen
+                    student_scores += 1
+                    total_scores += 1
+                    if score > highest_score_seen:
+                        highest_score_seen = score
+
                 for session_index, session in enumerate(student_sessions):
-                    pairs, syllabus_cursor = _plan_lesson_scores(
-                        rnd,
-                        lessons,
-                        student_flight_index=session_index,
-                        seen_counts=seen_counts,
-                        syllabus_cursor=syllabus_cursor,
-                    )
+                    is_solo_ready = session_index == last_pre_solo_index
+                    is_post_solo = session_index > last_pre_solo_index
 
                     # Create the report (get_or_create for idempotency).
                     report, created = InstructionReport.objects.get_or_create(
@@ -386,17 +439,50 @@ class Command(BaseCommand):
                     student_reports += 1
                     total_reports += 1
 
-                    # Create the lesson scores (update_or_create for idempotency).
-                    for lesson, score in pairs:
-                        LessonScore.objects.update_or_create(
-                            report=report,
-                            lesson_id=lesson.id,
-                            defaults={"score": score},
+                    if is_post_solo:
+                        # Post-solo: the student is now in the checkride phase,
+                        # so re-work previously-flown lessons up to "4".
+                        for lesson in _pick_post_solo_lessons(
+                            rnd, lessons, seen_counts
+                        ):
+                            LessonScore.objects.update_or_create(
+                                report=report,
+                                lesson_id=lesson.id,
+                                defaults={"score": "4"},
+                            )
+                            seen_counts[lesson.id] = seen_counts.get(lesson.id, 0) + 1
+                            _record("4")
+                    else:
+                        # Pre-solo (and the solo-ready session): normal
+                        # 1 -> 2 -> 3 progression.
+                        pairs, syllabus_cursor = _plan_lesson_scores(
+                            rnd,
+                            lessons,
+                            student_flight_index=session_index,
+                            seen_counts=seen_counts,
+                            syllabus_cursor=syllabus_cursor,
                         )
-                        student_scores += 1
-                        total_scores += 1
-                        if score > highest_score_seen:
-                            highest_score_seen = score
+                        for lesson, score in pairs:
+                            LessonScore.objects.update_or_create(
+                                report=report,
+                                lesson_id=lesson.id,
+                                defaults={"score": score},
+                            )
+                            _record(score)
+
+                        # Solo-readiness pass on the last pre-solo report:
+                        # bump every solo-required lesson to "3" so the student
+                        # is 100% solo-ready by their first solo flight.
+                        if is_solo_ready:
+                            for lesson in lessons:
+                                if lesson.far_requirement:
+                                    LessonScore.objects.update_or_create(
+                                        report=report,
+                                        lesson_id=lesson.id,
+                                        defaults={"score": "3"},
+                                    )
+                                    if "3" > highest_score_seen:
+                                        highest_score_seen = "3"
 
                 student_stats[student_id] = {
                     "reports": student_reports,
