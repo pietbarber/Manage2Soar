@@ -898,7 +898,7 @@ def set_password(request):
         form = SetPasswordForm(request.POST)
         if form.is_valid():
             member.set_password(form.cleaned_data["new_password1"])
-            member.save()
+            member.save(update_fields=["password"])
             transaction.on_commit(
                 lambda: _send_account_security_email(
                     member.email,
