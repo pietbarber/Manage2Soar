@@ -73,6 +73,34 @@ def test_biography_navigation_requires_direct_policy(client):
 
 
 @pytest.mark.django_db
+def test_superuser_self_biography_link_respects_direct_policy(client):
+    policies = default_member_profile_field_policies()
+    policies["biography"] = "disabled"
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    superuser = Member.objects.create_superuser(
+        username="policy_superuser_biography",
+        email="superuser@example.com",
+        password="pass",
+    )
+    client.force_login(superuser)
+
+    profile_response = client.get(reverse("members:member_view", args=[superuser.pk]))
+    biography_response = client.get(
+        reverse("members:biography_view", args=[superuser.pk])
+    )
+
+    assert profile_response.status_code == 200
+    assert b"Edit Biography" not in profile_response.content
+    assert b"Write Biography" not in profile_response.content
+    assert biography_response.status_code == 403
+
+
+@pytest.mark.django_db
 def test_profile_page_is_self_service_hub_for_direct_controls(client):
     MembershipStatus.objects.create(name="Policy Member", is_active=True)
     clear_active_membership_statuses_cache()

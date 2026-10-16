@@ -1,5 +1,7 @@
 import re
+import smtplib
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -23,6 +25,7 @@ from siteconfig.models import (
     SiteConfiguration,
     default_member_profile_field_policies,
 )
+from utils.email import DevModeEmailMultiAlternatives
 
 
 def configure_email_changes():
@@ -180,6 +183,52 @@ def test_email_change_request_uses_locked_member_state(
         member
     )
     assert mailoutbox[1].to == ["confirmed@example.com"]
+
+
+@pytest.mark.django_db
+def test_email_confirmation_delivery_failure_sends_security_notice_and_reports_error(
+    client, mailoutbox, django_capture_on_commit_callbacks
+):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_delivery_failure",
+        email="old@example.com",
+        membership_status="Email Active",
+    )
+    client.force_login(member)
+    real_send = DevModeEmailMultiAlternatives.send
+
+    def fail_confirmation_send(message, *args, **kwargs):
+        if message.subject.startswith("Confirm your"):
+            raise smtplib.SMTPRecipientsRefused(
+                {"new@example.com": (550, b"Mailbox unavailable")}
+            )
+        return real_send(message, *args, **kwargs)
+
+    with (
+        patch.object(
+            DevModeEmailMultiAlternatives,
+            "send",
+            autospec=True,
+            side_effect=fail_confirmation_send,
+        ),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        response = client.post(
+            reverse("members:request_email_change"), {"email": "new@example.com"}
+        )
+
+    assert response.status_code == 503
+    assert b"Email Change Not Completed" in response.content
+    assert b"couldn't send the confirmation email" in response.content
+    assert b"A confirmation link was sent" not in response.content
+    member.refresh_from_db()
+    assert member.email == "old@example.com"
+    assert member.pending_email == ""
+    assert member.pending_email_requested_at is None
+    assert len(mailoutbox) == 1
+    assert mailoutbox[0].to == ["old@example.com"]
+    assert mailoutbox[0].subject == "Manage2Soar email change requested"
 
 
 @pytest.mark.django_db

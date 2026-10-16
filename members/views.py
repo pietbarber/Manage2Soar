@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+import smtplib
 from datetime import date, timedelta
 
 from django import forms
@@ -415,8 +416,8 @@ def member_view(request, member_id):
         "is_self": is_self,
         # Staff retain the existing management path regardless of a member's
         # self-service policy.
-        "can_edit": request.user.is_superuser
-        or (is_self and biography_policy == "direct"),
+        "can_edit": (is_self and biography_policy == "direct")
+        or (request.user.is_superuser and not is_self),
         "can_change_password": is_self
         and not kiosk_session
         and get_member_profile_field_policy("password", site_config) == "direct",
@@ -515,7 +516,6 @@ def request_email_change(request):
         render_to_string("members/emails/email_change_confirmation.html", context),
         "text/html",
     )
-    confirmation_message.send()
     security_message = DevModeEmailMultiAlternatives(
         subject="Manage2Soar email change requested",
         body=render_to_string(
@@ -529,6 +529,39 @@ def request_email_change(request):
         "text/html",
     )
     transaction.on_commit(lambda: security_message.send(), robust=True)
+
+    confirmation_sent = False
+    confirmation_error = None
+    try:
+        confirmation_sent = bool(confirmation_message.send())
+    except (OSError, smtplib.SMTPException, ValueError) as exc:
+        confirmation_error = exc
+        logger.exception(
+            "Failed to send email-change confirmation to member %s", member.pk
+        )
+    if not confirmation_sent:
+        if confirmation_error is None:
+            logger.error(
+                "Email-change confirmation delivery returned no messages for member %s",
+                member.pk,
+            )
+        with transaction.atomic():
+            locked_member = Member.objects.select_for_update().get(pk=member.pk)
+            if (
+                locked_member.pending_email == new_email
+                and locked_member.pending_email_requested_at == requested_at
+            ):
+                locked_member.pending_email = ""
+                locked_member.pending_email_requested_at = None
+                locked_member.save(
+                    update_fields=["pending_email", "pending_email_requested_at"]
+                )
+        return render(
+            request,
+            "members/email_change_delivery_failed.html",
+            status=503,
+        )
+
     messages.success(request, "A confirmation link was sent to your new email address.")
     return redirect("members:email_change_requested")
 

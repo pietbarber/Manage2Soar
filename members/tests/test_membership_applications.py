@@ -97,6 +97,7 @@ class MembershipApplicationModelTests:
             state="CA",
             zip_code="12345",
             emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
             emergency_contact_phone="555-987-6543",
             agrees_to_terms=True,
             agrees_to_safety_rules=True,

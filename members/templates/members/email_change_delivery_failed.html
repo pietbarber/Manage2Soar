@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Email Change Not Completed{% endblock %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="card shadow-lg p-4" style="max-width: 500px; width: 100%;">
+        <div class="text-center mb-4">
+            <div class="text-danger mb-3" style="font-size: 4rem;" aria-hidden="true">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <h2 class="mb-3">Email Change Not Completed</h2>
+        </div>
+
+        <div class="alert alert-danger" role="alert">
+            We couldn't send the confirmation email, so your email address was not changed.
+            Please try again later.
+        </div>
+
+        <div class="text-center">
+            <a href="{% url 'members:member_view' request.user.pk %}" class="btn btn-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to My Profile
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -72,8 +72,13 @@ class MemberProfilePhotoForm(forms.ModelForm):
                 # Re-raise as validation error so it shows in form
                 raise ValidationError(str(e))
 
-        if commit:
-            instance.save()
+        if commit and self.changed_data:
+            update_fields = ["profile_photo"]
+            if "profile_photo" in self.changed_data and self.cleaned_data.get(
+                "profile_photo"
+            ):
+                update_fields.extend(["profile_photo_medium", "profile_photo_small"])
+            instance.save(update_fields=update_fields)
 
         return instance
 

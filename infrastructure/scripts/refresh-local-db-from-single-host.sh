@@ -232,8 +232,27 @@ import json
 import sys
 
 print(json.dumps({"argv": [
-    "tar", "-C", sys.argv[1], "-czf", sys.argv[2],
-    "profile_photos", "generated_avatars",
+    "python3", "-c", """
+import os
+import stat
+import subprocess
+import sys
+
+root, archive = sys.argv[1:]
+directories = []
+for name in ("profile_photos", "generated_avatars"):
+    try:
+        entry = os.stat(os.path.join(root, name))
+    except FileNotFoundError:
+        continue
+    if not stat.S_ISDIR(entry.st_mode):
+        raise NotADirectoryError(os.path.join(root, name))
+    directories.append(name)
+
+command = ["tar", "-C", root, "-czf", archive]
+command.extend(directories or ["--files-from=/dev/null"])
+subprocess.run(command, check=True)
+""", sys.argv[1], sys.argv[2],
 ]}))
 ' "$REMOTE_MEDIA_ROOT" "$REMOTE_PROFILE_MEDIA_ARCHIVE_PATH")"
   (
