@@ -224,6 +224,11 @@ gcloud container clusters get-credentials CLUSTER_NAME --zone ZONE
 
 ### Deployment Failures
 
+Pre-rollout migration failures include the migration container's stdout and stderr,
+the Kubernetes Job description, and the matching Pod descriptions (including
+events). Use those diagnostics to distinguish a migration exception from image,
+configuration, scheduling, or cluster startup failures.
+
 ```bash
 # Check pod status
 kubectl get pods -n NAMESPACE

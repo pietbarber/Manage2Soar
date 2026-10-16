@@ -36,8 +36,9 @@ gke_initial_node_count: 1
 # Autoscaling window.
 #   gke_enable_autoscaling: kept true (already set in inventory).
 #   gke_min_nodes: unchanged at 1 (single-node floor, spot VMs enabled).
-#   Phase 1 (Issue #1042): gke_max_nodes 5 -> 3. Lower ceiling reduces
-#   idle-capacity cost while still allowing the autoscaler to scale up under
-#   peak load and back down when idle. Revisit the ceiling as workloads grow.
+#   Restore the maximum from 3 to 5 after a pre-rollout migration pod remained
+#   unscheduled for its 900-second deadline because the node pool lacked CPU and
+#   memory and the autoscaler had reached its maximum. The minimum remains 1,
+#   preserving the low idle-capacity baseline.
 gke_min_nodes: 1
-gke_max_nodes: 3
+gke_max_nodes: 5
