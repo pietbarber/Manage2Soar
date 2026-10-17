@@ -23,9 +23,18 @@ MEMBER_PROFILE_POLICY_FIELDS = (
     "contact_visibility",
 )
 
+# Keep the stored shape compatible with older pods during rollout and rollback.
+LEGACY_MEMBER_PROFILE_POLICY_DEFAULTS = {
+    "username": "disabled",
+    "phone": "request",
+    "address": "request",
+    "nickname": "request",
+}
+
 
 def default_member_profile_field_policies():
     return {
+        **LEGACY_MEMBER_PROFILE_POLICY_DEFAULTS,
         "email": "disabled",
         "emergency_contacts": "direct",
         "profile_photo": "direct",
@@ -36,13 +45,18 @@ def default_member_profile_field_policies():
 
 
 def validate_member_profile_field_policies(value):
-    if not isinstance(value, dict) or set(value) != set(MEMBER_PROFILE_POLICY_FIELDS):
+    if not isinstance(value, dict) or set(value) != (
+        set(MEMBER_PROFILE_POLICY_FIELDS) | set(LEGACY_MEMBER_PROFILE_POLICY_DEFAULTS)
+    ):
         raise ValidationError(
             "Profile field policies must define exactly the supported fields."
         )
 
     for field, policy in value.items():
-        if not isinstance(policy, str) or policy not in {"disabled", "direct"}:
+        allowed = {"disabled", "direct"}
+        if field not in {"password", "profile_photo"}:
+            allowed.add("request")
+        if not isinstance(policy, str) or policy not in allowed:
             raise ValidationError(
                 "Invalid policy for %(field)s: %(policy)s.",
                 params={"field": field, "policy": policy},

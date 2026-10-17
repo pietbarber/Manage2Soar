@@ -31,7 +31,7 @@ User = get_user_model()
         {**default_member_profile_field_policies(), "unknown": "direct"},
         {
             **default_member_profile_field_policies(),
-            "email": "request",
+            "password": "request",
         },
         {
             **default_member_profile_field_policies(),
@@ -48,12 +48,84 @@ def test_member_profile_policy_validator_accepts_complete_policy_map():
     validate_member_profile_field_policies(default_member_profile_field_policies())
 
 
+def assert_legacy_policy_contract(policies):
+    """The validator used by pods running the 0053 application revision."""
+    assert set(policies) == {
+        "username",
+        "email",
+        "phone",
+        "address",
+        "emergency_contacts",
+        "nickname",
+        "profile_photo",
+        "biography",
+        "password",
+        "contact_visibility",
+    }
+    for field, value in policies.items():
+        allowed = {"disabled", "direct"}
+        if field not in {"password", "profile_photo"}:
+            allowed.add("request")
+        assert value in allowed
+
+
+@pytest.mark.django_db
+def test_policy_migration_preserves_old_pod_configuration_saves():
+    from django.apps import apps
+
+    migration = importlib.import_module(
+        "siteconfig.migrations.0054_rebuild_member_profile_policies"
+    )
+    policies = {
+        **default_member_profile_field_policies(),
+        "email": "request",
+        "phone": "disabled",
+        "nickname": "direct",
+    }
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    migration.normalize_profile_policies(apps, None)
+    config.refresh_from_db()
+    assert config.member_profile_field_policies == {**policies, "email": "disabled"}
+    assert_legacy_policy_contract(config.member_profile_field_policies)
+    # Old pods validate the whole model even for unrelated partial saves.
+    field = SiteConfiguration._meta.get_field("member_profile_field_policies")
+    with patch.object(field, "validators", [assert_legacy_policy_contract]):
+        config.club_name = "Updated Club"
+        config.save(update_fields=["club_name"])
+    migration.restore_legacy_member_profile_field_policies(apps, None)
+    config.refresh_from_db()
+    assert config.member_profile_field_policies == {**policies, "email": "disabled"}
+
+
+@pytest.mark.django_db
+def test_old_pod_request_policy_writes_remain_readable_and_disabled():
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "email": "request",
+        },
+    )
+    assert get_member_profile_field_policy("email", config) == "disabled"
+
+
 def test_member_profile_policy_defaults_and_migration_normalization_are_safe():
     migration = importlib.import_module(
         "siteconfig.migrations.0054_rebuild_member_profile_policies"
     )
 
     assert default_member_profile_field_policies() == {
+        "username": "disabled",
+        "phone": "request",
+        "address": "request",
+        "nickname": "request",
         "email": "disabled",
         "emergency_contacts": "direct",
         "profile_photo": "direct",
@@ -65,6 +137,10 @@ def test_member_profile_policy_defaults_and_migration_normalization_are_safe():
         {"email": "request", "username": "direct", "biography": "disabled"}
     ) == {
         **{field: "disabled" for field in default_member_profile_field_policies()},
+        "username": "direct",
+        "phone": "request",
+        "address": "request",
+        "nickname": "request",
         "biography": "disabled",
     }
     assert migration.legacy_member_profile_field_policies(
@@ -166,6 +242,8 @@ def test_siteconfiguration_admin_form_saves_direct_edit_policies_and_master_swit
         member_profile_field_policies={
             **default_member_profile_field_policies(),
             "emergency_contacts": "direct",
+            "phone": "disabled",
+            "nickname": "direct",
         },
     )
     unbound_form = SiteConfigurationAdminForm(instance=config)
@@ -185,7 +263,12 @@ def test_siteconfiguration_admin_form_saves_direct_edit_policies_and_master_swit
     form.save()
     config.refresh_from_db()
     assert config.member_profile_self_service_enabled is True
+    assert_legacy_policy_contract(config.member_profile_field_policies)
     assert config.member_profile_field_policies == {
+        "username": "disabled",
+        "phone": "disabled",
+        "address": "request",
+        "nickname": "direct",
         "email": "direct",
         "emergency_contacts": "direct",
         "profile_photo": "disabled",

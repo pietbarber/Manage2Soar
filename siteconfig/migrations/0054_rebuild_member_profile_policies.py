@@ -2,8 +2,11 @@ from django.db import migrations, models
 
 import siteconfig.models
 
-
 DEFAULT_POLICIES = {
+    "username": "disabled",
+    "phone": "request",
+    "address": "request",
+    "nickname": "request",
     "email": "disabled",
     "emergency_contacts": "direct",
     "profile_photo": "direct",
@@ -17,12 +20,19 @@ def normalize_member_profile_field_policies(policies):
     if not isinstance(policies, dict):
         return DEFAULT_POLICIES.copy()
 
-    return {
-        field: policies.get(field)
-        if policies.get(field) in {"disabled", "direct"}
-        else "disabled"
-        for field in DEFAULT_POLICIES
-    }
+    normalized = {}
+    for field in DEFAULT_POLICIES:
+        legacy = field in {"username", "phone", "address", "nickname"}
+        allowed = (
+            {"disabled", "direct", "request"} if legacy else {"disabled", "direct"}
+        )
+        value = policies.get(field)
+        normalized[field] = (
+            value
+            if isinstance(value, str) and value in allowed
+            else DEFAULT_POLICIES[field] if legacy else "disabled"
+        )
+    return normalized
 
 
 def normalize_profile_policies(apps, schema_editor):
@@ -43,12 +53,12 @@ def legacy_member_profile_field_policies(policies):
     if not isinstance(policies, dict):
         policies = {}
     return {
-        "username": "disabled",
+        "username": policies.get("username", "disabled"),
         "email": policies.get("email", "disabled"),
-        "phone": "request",
-        "address": "request",
+        "phone": policies.get("phone", "request"),
+        "address": policies.get("address", "request"),
         "emergency_contacts": policies.get("emergency_contacts", "disabled"),
-        "nickname": "request",
+        "nickname": policies.get("nickname", "request"),
         "profile_photo": policies.get("profile_photo", "disabled"),
         "biography": policies.get("biography", "disabled"),
         "password": policies.get("password", "disabled"),

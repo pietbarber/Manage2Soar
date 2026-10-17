@@ -143,12 +143,15 @@ class SiteConfigurationAdminForm(forms.ModelForm):
     def _post_clean(self):
         if hasattr(self, "cleaned_data"):
             self.instance.member_profile_field_policies = {
-                field: (
-                    "direct"
-                    if self.cleaned_data.get(f"profile_policy_{field}")
-                    else "disabled"
-                )
-                for field in MEMBER_PROFILE_POLICY_FIELDS
+                **self.instance.member_profile_field_policies,
+                **{
+                    field: (
+                        "direct"
+                        if self.cleaned_data.get(f"profile_policy_{field}")
+                        else "disabled"
+                    )
+                    for field in MEMBER_PROFILE_POLICY_FIELDS
+                },
             }
         super()._post_clean()
 
