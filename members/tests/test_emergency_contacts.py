@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import pytest
+from django.contrib.sessions.middleware import SessionMiddleware
 from django.db import connection
 from django.db.models.query import QuerySet
 from django.test import Client, RequestFactory
@@ -267,6 +268,8 @@ def test_profile_renders_multiple_contacts_with_formatted_phone_numbers(
 @pytest.mark.django_db
 def test_profile_reuses_site_configuration_for_all_policies(member, direct_policy):
     request = RequestFactory().get(reverse("members:member_view", args=[member.pk]))
+    SessionMiddleware(lambda req: None).process_request(request)
+    request.session.save()
     request.user = member
     with (
         patch("members.views.render", return_value=None),

@@ -1,10 +1,13 @@
 """Browser coverage for the member email-change modal."""
 
+from django.test import override_settings
+
 from siteconfig.models import SiteConfiguration, default_member_profile_field_policies
 
 from .conftest import DjangoPlaywrightTestCase
 
 
+@override_settings(EMAIL_DEV_MODE=False, EMAIL_DEV_MODE_REDIRECT_TO="")
 class TestMemberEmailChangeE2E(DjangoPlaywrightTestCase):
     def setUp(self):
         super().setUp()

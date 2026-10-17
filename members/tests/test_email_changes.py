@@ -489,6 +489,8 @@ def test_email_confirmation_post_changes_email(
     assert "new@example.com" in mailoutbox[0].alternatives[0][0]
 
     class GoogleLoginStrategy:
+        storage = object()
+
         @staticmethod
         def setting(name, default=None, **kwargs):
             return getattr(settings, f"SOCIAL_AUTH_{name}", default)
