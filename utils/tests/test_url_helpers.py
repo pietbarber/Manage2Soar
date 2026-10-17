@@ -11,9 +11,14 @@ from unittest.mock import patch
 import pytest
 from django.conf import settings
 from django.db.utils import OperationalError
+from django.test import RequestFactory
 
 from siteconfig.models import SiteConfiguration
-from utils.url_helpers import build_absolute_url, get_canonical_url
+from utils.url_helpers import (
+    build_absolute_url,
+    build_absolute_url_for_request,
+    get_canonical_url,
+)
 
 
 @pytest.mark.django_db
@@ -518,3 +523,35 @@ class TestCanonicalURLIntegration:
             # Should always produce a valid absolute URL
             assert result.startswith("http://") or result.startswith("https://")
             assert path.strip("/") in result
+
+
+@pytest.mark.django_db
+class TestBuildAbsoluteURLForRequest:
+    """Tests for request-aware canonical URL building used in emails."""
+
+    def test_uses_canonical_origin_when_configured(self):
+        config = SiteConfiguration.objects.first()
+        if not config:
+            config = SiteConfiguration.objects.create(
+                club_name="Test Club",
+                club_abbreviation="TCC",
+                domain_name="example.org",
+            )
+        config.canonical_url = "https://www.skylinesoaring.org"
+        config.save()
+
+        request = RequestFactory().get("/members/email/confirm/token/")
+        result = build_absolute_url_for_request(
+            request, "/members/email/confirm/token/"
+        )
+
+        assert result == "https://www.skylinesoaring.org/members/email/confirm/token/"
+
+    def test_falls_back_to_request_host_when_canonical_is_loopback(self):
+        request = RequestFactory().get("/members/email/confirm/token/")
+        with patch.object(settings, "SITE_URL", ""):
+            result = build_absolute_url_for_request(
+                request, "/members/email/confirm/token/"
+            )
+
+        assert result == "http://testserver/members/email/confirm/token/"

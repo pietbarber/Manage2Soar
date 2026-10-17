@@ -251,6 +251,17 @@ class Member(AbstractUser):
         blank=True,
         help_text="Per-field contact sharing preferences: inherit, share, or hide.",
     )
+    pending_email = models.EmailField(
+        blank=True,
+        default="",
+        db_default="",
+        help_text="Email address awaiting member confirmation.",
+    )
+    pending_email_requested_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the pending email confirmation was requested.",
+    )
 
     @property
     def profile_image_url(self):
@@ -438,6 +449,10 @@ class Member(AbstractUser):
 
         # 5) now safe to touch M2M
         transaction.on_commit(self._sync_groups)
+
+    class Meta:
+        verbose_name = "user"
+        verbose_name_plural = "users"
 
     ##################################
     #  def __str__

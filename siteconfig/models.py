@@ -15,27 +15,28 @@ from utils.favicon import generate_favicon_from_logo
 from utils.upload_entropy import upload_site_logo
 
 MEMBER_PROFILE_POLICY_FIELDS = (
-    "username",
     "email",
-    "phone",
-    "address",
     "emergency_contacts",
-    "nickname",
     "profile_photo",
     "biography",
     "password",
     "contact_visibility",
 )
 
+# Keep the stored shape compatible with older pods during rollout and rollback.
+LEGACY_MEMBER_PROFILE_POLICY_DEFAULTS = {
+    "username": "disabled",
+    "phone": "request",
+    "address": "request",
+    "nickname": "request",
+}
+
 
 def default_member_profile_field_policies():
     return {
-        "username": "direct",
-        "email": "request",
-        "phone": "request",
-        "address": "request",
+        **LEGACY_MEMBER_PROFILE_POLICY_DEFAULTS,
+        "email": "disabled",
         "emergency_contacts": "direct",
-        "nickname": "request",
         "profile_photo": "direct",
         "biography": "direct",
         "password": "direct",
@@ -44,18 +45,17 @@ def default_member_profile_field_policies():
 
 
 def validate_member_profile_field_policies(value):
-    if not isinstance(value, dict) or set(value) != set(MEMBER_PROFILE_POLICY_FIELDS):
+    if not isinstance(value, dict) or set(value) != (
+        set(MEMBER_PROFILE_POLICY_FIELDS) | set(LEGACY_MEMBER_PROFILE_POLICY_DEFAULTS)
+    ):
         raise ValidationError(
             "Profile field policies must define exactly the supported fields."
         )
 
-    allowed_policies = {"disabled", "direct", "request"}
     for field, policy in value.items():
-        allowed = (
-            {"disabled", "direct"}
-            if field in {"password", "profile_photo"}
-            else allowed_policies
-        )
+        allowed = {"disabled", "direct"}
+        if field not in {"password", "profile_photo"}:
+            allowed.add("request")
         if not isinstance(policy, str) or policy not in allowed:
             raise ValidationError(
                 "Invalid policy for %(field)s: %(policy)s.",
@@ -64,14 +64,14 @@ def validate_member_profile_field_policies(value):
 
 
 def get_member_profile_field_policy(field, site_config=None):
+    if field not in MEMBER_PROFILE_POLICY_FIELDS:
+        return "disabled"
     if site_config is None:
         site_config = SiteConfiguration.objects.first()
     if not site_config or not site_config.member_profile_self_service_enabled:
         return "disabled"
     policy = site_config.member_profile_field_policies.get(field, "disabled")
-    if field in {"password", "profile_photo"} and policy == "request":
-        return "disabled"
-    return policy
+    return policy if policy in {"disabled", "direct"} else "disabled"
 
 
 class MailingListCriterion(models.TextChoices):

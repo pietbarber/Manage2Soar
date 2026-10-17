@@ -1,0 +1,7 @@
+Your Manage2Soar email address changed
+
+Your Manage2Soar email address changed to {{ new_email }}.
+
+If you did not make this change, contact a club manager.
+
+This is an automated message from {{ site_name }}. Please do not reply to this email.

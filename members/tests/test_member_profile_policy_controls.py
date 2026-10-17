@@ -1,0 +1,228 @@
+import pytest
+from django.urls import reverse
+
+from members.models import Biography, Member
+from members.utils.membership import clear_active_membership_statuses_cache
+from siteconfig.models import (
+    MembershipStatus,
+    SiteConfiguration,
+    default_member_profile_field_policies,
+)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("field", "control"),
+    [
+        ("profile_photo", b"Update Profile Photo"),
+        ("email", b"Change Email"),
+        ("biography", b"Edit Biography"),
+        ("password", b"Change Password"),
+        ("emergency_contacts", b"Add Emergency Contact"),
+        ("contact_visibility", b'name="visibility_email"'),
+    ],
+)
+def test_profile_self_service_controls_require_direct_policy(client, field, control):
+    MembershipStatus.objects.create(name="Policy Member", is_active=True)
+    clear_active_membership_statuses_cache()
+    policies = default_member_profile_field_policies()
+    policies[field] = "disabled"
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    member = Member.objects.create_user(
+        username=f"policy_{field}",
+        password="password",
+        membership_status="Policy Member",
+    )
+    Biography.objects.create(member=member, content="<p>Biography</p>")
+    client.force_login(member)
+
+    response = client.get(reverse("members:member_view", args=[member.pk]))
+
+    assert response.status_code == 200
+    assert control not in response.content
+
+
+@pytest.mark.django_db
+def test_biography_navigation_requires_direct_policy(client):
+    MembershipStatus.objects.create(name="Policy Member", is_active=True)
+    clear_active_membership_statuses_cache()
+    policies = default_member_profile_field_policies()
+    policies["biography"] = "disabled"
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    member = Member.objects.create_user(
+        username="policy_biography_navigation",
+        password="password",
+        membership_status="Policy Member",
+    )
+    client.force_login(member)
+
+    response = client.get(reverse("members:member_view", args=[member.pk]))
+
+    assert response.status_code == 200
+    assert b"Edit my Biography" not in response.content
+
+
+@pytest.mark.django_db
+def test_superuser_self_biography_link_respects_direct_policy(client):
+    policies = default_member_profile_field_policies()
+    policies["biography"] = "disabled"
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    superuser = Member.objects.create_superuser(
+        username="policy_superuser_biography",
+        email="superuser@example.com",
+        password="pass",
+    )
+    client.force_login(superuser)
+
+    profile_response = client.get(reverse("members:member_view", args=[superuser.pk]))
+    biography_response = client.get(
+        reverse("members:biography_view", args=[superuser.pk])
+    )
+
+    assert profile_response.status_code == 200
+    assert b"Edit Biography" not in profile_response.content
+    assert b"Write Biography" not in profile_response.content
+    assert biography_response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_profile_page_is_self_service_hub_for_direct_controls(client):
+    MembershipStatus.objects.create(name="Policy Member", is_active=True)
+    clear_active_membership_statuses_cache()
+    policies = default_member_profile_field_policies()
+    for field in (
+        "profile_photo",
+        "email",
+        "biography",
+        "password",
+        "emergency_contacts",
+        "contact_visibility",
+    ):
+        policies[field] = "direct"
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    member = Member.objects.create_user(
+        username="profile_hub",
+        email="member@example.com",
+        password="password",
+        membership_status="Policy Member",
+    )
+    client.force_login(member)
+
+    response = client.get(reverse("members:member_view", args=[member.pk]))
+
+    assert response.status_code == 200
+    assert reverse("members:request_email_change").encode() in response.content
+    assert b'id="profile-editing"' not in response.content
+    assert b"emailSettingsModal" in response.content
+    assert reverse("members:set_password").encode() in response.content
+    assert (
+        reverse("members:biography_view", args=[member.pk]).encode() in response.content
+    )
+    assert b'aria-labelledby="privacySettingsModalLabel"' in response.content
+
+
+@pytest.mark.django_db
+def test_email_change_control_is_not_shown_to_other_members(client):
+    MembershipStatus.objects.create(name="Policy Member", is_active=True)
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="testclub.com", club_abbreviation="TC"
+    )
+    viewer = Member.objects.create_user(
+        username="profile_viewer",
+        password="password",
+        membership_status="Policy Member",
+    )
+    subject = Member.objects.create_user(
+        username="profile_subject",
+        password="password",
+        membership_status="Policy Member",
+    )
+    client.force_login(viewer)
+
+    response = client.get(reverse("members:member_view", args=[subject.pk]))
+
+    assert response.status_code == 200
+    assert b"Change Email" not in response.content
+    assert b"emailSettingsModal" not in response.content
+
+
+def _configure_direct_account_controls():
+    MembershipStatus.objects.create(name="Policy Member", is_active=True)
+    clear_active_membership_statuses_cache()
+    policies = default_member_profile_field_policies()
+    policies["email"] = "direct"
+    policies["password"] = "direct"
+    return SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+
+
+@pytest.mark.django_db
+def test_kiosk_session_hides_account_controls(client):
+    _configure_direct_account_controls()
+    member = Member.objects.create_user(
+        username="kiosk_role",
+        email="role@example.com",
+        password="password",
+        membership_status="Policy Member",
+    )
+    client.force_login(member)
+    session = client.session
+    session["is_kiosk_authenticated"] = True
+    session.save()
+
+    response = client.get(reverse("members:member_view", args=[member.pk]))
+
+    assert response.status_code == 200
+    assert reverse("members:set_password").encode() not in response.content
+    assert reverse("members:request_email_change").encode() not in response.content
+    assert b"emailSettingsModal" not in response.content
+
+
+@pytest.mark.django_db
+def test_kiosk_session_cannot_change_password(client):
+    _configure_direct_account_controls()
+    member = Member.objects.create_user(
+        username="kiosk_password",
+        email="role@example.com",
+        password="password",
+        membership_status="Policy Member",
+    )
+    client.force_login(member)
+    original_hash = member.password
+    session = client.session
+    session["is_kiosk_authenticated"] = True
+    session.save()
+
+    response = client.post(
+        reverse("members:set_password"),
+        {"new_password1": "NewStrongPass1", "new_password2": "NewStrongPass1"},
+    )
+
+    assert response.status_code == 403
+    member.refresh_from_db()
+    assert member.password == original_hash

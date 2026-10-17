@@ -221,7 +221,7 @@ SOCIAL_AUTH_PIPELINE = (
 # The user_details pipeline step would otherwise update first_name/last_name
 # from the Google account on every login. These fields should remain independent
 # and editable only by the member or admin.
-SOCIAL_AUTH_PROTECTED_USER_FIELDS = ["first_name", "last_name"]
+SOCIAL_AUTH_PROTECTED_USER_FIELDS = ["first_name", "last_name", "email"]
 
 # Issue #674: Preserve the ?next= redirect parameter through the Google OAuth2
 # redirect cycle so users land on the page they originally requested.

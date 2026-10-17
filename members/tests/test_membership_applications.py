@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
@@ -78,6 +79,7 @@ class MembershipApplicationModelTests:
             state="CA",
             zip_code="12345",
             emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
             emergency_contact_phone="555-987-6543",
             # Missing agreements
         )
@@ -95,6 +97,7 @@ class MembershipApplicationModelTests:
             state="CA",
             zip_code="12345",
             emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
             emergency_contact_phone="555-987-6543",
             agrees_to_terms=True,
             agrees_to_safety_rules=True,
@@ -154,6 +157,35 @@ class MembershipApplicationModelTests:
         app.refresh_from_db()
         assert app.status == "approved"
         assert app.member_account == member
+
+    def test_approve_application_allows_existing_member_email(self):
+        """Approving an application may create another account sharing an email."""
+        Member.objects.create_user(
+            username="existing_shared_email",
+            email="shared@example.com",
+        )
+        app = MembershipApplication.objects.create(
+            first_name="Jane",
+            last_name="Doe",
+            email="shared@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Alex Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn to fly gliders",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        member = app.approve_application()
+
+        assert member.email == "shared@example.com"
+        assert Member.objects.filter(email__iexact="shared@example.com").count() == 2
 
     def test_add_to_waitlist(self):
         """Test adding an application to the waitlist."""
@@ -1041,6 +1073,52 @@ class MembershipApplicationViewTests(TestCase):
         )
         self.assertEqual(application.status, original_status)
 
+    def test_review_legacy_application_with_partial_emergency_contact(self):
+        """Review actions should work for records predating contact completeness validation."""
+        self._create_manager()
+
+        for action, expected_status in (
+            ("save_notes", "pending"),
+            ("need_info", "additional_info_needed"),
+        ):
+            with self.subTest(action=action):
+                application = MembershipApplication.objects.create(
+                    first_name="Legacy",
+                    last_name="Applicant",
+                    email=f"legacy-{action}@example.com",
+                    phone="555-123-4567",
+                    address_line1="123 Main St",
+                    city="Anytown",
+                    state="CA",
+                    zip_code="12345",
+                    emergency_contact_name="Legacy Contact",
+                    emergency_contact_phone="555-987-6543",
+                    soaring_goals="Test",
+                    agrees_to_terms=True,
+                    agrees_to_safety_rules=True,
+                    agrees_to_financial_obligations=True,
+                )
+
+                response = self.client.post(
+                    reverse(
+                        "members:membership_application_detail",
+                        args=[application.application_id],
+                    ),
+                    {
+                        "review_action": action,
+                        "admin_notes": "Follow up with the applicant.",
+                    },
+                    follow=True,
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "Follow up with the applicant.")
+                application.refresh_from_db()
+                self.assertEqual(application.status, expected_status)
+                self.assertEqual(
+                    application.admin_notes, "Follow up with the applicant."
+                )
+
     def test_add_to_waitlist_already_waitlisted_keeps_position(self):
         """Test that clicking 'Add to Waitlist' on someone already waitlisted doesn't change position.
 
@@ -1316,3 +1394,86 @@ class ApprovalBlankSSANumberTests(TestCase):
 
         self.assertIsNone(first.SSA_member_number)
         self.assertIsNone(second.SSA_member_number)
+
+
+def _valid_application_form_data(**contact_data):
+    return {
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "john@example.com",
+        "phone": "555-123-4567",
+        "address_line1": "123 Main St",
+        "city": "Anytown",
+        "state": "CA",
+        "zip_code": "12345",
+        "soaring_goals": "I want to learn gliding",
+        "agrees_to_terms": True,
+        "agrees_to_safety_rules": True,
+        "agrees_to_financial_obligations": True,
+        **contact_data,
+    }
+
+
+@pytest.mark.django_db
+def test_partial_emergency_contact_is_rejected_with_clear_errors():
+    form = MembershipApplicationForm(
+        data=_valid_application_form_data(
+            emergency_contact_name="Jane Doe",
+            emergency_contact_phone="555-987-6543",
+        )
+    )
+
+    assert not form.is_valid()
+    assert (
+        "Provide the emergency contact's name"
+        in form.errors.as_data()["emergency_contact_relationship"][0].message
+    )
+    assert "emergency_contact_relationship" in form.errors
+
+
+@pytest.mark.django_db
+def test_empty_emergency_contact_is_valid():
+    form = MembershipApplicationForm(data=_valid_application_form_data())
+
+    assert form.is_valid()
+
+
+@pytest.mark.django_db
+def test_membership_application_accepts_an_existing_member_email():
+    Member.objects.create_user(
+        username="existing_application_email",
+        email="john@example.com",
+    )
+
+    form = MembershipApplicationForm(data=_valid_application_form_data())
+
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_model_rejects_partial_emergency_contact():
+    app = MembershipApplication(
+        **_valid_application_form_data(
+            emergency_contact_name="Jane Doe",
+            emergency_contact_phone="555-987-6543",
+        )
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        app.full_clean()
+
+    assert "emergency_contact_relationship" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_partial_emergency_contact_cannot_be_approved():
+    app = MembershipApplication(
+        **_valid_application_form_data(
+            emergency_contact_name="Jane Doe",
+            emergency_contact_phone="555-987-6543",
+        )
+    )
+
+    assert not app.can_be_approved()
+    with pytest.raises(ValueError, match="cannot be approved"):
+        app.approve_application()

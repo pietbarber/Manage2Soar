@@ -1,12 +1,16 @@
 import base64
 import logging
 import os
-from datetime import date
+import smtplib
+from datetime import date, timedelta
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.core import signing
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
@@ -14,7 +18,10 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Func, Prefetch, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -23,6 +30,7 @@ from instructors.models import MemberQualification
 from members.utils import can_view_contact_field
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils import contact_field_visibility, is_privileged_viewer
+from members.utils.kiosk import is_kiosk_session
 from members.utils.membership import get_active_membership_statuses
 from members.utils.roles import get_member_role_metadata
 from members.utils.username import MAX_USERNAME_RETRIES, generate_username
@@ -32,15 +40,17 @@ from siteconfig.forms import (
     VisitingPilotSignupForm,
 )
 from siteconfig.models import SiteConfiguration, get_member_profile_field_policy
+from utils.email import DevModeEmailMultiAlternatives, enforce_noreply_from_email
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
-from .decorators import active_member_required
+from .decorators import active_member_required, non_kiosk_member_required
 from .forms import (
     BiographyForm,
     DirectRecipientPasswordResetForm,
     EmergencyContactDeclineForm,
     EmergencyContactForm,
     MemberProfilePhotoForm,
+    PasswordResetConfirmForm,
     SafetyReportForm,
     SetPasswordForm,
 )
@@ -57,6 +67,19 @@ from .utils.badge_utils import suppress_badge_board_legs, suppress_member_badge_
 from .utils.vcard_tools import generate_vcard, generate_vcard_qr
 
 logger = logging.getLogger(__name__)
+EMAIL_CHANGE_TOKEN_MAX_AGE = 60 * 60 * 24
+
+
+def _send_account_security_email(recipient, subject, body):
+    if not recipient:
+        return
+    DevModeEmailMultiAlternatives(
+        subject=subject,
+        body=body,
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[recipient],
+    ).send()
+
 
 try:
     from notifications.models import Notification
@@ -240,6 +263,7 @@ def member_list(request):
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     is_self = request.user == member
+    kiosk_session = is_kiosk_session(request)
     can_edit = is_self or request.user.is_superuser
 
     # Decide whether to show solo/checkride buttons
@@ -281,6 +305,11 @@ def member_view(request, member_id):
         and get_member_profile_field_policy("contact_visibility", site_config)
         == "direct"
     )
+    mask_contact_values = is_privileged_viewer(request.user) and not is_self
+    redact_contact_fields = {
+        field: mask_contact_values and not effective_contact_visibility[field]
+        for field in ("email", "phone", "address")
+    }
     qr_png = generate_vcard_qr(
         member,
         include_contact=can_view_personal,
@@ -322,17 +351,7 @@ def member_view(request, member_id):
 
     if is_self and request.method == "POST":
         if profile_photo_policy != "direct":
-            if profile_photo_policy == "request":
-                messages.warning(
-                    request,
-                    "Changing your profile photo requires approval by a member manager.",
-                )
-            else:
-                messages.error(
-                    request,
-                    "Profile photo updates are currently disabled by the club.",
-                )
-            return redirect("members:member_view", member_id=member.pk)
+            return render(request, "403.html", status=403)
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
             form.save()
@@ -353,6 +372,8 @@ def member_view(request, member_id):
         "can_view_email": contact_visibility["email"],
         "can_view_phone": contact_visibility["phone"],
         "can_view_address": contact_visibility["address"],
+        "redact_contact_fields": redact_contact_fields,
+        "has_staff_redactions": any(redact_contact_fields.values()),
         "can_view_policy": can_view_policy,
         "privacy_sharing": (effective_contact_visibility if can_view_policy else None),
         "privacy_settings": (
@@ -394,9 +415,16 @@ def member_view(request, member_id):
         ),
         "form": form,
         "is_self": is_self,
-        "can_edit": can_edit and (not is_self or biography_policy == "direct"),
+        # Staff retain the existing management path regardless of a member's
+        # self-service policy.
+        "can_edit": (is_self and biography_policy == "direct")
+        or (request.user.is_superuser and not is_self),
         "can_change_password": is_self
+        and not kiosk_session
         and get_member_profile_field_policy("password", site_config) == "direct",
+        "can_change_email": is_self
+        and not kiosk_session
+        and get_member_profile_field_policy("email", site_config) == "direct",
         "can_update_emergency_contacts": is_self
         and emergency_contacts_policy == "direct",
         "biography": biography,
@@ -430,6 +458,207 @@ def member_vcard(request, member_id):
     return response
 
 
+@non_kiosk_member_required
+@require_http_methods(["POST"])
+def request_email_change(request):
+    if get_member_profile_field_policy("email") != "direct":
+        return render(request, "403.html", status=403)
+
+    new_email = request.POST.get("email", "").strip().lower()
+    max_email_length = Member._meta.get_field("pending_email").max_length
+    try:
+        new_email = forms.EmailField(max_length=max_email_length).clean(new_email)
+    except ValidationError:
+        messages.error(request, "Enter a valid email address.")
+        return redirect("members:member_view", member_id=request.user.pk)
+
+    with transaction.atomic():
+        member = Member.objects.select_for_update().get(pk=request.user.pk)
+        if get_member_profile_field_policy("email") != "direct":
+            return render(request, "403.html", status=403)
+        if new_email == member.email.lower():
+            messages.info(request, "That is already your current email address.")
+            return redirect("members:member_view", member_id=member.pk)
+
+        requested_at = timezone.now()
+        previous_requested_at = member.pending_email_requested_at
+        if previous_requested_at and requested_at <= previous_requested_at:
+            requested_at = previous_requested_at + timedelta(microseconds=1)
+        member.pending_email = new_email
+        member.pending_email_requested_at = requested_at
+        member.save(update_fields=["pending_email", "pending_email_requested_at"])
+        current_email = member.email
+        token = signing.dumps(
+            {
+                "member_id": member.pk,
+                "email": new_email,
+                "requested_at": requested_at.isoformat(),
+                "current_email": current_email,
+                "password_fingerprint": _email_change_password_fingerprint(member),
+            },
+            salt="members.email-change",
+        )
+    confirmation_url = build_absolute_url(
+        reverse("members:confirm_email_change", args=[token])
+    )
+    site_config = SiteConfiguration.objects.first()
+    context = {
+        "site_name": site_config.club_name if site_config else "Manage2Soar",
+        "new_email": new_email,
+        "confirmation_url": confirmation_url,
+    }
+    confirmation_message = DevModeEmailMultiAlternatives(
+        subject="Confirm your Manage2Soar email address",
+        body=render_to_string("members/emails/email_change_confirmation.txt", context),
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[new_email],
+    )
+    confirmation_message.attach_alternative(
+        render_to_string("members/emails/email_change_confirmation.html", context),
+        "text/html",
+    )
+    security_message = DevModeEmailMultiAlternatives(
+        subject="Manage2Soar email change requested",
+        body=render_to_string(
+            "members/emails/email_change_security_notice.txt", context
+        ),
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[current_email],
+    )
+    security_message.attach_alternative(
+        render_to_string("members/emails/email_change_security_notice.html", context),
+        "text/html",
+    )
+    transaction.on_commit(lambda: security_message.send(), robust=True)
+
+    confirmation_sent = False
+    confirmation_error = None
+    try:
+        confirmation_sent = bool(confirmation_message.send())
+    except (OSError, smtplib.SMTPException, ValueError) as exc:
+        confirmation_error = exc
+        logger.exception(
+            "Failed to send email-change confirmation to member %s", member.pk
+        )
+    if not confirmation_sent:
+        if confirmation_error is None:
+            logger.error(
+                "Email-change confirmation delivery returned no messages for member %s",
+                member.pk,
+            )
+        with transaction.atomic():
+            locked_member = Member.objects.select_for_update().get(pk=member.pk)
+            if (
+                locked_member.pending_email == new_email
+                and locked_member.pending_email_requested_at == requested_at
+            ):
+                locked_member.pending_email = ""
+                locked_member.pending_email_requested_at = None
+                locked_member.save(
+                    update_fields=["pending_email", "pending_email_requested_at"]
+                )
+        return render(
+            request,
+            "members/email_change_delivery_failed.html",
+            status=503,
+        )
+
+    messages.success(request, "A confirmation link was sent to your new email address.")
+    return redirect("members:email_change_requested")
+
+
+def _email_change_password_fingerprint(member):
+    return salted_hmac(
+        "members.email-change.password-state",
+        member.password,
+        # Django 5.2 accepts this keyword; newer type stubs omit it.
+        algorithm="sha256",  # pyright: ignore[reportCallIssue]
+    ).hexdigest()
+
+
+def _email_change_request_matches(member, data):
+    requested_at = member.pending_email_requested_at
+    return (
+        member.pending_email == data.get("email")
+        and requested_at is not None
+        and requested_at.isoformat() == data.get("requested_at")
+        and member.email == data.get("current_email")
+        and _email_change_password_fingerprint(member)
+        == data.get("password_fingerprint")
+    )
+
+
+@non_kiosk_member_required
+def email_change_requested(request):
+    if not request.user.pending_email:
+        return redirect("members:member_view", member_id=request.user.pk)
+
+    return render(
+        request,
+        "members/email_change_requested.html",
+        {"pending_email": request.user.pending_email},
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def confirm_email_change(request, token):
+    try:
+        data = signing.loads(
+            token, salt="members.email-change", max_age=EMAIL_CHANGE_TOKEN_MAX_AGE
+        )
+    except signing.BadSignature:
+        return render(request, "403.html", status=403)
+
+    member = get_object_or_404(Member, pk=data.get("member_id"))
+    if not _email_change_request_matches(member, data):
+        return render(request, "403.html", status=403)
+    if get_member_profile_field_policy("email") != "direct":
+        return render(request, "403.html", status=403)
+
+    if request.method == "GET":
+        return render(
+            request,
+            "members/confirm_email_change.html",
+            {"member": member, "pending_email": member.pending_email},
+        )
+
+    with transaction.atomic():
+        member = Member.objects.select_for_update().get(pk=member.pk)
+        if not _email_change_request_matches(member, data):
+            return render(request, "403.html", status=403)
+        if get_member_profile_field_policy("email") != "direct":
+            return render(request, "403.html", status=403)
+        old_email = member.email
+        member.email = member.pending_email
+        member.pending_email = ""
+        member.pending_email_requested_at = None
+        member.save(
+            update_fields=[
+                "email",
+                "pending_email",
+                "pending_email_requested_at",
+            ]
+        )
+    site_config = SiteConfiguration.objects.first()
+    context = {
+        "site_name": site_config.club_name if site_config else "Manage2Soar",
+        "new_email": member.email,
+    }
+    completion_message = DevModeEmailMultiAlternatives(
+        subject="Your Manage2Soar email address changed",
+        body=render_to_string("members/emails/email_change_completed.txt", context),
+        from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+        to=[old_email],
+    )
+    completion_message.attach_alternative(
+        render_to_string("members/emails/email_change_completed.html", context),
+        "text/html",
+    )
+    transaction.on_commit(lambda: completion_message.send(), robust=True)
+    messages.success(request, "Your email address has been updated.")
+    return redirect("members:member_view", member_id=member.id)
+
+
 @active_member_required
 @require_http_methods(["POST"])
 def update_contact_visibility(request, member_id):
@@ -439,17 +668,7 @@ def update_contact_visibility(request, member_id):
 
     policy = get_member_profile_field_policy("contact_visibility")
     if policy != "direct":
-        if policy == "request":
-            messages.warning(
-                request,
-                "Changing contact visibility requires approval by a member manager.",
-            )
-        else:
-            messages.error(
-                request,
-                "Updating contact visibility is currently disabled by the club.",
-            )
-        return redirect("members:member_view", member_id=member.id)
+        return render(request, "403.html", status=403)
 
     contact_visibility = dict(member.contact_visibility or {})
     for field in ("email", "phone", "address"):
@@ -479,17 +698,7 @@ def emergency_contact_edit(request, member_id, contact_id=None):
 
     policy = get_member_profile_field_policy("emergency_contacts")
     if policy != "direct":
-        if policy == "request":
-            messages.warning(
-                request,
-                "Emergency contact changes require approval by a member manager.",
-            )
-        else:
-            messages.error(
-                request,
-                "Emergency contact updates are currently disabled by the club.",
-            )
-        return redirect("members:member_view", member_id=member.id)
+        return render(request, "403.html", status=403)
 
     contact = None
     if contact_id is not None:
@@ -520,24 +729,15 @@ def emergency_contact_delete(request, member_id, contact_id):
         member = get_object_or_404(members, pk=member_id)
         if request.user != member:
             return render(request, "403.html", status=403)
-        contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
 
         # Keep the policy check, contact recount, and the delete mutation inside
         # the same transaction that holds the member row lock, so a concurrent
         # delete cannot slip through the "final contact" recount.
         policy = get_member_profile_field_policy("emergency_contacts")
         if policy != "direct":
-            if policy == "request":
-                messages.warning(
-                    request,
-                    "Removing emergency contacts requires approval by a member manager.",
-                )
-            else:
-                messages.error(
-                    request,
-                    "Emergency contact updates are currently disabled by the club.",
-                )
-            return redirect("members:member_view", member_id=member.id)
+            return render(request, "403.html", status=403)
+
+        contact = get_object_or_404(EmergencyContact, pk=contact_id, member=member)
 
         is_last_contact = member.emergency_contacts.count() == 1
         form = (
@@ -621,16 +821,7 @@ def biography_view(request, member_id):
     if request.user == member:
         policy = get_member_profile_field_policy("biography")
         if policy != "direct":
-            if policy == "request":
-                messages.warning(
-                    request,
-                    "Biography changes require approval by a member manager.",
-                )
-            else:
-                messages.error(
-                    request, "Biography updates are currently disabled by the club."
-                )
-            return redirect("members:member_view", member_id=member.pk)
+            return render(request, "403.html", status=403)
 
     if request.method == "POST" and can_edit:
         form = BiographyForm(request.POST, request.FILES, instance=biography)
@@ -698,27 +889,27 @@ def home(request):
 # Redirects to home page on success.
 
 
-@active_member_required
+@non_kiosk_member_required
 def set_password(request):
     member = request.user
     policy = get_member_profile_field_policy("password")
     if policy != "direct":
-        if policy == "request":
-            messages.warning(
-                request,
-                "Password changes require approval by a member manager.",
-            )
-        else:
-            messages.error(
-                request, "Password changes are currently disabled by the club."
-            )
-        return redirect("members:member_view", member_id=member.pk)
+        return render(request, "403.html", status=403)
 
     if request.method == "POST":
         form = SetPasswordForm(request.POST)
         if form.is_valid():
             member.set_password(form.cleaned_data["new_password1"])
-            member.save()
+            member.save(update_fields=["password"])
+            transaction.on_commit(
+                lambda: _send_account_security_email(
+                    member.email,
+                    "Your Manage2Soar password changed",
+                    "Your Manage2Soar password was changed. If you did not make this "
+                    "change, contact a club manager immediately.",
+                ),
+                robust=True,
+            )
             messages.success(request, "Password changed successfully.")
             return redirect("members:member_list")
     else:
@@ -1222,8 +1413,8 @@ def visiting_pilot_signup(request, token):
                     except IntegrityError:
                         # Only retry if this was a username race (the candidate
                         # was claimed between generate_username()'s exists() check
-                        # and the INSERT).  Any other constraint violation (e.g.
-                        # email uniqueness) should propagate immediately.
+                        # and the INSERT). Any other constraint violation should
+                        # propagate immediately.
                         if not Member.objects.filter(
                             username=candidate_username
                         ).exists():
@@ -1632,3 +1823,9 @@ class CustomPasswordResetView(auth_views.PasswordResetView):
             self.extra_email_context = email_context
 
         return super().form_valid(form)
+
+
+class CustomPasswordResetConfirmView(auth_views.PasswordResetConfirmView):
+    """Avoid saving stale member fields when a reset races another update."""
+
+    form_class = PasswordResetConfirmForm

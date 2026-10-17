@@ -346,17 +346,33 @@ class MembershipApplication(models.Model):
         """Check if the applicant has any soaring/glider flight experience."""
         return (self.glider_flight_hours or 0) > 0
 
-    def clean(self):
-        """Require a name when emergency-contact details are provided."""
-        super().clean()
-        if not self.emergency_contact_name and (
-            self.emergency_contact_relationship or self.emergency_contact_phone
-        ):
+    def clean_fields(self, exclude=None):
+        """Require complete emergency-contact data when all fields are validated."""
+        super().clean_fields(exclude=exclude)
+
+        emergency_contact_field_names = (
+            "emergency_contact_name",
+            "emergency_contact_relationship",
+            "emergency_contact_phone",
+        )
+        if set(emergency_contact_field_names).intersection(exclude or ()):
+            return
+
+        emergency_contact_fields = tuple(
+            getattr(self, field) for field in emergency_contact_field_names
+        )
+        if any(emergency_contact_fields) and not all(emergency_contact_fields):
             raise ValidationError(
                 {
-                    "emergency_contact_name": (
-                        "Enter a name when providing emergency-contact details."
+                    field: (
+                        "Provide the emergency contact's name, relationship, and phone "
+                        "number, or leave all three blank."
                     )
+                    for field, value in zip(
+                        emergency_contact_field_names,
+                        emergency_contact_fields,
+                    )
+                    if not value
                 }
             )
 
@@ -390,8 +406,12 @@ class MembershipApplication(models.Model):
             or self.emergency_contact_relationship
             or self.emergency_contact_phone
         )
-        if emergency_contact_data and not (
-            self.emergency_contact_name and self.emergency_contact_phone
+        if emergency_contact_data and not all(
+            (
+                self.emergency_contact_name,
+                self.emergency_contact_relationship,
+                self.emergency_contact_phone,
+            )
         ):
             return False
 
@@ -435,7 +455,7 @@ class MembershipApplication(models.Model):
                 break
             except IntegrityError:
                 # Only retry if this was a username race.  Any other constraint
-                # violation (e.g. duplicate email) should propagate immediately.
+                # violation should propagate immediately.
                 if not Member.objects.filter(username=candidate_username).exists():
                     raise
                 if _attempt == MAX_USERNAME_RETRIES - 1:

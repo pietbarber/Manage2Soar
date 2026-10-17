@@ -20,6 +20,7 @@ from .account_emails import send_account_setup_email
 from .models import (
     Badge,
     Biography,
+    EmergencyContact,
     KioskAccessLog,
     KioskToken,
     Member,
@@ -177,6 +178,11 @@ class MemberBadgeInline(admin.TabularInline):
     autocomplete_fields = ["badge"]  # Optional: if you have lots of badges
 
 
+class EmergencyContactInline(admin.TabularInline):
+    model = EmergencyContact
+    extra = 0
+
+
 #########################
 # CustomMemberChangeForm Class
 
@@ -187,6 +193,28 @@ class MemberBadgeInline(admin.TabularInline):
 
 # This form is referenced by MemberAdmin via the 'form' attribute.
 class CustomMemberChangeForm(UserChangeForm):
+    CONTACT_VISIBILITY_CHOICES = (
+        ("inherit", "Use club default"),
+        ("share", "Share"),
+        ("hide", "Hide"),
+    )
+
+    contact_visibility_email = forms.ChoiceField(
+        label="Email visibility",
+        choices=CONTACT_VISIBILITY_CHOICES,
+        help_text="Controls visibility to regular members.",
+    )
+    contact_visibility_phone = forms.ChoiceField(
+        label="Phone visibility",
+        choices=CONTACT_VISIBILITY_CHOICES,
+        help_text="Controls visibility to regular members.",
+    )
+    contact_visibility_address = forms.ChoiceField(
+        label="Address visibility",
+        choices=CONTACT_VISIBILITY_CHOICES,
+        help_text="Controls visibility to regular members.",
+    )
+
     class Meta:
         model = Member
         fields = (
@@ -198,6 +226,28 @@ class CustomMemberChangeForm(UserChangeForm):
             "instructor",
             "towpilot",
         )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        visibility = self.instance.contact_visibility or {}
+        for field in ("email", "phone", "address"):
+            self.fields[f"contact_visibility_{field}"].initial = (
+                "hide"
+                if self.instance.redact_contact
+                else visibility.get(field, "inherit")
+            )
+
+    def save(self, commit=True):
+        member = super().save(commit=False)
+        member.contact_visibility = {
+            field: self.cleaned_data[f"contact_visibility_{field}"]
+            for field in ("email", "phone", "address")
+            if self.cleaned_data[f"contact_visibility_{field}"] != "inherit"
+        }
+        member.redact_contact = False
+        if commit:
+            member.save()
+        return member
 
 
 #########################
@@ -331,7 +381,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
-    inlines = [MemberBadgeInline]
+    inlines = [MemberBadgeInline, EmergencyContactInline]
 
     list_display = (
         "last_name",
@@ -416,6 +466,9 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "glider_rating",
                     "private_notes",
                     "public_notes",
+                    "contact_visibility_email",
+                    "contact_visibility_phone",
+                    "contact_visibility_address",
                     "redact_contact",
                 )
             },

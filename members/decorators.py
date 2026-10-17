@@ -28,6 +28,24 @@ def active_member_required(view_func):
     return wrapper
 
 
+def non_kiosk_member_required(view_func):
+    """Require an active member, but reject kiosk (shared) sessions.
+
+    Kiosk sessions authenticate as a shared Role Account. Credential-recovery
+    flows (email address or password changes) must not be usable from them,
+    otherwise anyone at the kiosk could take over the shared account.
+    """
+    member_view = active_member_required(view_func)
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if is_kiosk_session(request):
+            return render(request, "403.html", status=403)
+        return member_view(request, *args, **kwargs)
+
+    return wrapper
+
+
 def safety_officer_required(view_func):
     """Decorator that requires the user to be a safety officer.
 

@@ -1,7 +1,16 @@
 import pytest
+from django.contrib import admin
+from django.contrib.auth.models import Group
+from django.urls import reverse
 
+from members.admin import (
+    CustomMemberChangeForm,
+    EmergencyContactInline,
+    MemberAdmin,
+)
 from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
+from siteconfig.models import MembershipStatus
 
 
 @pytest.mark.django_db
@@ -56,3 +65,57 @@ def test_approved_application_creates_structured_emergency_contact():
     assert contact.relationship == "Parent"
     assert contact.mobile_phone == "555-0201"
     assert member.emergency_contact is None
+
+
+@pytest.mark.django_db
+def test_admin_contact_visibility_controls_preserve_inherit_share_and_hide():
+    member = Member.objects.create_user(
+        username="admin_visibility",
+        contact_visibility={"email": "hide", "phone": "share"},
+    )
+
+    form = CustomMemberChangeForm(instance=member)
+
+    assert form.fields["contact_visibility_email"].initial == "hide"
+    assert form.fields["contact_visibility_phone"].initial == "share"
+    assert form.fields["contact_visibility_address"].initial == "inherit"
+    assert [choice[0] for choice in form.CONTACT_VISIBILITY_CHOICES] == [
+        "inherit",
+        "share",
+        "hide",
+    ]
+
+
+def test_member_admin_registers_structured_emergency_contact_inline():
+    assert EmergencyContactInline in MemberAdmin.inlines
+    assert issubclass(EmergencyContactInline, admin.TabularInline)
+    assert EmergencyContactInline.model is EmergencyContact
+    assert EmergencyContactInline.extra == 0
+
+
+@pytest.mark.django_db
+def test_member_manager_can_open_emergency_contact_inline_in_admin(client):
+    status, _ = MembershipStatus.objects.get_or_create(
+        name="Admin Active", defaults={"is_active": True, "sort_order": 1}
+    )
+    manager = Member.objects.create_user(
+        username="contact_admin_manager",
+        password="test-password",
+        is_staff=True,
+        member_manager=True,
+        membership_status=status.name,
+    )
+    manager.groups.add(Group.objects.get(name="Member Managers"))
+    member = Member.objects.create_user(username="contact_admin_subject")
+    EmergencyContact.objects.create(
+        member=member,
+        name="Admin Contact",
+        relationship="Parent",
+        mobile_phone="555-0100",
+    )
+    client.force_login(manager)
+
+    response = client.get(reverse("admin:members_member_change", args=[member.pk]))
+
+    assert response.status_code == 200
+    assert b"Admin Contact" in response.content

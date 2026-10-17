@@ -1,3 +1,4 @@
+import importlib
 import io
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
@@ -14,6 +15,7 @@ from siteconfig.models import (
     MembershipStatus,
     SiteConfiguration,
     default_member_profile_field_policies,
+    get_member_profile_field_policy,
     validate_member_profile_field_policies,
 )
 from utils.favicon import PWA_CLUB_ICON_NAME
@@ -29,19 +31,11 @@ User = get_user_model()
         {**default_member_profile_field_policies(), "unknown": "direct"},
         {
             **default_member_profile_field_policies(),
-            "username": "unsupported",
-        },
-        {
-            **default_member_profile_field_policies(),
-            "username": [],
-        },
-        {
-            **default_member_profile_field_policies(),
             "password": "request",
         },
         {
             **default_member_profile_field_policies(),
-            "profile_photo": "request",
+            "email": [],
         },
     ],
 )
@@ -52,6 +46,236 @@ def test_member_profile_policy_validator_rejects_invalid_maps(policies):
 
 def test_member_profile_policy_validator_accepts_complete_policy_map():
     validate_member_profile_field_policies(default_member_profile_field_policies())
+
+
+def assert_legacy_policy_contract(policies):
+    """The validator used by pods running the 0053 application revision."""
+    assert set(policies) == {
+        "username",
+        "email",
+        "phone",
+        "address",
+        "emergency_contacts",
+        "nickname",
+        "profile_photo",
+        "biography",
+        "password",
+        "contact_visibility",
+    }
+    for field, value in policies.items():
+        allowed = {"disabled", "direct"}
+        if field not in {"password", "profile_photo"}:
+            allowed.add("request")
+        assert value in allowed
+
+
+@pytest.mark.django_db
+def test_policy_migration_preserves_old_pod_configuration_saves():
+    from django.apps import apps
+
+    migration = importlib.import_module(
+        "siteconfig.migrations.0054_rebuild_member_profile_policies"
+    )
+    policies = {
+        **default_member_profile_field_policies(),
+        "email": "request",
+        "phone": "disabled",
+        "nickname": "direct",
+    }
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    migration.normalize_profile_policies(apps, None)
+    config.refresh_from_db()
+    assert config.member_profile_field_policies == {**policies, "email": "disabled"}
+    assert_legacy_policy_contract(config.member_profile_field_policies)
+    # Old pods validate the whole model even for unrelated partial saves.
+    field = SiteConfiguration._meta.get_field("member_profile_field_policies")
+    with patch.object(field, "validators", [assert_legacy_policy_contract]):
+        config.club_name = "Updated Club"
+        config.save(update_fields=["club_name"])
+    migration.restore_legacy_member_profile_field_policies(apps, None)
+    config.refresh_from_db()
+    assert config.member_profile_field_policies == {**policies, "email": "disabled"}
+
+
+@pytest.mark.django_db
+def test_old_pod_request_policy_writes_remain_readable_and_disabled():
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "email": "request",
+        },
+    )
+    assert get_member_profile_field_policy("email", config) == "disabled"
+
+
+def test_member_profile_policy_defaults_and_migration_normalization_are_safe():
+    migration = importlib.import_module(
+        "siteconfig.migrations.0054_rebuild_member_profile_policies"
+    )
+
+    assert default_member_profile_field_policies() == {
+        "username": "disabled",
+        "phone": "request",
+        "address": "request",
+        "nickname": "request",
+        "email": "disabled",
+        "emergency_contacts": "direct",
+        "profile_photo": "direct",
+        "biography": "direct",
+        "password": "direct",
+        "contact_visibility": "direct",
+    }
+    assert migration.normalize_member_profile_field_policies(
+        {"email": "request", "username": "direct", "biography": "disabled"}
+    ) == {
+        **{field: "disabled" for field in default_member_profile_field_policies()},
+        "username": "direct",
+        "phone": "request",
+        "address": "request",
+        "nickname": "request",
+        "biography": "disabled",
+    }
+    assert migration.legacy_member_profile_field_policies(
+        {"email": "direct", "biography": "direct"}
+    ) == {
+        "username": "disabled",
+        "email": "direct",
+        "phone": "request",
+        "address": "request",
+        "emergency_contacts": "disabled",
+        "nickname": "request",
+        "profile_photo": "disabled",
+        "biography": "direct",
+        "password": "disabled",
+        "contact_visibility": "disabled",
+    }
+
+
+@pytest.mark.django_db
+def test_member_profile_policy_master_toggle_and_username_are_disabled():
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "email": "direct",
+        },
+    )
+
+    assert get_member_profile_field_policy("email", config) == "direct"
+    assert get_member_profile_field_policy("username", config) == "disabled"
+    config.member_profile_self_service_enabled = False
+    assert get_member_profile_field_policy("email", config) == "disabled"
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_admin_form_uses_compact_direct_policy_checkboxes():
+    from siteconfig.admin import SiteConfigurationAdminForm
+
+    form = SiteConfigurationAdminForm()
+
+    assert "member_profile_field_policies" not in form.fields
+    assert {
+        "profile_policy_email",
+        "profile_policy_emergency_contacts",
+        "profile_policy_profile_photo",
+        "profile_policy_biography",
+        "profile_policy_password",
+        "profile_policy_contact_visibility",
+    } <= form.fields.keys()
+    assert [
+        form.fields[field].label
+        for field in (
+            "profile_policy_email",
+            "profile_policy_emergency_contacts",
+            "profile_policy_profile_photo",
+            "profile_policy_biography",
+            "profile_policy_password",
+            "profile_policy_contact_visibility",
+        )
+    ] == [
+        "Email",
+        "Emergency Contacts",
+        "Profile Photo",
+        "Biography",
+        "Password",
+        "Contact Visibility",
+    ]
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_admin_page_loads(client, django_user_model):
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+    )
+    admin_user = django_user_model.objects.create_superuser(
+        username="siteconfig_admin_page",
+        email="admin@example.org",
+        password="test-password",
+    )
+    client.force_login(admin_user)
+
+    response = client.get(f"/admin/siteconfig/siteconfiguration/{config.pk}/change/")
+
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_siteconfiguration_admin_form_saves_direct_edit_policies_and_master_switch():
+    from siteconfig.admin import SiteConfigurationAdminForm
+
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_profile_field_policies={
+            **default_member_profile_field_policies(),
+            "emergency_contacts": "direct",
+            "phone": "disabled",
+            "nickname": "direct",
+        },
+    )
+    unbound_form = SiteConfigurationAdminForm(instance=config)
+    data = dict(unbound_form.initial)
+    data.update(
+        {
+            "member_profile_self_service_enabled": "on",
+            "profile_policy_email": "on",
+            "profile_policy_emergency_contacts": "on",
+            "profile_policy_password": "on",
+        }
+    )
+
+    form = SiteConfigurationAdminForm(data=data, instance=config)
+
+    assert form.is_valid(), form.errors
+    form.save()
+    config.refresh_from_db()
+    assert config.member_profile_self_service_enabled is True
+    assert_legacy_policy_contract(config.member_profile_field_policies)
+    assert config.member_profile_field_policies == {
+        "username": "disabled",
+        "phone": "disabled",
+        "address": "request",
+        "nickname": "direct",
+        "email": "direct",
+        "emergency_contacts": "direct",
+        "profile_photo": "disabled",
+        "biography": "disabled",
+        "password": "direct",
+        "contact_visibility": "disabled",
+    }
 
 
 @pytest.mark.django_db
@@ -101,6 +325,33 @@ def test_siteconfiguration_admin_exposes_member_contact_visibility_defaults():
         "share_member_phone_by_default",
         "share_member_address_by_default",
     } <= field_names
+
+
+def test_siteconfiguration_admin_self_service_fieldset_matches_original_shape():
+    from siteconfig.admin import SiteConfigurationAdmin
+
+    fieldsets = dict(SiteConfigurationAdmin.fieldsets)
+    titles = [title for title, _options in SiteConfigurationAdmin.fieldsets]
+    self_service = fieldsets["Member Profile Self-Service"]
+
+    assert (
+        titles.index("Member Profile Self-Service")
+        == titles.index("Contact Information") + 1
+    )
+    assert "collapse" in self_service.get("classes", ())
+    assert self_service["fields"] == (
+        "member_profile_self_service_enabled",
+        "profile_policy_email",
+        "profile_policy_emergency_contacts",
+        "profile_policy_profile_photo",
+        "profile_policy_biography",
+        "profile_policy_password",
+        "profile_policy_contact_visibility",
+    )
+    assert self_service["description"] == (
+        "Configure which profile fields members may edit directly. "
+        "Collapsed by default to keep the site settings page compact."
+    )
 
 
 @pytest.mark.django_db

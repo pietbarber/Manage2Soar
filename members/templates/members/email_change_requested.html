@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load siteconfig_tags %}
+{% block title %}Email Change Confirmation Sent{% endblock %}
+
+{% block content %}
+{% get_siteconfig as siteconfig %}
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="card shadow-lg p-4" style="max-width: 500px; width: 100%;">
+        <div class="text-center mb-4">
+            {% if siteconfig and siteconfig.club_logo %}
+                <img src="{{ siteconfig.club_logo.url }}" alt="Logo" style="max-height: 60px;" onerror="this.style.display='none'">
+            {% endif %}
+            <div class="text-success mb-3" style="font-size: 4rem;" aria-hidden="true">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2 class="mb-3">Check Your Email</h2>
+        </div>
+
+        <div class="alert alert-info">
+            <p class="mb-2">
+                <i class="fas fa-envelope me-2"></i>
+                <strong>We've sent a confirmation link to {{ pending_email }}.</strong>
+            </p>
+            <p class="mb-0 small">
+                Your email address will not change until you confirm the link.
+            </p>
+        </div>
+
+        <div class="mb-4">
+            <h5 class="mb-3">What to do next:</h5>
+            <ol class="text-muted">
+                <li class="mb-2">Check the inbox and spam folder for {{ pending_email }}</li>
+                <li class="mb-2">Click the secure confirmation link</li>
+                <li>Your new email address will be updated</li>
+            </ol>
+        </div>
+
+        <div class="alert alert-warning small">
+            <i class="fas fa-clock me-1"></i>
+            <strong>Important:</strong> The confirmation link will expire in 24 hours for security.
+        </div>
+
+        <div class="text-center">
+            <a href="{% url 'members:member_view' request.user.pk %}" class="btn btn-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to My Profile
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

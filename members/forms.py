@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.forms import SetPasswordForm as AuthSetPasswordForm
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.template import loader
@@ -72,8 +73,13 @@ class MemberProfilePhotoForm(forms.ModelForm):
                 # Re-raise as validation error so it shows in form
                 raise ValidationError(str(e))
 
-        if commit:
-            instance.save()
+        if commit and self.changed_data:
+            update_fields = ["profile_photo"]
+            if "profile_photo" in self.changed_data and self.cleaned_data.get(
+                "profile_photo"
+            ):
+                update_fields.extend(["profile_photo_medium", "profile_photo_small"])
+            instance.save(update_fields=update_fields)
 
         return instance
 
@@ -216,6 +222,16 @@ class DirectRecipientPasswordResetForm(PasswordResetForm):
             email_message.attach_alternative(html_email, "text/html")
 
         email_message.send()
+
+
+class PasswordResetConfirmForm(AuthSetPasswordForm):
+    """Save password resets without overwriting concurrent member changes."""
+
+    def save(self, commit=True):
+        self.user.set_password(self.cleaned_data["new_password1"])
+        if commit:
+            self.user.save(update_fields=["password"])
+        return self.user
 
 
 #########################

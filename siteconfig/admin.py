@@ -8,6 +8,7 @@ from duty_roster.models import DutyRoleDefinition
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
+    MEMBER_PROFILE_POLICY_FIELDS,
     ChargeableItem,
     MailingList,
     MailingListCriterion,
@@ -64,12 +65,26 @@ class MailingListAdminForm(forms.ModelForm):
 class SiteConfigurationAdminForm(forms.ModelForm):
     """Admin form with period-neutral reservation cap wording."""
 
+    profile_policy_email = forms.BooleanField(required=False)
+    profile_policy_emergency_contacts = forms.BooleanField(required=False)
+    profile_policy_profile_photo = forms.BooleanField(required=False)
+    profile_policy_biography = forms.BooleanField(required=False)
+    profile_policy_password = forms.BooleanField(required=False)
+    profile_policy_contact_visibility = forms.BooleanField(required=False)
+
     class Meta:
         model = SiteConfiguration
         fields = "__all__"
+        exclude = ("member_profile_field_policies",)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        policies = self.instance.member_profile_field_policies or {}
+        for field in MEMBER_PROFILE_POLICY_FIELDS:
+            policy_field = self.fields[f"profile_policy_{field}"]
+            policy_field.label = field.replace("_", " ").title()
+            policy_field.help_text = "Allow members to edit this field directly."
+            policy_field.initial = policies.get(field) == "direct"
         reservation_cap_field = self.fields.get("max_reservations_per_year")
         if reservation_cap_field:
             reservation_cap_field.label = "Max reservations per selected period"
@@ -124,6 +139,21 @@ class SiteConfigurationAdminForm(forms.ModelForm):
                 label=visiting_pilot_status_field.label,
                 help_text=visiting_pilot_status_field.help_text,
             )
+
+    def _post_clean(self):
+        if hasattr(self, "cleaned_data"):
+            self.instance.member_profile_field_policies = {
+                **self.instance.member_profile_field_policies,
+                **{
+                    field: (
+                        "direct"
+                        if self.cleaned_data.get(f"profile_policy_{field}")
+                        else "disabled"
+                    )
+                    for field in MEMBER_PROFILE_POLICY_FIELDS
+                },
+            }
+        super()._post_clean()
 
 
 class DutyRoleDefinitionInline(admin.TabularInline):
@@ -197,6 +227,21 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "operations_info",
                 ),
                 "description": "Contact form and location information for visitors",
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Member Profile Self-Service",
+            {
+                "fields": ("member_profile_self_service_enabled",)
+                + tuple(
+                    f"profile_policy_{field_name}"
+                    for field_name in MEMBER_PROFILE_POLICY_FIELDS
+                ),
+                "description": (
+                    "Configure which profile fields members may edit directly. "
+                    "Collapsed by default to keep the site settings page compact."
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -377,28 +422,6 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
-            "Member Contact Privacy & Self-Service",
-            {
-                "fields": (
-                    "member_profile_self_service_enabled",
-                    "member_profile_field_policies",
-                ),
-                "description": (
-                    "Club-wide contact-privacy defaults and member self-service policy "
-                    "(Issue #1034). The three <strong>share_member_*_by_default</strong> "
-                    "toggles set the default for whether regular members can see each "
-                    "contact field; members can inherit the defaults or override them "
-                    "with a share/hide preference. "
-                    "<strong>member_profile_self_service_enabled</strong> is the "
-                    "master switch for member self-service profile edits, and "
-                    "<strong>member_profile_field_policies</strong> sets each field's "
-                    "policy (disabled/direct/request; password and profile photo do "
-                    "not support request mode)."
-                ),
-                "classes": ("collapse",),
-            },
-        ),
-        (
             "Visiting Pilot Management",
             {
                 "fields": (
@@ -566,7 +589,7 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
         queryset.delete()
         messages.success(
             request,
-            f'Successfully deleted membership statuses: {", ".join(deleted_names)}.',
+            f"Successfully deleted membership statuses: {', '.join(deleted_names)}.",
         )
 
     admin_helper_message = (

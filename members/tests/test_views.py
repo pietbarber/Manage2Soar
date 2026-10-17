@@ -1,12 +1,19 @@
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
 
+from members.forms import SetPasswordForm
 from members.models import Biography
 from members.utils.membership import clear_active_membership_statuses_cache
-from siteconfig.models import MembershipStatus, SiteConfiguration
+from siteconfig.models import (
+    MembershipStatus,
+    SiteConfiguration,
+    default_member_profile_field_policies,
+)
 
 User = get_user_model()
 
@@ -43,6 +50,38 @@ def test_biography_view_returns_404_for_missing_user(client):
     url = reverse("members:biography_view", args=[99999])
     response = client.get(url)
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_staff_can_edit_biography_when_member_policy_is_disabled(client):
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
+    policies = config.member_profile_field_policies
+    policies["biography"] = "disabled"
+    config.save(update_fields=["member_profile_field_policies"])
+    staff = User.objects.create_superuser(
+        username="staff", email="staff@example.com", password="password"
+    )
+    member = User.objects.create_user(
+        username="member", membership_status="Full Member"
+    )
+    client.force_login(staff)
+
+    response = client.post(
+        reverse("members:biography_view", args=[member.pk]),
+        {"content": "<p>Staff update</p>"},
+    )
+
+    assert response.status_code == 302
+    assert member.biography.content == "<p>Staff update</p>"
+
+    response = client.get(reverse("members:member_view", args=[member.pk]))
+
+    assert response.status_code == 200
+    assert b"Edit Biography" in response.content
 
 
 @pytest.mark.django_db
@@ -100,6 +139,100 @@ def test_set_password_mismatched_passwords(client, django_user_model):
         b"Passwords must match" in response.content
         or b"do not match" in response.content.lower()
     )
+
+
+@pytest.mark.django_db
+def test_set_password_sends_security_notification(
+    client, django_user_model, django_capture_on_commit_callbacks
+):
+    MembershipStatus.objects.get_or_create(
+        name="Full Member", defaults={"is_active": True, "sort_order": 1}
+    )
+    clear_active_membership_statuses_cache()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
+    user = django_user_model.objects.create_user(
+        username="password_notification",
+        email="member@example.com",
+        password="oldpass",
+        membership_status="Full Member",
+    )
+    client.force_login(user)
+
+    with patch("members.views._send_account_security_email") as send_email:
+        with django_capture_on_commit_callbacks(execute=True):
+            response = client.post(
+                reverse("members:set_password"),
+                {
+                    "new_password1": "new-password-123",
+                    "new_password2": "new-password-123",
+                },
+            )
+
+    assert response.status_code == 302
+    user.refresh_from_db()
+    assert user.check_password("new-password-123")
+    send_email.assert_called_once_with(
+        "member@example.com",
+        "Your Manage2Soar password changed",
+        "Your Manage2Soar password was changed. If you did not make this change, "
+        "contact a club manager immediately.",
+    )
+
+
+@pytest.mark.django_db
+def test_set_password_does_not_overwrite_concurrent_member_updates(
+    client, django_user_model
+):
+    MembershipStatus.objects.get_or_create(
+        name="Full Member", defaults={"is_active": True, "sort_order": 1}
+    )
+    clear_active_membership_statuses_cache()
+    policies = default_member_profile_field_policies()
+    policies["password"] = "direct"
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+        member_profile_field_policies=policies,
+    )
+    member = django_user_model.objects.create_user(
+        username="password_stale_member",
+        email="old@example.com",
+        password="old-password",
+        membership_status="Full Member",
+    )
+    client.force_login(member)
+    real_is_valid = SetPasswordForm.is_valid
+
+    def is_valid_with_concurrent_update(form):
+        valid = real_is_valid(form)
+        if valid:
+            django_user_model.objects.filter(pk=member.pk).update(
+                email="confirmed@example.com",
+                pending_email="pending@example.com",
+            )
+        return valid
+
+    with patch(
+        "members.views.SetPasswordForm.is_valid", is_valid_with_concurrent_update
+    ):
+        response = client.post(
+            reverse("members:set_password"),
+            {
+                "new_password1": "new-password-123",
+                "new_password2": "new-password-123",
+            },
+        )
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.check_password("new-password-123")
+    assert member.email == "confirmed@example.com"
+    assert member.pending_email == "pending@example.com"
 
 
 @pytest.mark.django_db

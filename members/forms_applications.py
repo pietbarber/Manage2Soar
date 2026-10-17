@@ -367,18 +367,9 @@ class MembershipApplicationForm(forms.ModelForm):
         self.fields["pilot_certificate_number"].required = False
 
     def clean_email(self):
-        """Validate email and ensure it's not already in use."""
+        """Validate email and prevent duplicate pending applications."""
         email = self.cleaned_data.get("email")
         if email:
-            # Check if email is already used by an existing member
-            from members.models import Member
-
-            if Member.objects.filter(email__iexact=email).exists():
-                raise ValidationError(
-                    "This email address is already registered. If you already have an account, "
-                    "please log in instead of submitting a new application."
-                )
-
             # Check if there's already a pending application with this email
             existing_app = MembershipApplication.objects.filter(
                 email__iexact=email,
@@ -407,17 +398,18 @@ class MembershipApplicationForm(forms.ModelForm):
         contact_relationship = cleaned_data.get("emergency_contact_relationship")
         contact_phone = cleaned_data.get("emergency_contact_phone")
 
-        if contact_name or contact_relationship or contact_phone:
-            if not contact_name:
-                self.add_error(
-                    "emergency_contact_name",
-                    "Enter the emergency contact's name when providing contact details.",
-                )
-            if not contact_phone:
-                self.add_error(
-                    "emergency_contact_phone",
-                    "Enter a phone number when providing emergency contact details.",
-                )
+        emergency_contact_fields = {
+            "emergency_contact_name": contact_name,
+            "emergency_contact_relationship": contact_relationship,
+            "emergency_contact_phone": contact_phone,
+        }
+        if any(emergency_contact_fields.values()) and not all(
+            emergency_contact_fields.values()
+        ):
+            error = "Provide the emergency contact's name, relationship, and phone number, or leave all three blank."
+            for field, value in emergency_contact_fields.items():
+                if not value:
+                    self.add_error(field, error)
 
         # Validate agreement checkboxes
         if not cleaned_data.get("agrees_to_terms"):

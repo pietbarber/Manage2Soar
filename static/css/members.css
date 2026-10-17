@@ -70,6 +70,19 @@
     overflow: hidden;
 }
 
+.profile-action-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    min-width: 12rem;
+}
+
+.profile-action-buttons > .btn {
+    display: block;
+    width: 100%;
+}
+
 .profile-photo-container {
     position: relative;
     text-align: center;
@@ -97,6 +110,27 @@
     padding: 1.5rem;
     margin-bottom: 1.5rem;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.staff-reveal {
+    cursor: pointer;
+}
+
+.staff-reveal:hover .staff-redacted,
+.staff-reveal:focus .staff-redacted {
+    text-decoration: underline;
+}
+
+.staff-reveal.is-revealed .staff-redacted {
+    display: none;
+}
+
+.staff-reveal.is-revealed .staff-revealed {
+    display: inline !important;
+}
+
+.staff-reveal.is-revealed address.staff-revealed {
+    display: block !important;
 }
 
 .contact-info .list-group-item {

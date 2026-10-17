@@ -102,6 +102,38 @@ def test_member_cannot_edit_another_members_emergency_contact(member, client_for
 
 
 @pytest.mark.django_db
+def test_emergency_contact_endpoints_reject_disabled_policy(member, client_for):
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="testclub.com",
+        club_abbreviation="TC",
+    )
+    policies = config.member_profile_field_policies
+    policies["emergency_contacts"] = "disabled"
+    config.save(update_fields=["member_profile_field_policies"])
+    contact = EmergencyContact.objects.create(member=member, name="Private Contact")
+
+    add_response = client_for.post(
+        reverse("members:emergency_contact_add", args=[member.pk]),
+        {"name": "New Contact", "mobile_phone": "555-0100"},
+    )
+    edit_response = client_for.post(
+        reverse("members:emergency_contact_edit", args=[member.pk, contact.pk]),
+        {"name": "Updated Contact", "mobile_phone": "555-0101"},
+    )
+    delete_response = client_for.post(
+        reverse("members:emergency_contact_delete", args=[member.pk, contact.pk]),
+    )
+
+    assert add_response.status_code == 403
+    assert edit_response.status_code == 403
+    assert delete_response.status_code == 403
+    contact.refresh_from_db()
+    assert contact.name == "Private Contact"
+    assert member.emergency_contacts.count() == 1
+
+
+@pytest.mark.django_db
 def test_delete_endpoint_checks_ownership_before_contact_lookup(member, client_for):
     other = Member.objects.create_user(
         username="other_owner",
@@ -251,6 +283,7 @@ def test_profile_reuses_site_configuration_for_all_policies(member, direct_polic
         "emergency_contacts",
         "contact_visibility",
         "password",
+        "email",
     ]
     site_configs = [call.args[1] for call in policy_lookup.call_args_list]
     assert site_configs[0] is not None

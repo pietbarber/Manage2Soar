@@ -124,3 +124,37 @@ class TestMemberProfilePhotoForm:
         assert form.is_valid()
         saved_member = form.save()
         assert saved_member.pk == member.pk
+
+    def test_photo_save_does_not_overwrite_other_concurrent_member_changes(
+        self, django_user_model, settings
+    ):
+        settings.TESTING = True
+        member = django_user_model.objects.create_user(
+            username="photo_stale_member",
+            email="old@example.com",
+            membership_status="Full Member",
+        )
+        stale_member = django_user_model.objects.get(pk=member.pk)
+        django_user_model.objects.filter(pk=member.pk).update(
+            email="confirmed@example.com",
+            pending_email="pending@example.com",
+        )
+        form = MemberProfilePhotoForm(
+            data={},
+            files={"profile_photo": create_test_image(600, 600)},
+            instance=stale_member,
+        )
+
+        assert form.is_valid()
+        saved_member = form.save()
+        member.refresh_from_db()
+
+        assert member.email == "confirmed@example.com"
+        assert member.pending_email == "pending@example.com"
+        assert saved_member.profile_photo
+        assert saved_member.profile_photo_medium
+        assert saved_member.profile_photo_small
+
+        saved_member.profile_photo.delete(save=False)
+        saved_member.profile_photo_medium.delete(save=False)
+        saved_member.profile_photo_small.delete(save=False)

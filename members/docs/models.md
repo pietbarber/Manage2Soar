@@ -50,6 +50,8 @@ erDiagram
         date private_glider_checkride_date
         string home_club
         json contact_visibility
+        string pending_email
+        datetime pending_email_requested_at
     }
 
     EmergencyContact {
@@ -209,9 +211,12 @@ Values that do not fit the controlled choices are retained in
 ### `Member`
 - Extends Django's `AbstractUser`.
 - Stores all member profile data, authentication info, and group/role logic.
+- Email addresses are not unique; multiple member accounts may share an address, while usernames identify individual accounts.
 - Methods for profile image, display name, group syncing, and status.
 - Includes `home_club` field for visiting pilots from other soaring clubs.
 - Stores per-field email, phone, and address visibility preferences in `contact_visibility`.
+- `contact_visibility` stores optional per-field values of `share` or `hide` for email, phone, and address. An omitted key is the effective `inherit` state and uses the site default; `share` and `hide` override it.
+- `pending_email` and `pending_email_requested_at` hold an email change until the member confirms the emailed link. The current email remains unchanged until confirmation.
 - Can be linked to a `MembershipApplication` that created the account.
 - **Performance Optimization (Issue #285)**: Added database indexes on `membership_status` and `(last_name, first_name)` for faster filtering and sorting in logsheet operations.
 - **Photo Thumbnails (Issue #286)**: Added `profile_photo_medium` (200x200) and `profile_photo_small` (64x64) fields for optimized page loading. Thumbnails are auto-generated when photos are uploaded via admin. URL properties (`profile_image_url_medium`, `profile_image_url_small`) provide graceful fallback chains.
@@ -224,6 +229,7 @@ See also: [Redaction of Personal Contact Information](redaction.md)
 - Linked to `Member` via `member` FK (`related_name="emergency_contacts"`); a member may have zero or many.
 - All contact fields (`name` required, the rest optional) plus a `preferred_contact_method` choice and free-form `preferred_contact_details`.
 - Replaces the legacy free-text `Member.emergency_contact`, which remains display-only during migration.
+- Admin/member management and exports use the structured records; a dedicated inline admin workflow remains part of the profile rebuild scope.
 
 ### `MembershipApplication`
 - Stores membership applications from non-logged-in users (Issue #245).
@@ -232,11 +238,6 @@ See also: [Redaction of Personal Contact Information](redaction.md)
 - Links to `Member` account upon approval via `member_account` field.
 - Includes waitlist management with position tracking.
 - Administrative notes and review tracking for membership managers.
-
-### `EmergencyContact`
-- Stores an optional structured emergency contact for a member.
-- Linked to `Member`; members may have multiple contacts.
-- Records contact details and a preferred contact method.
 
 ### `Biography`
 - Stores member biographies, including rich text and upload path logic.
