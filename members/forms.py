@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.forms import SetPasswordForm as AuthSetPasswordForm
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.template import loader
@@ -221,6 +222,16 @@ class DirectRecipientPasswordResetForm(PasswordResetForm):
             email_message.attach_alternative(html_email, "text/html")
 
         email_message.send()
+
+
+class PasswordResetConfirmForm(AuthSetPasswordForm):
+    """Save password resets without overwriting concurrent member changes."""
+
+    def save(self, commit=True):
+        self.user.set_password(self.cleaned_data["new_password1"])
+        if commit:
+            self.user.save(update_fields=["password"])
+        return self.user
 
 
 #########################

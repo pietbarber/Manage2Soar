@@ -17,6 +17,7 @@ from django.utils.http import urlsafe_base64_encode
 from social_core.pipeline.user import user_details
 
 from members.admin import CustomMemberChangeForm
+from members.forms import PasswordResetConfirmForm
 from members.models import Member
 from members.utils.membership import clear_active_membership_statuses_cache
 from members.views import _email_change_password_fingerprint, request_email_change
@@ -575,6 +576,57 @@ def test_password_reset_invalidates_pending_email_confirmation(client):
     member.refresh_from_db()
     assert member.email == "old@example.com"
     assert member.pending_email == "pending@example.com"
+
+
+@pytest.mark.django_db
+def test_password_reset_does_not_overwrite_concurrent_email_change(client):
+    configure_email_changes()
+    member = Member.objects.create_user(
+        username="email_reset_race",
+        email="old@example.com",
+        password="Initial-password-123!",
+        membership_status="Email Active",
+    )
+    member.pending_email = "pending@example.com"
+    member.pending_email_requested_at = timezone.now()
+    member.save(update_fields=["pending_email", "pending_email_requested_at"])
+
+    uid = urlsafe_base64_encode(force_bytes(member.pk))
+    reset_token = default_token_generator.make_token(member)
+    reset_url = reverse(
+        "password_reset_confirm", kwargs={"uidb64": uid, "token": reset_token}
+    )
+    reset_response = client.get(reset_url, follow=True)
+    assert reset_response.status_code == 200
+    password_form_url = reset_response.redirect_chain[-1][0]
+
+    original_save = PasswordResetConfirmForm.save
+
+    def confirm_email_before_password_save(form, commit=True):
+        Member.objects.filter(pk=form.user.pk).update(
+            email="confirmed@example.com",
+            pending_email="",
+            pending_email_requested_at=None,
+        )
+        return original_save(form, commit=commit)
+
+    with patch.object(
+        PasswordResetConfirmForm, "save", confirm_email_before_password_save
+    ):
+        response = client.post(
+            password_form_url,
+            {
+                "new_password1": "A-new-strong-password-123!",
+                "new_password2": "A-new-strong-password-123!",
+            },
+        )
+
+    assert response.status_code == 302
+    member.refresh_from_db()
+    assert member.check_password("A-new-strong-password-123!")
+    assert member.email == "confirmed@example.com"
+    assert member.pending_email == ""
+    assert member.pending_email_requested_at is None
 
 
 @pytest.mark.django_db

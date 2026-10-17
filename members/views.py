@@ -50,6 +50,7 @@ from .forms import (
     EmergencyContactDeclineForm,
     EmergencyContactForm,
     MemberProfilePhotoForm,
+    PasswordResetConfirmForm,
     SafetyReportForm,
     SetPasswordForm,
 )
@@ -1821,3 +1822,9 @@ class CustomPasswordResetView(auth_views.PasswordResetView):
             self.extra_email_context = email_context
 
         return super().form_valid(form)
+
+
+class CustomPasswordResetConfirmView(auth_views.PasswordResetConfirmView):
+    """Avoid saving stale member fields when a reset races another update."""
+
+    form_class = PasswordResetConfirmForm
