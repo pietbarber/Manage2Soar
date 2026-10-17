@@ -42,7 +42,7 @@
   1. **Always prefix Python commands**: Use `source .venv/bin/activate && your_command` when uncertain
   2. **Check environment first**: Run `which python` to verify virtual environment
   3. **When you see "command not found" errors**: Immediately run `source .venv/bin/activate` and retry
-- **Commands requiring venv**: `pytest`, `python manage.py`, `pip`, `django-admin`, `black`, `isort`, `bandit`, `safety`, and all Python tooling.
+- **Commands requiring venv**: `pytest`, `python manage.py`, `pip`, `django-admin`, `black`, `isort`, `bandit`, and all Python tooling.
 
 ## Git Workflow - NEVER COMMIT TO MAIN ⚠️
 - **CRITICAL**: ALL changes must go through feature branches and pull requests. NEVER commit directly to `main`.

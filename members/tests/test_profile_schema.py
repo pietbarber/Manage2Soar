@@ -10,7 +10,15 @@ from members.admin import (
 )
 from members.models import EmergencyContact, Member
 from members.models_applications import MembershipApplication
+from members.utils.membership import clear_active_membership_statuses_cache
 from siteconfig.models import MembershipStatus
+
+
+@pytest.fixture
+def clear_membership_status_cache():
+    clear_active_membership_statuses_cache()
+    yield
+    clear_active_membership_statuses_cache()
 
 
 @pytest.mark.django_db
@@ -94,9 +102,12 @@ def test_member_admin_registers_structured_emergency_contact_inline():
 
 
 @pytest.mark.django_db
-def test_member_manager_can_open_emergency_contact_inline_in_admin(client):
-    status, _ = MembershipStatus.objects.get_or_create(
-        name="Admin Active", defaults={"is_active": True, "sort_order": 1}
+def test_member_manager_can_open_emergency_contact_inline_in_admin(
+    client, clear_membership_status_cache
+):
+    status, _ = MembershipStatus.objects.update_or_create(
+        name="Admin Active",
+        defaults={"is_active": True, "sort_order": 1},
     )
     manager = Member.objects.create_user(
         username="contact_admin_manager",
@@ -106,6 +117,7 @@ def test_member_manager_can_open_emergency_contact_inline_in_admin(client):
         membership_status=status.name,
     )
     manager.groups.add(Group.objects.get(name="Member Managers"))
+    assert manager.is_active and manager.is_staff
     member = Member.objects.create_user(username="contact_admin_subject")
     EmergencyContact.objects.create(
         member=member,
@@ -113,7 +125,8 @@ def test_member_manager_can_open_emergency_contact_inline_in_admin(client):
         relationship="Parent",
         mobile_phone="555-0100",
     )
-    client.force_login(manager)
+    client.force_login(manager, backend="django.contrib.auth.backends.ModelBackend")
+    assert client.session.get("_auth_user_id") == str(manager.pk)
 
     response = client.get(reverse("admin:members_member_change", args=[member.pk]))
 

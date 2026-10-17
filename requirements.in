@@ -20,6 +20,7 @@ gunicorn
 icalendar
 identify
 isort
+Jinja2
 ortools
 pillow
 pip-audit
@@ -35,7 +36,6 @@ python-slugify
 pytz
 qrcode
 ruff
-safety
 social-auth-app-django
 social-auth-core
 tinycss2
