@@ -571,7 +571,8 @@ def _email_change_password_fingerprint(member):
     return salted_hmac(
         "members.email-change.password-state",
         member.password,
-        algorithm="sha256",
+        # Django 5.2 accepts this keyword; newer type stubs omit it.
+        algorithm="sha256",  # pyright: ignore[reportCallIssue]
     ).hexdigest()
 
 
