@@ -122,6 +122,6 @@ Order:
 * Username self-editing is deferred for future investigation.
 * Member-manager approval workflows and request-policy behavior are deferred;
   this rebuild does not implement them.
-* Email uniqueness is enforced for nonblank addresses by the profile self-service
-  work. The database constraint is case-insensitive, and the migration stops with
-  the conflicting member IDs if existing duplicate addresses require resolution.
+* Multiple member accounts may share an email address. Profile self-service
+  verifies mailbox access without imposing email uniqueness or requiring
+  existing shared addresses to be deduplicated.
