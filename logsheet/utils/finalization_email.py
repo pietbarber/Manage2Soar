@@ -15,7 +15,7 @@ to all active members with:
 import ipaddress
 import logging
 import re
-from html import unescape
+from html.parser import HTMLParser
 from urllib.parse import unquote, urlparse
 
 import bleach
@@ -69,17 +69,10 @@ _PDF_EMBED_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-_ANCHOR_TAG_RE = re.compile(
-    r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
-    re.IGNORECASE | re.DOTALL,
-)
-
 _IMG_SRC_RE = re.compile(
     r'(<img\b[^>]*\bsrc=["\'])([^"\']+)(["\'][^>]*>)',
     re.IGNORECASE | re.DOTALL,
 )
-
-_HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
 def _youtube_replacement(match):
@@ -401,25 +394,53 @@ def html_to_text_preserve_links(html):
     if not html:
         return ""
 
-    def _anchor_to_text(match):
-        href = unescape(match.group(1)).strip()
-        label = unescape(_HTML_TAG_RE.sub("", match.group(2))).strip()
-        label = re.sub(r"\s+", " ", label)
+    class _EmailTextParser(HTMLParser):
+        """Extract text and link destinations without regex parsing HTML."""
 
-        if not href:
-            return label
-        if not label:
-            return href
-        if label == href:
-            return href
-        return f"{label} ({href})"
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.parts = []
+            self.anchor = None
 
-    text = _ANCHOR_TAG_RE.sub(_anchor_to_text, html)
-    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</p\s*>", "\n\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</li\s*>", "\n", text, flags=re.IGNORECASE)
-    text = _HTML_TAG_RE.sub("", text)
-    text = unescape(text)
+        def handle_starttag(self, tag, attrs):
+            if tag.lower() == "a":
+                self.anchor = {
+                    "href": dict(attrs).get("href") or "",
+                    "text": [],
+                }
+            elif tag.lower() == "br":
+                self.parts.append("\n")
+
+        def handle_data(self, data):
+            if self.anchor is not None:
+                self.anchor["text"].append(data)
+            else:
+                self.parts.append(data)
+
+        def handle_endtag(self, tag):
+            tag = tag.lower()
+            if tag == "a" and self.anchor is not None:
+                href = self.anchor["href"].strip()
+                label = re.sub(r"\s+", " ", "".join(self.anchor["text"])).strip()
+                if not href:
+                    replacement = label
+                elif not label or label == href:
+                    replacement = href
+                else:
+                    replacement = f"{label} ({href})"
+                self.parts.append(replacement)
+                self.anchor = None
+            elif tag == "p":
+                self.parts.append("\n\n")
+            elif tag == "li":
+                self.parts.append("\n")
+
+    parser = _EmailTextParser()
+    parser.feed(html)
+    parser.close()
+    if parser.anchor is not None:
+        parser.parts.extend(parser.anchor["text"])
+    text = "".join(parser.parts)
     text = text.replace("\xa0", " ")
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
