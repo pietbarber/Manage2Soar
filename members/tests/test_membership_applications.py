@@ -1073,6 +1073,52 @@ class MembershipApplicationViewTests(TestCase):
         )
         self.assertEqual(application.status, original_status)
 
+    def test_review_legacy_application_with_partial_emergency_contact(self):
+        """Review actions should work for records predating contact completeness validation."""
+        self._create_manager()
+
+        for action, expected_status in (
+            ("save_notes", "pending"),
+            ("need_info", "additional_info_needed"),
+        ):
+            with self.subTest(action=action):
+                application = MembershipApplication.objects.create(
+                    first_name="Legacy",
+                    last_name="Applicant",
+                    email=f"legacy-{action}@example.com",
+                    phone="555-123-4567",
+                    address_line1="123 Main St",
+                    city="Anytown",
+                    state="CA",
+                    zip_code="12345",
+                    emergency_contact_name="Legacy Contact",
+                    emergency_contact_phone="555-987-6543",
+                    soaring_goals="Test",
+                    agrees_to_terms=True,
+                    agrees_to_safety_rules=True,
+                    agrees_to_financial_obligations=True,
+                )
+
+                response = self.client.post(
+                    reverse(
+                        "members:membership_application_detail",
+                        args=[application.application_id],
+                    ),
+                    {
+                        "review_action": action,
+                        "admin_notes": "Follow up with the applicant.",
+                    },
+                    follow=True,
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "Follow up with the applicant.")
+                application.refresh_from_db()
+                self.assertEqual(application.status, expected_status)
+                self.assertEqual(
+                    application.admin_notes, "Follow up with the applicant."
+                )
+
     def test_add_to_waitlist_already_waitlisted_keeps_position(self):
         """Test that clicking 'Add to Waitlist' on someone already waitlisted doesn't change position.
 
