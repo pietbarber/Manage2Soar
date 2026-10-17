@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install bandit[toml] safety pip-audit
+          pip install bandit[toml] pip-audit
           # Install project dependencies for comprehensive scanning
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
@@ -39,12 +39,6 @@ jobs:
           echo "Running Bandit security scan..."
           bandit --configfile bandit.yaml -r . -f json -o bandit-report.json || true
           bandit --configfile bandit.yaml -r . -f txt || true
-
-      - name: Run Safety - Check Dependencies
-        run: |
-          echo "Checking dependencies for known vulnerabilities..."
-          safety check --json --output safety-report.json || true
-          safety check || true
 
       - name: Run pip-audit - Python Package Audit
         run: |
@@ -59,7 +53,6 @@ jobs:
           name: security-reports
           path: |
             bandit-report.json
-            safety-report.json
             pip-audit-report.json
 
       - name: Comment PR with Security Summary
@@ -92,14 +85,24 @@ jobs:
               comment += `### Bandit Static Analysis\n❌ Failed to parse results: ${e.message}\n\n`;
             }
 
-            // Parse Safety results
+            // Parse pip-audit results
             try {
-              const safetyData = JSON.parse(fs.readFileSync('safety-report.json', 'utf8'));
+              const auditData = JSON.parse(fs.readFileSync('pip-audit-report.json', 'utf8'));
+              const dependencies = auditData.dependencies || [];
+              const vulnerabilities = dependencies.flatMap(dependency =>
+                (dependency.vulns || []).map(vulnerability => ({
+                  ...vulnerability,
+                  package: dependency.name
+                }))
+              );
+              const vulnerablePackages = new Set(vulnerabilities.map(vulnerability => vulnerability.package));
+
               comment += `### Dependency Vulnerability Check\n`;
-              comment += `- **Vulnerable Packages**: ${safetyData.vulnerabilities ? safetyData.vulnerabilities.length : 0}\n\n`;
+              comment += `- **Vulnerable Packages**: ${vulnerablePackages.size}\n`;
+              comment += `- **Known Vulnerabilities**: ${vulnerabilities.length}\n\n`;
             } catch (e) {
-              console.log('Error parsing safety results:', e.message);
-              comment += `### Dependency Vulnerability Check\n✅ No known vulnerabilities found (or failed to parse results)\n\n`;
+              console.log('Error parsing pip-audit results:', e.message);
+              comment += `### Dependency Vulnerability Check\n❌ Failed to parse pip-audit results: ${e.message}\n\n`;
             }
 
             comment += `📊 **Full reports available in the Actions artifacts**`;
