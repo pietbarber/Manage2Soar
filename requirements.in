@@ -20,6 +20,7 @@ gunicorn
 icalendar
 identify
 isort
+Jinja2
 ortools
 pillow
 pip-audit

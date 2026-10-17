@@ -186,6 +186,18 @@ class TestHtmlToTextPreserveLinks(SimpleTestCase):
         result = html_to_text_preserve_links(html)
         assert "View PDF Document (https://example.com/doc.pdf)" in result
 
+    def test_preserves_separators_inside_link_labels(self):
+        html = (
+            'Before <a href="https://example.com/doc"><p>Alpha<br>Beta</p>'
+            "<p>Gamma</p><ul><li>Delta</li></ul></a> After"
+        )
+
+        result = html_to_text_preserve_links(html)
+
+        assert result == (
+            "Before Alpha Beta Gamma Delta (https://example.com/doc) After"
+        )
+
 
 class TestEmailSiteUrlResolution(SimpleTestCase):
     @override_settings(SITE_URL="http://127.0.0.1:8001")

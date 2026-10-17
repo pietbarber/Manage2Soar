@@ -409,7 +409,7 @@ def html_to_text_preserve_links(html):
                     "text": [],
                 }
             elif tag.lower() == "br":
-                self.parts.append("\n")
+                self.handle_data("\n")
 
         def handle_data(self, data):
             if self.anchor is not None:
@@ -431,9 +431,9 @@ def html_to_text_preserve_links(html):
                 self.parts.append(replacement)
                 self.anchor = None
             elif tag == "p":
-                self.parts.append("\n\n")
+                self.handle_data("\n\n")
             elif tag == "li":
-                self.parts.append("\n")
+                self.handle_data("\n")
 
     parser = _EmailTextParser()
     parser.feed(html)
@@ -480,9 +480,10 @@ def get_finalization_email_context(logsheet, config=None, site_url=None):
     # Determine the maximum duration (for highlighting)
     max_duration = None
     for flight in raw_flights:
-        if flight.duration is not None:
-            if max_duration is None or flight.duration > max_duration:
-                max_duration = flight.duration
+        if flight.duration is not None and (
+            max_duration is None or flight.duration > max_duration
+        ):
+            max_duration = flight.duration
 
     # Build enriched flight rows with pre-formatted values for the template.
     def _fmt_time(t):

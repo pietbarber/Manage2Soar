@@ -142,12 +142,16 @@ iniconfig==2.3.0
     # via pytest
 isort==9.0.1
     # via -r requirements.in
+jinja2==3.1.6
+    # via -r requirements.in
 joserfc==1.7.5
     # via authlib
 license-expression==30.4.4
     # via cyclonedx-python-lib
 markdown-it-py==4.2.0
     # via rich
+markupsafe==3.0.4
+    # via jinja2
 mccabe==0.7.0
     # via flake8
 mdurl==0.1.2
