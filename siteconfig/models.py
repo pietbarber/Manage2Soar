@@ -618,8 +618,8 @@ class SiteConfiguration(models.Model):
         null=True,
         blank=True,
         help_text=(
-            "First day covered by the club books. Only the opening entry may be "
-            "dated on this day; every other entry must be dated after it."
+            "First day covered by the club books. The opening entry must be dated "
+            "on this day; every other entry must be dated on or after it."
         ),
     )
     billing_period_close_policy = models.CharField(
