@@ -276,22 +276,89 @@ gcloud filestore instances list --project=manage2soar --format='value(name)'   #
 gcloud billing accounts list --project=manage2soar   # (manual) confirm no new file.googleapis.com line item
 ```
 
-**Trigger 2 — when the cluster auto-upgrades to GKE 1.37 (REGULAR channel):**
+**Trigger 2 — when the cluster auto-upgrades to GKE 1.37 (REGULAR channel).**
+
+This is the copy-paste runbook to execute once the cluster crosses to 1.37. All
+commands are read-only. Run them, then record the result against the **baseline
+(2026-10-19)** column below.
+
 ```bash
-gcloud container clusters describe manage2soar-cluster --project=manage2soar --zone=us-east1-b --format='value(currentMasterVersion)'
-kubectl get pvc --all-namespaces -o wide        # Expected: still "No resources found"
-kubectl get pv -o wide                          # Expected: still "No resources found"
-kubectl get storageclass                        # Expected: same 4 PD-backed classes, no Filestore-backed class
-kubectl get csidriver                           # Expected: still no filestore.csi.storage.googleapis.com
-gcloud filestore instances list --project=manage2soar --format='value(name)'   # Expected: empty
+# 0. Confirm we are looking at the right cluster (do this first, every time)
+kubectl config current-context
+#    Expected: gke_manage2soar_us-east1-b_manage2soar-cluster
+
+# 1. Confirm the upgrade actually landed (this arms the 1.37 RWX behavior)
+gcloud container clusters describe manage2soar-cluster \
+  --project=manage2soar --zone=us-east1-b \
+  --format='value(currentMasterVersion,currentNodeVersion)'
+#    Expected: 1.37.x / 1.37.x
+
+# 2. THE critical check — any RWX PVC, including pending, across ALL namespaces
+kubectl get pvc --all-namespaces -o wide
+#    Expected: "No resources found"
+
+#    2a. Explicit RWX isolation (should print nothing)
+kubectl get pvc --all-namespaces -o json \
+  | jq -r '.items[] | select(.spec.accessModes | index("ReadWriteMany"))
+          | "\(.metadata.namespace)/\(.metadata.name) -> sc=\(.spec.storageClassName // "OMITTED") phase=\(.status.phase)"'
+
+# 3. PersistentVolumes (expected: none)
+kubectl get pv -o wide
+
+# 4. Storage classes — expect the SAME 4 PD-backed classes, no new Filestore-backed class
+kubectl get storageclass
+
+# 5. CSI drivers — expect NO filestore.csi.storage.googleapis.com
+kubectl get csidriver
+
+# 6. Filestore instances (expected: none / SERVICE_DISABLED)
+gcloud filestore instances list --project=manage2soar --format='value(name)'
+
+# 7. Billing (manual) — confirm NO file.googleapis.com line item
+#    Cloud Billing export / cost report for project manage2soar
 ```
 
-**Escalation criteria (if any observed):** a newly appearing Filestore-backed
-storage class, any `ReadWriteMany` PVC, any `Pending`/`Lost` PVC, any Filestore
-instance, or any `file.googleapis.com` billing line item → treat as a **separate,
-planned** remediation task (do **not** delete/recreate bound PVCs, do **not**
-substitute an incompatible RWO class, do **not** disable a driver with live
-dependencies).
+**Check table — compare against baseline:**
+
+| # | Check | Baseline (2026-10-19) | Expected after 1.37 |
+|---|---|---|---|
+| 1 | Cluster version | 1.35.8 | **1.37.x** (confirms behavior armed) |
+| 2 | PVCs (any namespace) | No resources found | **Still "No resources found"** ← critical |
+| 3 | PVs | No resources found | **Still none** |
+| 4 | Storage classes | 4, all PD-backed RWO | **Same 4** — no Filestore-backed class |
+| 5 | CSI drivers | `pd.csi.storage.gke.io`, `podcertificate.gke.io` | **Same** — no Filestore CSI driver |
+| 6 | Filestore instances | none (API disabled) | **Still none** |
+| 7 | Billing | — | **No `file.googleapis.com` line item** |
+
+**Expected outcome (high confidence):** all rows stay at baseline → the 1.37
+upgrade introduced no exposure. That is the pass/fail gate for this trigger.
+
+### 🔴 STOP-AND-PLAN rule (the single signal to halt)
+
+Auto-provisioning of billed Filestore at 1.37 requires **all three** to be true
+at once: (a) a `ReadWriteMany` PVC exists, (b) it **omits** `storageClassName`
+(`""` does NOT count — that selects "no default"), and (c) the Filestore CSI
+driver is present. We miss **all three** today; #5 (driver) is an independent
+gate Google will not flip silently.
+
+**Any one of the following, observed at trigger 1 or 2, means STOP:**
+- any `ReadWriteMany` PVC (row 2/2a), especially one with `sc=OMITTED`;
+- any new Filestore-backed storage class (row 4);
+- any Filestore CSI driver appearing (row 5);
+- any Filestore instance (row 6) or `Pending`/`Lost` PVC;
+- any `file.googleapis.com` billing line item (row 7).
+
+**If STOP is triggered:**
+1. **Do NOT** delete/recreate any bound PVC.
+2. **Do NOT** substitute an incompatible RWO storage class for the RWX need.
+3. **Do NOT** disable a CSI driver with live dependencies.
+4. Record the exact `kubectl`/`gcloud` output, then open a **separate, planned
+   remediation issue** (owner: infra admin) to deliberately choose the RWX
+   provider — Filestore (knowing it is billed), GCS-FUSE, or a design change —
+   rather than letting it bind to the GKE default.
+
+**Record the outcome:** append the runbook output and a one-line verdict
+(PASS / STOP→issue #N) as a dated addendum under this Phase 6 section.
 
 ---
 
