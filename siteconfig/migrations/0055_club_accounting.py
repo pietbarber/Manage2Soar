@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='siteconfiguration',
             name='club_accounting_start_date',
-            field=models.DateField(blank=True, help_text='First day covered by the club books. Only the opening entry may be dated on this day; every other entry must be dated after it.', null=True),
+            field=models.DateField(blank=True, help_text='First day covered by the club books. The opening entry must be dated on this day; every other entry must be dated on or after it.', null=True),
         ),
     ]

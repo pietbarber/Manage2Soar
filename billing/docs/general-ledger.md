@@ -15,7 +15,7 @@ Member Billing stays under **Log Sheets**.
 |---|---|
 | `billing_app_enabled` | Required. Club accounting cannot be on without it. |
 | `club_accounting_enabled` | Shows the Club Finances menu and allows posting. Default `False`. |
-| `club_accounting_start_date` | Optional; set by the go-live wizard. The opening entry is dated on this day; every other entry must be dated after it. |
+| `club_accounting_start_date` | Optional; set by the go-live wizard. The opening entry is dated on this day; every other entry must be dated on or after it. |
 
 Nothing about a particular club is hard-coded. Bank account names, their
 opening balances, and the start date are data the treasurer enters.
@@ -83,8 +83,8 @@ and SQLite, reject `UPDATE` and `DELETE`.
 `post_journal_entry` refuses an entry when:
 - club accounting is off;
 - the actor isn't a treasurer or superuser (member postings excepted);
-- the date is in the future, on or before the start date (except the opening
-  entry, which must be on it), or in a closed billing period;
+- the date is in the future, before the start date (the opening entry must be
+  on it), or in a closed billing period;
 - there are fewer than two lines, a line has both or neither side, or an
   amount is negative;
 - debits ≠ credits;
