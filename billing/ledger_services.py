@@ -97,9 +97,10 @@ def _validate_date(entry_date, *, source, reverses=None):
                 raise ValidationError(
                     "The opening entry must be dated on the books' start date."
                 )
-        elif entry_date <= start:
+        elif entry_date < start:
             raise ValidationError(
-                f"Entries must be dated after the books' start date ({start:%Y-%m-%d})."
+                "Entries must be dated on or after the books' start date "
+                f"({start:%Y-%m-%d})."
             )
     if lock_period_for_date(entry_date):
         raise ValidationError(

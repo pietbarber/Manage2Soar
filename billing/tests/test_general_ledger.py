@@ -235,20 +235,29 @@ def test_future_dates_are_refused(treasurer, checking):
         )
 
 
-def test_entries_must_follow_the_start_date(
+def test_entries_must_be_on_or_after_the_start_date(
     treasurer, checking, enable_club_accounting
 ):
     enable_club_accounting.club_accounting_start_date = today()
     enable_club_accounting.save(update_fields=["club_accounting_start_date"])
-    with pytest.raises(ValidationError, match="after the books' start date"):
+    with pytest.raises(ValidationError, match="on or after the books' start date"):
         post_expense(
             actor=treasurer,
-            date=today(),
+            date=today() - timedelta(days=1),
             paid_from=checking,
             expense_account=account("500"),
             amount="1",
-            memo="On start date",
+            memo="Before start date",
         )
+    entry = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("500"),
+        amount="1",
+        memo="On start date",
+    )
+    assert entry.date == today()
 
 
 def test_closed_billing_period_refuses_entries(treasurer, checking):

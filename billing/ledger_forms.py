@@ -233,8 +233,8 @@ class GoLiveForm(forms.Form):
     start_date = _date_field(
         label="Books start date",
         help_text=(
-            "Usually the date of the bank statement balances below. Every later "
-            "entry must be dated after this day."
+            "Usually the date of the bank statement balances below. Entries after "
+            "go-live may be dated on or after this day."
         ),
     )
 
