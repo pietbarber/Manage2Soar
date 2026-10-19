@@ -75,6 +75,7 @@ and SQLite, reject `UPDATE` and `DELETE`.
 |---|---|
 | `post_journal_entry(actor, date, lines, memo, ...)` | The single write path. |
 | `post_expense`, `post_income`, `post_cash_transfer` | Plain-language wrappers used by the forms. |
+| `post_member_paid_expense(actor, date, member, expense_account, amount, memo, ...)` | A member paid a club bill out of pocket: credits their member ledger and posts Dr expense, Cr Member Receivables (that member) in one transaction. |
 | `reverse_journal_entry(entry, actor, date, reason)` | Posts the mirror image. |
 | `go_live(actor, start_date, rows)` | Sets the start date and posts the opening entry for bank balances. |
 | `account_balance`, `account_balances`, `account_register` | Balances and running-balance registers. |
@@ -98,7 +99,9 @@ entry; a different payload raises.
 
 Reversals:
 - Only manual entries can be reversed here.
-- Member postings are reversed from the member's ledger.
+- Member postings are reversed from the member's ledger. Reversing a member
+  ledger entry that has a journal entry (`reverse_entry` in
+  `billing/services.py`) posts the journal reversal in the same transaction.
 - The opening entry can't be reversed here; the go-live wizard replaces it.
 - A reversal can't predate its original, can't be reversed, and can happen
   only once.
@@ -141,7 +144,8 @@ Every view requires `billing_app_required`, `treasurer_required`, and
 | `chart_of_accounts` | `books/accounts/` | Accounts grouped by type, with balances and integrity warnings. |
 | `account_create` / `account_edit` | `books/accounts/new/`, `books/accounts/<id>/edit/` | Add or edit accounts. |
 | `account_register` / `account_register_csv` | `books/accounts/<id>/`, `.../export/` | One account with a running balance; defaults to the current year. |
-| `record_expense` | `books/expense/` | Dr expense, Cr cash. |
+| `record_expense` | `books/expense/` | Expense paid by club: Dr expense, Cr cash. |
+| `record_member_expense` | `books/member-expense/` | Expense paid by member: Dr expense, Cr Member Receivables (member), plus a member-ledger credit. |
 | `record_income` | `books/income/` | Dr cash, Cr income. |
 | `cash_transfer` | `books/transfer/` | Dr destination, Cr source (both cash accounts). |
 | `general_journal` | `books/journal/` | Free-form balanced lines (e.g. unpaid bills, reserves). Member Receivables is not offered. |
@@ -153,14 +157,18 @@ Every view requires `billing_app_required`, `treasurer_required`, and
 
 These phases are planned but not yet built:
 
-1. **Member ledger integration.** Every member `LedgerEntry` posts its journal
-   entry in the same transaction:
+1. **Member ledger integration.** The first piece is built: an expense a
+   member paid for the club credits their member ledger and posts to Member
+   Receivables together, and reversing it from the member's ledger reverses
+   the books too. Next, every member `LedgerEntry` posts its journal entry in
+   the same transaction:
    - flight charges split into tow, rental and instruction revenue;
    - payments go to a chosen deposit account.
 
    It also adds member-to-member transfers and refunds, member balances in the
    go-live wizard, and a receivables-vs-member-ledgers tie-out in
-   `verify_books`.
+   `verify_books`. Until then, Member Receivables in the books shows only the
+   member-paid expenses, not each member's full balance.
 2. **Reports.** Balance sheet, income statement, trial balance, and a treasurer
    dashboard.
 3. **Later.** A bills/payables workflow, recurring transactions, reserve funds,
@@ -284,6 +292,7 @@ account, **Member Receivables** (*receivable* means the club expects to
 receive this money from members). The control account's balance should equal
 the sum of what members owe. This is why the app forbids manual entries to it:
 if you could post to it by hand, it would drift away from the member ledgers.
+Entries that touch it always post a member ledger entry at the same time.
 (`JournalLine.member` splits the balance per member.)
 
 When a member is charged, the flow works like this:
@@ -296,6 +305,19 @@ When a member is charged, the flow works like this:
 The club has earned revenue and is owed money. When the member pays, Member
 Receivables is credited and cash (or Undeposited Funds) is debited. Both
 legs are planned for the member-ledger integration (Roadmap, phase 1).
+
+**A member pays a club bill out of pocket: $700 field rent in cash**
+(*Expense paid by member*)
+
+| Account | Debit | Credit |
+|---|---:|---:|
+| Field Rent (expense) | 700.00 | |
+| Member Receivables (asset, that member) | | 700.00 |
+
+The club still had the expense, but no club money left the bank. Instead the
+club now owes the member $700, or the member owes $700 less. Their member
+ledger gets a matching $700 credit, which their dues or flying charges then
+use up.
 
 ### Mistakes: reverse, don't edit
 

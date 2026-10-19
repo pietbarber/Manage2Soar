@@ -649,6 +649,16 @@ def reverse_entry(*, entry, actor, effective_date, reason, correction_group=None
     )
     reversal._service_created = True
     reversal.save()
+    if hasattr(original, "journal_entry"):
+        from billing.ledger_services import reverse_member_posting
+
+        reverse_member_posting(
+            member_entry=original,
+            member_reversal=reversal,
+            actor=actor,
+            date=effective_date,
+            reason=reason,
+        )
     return reversal
 
 

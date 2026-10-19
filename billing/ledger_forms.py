@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 
 from billing.ledger_services import bank_accounts
 from billing.models import Account, JournalEntry
+from members.models import Member
+from members.utils.membership import get_active_membership_statuses
 from siteconfig.timezone_utils import get_club_today
 
 AMOUNT_FIELD = dict(min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
@@ -90,6 +92,38 @@ class ExpenseForm(_EntryDetailsForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["paid_from"].queryset = cash_accounts()
+        self.fields["expense_account"].queryset = Account.objects.filter(
+            is_active=True, type=Account.Type.EXPENSE
+        )
+
+
+class MemberPaidExpenseForm(_EntryDetailsForm):
+    member = forms.ModelChoiceField(
+        queryset=Member.objects.none(),
+        label="Paid by member",
+        help_text="Their member account is credited for this amount.",
+    )
+    expense_account = forms.ModelChoiceField(
+        queryset=Account.objects.none(), label="Category"
+    )
+    amount = forms.DecimalField(**AMOUNT_FIELD)
+
+    field_order = (
+        "date",
+        "member",
+        "expense_account",
+        "amount",
+        "memo",
+        "reference",
+        "internal_note",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["memo"].help_text = "Shown on the member's statement."
+        self.fields["member"].queryset = Member.objects.filter(
+            membership_status__in=get_active_membership_statuses()
+        ).order_by("last_name", "first_name")
         self.fields["expense_account"].queryset = Account.objects.filter(
             is_active=True, type=Account.Type.EXPENSE
         )
