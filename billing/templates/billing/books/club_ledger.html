@@ -7,6 +7,11 @@
 <div class="container py-4">
   {% with heading="Club Ledger" %}{% include "billing/books/_header.html" %}{% endwith %}
   {% include "billing/books/_problems.html" %}
+  {% if needs_go_live %}
+  <div class="alert alert-info">
+    Starting the books? Enter the club's bank balances in <a href="{% url 'billing:go_live' %}">Go-live setup</a> first.
+  </div>
+  {% endif %}
 
   <div class="row g-3 mb-4">
     {% for row in cash_rows %}

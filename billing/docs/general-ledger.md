@@ -15,7 +15,7 @@ Member Billing stays under **Log Sheets**.
 |---|---|
 | `billing_app_enabled` | Required. Club accounting cannot be on without it. |
 | `club_accounting_enabled` | Shows the Club Finances menu and allows posting. Default `False`. |
-| `club_accounting_start_date` | Optional. The opening entry is dated on this day; every other entry must be dated after it. |
+| `club_accounting_start_date` | Optional; set by the go-live wizard. The opening entry is dated on this day; every other entry must be dated after it. |
 
 Nothing about a particular club is hard-coded. Bank account names, their
 opening balances, and the start date are data the treasurer enters.
@@ -76,6 +76,7 @@ and SQLite, reject `UPDATE` and `DELETE`.
 | `post_journal_entry(actor, date, lines, memo, ...)` | The single write path. |
 | `post_expense`, `post_income`, `post_cash_transfer` | Plain-language wrappers used by the forms. |
 | `reverse_journal_entry(entry, actor, date, reason)` | Posts the mirror image. |
+| `go_live(actor, start_date, rows)` | Sets the start date and posts the opening entry for bank balances. |
 | `account_balance`, `account_balances`, `account_register` | Balances and running-balance registers. |
 | `verify_books()` | Integrity problems as a list of strings. |
 
@@ -89,7 +90,8 @@ and SQLite, reject `UPDATE` and `DELETE`.
 - debits ≠ credits;
 - a line uses an inactive account;
 - a manual entry touches Member Receivables. That account changes only through
-  member ledgers, so it always ties to them.
+  member ledgers, so it always ties to them;
+- it is an opening entry and another opening entry is still in effect.
 
 A repeated `source_key` with the same date and lines returns the existing
 entry; a different payload raises.
@@ -97,7 +99,7 @@ entry; a different payload raises.
 Reversals:
 - Only manual entries can be reversed here.
 - Member postings are reversed from the member's ledger.
-- The opening entry can't be reversed.
+- The opening entry can't be reversed here; the go-live wizard replaces it.
 - A reversal can't predate its original, can't be reversed, and can happen
   only once.
 
@@ -107,6 +109,25 @@ non-zero when it finds problems. It checks for:
 - an unbalanced trial balance;
 - receivables lines without a member;
 - member-tagged lines outside receivables.
+
+### Go-live
+
+`go_live(actor, start_date, rows)` starts the books. Each row is a
+`BankBalance(name, amount, account=None)`:
+- An existing bank account takes the row's name, so the treasurer can rename
+  110 Checking to match the bank.
+- A row without an account creates a new bank account with the next free code
+  in 110–119.
+- A positive balance debits the bank account; a negative (overdrawn) balance
+  credits it. The total goes to the **General Fund**, not Opening Balance
+  Equity, because every bank balance is entered at once.
+
+It also sets `club_accounting_start_date` and posts one `opening` entry dated on
+it. It can be rerun until any other entry is posted: the current opening entry
+is reversed (on its own date) and replaced, and an unchanged submission posts
+nothing. Once other entries exist, it refuses, and opening balances are
+corrected with a general journal entry. Member receivables aren't part of
+go-live yet; they arrive with member ledger integration.
 
 ## Views (`billing/ledger_views.py`)
 
@@ -126,6 +147,7 @@ Every view requires `billing_app_required`, `treasurer_required`, and
 | `general_journal` | `books/journal/` | Free-form balanced lines (e.g. unpaid bills, reserves). Member Receivables is not offered. |
 | `journal_detail` | `books/entries/<id>/` | One entry, its lines, and a reversal form. |
 | `journal_reverse` | `books/entries/<id>/reverse/` | POST; date and reason required. |
+| `go_live` | `books/go-live/` | Start date and bank balances; posts or replaces the opening entry. Read-only once other entries exist. |
 
 ## Roadmap
 
@@ -136,9 +158,9 @@ These phases are planned but not yet built:
    - flight charges split into tow, rental and instruction revenue;
    - payments go to a chosen deposit account.
 
-   It also adds member-to-member transfers and refunds, a go-live wizard that
-   posts opening balances with the General Fund as the plug, and a
-   receivables-vs-member-ledgers tie-out in `verify_books`.
+   It also adds member-to-member transfers and refunds, member balances in the
+   go-live wizard, and a receivables-vs-member-ledgers tie-out in
+   `verify_books`.
 2. **Reports.** Balance sheet, income statement, trial balance, and a treasurer
    dashboard.
 3. **Later.** A bills/payables workflow, recurring transactions, reserve funds,
@@ -248,12 +270,12 @@ second time.
 |---|---:|---:|
 | Checking (asset) | 5,000.00 | |
 | Savings (asset) | 12,000.00 | |
-| Opening Balance Equity (equity) | | 17,000.00 |
+| General Fund (equity) | | 17,000.00 |
 
 When the books start, the club already has money. The opening entry debits each
-bank account for its starting balance and credits equity for the total, so the
-entry balances. Once the go-live wizard (Roadmap, phase 1) exists, it will post
-this with the General Fund as the balancing figure.
+bank account for its starting balance and credits equity (the General Fund) for
+the total, so the entry balances. The **Go-Live Setup** page under Club
+Finances posts this entry for you.
 
 ### Member accounts
 
