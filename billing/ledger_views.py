@@ -18,8 +18,10 @@ from billing.decorators import (
 )
 from billing.ledger_forms import (
     AccountForm,
+    BankBalanceFormSet,
     ClubLedgerFilterForm,
     ExpenseForm,
+    GoLiveForm,
     IncomeForm,
     JournalHeaderForm,
     JournalLineFormSet,
@@ -27,10 +29,15 @@ from billing.ledger_forms import (
     TransferForm,
 )
 from billing.ledger_services import (
+    BankBalance,
     Line,
     account_balances,
     account_register,
+    active_opening_entry,
+    bank_accounts,
     books_start_date,
+    go_live,
+    go_live_locked,
     post_cash_transfer,
     post_expense,
     post_income,
@@ -104,6 +111,7 @@ def club_ledger(request):
             "querystring": query.urlencode(),
             "cash_rows": [row for row in account_balances() if row["account"].is_cash],
             "problems": verify_books(),
+            "needs_go_live": active_opening_entry() is None and not go_live_locked(),
         },
     )
 
@@ -371,6 +379,64 @@ def general_journal(request):
         request,
         "billing/books/general_journal.html",
         {"form": header, "formset": formset},
+    )
+
+
+@club_books_view
+def go_live_setup(request):
+    opening = active_opening_entry()
+    if go_live_locked():
+        return render(
+            request,
+            "billing/books/go_live.html",
+            {"locked": True, "opening": opening, "start_date": books_start_date()},
+        )
+    opening_amounts = {}
+    if opening:
+        for line in opening.lines.all():
+            opening_amounts[line.account_id] = line.debit - line.credit
+    initial = [
+        {
+            "account": account,
+            "name": account.name,
+            "amount": opening_amounts.get(account.pk),
+        }
+        for account in bank_accounts().order_by("code")
+    ]
+    form = GoLiveForm(
+        request.POST or None,
+        initial={"start_date": opening.date} if opening else None,
+    )
+    formset = BankBalanceFormSet(request.POST or None, initial=initial, prefix="banks")
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        rows = [
+            BankBalance(
+                account=data.get("account"),
+                name=data.get("name", ""),
+                amount=data.get("amount") or 0,
+            )
+            for data in formset.cleaned_data
+            if data.get("account") or data.get("name") or data.get("amount")
+        ]
+        try:
+            entry = go_live(
+                actor=request.user,
+                start_date=form.cleaned_data["start_date"],
+                rows=rows,
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc.messages)
+        else:
+            messages.success(
+                request,
+                f"The books start on {entry.date:%Y-%m-%d}. "
+                f"Posted opening entry #{entry.pk}.",
+            )
+            return redirect("billing:journal_detail", entry_id=entry.pk)
+    return render(
+        request,
+        "billing/books/go_live.html",
+        {"form": form, "formset": formset, "opening": opening, "locked": False},
     )
 
 

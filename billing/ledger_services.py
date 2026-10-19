@@ -3,7 +3,8 @@
 Every write goes through ``post_journal_entry``. It refuses unbalanced
 entries, closed billing periods, future dates, and dates before the books'
 start date, and it is idempotent on ``source_key``. Posted entries and lines
-are immutable; corrections are reversals.
+are immutable; corrections are reversals. ``go_live`` sets the start date and
+posts the opening entry for the club's bank balances.
 """
 
 from collections import defaultdict
@@ -32,6 +33,19 @@ class Line:
     credit: Decimal = ZERO
     member: object = None
     memo: str = ""
+
+
+@dataclass(frozen=True)
+class BankBalance:
+    """One go-live row: an existing bank account (or a new one) and its balance."""
+
+    name: str
+    amount: Decimal = ZERO
+    account: Account | None = None
+
+
+# Bank accounts live in the 110-119 block of the chart; the seed provides 110.
+BANK_ACCOUNT_CODES = tuple(str(code) for code in range(110, 120))
 
 
 def _config():
@@ -68,11 +82,16 @@ def get_role_account(role):
         ) from exc
 
 
-def _validate_date(entry_date, *, source):
+def _validate_date(entry_date, *, source, reverses=None):
     if entry_date > _club_today():
         raise ValidationError("Future dates are not allowed.")
     start = books_start_date()
-    if start:
+    replacing_opening = (
+        source == JournalEntry.Source.REVERSAL
+        and reverses is not None
+        and reverses.source == JournalEntry.Source.OPENING
+    )
+    if start and not replacing_opening:
         if source == JournalEntry.Source.OPENING:
             if entry_date != start:
                 raise ValidationError(
@@ -193,7 +212,9 @@ def post_journal_entry(
                     "Source key already identifies a different journal entry."
                 )
             return existing
-    _validate_date(date, source=source)
+    _validate_date(date, source=source, reverses=reverses)
+    if source == JournalEntry.Source.OPENING and active_opening_entry():
+        raise ValidationError("The books already have an opening entry.")
 
     entry = JournalEntry(
         date=date,
@@ -340,7 +361,13 @@ def reverse_journal_entry(*, entry, actor, date, reason):
     ):
         raise ValidationError("Reverse member postings from the member's ledger.")
     if original.source == JournalEntry.Source.OPENING:
-        raise ValidationError("The opening entry cannot be reversed.")
+        raise ValidationError(
+            "Change opening balances with the go-live wizard instead."
+        )
+    return _post_reversal(original, actor=actor, date=date, reason=reason)
+
+
+def _post_reversal(original, *, actor, date, reason):
     if hasattr(original, "reversal"):
         raise ValidationError("This journal entry has already been reversed.")
     if date < original.date:
@@ -367,6 +394,147 @@ def reverse_journal_entry(*, entry, actor, date, reason):
         reverses=original,
         source_key=f"journal-reversal:{original.pk}",
         allow_receivables=True,
+    )
+
+
+def bank_accounts():
+    """Active bank and cash accounts, other than Undeposited Funds."""
+    return Account.objects.filter(is_active=True, is_cash=True).exclude(
+        system_role=Account.Role.UNDEPOSITED_FUNDS
+    )
+
+
+def active_opening_entry():
+    """Return the opening entry in effect (not reversed), if any."""
+    return (
+        JournalEntry.objects.filter(
+            source=JournalEntry.Source.OPENING, reversal__isnull=True
+        )
+        .order_by("-created_at", "-id")
+        .first()
+    )
+
+
+def go_live_locked():
+    """True once the books hold anything besides opening entries.
+
+    Until then the go-live wizard may be rerun; replaced opening entries and
+    their reversals don't count.
+    """
+    return (
+        JournalEntry.objects.exclude(source=JournalEntry.Source.OPENING)
+        .exclude(
+            source=JournalEntry.Source.REVERSAL,
+            reverses__source=JournalEntry.Source.OPENING,
+        )
+        .exists()
+    )
+
+
+def _next_bank_account_code():
+    used = set(
+        Account.objects.filter(code__in=BANK_ACCOUNT_CODES).values_list(
+            "code", flat=True
+        )
+    )
+    for code in BANK_ACCOUNT_CODES:
+        if code not in used:
+            return code
+    raise ValidationError(
+        "Bank account codes 110-119 are all in use. Add the account from the "
+        "Chart of Accounts instead."
+    )
+
+
+def _go_live_account(row):
+    name = (row.name or "").strip()
+    if row.account is None:
+        if not name:
+            raise ValidationError("Each new bank account needs a name.")
+        account = Account(
+            code=_next_bank_account_code(),
+            name=name,
+            type=Account.Type.ASSET,
+            is_cash=True,
+        )
+        account.full_clean()
+        account.save()
+        return account
+    account = row.account
+    if not account.is_active or not account.is_cash:
+        raise ValidationError(f"{account} is not an active bank or cash account.")
+    if account.system_role == Account.Role.UNDEPOSITED_FUNDS:
+        raise ValidationError("Undeposited Funds starts at zero.")
+    if name and name != account.name:
+        account.name = name
+        account.full_clean()
+        account.save(update_fields=["name"])
+    return account
+
+
+@transaction.atomic
+def go_live(*, actor, start_date, rows):
+    """Start the books: set the start date and post the opening bank balances.
+
+    Each row's balance is debited to its bank account (credited if overdrawn)
+    and the total is credited to the General Fund. Until any other entry is
+    posted, running this again reverses the current opening entry and posts a
+    replacement; after that, opening balances are corrected with a general
+    journal entry.
+    """
+    from siteconfig.models import SiteConfiguration
+
+    _require_club_accounting()
+    require_manual_transaction_access(actor)
+    config = SiteConfiguration.objects.select_for_update().first()
+    if go_live_locked():
+        raise ValidationError(
+            "The books already have entries after go-live. Correct opening "
+            "balances with a general journal entry."
+        )
+    if start_date > _club_today():
+        raise ValidationError("Future dates are not allowed.")
+    general_fund = get_role_account(Account.Role.GENERAL_FUND)
+
+    lines = []
+    total = ZERO
+    for row in rows:
+        amount = Decimal(str(row.amount or 0))
+        account = _go_live_account(row)
+        if not amount:
+            continue
+        if amount > 0:
+            lines.append(Line(account=account, debit=_money(amount)))
+            total += _money(amount)
+        else:
+            lines.append(Line(account=account, credit=_money(-amount)))
+            total -= _money(-amount)
+    if not lines:
+        raise ValidationError("Enter at least one bank balance.")
+    if total > 0:
+        lines.append(Line(account=general_fund, credit=total))
+    elif total < 0:
+        lines.append(Line(account=general_fund, debit=-total))
+
+    current = active_opening_entry()
+    if current:
+        if _existing_matches(current, entry_date=start_date, lines=lines):
+            return current
+        _post_reversal(
+            current,
+            actor=actor,
+            date=current.date,
+            reason="Replaced by the go-live wizard.",
+        )
+    if config.club_accounting_start_date != start_date:
+        config.club_accounting_start_date = start_date
+        config.save(update_fields=["club_accounting_start_date"])
+    return post_journal_entry(
+        actor=actor,
+        date=start_date,
+        lines=lines,
+        memo="Opening bank balances",
+        source=JournalEntry.Source.OPENING,
     )
 
 

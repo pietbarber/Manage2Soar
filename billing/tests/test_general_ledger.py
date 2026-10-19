@@ -8,10 +8,13 @@ from django.db import DatabaseError, connection, transaction
 
 from billing.exceptions import ClubAccountingDisabledError
 from billing.ledger_services import (
+    BankBalance,
     Line,
     account_balance,
     account_balances,
     account_register,
+    active_opening_entry,
+    go_live,
     post_cash_transfer,
     post_expense,
     post_income,
@@ -525,5 +528,131 @@ def test_opening_source_must_use_start_date(
         lines=lines,
         source=JournalEntry.Source.OPENING,
     )
-    with pytest.raises(ValidationError, match="opening entry cannot be reversed"):
+    with pytest.raises(ValidationError, match="go-live wizard"):
         reverse_journal_entry(entry=entry, actor=treasurer, date=today(), reason="x")
+
+
+def bank(code="110", amount="0", name=None):
+    account = Account.objects.get(code=code)
+    return BankBalance(account=account, name=name or account.name, amount=amount)
+
+
+def test_go_live_posts_opening_bank_balances(treasurer, enable_club_accounting):
+    start = today() - timedelta(days=1)
+    entry = go_live(
+        actor=treasurer,
+        start_date=start,
+        rows=[
+            bank(amount="5000.00", name="Wells Fargo Checking"),
+            BankBalance(account=None, name="Wells Fargo Savings", amount="2500"),
+        ],
+    )
+
+    enable_club_accounting.refresh_from_db()
+    assert enable_club_accounting.club_accounting_start_date == start
+    assert entry.source == JournalEntry.Source.OPENING
+    assert entry.date == start
+    checking = account("110")
+    savings = account("111")
+    assert checking.name == "Wells Fargo Checking"
+    assert savings.name == "Wells Fargo Savings"
+    assert savings.is_cash and savings.type == Account.Type.ASSET
+    assert account_balance(checking) == Decimal("5000.00")
+    assert account_balance(savings) == Decimal("2500.00")
+    assert account_balance(role(Account.Role.GENERAL_FUND)) == Decimal("7500.00")
+    assert account_balance(role(Account.Role.OPENING_BALANCE_EQUITY)) == Decimal("0.00")
+    assert verify_books() == []
+
+
+def test_go_live_rerun_replaces_the_opening_entry(treasurer, enable_club_accounting):
+    first = go_live(
+        actor=treasurer,
+        start_date=today() - timedelta(days=1),
+        rows=[bank(amount="5000")],
+    )
+    second_start = today() - timedelta(days=2)
+    second = go_live(
+        actor=treasurer, start_date=second_start, rows=[bank(amount="4800")]
+    )
+
+    first.refresh_from_db()
+    assert first.reversal.source == JournalEntry.Source.REVERSAL
+    assert first.reversal.date == first.date
+    assert active_opening_entry() == second
+    enable_club_accounting.refresh_from_db()
+    assert enable_club_accounting.club_accounting_start_date == second_start
+    assert account_balance(account("110")) == Decimal("4800.00")
+    assert account_balance(role(Account.Role.GENERAL_FUND)) == Decimal("4800.00")
+    assert verify_books() == []
+
+
+def test_go_live_with_unchanged_balances_posts_nothing(treasurer):
+    start = today() - timedelta(days=1)
+    first = go_live(actor=treasurer, start_date=start, rows=[bank(amount="5000")])
+    again = go_live(actor=treasurer, start_date=start, rows=[bank(amount="5000.00")])
+    assert again == first
+    assert JournalEntry.objects.count() == 1
+
+
+def test_go_live_locks_once_other_entries_exist(treasurer):
+    go_live(
+        actor=treasurer,
+        start_date=today() - timedelta(days=1),
+        rows=[bank(amount="5000")],
+    )
+    post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=account("110"),
+        expense_account=account("500"),
+        amount="100",
+        memo="Field rent",
+    )
+    with pytest.raises(ValidationError, match="general journal entry"):
+        go_live(actor=treasurer, start_date=today(), rows=[bank(amount="4900")])
+
+
+def test_go_live_overdrawn_account_debits_general_fund(treasurer):
+    go_live(
+        actor=treasurer,
+        start_date=today() - timedelta(days=1),
+        rows=[bank(amount="-25.50")],
+    )
+    assert account_balance(account("110")) == Decimal("-25.50")
+    assert account_balance(role(Account.Role.GENERAL_FUND)) == Decimal("-25.50")
+    assert verify_books() == []
+
+
+def test_go_live_refuses_bad_input(treasurer):
+    with pytest.raises(ValidationError, match="at least one bank balance"):
+        go_live(actor=treasurer, start_date=today(), rows=[bank(amount="0")])
+    with pytest.raises(ValidationError, match="Future dates"):
+        go_live(
+            actor=treasurer,
+            start_date=today() + timedelta(days=1),
+            rows=[bank(amount="10")],
+        )
+    with pytest.raises(ValidationError, match="Undeposited Funds"):
+        go_live(actor=treasurer, start_date=today(), rows=[bank("100", amount="10")])
+    assert not JournalEntry.objects.exists()
+
+
+def test_go_live_requires_treasurer(member):
+    with pytest.raises(ValidationError, match="Only treasurers"):
+        go_live(actor=member, start_date=today(), rows=[bank(amount="10")])
+
+
+def test_only_one_opening_entry_at_a_time(treasurer):
+    start = today() - timedelta(days=1)
+    go_live(actor=treasurer, start_date=start, rows=[bank(amount="10")])
+    with pytest.raises(ValidationError, match="already have an opening entry"):
+        post_journal_entry(
+            actor=treasurer,
+            date=start,
+            memo="Second opening",
+            lines=[
+                Line(account=account("110"), debit=Decimal("5")),
+                Line(account=role(Account.Role.GENERAL_FUND), credit=Decimal("5")),
+            ],
+            source=JournalEntry.Source.OPENING,
+        )
