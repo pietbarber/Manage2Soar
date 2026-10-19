@@ -11,7 +11,8 @@
         <i class="bi bi-plus-lg me-1"></i>Record
       </button>
       <ul class="dropdown-menu dropdown-menu-end">
-        <li><a class="dropdown-item" href="{% url 'billing:record_expense' %}">Expense</a></li>
+        <li><a class="dropdown-item" href="{% url 'billing:record_expense' %}">Expense paid by club</a></li>
+        <li><a class="dropdown-item" href="{% url 'billing:record_member_expense' %}">Expense paid by member</a></li>
         <li><a class="dropdown-item" href="{% url 'billing:record_income' %}">Income</a></li>
         <li><a class="dropdown-item" href="{% url 'billing:cash_transfer' %}">Transfer between accounts</a></li>
         <li><hr class="dropdown-divider"></li>

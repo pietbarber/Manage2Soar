@@ -287,6 +287,76 @@ def post_expense(
     )
 
 
+@transaction.atomic
+def post_member_paid_expense(
+    *,
+    actor,
+    date,
+    member,
+    expense_account,
+    amount,
+    memo,
+    reference="",
+    internal_note="",
+):
+    """Record a club expense a member paid out of pocket.
+
+    The member's ledger is credited (the club owes them, or they owe less) and
+    the books debit the expense against Member Receivables for that member.
+    Both post together; reverse it from the member's ledger.
+    """
+    from billing.services import post_manual_credit
+
+    _require_club_accounting()
+    require_manual_transaction_access(actor)
+    if expense_account.type != Account.Type.EXPENSE:
+        raise ValidationError("Choose an expense account.")
+    memo = require_audit_text(memo, "memo")
+    amount = _money(amount)
+    member_entry = post_manual_credit(
+        member=member,
+        actor=actor,
+        amount=amount,
+        effective_date=date,
+        description=memo,
+        reason=(internal_note or "").strip()
+        or f"Paid a club expense ({expense_account.name}).",
+    )
+    return post_journal_entry(
+        actor=actor,
+        date=date,
+        memo=memo,
+        payee=str(member),
+        reference=reference,
+        internal_note=internal_note,
+        lines=[
+            Line(account=expense_account, debit=amount),
+            Line(
+                account=get_role_account(Account.Role.MEMBER_RECEIVABLES),
+                credit=amount,
+                member=member,
+            ),
+        ],
+        source=JournalEntry.Source.MEMBER_POSTING,
+        member_entry=member_entry,
+        allow_receivables=True,
+    )
+
+
+def reverse_member_posting(*, member_entry, member_reversal, actor, date, reason):
+    """Mirror a member-ledger reversal in the books, if the entry was posted there."""
+    journal = JournalEntry.objects.filter(member_entry=member_entry).first()
+    if journal is None:
+        return None
+    return _post_reversal(
+        JournalEntry.objects.select_for_update().get(pk=journal.pk),
+        actor=actor,
+        date=date,
+        reason=reason,
+        member_entry=member_reversal,
+    )
+
+
 def post_income(
     *,
     actor,
@@ -368,7 +438,7 @@ def reverse_journal_entry(*, entry, actor, date, reason):
     return _post_reversal(original, actor=actor, date=date, reason=reason)
 
 
-def _post_reversal(original, *, actor, date, reason):
+def _post_reversal(original, *, actor, date, reason, member_entry=None):
     if hasattr(original, "reversal"):
         raise ValidationError("This journal entry has already been reversed.")
     if date < original.date:
@@ -394,6 +464,7 @@ def _post_reversal(original, *, actor, date, reason):
         source=JournalEntry.Source.REVERSAL,
         reverses=original,
         source_key=f"journal-reversal:{original.pk}",
+        member_entry=member_entry,
         allow_receivables=True,
     )
 

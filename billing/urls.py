@@ -51,6 +51,11 @@ urlpatterns = [
         name="account_edit",
     ),
     path("books/expense/", ledger_views.record_expense, name="record_expense"),
+    path(
+        "books/member-expense/",
+        ledger_views.record_member_expense,
+        name="record_member_expense",
+    ),
     path("books/income/", ledger_views.record_income, name="record_income"),
     path("books/transfer/", ledger_views.cash_transfer, name="cash_transfer"),
     path("books/journal/", ledger_views.general_journal, name="general_journal"),

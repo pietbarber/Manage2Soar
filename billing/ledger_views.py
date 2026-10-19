@@ -25,6 +25,7 @@ from billing.ledger_forms import (
     IncomeForm,
     JournalHeaderForm,
     JournalLineFormSet,
+    MemberPaidExpenseForm,
     ReverseJournalForm,
     TransferForm,
 )
@@ -42,6 +43,7 @@ from billing.ledger_services import (
     post_expense,
     post_income,
     post_journal_entry,
+    post_member_paid_expense,
     reverse_journal_entry,
     verify_books,
 )
@@ -294,9 +296,20 @@ def account_edit(request, account_id=None):
 ENTRY_FORMS = {
     "expense": {
         "form": ExpenseForm,
-        "title": "Record expense",
-        "help": "Money the club paid out, such as field rent or a maintenance invoice.",
+        "title": "Expense paid by club",
+        "help": "Money the club paid out of its own accounts, such as field rent or a maintenance invoice.",
         "post": lambda actor, data: post_expense(actor=actor, **data),
+    },
+    "member_expense": {
+        "form": MemberPaidExpenseForm,
+        "title": "Expense paid by member",
+        "help": (
+            "A member paid a club bill out of pocket, such as maintenance items "
+            "purchased on a personal credit card. The expense is recorded and the "
+            "member's account is credited. To undo it, reverse the credit from "
+            "the member's ledger."
+        ),
+        "post": lambda actor, data: post_member_paid_expense(actor=actor, **data),
     },
     "income": {
         "form": IncomeForm,
@@ -341,6 +354,11 @@ def _record_entry(request, kind):
 @club_books_view
 def record_expense(request):
     return _record_entry(request, "expense")
+
+
+@club_books_view
+def record_member_expense(request):
+    return _record_entry(request, "member_expense")
 
 
 @club_books_view

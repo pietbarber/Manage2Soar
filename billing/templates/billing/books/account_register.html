@@ -55,7 +55,7 @@
           <td class="text-start text-nowrap">{{ row.entry.date|date:"Y-m-d" }}</td>
           <td class="text-start">
             <a href="{% url 'billing:journal_detail' row.entry.pk %}">{{ row.entry.memo }}</a>
-            {% if row.entry.payee or row.line.member %}<div class="small text-muted">{{ row.entry.payee }}{% if row.line.member %}{{ row.line.member.get_full_name|default:row.line.member.username }}{% endif %}</div>{% endif %}
+            {% if row.entry.payee or row.line.member %}<div class="small text-muted">{{ row.entry.payee }}{% if row.line.member and row.entry.payee != row.line.member|stringformat:"s" %}{% if row.entry.payee %} · {% endif %}{{ row.line.member.get_full_name|default:row.line.member.username }}{% endif %}</div>{% endif %}
           </td>
           <td class="text-start small">{{ row.other_accounts|join:", " }}</td>
           <td class="text-end">{% if row.increase %}${{ row.increase|floatformat:"2g" }}{% endif %}</td>

@@ -19,6 +19,7 @@ from billing.ledger_services import (
     post_expense,
     post_income,
     post_journal_entry,
+    post_member_paid_expense,
     reverse_journal_entry,
     verify_books,
 )
@@ -665,3 +666,83 @@ def test_only_one_opening_entry_at_a_time(treasurer):
             ],
             source=JournalEntry.Source.OPENING,
         )
+
+
+def member_paid_rent(treasurer, member, amount="700.00"):
+    return post_member_paid_expense(
+        actor=treasurer,
+        date=today(),
+        member=member,
+        expense_account=account("500"),
+        amount=amount,
+        memo="Field rent paid in cash to landowner",
+    )
+
+
+def test_member_paid_expense_credits_member_and_books(treasurer, member):
+    from billing.services import get_balance
+
+    entry = member_paid_rent(treasurer, member)
+
+    assert entry.source == JournalEntry.Source.MEMBER_POSTING
+    assert entry.member_entry.kind == "credit"
+    assert entry.member_entry.ledger.member == member
+    assert get_balance(entry.member_entry.ledger) == Decimal("-700.00")
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    assert account_balance(account("500")) == Decimal("700.00")
+    assert account_balance(receivables) == Decimal("-700.00")
+    line = entry.lines.get(account=receivables)
+    assert line.member == member and line.credit == Decimal("700.00")
+    assert verify_books() == []
+
+
+def test_member_ledger_reversal_also_reverses_the_books(treasurer, member):
+    from billing.services import get_balance, reverse_manual_entry
+
+    entry = member_paid_rent(treasurer, member)
+    member_reversal = reverse_manual_entry(
+        entry=entry.member_entry,
+        actor=treasurer,
+        effective_date=today(),
+        reason="Entered twice",
+    )
+
+    entry.refresh_from_db()
+    assert entry.reversal.member_entry == member_reversal
+    assert get_balance(entry.member_entry.ledger) == Decimal("0.00")
+    assert account_balance(account("500")) == Decimal("0.00")
+    assert account_balance(role(Account.Role.MEMBER_RECEIVABLES)) == Decimal("0.00")
+    with pytest.raises(ValidationError, match="member's ledger"):
+        reverse_journal_entry(entry=entry, actor=treasurer, date=today(), reason="x")
+
+
+def test_member_paid_expense_is_all_or_nothing(treasurer, member, club_books):
+    from billing.models import LedgerEntry
+
+    club_books.club_accounting_start_date = today()
+    club_books.save(update_fields=["club_accounting_start_date"])
+    with pytest.raises(ValidationError):
+        post_member_paid_expense(
+            actor=treasurer,
+            date=today() - timedelta(days=1),
+            member=member,
+            expense_account=account("500"),
+            amount="700",
+            memo="Before the books start",
+        )
+    assert not LedgerEntry.objects.exists()
+    assert not JournalEntry.objects.exists()
+
+
+def test_member_paid_expense_requires_expense_and_treasurer(treasurer, member):
+    with pytest.raises(ValidationError, match="expense account"):
+        post_member_paid_expense(
+            actor=treasurer,
+            date=today(),
+            member=member,
+            expense_account=account("400"),
+            amount="10",
+            memo="Wrong category",
+        )
+    with pytest.raises(ValidationError, match="Only treasurers"):
+        member_paid_rent(member, member)

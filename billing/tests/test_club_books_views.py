@@ -6,7 +6,12 @@ import pytest
 from django.core.cache import cache
 from django.urls import reverse
 
-from billing.ledger_services import account_balance, post_expense
+from billing.ledger_services import (
+    account_balance,
+    get_role_account,
+    post_expense,
+    post_member_paid_expense,
+)
 from billing.models import Account, JournalEntry
 from members.models import Member
 from siteconfig.timezone_utils import get_club_today
@@ -17,6 +22,7 @@ GET_PAGES = (
     "billing:chart_of_accounts",
     "billing:account_create",
     "billing:record_expense",
+    "billing:record_member_expense",
     "billing:record_income",
     "billing:cash_transfer",
     "billing:general_journal",
@@ -242,6 +248,27 @@ def test_account_register_shows_running_balance(client, treasurer, checking):
     assert response.context["register"]["closing_balance"] == -150
 
 
+def test_receivables_register_names_member_once(client, treasurer, member):
+    member.first_name, member.last_name = "Jack", "Rabbit"
+    member.save()
+    rent = Account.objects.get(code="500")
+    post_member_paid_expense(
+        actor=treasurer,
+        date=get_club_today(),
+        member=member,
+        expense_account=rent,
+        amount="700.00",
+        memo="Field rent paid in cash",
+    )
+    receivables = get_role_account(Account.Role.MEMBER_RECEIVABLES)
+    client.force_login(treasurer)
+    response = client.get(reverse("billing:account_register", args=[receivables.pk]))
+    html = response.content.decode()
+    assert str(member) in html
+    assert f"{member}{member}" not in html
+    assert html.count(str(member)) == 1
+
+
 def test_create_and_edit_account(client, treasurer):
     client.force_login(treasurer)
     response = client.post(
@@ -406,3 +433,33 @@ def test_general_journal_groups_accounts_by_type(client, treasurer):
     assert "300 General Fund" in content[positions[2] : positions[3]]
     # Member Receivables is still never offered.
     assert "Member Receivables" not in content
+
+
+def test_record_member_expense_posts_both_sides(client, treasurer, member):
+    client.force_login(treasurer)
+    response = client.post(
+        reverse("billing:record_member_expense"),
+        {
+            "date": get_club_today().isoformat(),
+            "member": member.pk,
+            "expense_account": Account.objects.get(code="500").pk,
+            "amount": "700.00",
+            "memo": "Field rent paid in cash to landowner",
+        },
+    )
+    entry = JournalEntry.objects.get()
+    assert response.status_code == 302
+    assert response["Location"] == reverse("billing:journal_detail", args=[entry.pk])
+    assert entry.member_entry.ledger.member == member
+
+    content = client.get(response["Location"]).content.decode()
+    assert "reverse it from" in content
+    assert reverse("billing:ledger_detail", args=[member.pk]) in content
+
+
+def test_expense_menu_labels(client, treasurer):
+    client.force_login(treasurer)
+    content = client.get(reverse("billing:club_ledger")).content.decode()
+    assert "Expense paid by club" in content
+    assert "Expense paid by member" in content
+    assert reverse("billing:record_member_expense") in content
