@@ -40,6 +40,9 @@
     </table>
   </div>
 
+  {% if entry.member_entry and not reversal %}
+  <p class="small text-muted">This entry mirrors a member ledger entry. To undo it, reverse it from <a href="{% url 'billing:ledger_detail' entry.member_entry.ledger.member_id %}">{{ entry.member_entry.ledger.member }}'s ledger</a>; the books reverse with it.</p>
+  {% endif %}
   {% if can_reverse %}
   <div class="card border-0 shadow-sm">
     <div class="card-body">
