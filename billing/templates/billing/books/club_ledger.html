@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load widget_tweaks %}
+{% load billing_extras %}
 
 {% block title %}Club Ledger{% endblock %}
 
@@ -19,7 +20,7 @@
       <a class="card border-0 shadow-sm h-100 text-decoration-none text-body" href="{% url 'billing:account_register' row.account.pk %}">
         <div class="card-body">
           <div class="text-muted small">{{ row.account.name }}</div>
-          <div class="h4 mb-0 {% if row.balance < 0 %}text-danger{% endif %}">${{ row.balance|floatformat:"2g" }}</div>
+          <div class="h4 mb-0 {% if row.balance < 0 %}text-danger{% endif %}">{{ row.balance|money }}</div>
         </div>
       </a>
     </div>
@@ -85,10 +86,10 @@
           </td>
           {% endif %}
           <td class="text-start {% if line.credit %}ps-4{% endif %}">
-            <a class="text-reset" href="{% url 'billing:account_register' line.account.pk %}">{{ line.account.name }}</a>{% if line.member %} <span class="small text-muted">({{ line.member.get_full_name|default:line.member.username }})</span>{% endif %}
+            <a class="text-reset" href="{% url 'billing:account_register' line.account.pk %}">{{ line.account.name }}</a>{% if line.member %} <span class="small text-muted">({{ line.member|member_name }})</span>{% endif %}
           </td>
-          <td class="text-end">{% if line.debit %}${{ line.debit|floatformat:"2g" }}{% endif %}</td>
-          <td class="text-end">{% if line.credit %}${{ line.credit|floatformat:"2g" }}{% endif %}</td>
+          <td class="text-end">{% if line.debit %}{{ line.debit|money }}{% endif %}</td>
+          <td class="text-end">{% if line.credit %}{{ line.credit|money }}{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

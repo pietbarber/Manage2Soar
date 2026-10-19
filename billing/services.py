@@ -31,6 +31,11 @@ def _club_today():
     return get_club_today()
 
 
+def member_label(member):
+    """The name billing shows for a member, the same as the rest of the site."""
+    return member.full_display_name or member.username
+
+
 def _money(amount):
     amount = Decimal(str(amount)).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
     if amount <= 0:

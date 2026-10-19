@@ -20,7 +20,7 @@ from billing.exceptions import ClubAccountingDisabledError
 from billing.models import Account, JournalEntry, JournalLine
 from billing.periods import lock_period_for_date
 from billing.permissions import require_audit_text, require_manual_transaction_access
-from billing.services import _club_today, _money
+from billing.services import _club_today, _money, member_label
 
 ZERO = Decimal("0.00")
 MONEY_FIELD = DecimalField(max_digits=14, decimal_places=2)
@@ -326,7 +326,7 @@ def post_member_paid_expense(
         actor=actor,
         date=date,
         memo=memo,
-        payee=str(member),
+        payee=member_label(member),
         reference=reference,
         internal_note=internal_note,
         lines=[

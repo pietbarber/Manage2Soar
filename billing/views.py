@@ -21,6 +21,7 @@ from billing.periods import close_period, reopen_period
 from billing.services import (
     get_balance,
     get_statement_rows,
+    member_label,
     override_opening_balance,
     post_manual_charge,
     post_manual_credit,
@@ -259,9 +260,7 @@ def ledger_detail_csv(request, member_id):
                     else ""
                 ),
                 f"{row['running_balance']:.2f}",
-                sanitize_csv_cell(
-                    entry.created_by.get_full_name() or entry.created_by.username
-                ),
+                sanitize_csv_cell(member_label(entry.created_by)),
                 sanitize_csv_cell(entry.internal_note),
             ]
         )

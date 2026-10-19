@@ -319,6 +319,13 @@ club now owes the member $700, or the member owes $700 less. Their member
 ledger gets a matching $700 credit, which their dues or flying charges then
 use up.
 
+**A negative Member Receivables balance is not an error.** Receivables is an
+asset, so a positive balance means members owe the club. A negative balance
+means the club owes its members: for example, the $700 above, until the
+member's charges use it up. Negative amounts are shown in parentheses, as in
+`($700.00)`, the usual accounting style. The same applies to a single member
+on their own ledger, where `($700.00)` is a credit balance in their favor.
+
 ### Mistakes: reverse, don't edit
 
 Journal entries can never be changed or deleted, even by a superuser (the
