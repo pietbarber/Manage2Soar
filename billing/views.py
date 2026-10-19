@@ -151,9 +151,10 @@ def ledger_detail(request, member_id):
     has_opening_balance = bool(
         ledger and ledger.entries.filter(kind=LedgerEntry.Kind.OPENING_BALANCE).exists()
     )
-    form = ManualEntryForm(
-        request.POST or None, allow_opening_balance=not has_opening_balance
-    )
+    # Initial Debit/Credit set the starting balance, so they are offered only
+    # while the member's ledger is still empty.
+    has_entries = bool(ledger and ledger.entries.exists())
+    form = ManualEntryForm(request.POST or None, allow_initial_balance=not has_entries)
 
     if request.method == "POST":
         if not form.is_valid():
@@ -187,7 +188,10 @@ def ledger_detail(request, member_id):
             elif data["kind"] == "credit":
                 post_manual_credit(**common)
             else:
-                post_opening_balance(effect=data["effect"], **common)
+                post_opening_balance(
+                    effect=ManualEntryForm.INITIAL_BALANCE_EFFECTS[data["kind"]],
+                    **common,
+                )
         except ValidationError as exc:
             form.add_error(None, exc.messages)
         else:
