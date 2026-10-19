@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load widget_tweaks %}
+{% load billing_extras %}
 
 {% block title %}{{ account.name }}{% endblock %}
 
@@ -16,7 +17,7 @@
       </div>
       <div class="text-end">
         <div class="text-muted small">Balance{% if end %} on {{ end|date:"Y-m-d" }}{% endif %}</div>
-        <div class="display-6 mb-0">${{ register.closing_balance|floatformat:"2g" }}</div>
+        <div class="display-6 mb-0">{{ register.closing_balance|money }}</div>
       </div>
     </div>
   </div>
@@ -55,19 +56,19 @@
           <td class="text-start text-nowrap">{{ row.entry.date|date:"Y-m-d" }}</td>
           <td class="text-start">
             <a href="{% url 'billing:journal_detail' row.entry.pk %}">{{ row.entry.memo }}</a>
-            {% if row.entry.payee or row.line.member %}<div class="small text-muted">{{ row.entry.payee }}{% if row.line.member and row.entry.payee != row.line.member|stringformat:"s" %}{% if row.entry.payee %} · {% endif %}{{ row.line.member.get_full_name|default:row.line.member.username }}{% endif %}</div>{% endif %}
+            {% if row.entry.payee or row.line.member %}<div class="small text-muted">{{ row.entry.payee }}{% if row.line.member and row.entry.payee != row.line.member|member_name %}{% if row.entry.payee %} · {% endif %}{{ row.line.member|member_name }}{% endif %}</div>{% endif %}
           </td>
           <td class="text-start small">{{ row.other_accounts|join:", " }}</td>
-          <td class="text-end">{% if row.increase %}${{ row.increase|floatformat:"2g" }}{% endif %}</td>
-          <td class="text-end">{% if row.decrease %}${{ row.decrease|floatformat:"2g" }}{% endif %}</td>
-          <td class="text-end">${{ row.balance|floatformat:"2g" }}</td>
+          <td class="text-end">{% if row.increase %}{{ row.increase|money }}{% endif %}</td>
+          <td class="text-end">{% if row.decrease %}{{ row.decrease|money }}{% endif %}</td>
+          <td class="text-end">{{ row.balance|money }}</td>
         </tr>
         {% empty %}
         <tr><td colspan="6" class="text-start text-muted">No activity in this range.</td></tr>
         {% endfor %}
         <tr class="table-light">
           <td class="text-start" colspan="5">Opening balance{% if start %} before {{ start|date:"Y-m-d" }}{% endif %}</td>
-          <td class="text-end">${{ register.opening_balance|floatformat:"2g" }}</td>
+          <td class="text-end">{{ register.opening_balance|money }}</td>
         </tr>
       </tbody>
     </table>
