@@ -30,6 +30,18 @@ def test_login_shows_invalid_credentials_error(client):
 
 
 @pytest.mark.django_db
+def test_login_preserves_username_on_invalid_credentials(client):
+    response = client.post(
+        reverse("login"),
+        {"username": "missing-user", "password": "wrong-password"},
+    )
+
+    assert response.status_code == 200
+    assert b'value="missing-user"' in response.content
+    assert b'value="wrong-password"' not in response.content
+
+
+@pytest.mark.django_db
 def test_biography_view_shows_biography(client):
     SiteConfiguration.objects.create(
         club_name="Test Club",
