@@ -3,6 +3,7 @@ from decimal import Decimal
 from django import forms
 from django.core.exceptions import ValidationError
 
+from billing.ledger_services import bank_accounts
 from billing.models import Account, JournalEntry
 from siteconfig.timezone_utils import get_club_today
 
@@ -199,6 +200,45 @@ class AccountForm(forms.ModelForm):
             )
         if instance.system_role:
             self.fields["is_active"].disabled = True
+
+
+class GoLiveForm(forms.Form):
+    start_date = _date_field(
+        label="Books start date",
+        help_text=(
+            "Usually the date of the bank statement balances below. Every later "
+            "entry must be dated after this day."
+        ),
+    )
+
+
+class BankBalanceForm(forms.Form):
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.none(), required=False, widget=forms.HiddenInput
+    )
+    name = forms.CharField(max_length=100, required=False, label="Bank account")
+    amount = forms.DecimalField(
+        required=False, max_digits=12, decimal_places=2, label="Balance"
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["account"].queryset = bank_accounts()
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("account") and not (cleaned.get("name") or "").strip():
+            raise ValidationError("Bank accounts need a name.")
+        if (
+            not cleaned.get("account")
+            and cleaned.get("amount")
+            and not (cleaned.get("name") or "").strip()
+        ):
+            raise ValidationError("Name the new bank account.")
+        return cleaned
+
+
+BankBalanceFormSet = forms.formset_factory(BankBalanceForm, extra=1)
 
 
 class ReverseJournalForm(forms.Form):

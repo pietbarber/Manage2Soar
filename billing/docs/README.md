@@ -21,7 +21,7 @@ The billing app handles:
 - Flight charge allocation from Logsheet data
 - Manual charges and payments
 - Financial statement generation
-- Opt-in double-entry club books: bank accounts, expenses, income, transfers ([details](general-ledger.md))
+- Opt-in double-entry club books: go-live opening balances, bank accounts, expenses, income, transfers ([details](general-ledger.md))
 
 ### Enable Billing App
 

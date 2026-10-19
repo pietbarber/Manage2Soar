@@ -1,4 +1,5 @@
 import csv
+from datetime import timedelta
 from io import StringIO
 
 import pytest
@@ -19,6 +20,7 @@ GET_PAGES = (
     "billing:record_income",
     "billing:cash_transfer",
     "billing:general_journal",
+    "billing:go_live",
 )
 
 
@@ -303,3 +305,84 @@ def test_club_finances_nav_hidden_when_disabled(client, treasurer, club_books, f
     cache.clear()
     client.force_login(treasurer)
     assert 'id="clubFinancesDropdown"' not in client.get("/").content.decode()
+
+
+def go_live_post(**extra):
+    checking = Account.objects.get(code="110")
+    data = {
+        "start_date": (get_club_today() - timedelta(days=1)).isoformat(),
+        "banks-TOTAL_FORMS": "2",
+        "banks-INITIAL_FORMS": "1",
+        "banks-MIN_NUM_FORMS": "0",
+        "banks-MAX_NUM_FORMS": "1000",
+        "banks-0-account": str(checking.pk),
+        "banks-0-name": "Wells Fargo Checking",
+        "banks-0-amount": "5000.00",
+        "banks-1-account": "",
+        "banks-1-name": "",
+        "banks-1-amount": "",
+    }
+    data.update(extra)
+    return data
+
+
+def test_go_live_page_prefills_bank_accounts(client, treasurer):
+    client.force_login(treasurer)
+    content = client.get(reverse("billing:go_live")).content.decode()
+    assert 'value="Checking"' in content
+    assert "Start the books" in content
+    assert (
+        "Go-live setup" in client.get(reverse("billing:club_ledger")).content.decode()
+    )
+
+
+def test_go_live_page_posts_opening_entry(client, treasurer, club_books):
+    client.force_login(treasurer)
+    response = client.post(
+        reverse("billing:go_live"),
+        go_live_post(
+            **{"banks-1-name": "Credit Union Savings", "banks-1-amount": "250"}
+        ),
+    )
+    entry = JournalEntry.objects.get(source=JournalEntry.Source.OPENING)
+    assert response.status_code == 302
+    assert response["Location"] == reverse("billing:journal_detail", args=[entry.pk])
+    assert Account.objects.get(code="110").name == "Wells Fargo Checking"
+    assert account_balance(Account.objects.get(code="111")) == 250
+    general_fund = Account.objects.get(system_role=Account.Role.GENERAL_FUND)
+    assert account_balance(general_fund) == 5250
+
+    content = client.get(reverse("billing:go_live")).content.decode()
+    assert "Replace opening balances" in content
+    assert 'value="5000.00"' in content
+    assert (
+        "Go-live setup"
+        not in client.get(reverse("billing:club_ledger")).content.decode()
+    )
+
+
+def test_go_live_page_requires_name_for_new_account(client, treasurer):
+    client.force_login(treasurer)
+    response = client.post(
+        reverse("billing:go_live"), go_live_post(**{"banks-1-amount": "10"})
+    )
+    assert response.status_code == 200
+    assert "Name the new bank account." in response.content.decode()
+    assert not JournalEntry.objects.exists()
+
+
+def test_go_live_page_locked_after_other_entries(client, treasurer):
+    client.force_login(treasurer)
+    client.post(reverse("billing:go_live"), go_live_post())
+    expense(treasurer, Account.objects.get(code="110"))
+
+    response = client.get(reverse("billing:go_live"))
+    assert "can no longer be changed here" in response.content.decode()
+    response = client.post(reverse("billing:go_live"), go_live_post())
+    assert response.status_code == 200
+    assert JournalEntry.objects.filter(source=JournalEntry.Source.OPENING).count() == 1
+
+
+def test_go_live_in_club_finances_nav(client, treasurer):
+    client.force_login(treasurer)
+    assert reverse("billing:go_live") in client.get("/").content.decode()
