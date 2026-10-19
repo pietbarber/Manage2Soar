@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load billing_extras %}
 
 {% block content %}
 <div class="container py-4">
@@ -20,7 +21,7 @@
         <div class="small text-success">Paid in full</div>
         {% endif %}
       </div>
-      <div class="h3 mb-0 {% if ledger_balance > 0 %}text-danger{% elif ledger_balance < 0 %}text-success{% endif %}">${{ ledger_balance|floatformat:2 }}</div>
+      <div class="h3 mb-0 {% if ledger_balance > 0 %}text-danger{% elif ledger_balance < 0 %}text-success{% endif %}">{{ ledger_balance|money }}</div>
     </div>
   </div>
 
@@ -47,9 +48,9 @@
             <td class="text-nowrap">{{ row.entry.effective_date }}</td>
             <td>{{ row.entry.get_kind_display }}</td>
             <td>{{ row.entry.member_description }}</td>
-            <td class="text-end text-danger">{% if row.entry.effect == "debit" %}${{ row.entry.amount|floatformat:2 }}{% endif %}</td>
-            <td class="text-end text-success">{% if row.entry.effect == "credit" %}${{ row.entry.amount|floatformat:2 }}{% endif %}</td>
-            <td class="text-end fw-semibold {% if row.running_balance > 0 %}text-danger{% elif row.running_balance < 0 %}text-success{% endif %}">${{ row.running_balance|floatformat:2 }}</td>
+            <td class="text-end text-danger">{% if row.entry.effect == "debit" %}{{ row.entry.amount|money }}{% endif %}</td>
+            <td class="text-end text-success">{% if row.entry.effect == "credit" %}{{ row.entry.amount|money }}{% endif %}</td>
+            <td class="text-end fw-semibold {% if row.running_balance > 0 %}text-danger{% elif row.running_balance < 0 %}text-success{% endif %}">{{ row.running_balance|money }}</td>
           </tr>
           {% empty %}
           <tr><td colspan="6" class="text-muted text-center py-4">No ledger entries posted.</td></tr>
@@ -68,7 +69,7 @@
       <div>
         <div class="text-uppercase text-muted small">Total charges accrued</div>
       </div>
-      <div class="h3 mb-0 text-danger">${{ total_owed|floatformat:2 }}</div>
+      <div class="h3 mb-0 text-danger">{{ total_owed|money }}</div>
     </div>
   </div>
 
@@ -93,10 +94,10 @@
           <tr>
             <td class="text-nowrap">{{ row.flight_date }}</td>
             <td>{{ row.glider }}</td>
-            <td class="text-end">${{ row.tow_cost|floatformat:2 }}</td>
-            <td class="text-end">${{ row.rental_cost|floatformat:2 }}</td>
-            <td class="text-end">${{ row.instruction_cost|floatformat:2 }}</td>
-            <td class="text-end fw-semibold">${{ row.total_cost|floatformat:2 }}</td>
+            <td class="text-end">{{ row.tow_cost|money }}</td>
+            <td class="text-end">{{ row.rental_cost|money }}</td>
+            <td class="text-end">{{ row.instruction_cost|money }}</td>
+            <td class="text-end fw-semibold">{{ row.total_cost|money }}</td>
           </tr>
           {% empty %}
           <tr><td colspan="6" class="text-muted text-center py-4">No operational flight charges recorded.</td></tr>
@@ -127,7 +128,7 @@
             <td class="text-nowrap">{{ charge.date }}</td>
             <td>{{ charge.chargeable_item.name }}</td>
             <td>{{ charge.notes|default:charge.chargeable_item.name }}</td>
-            <td class="text-end fw-semibold">${{ charge.total_price|floatformat:2 }}</td>
+            <td class="text-end fw-semibold">{{ charge.total_price|money }}</td>
           </tr>
           {% endfor %}
         </tbody>

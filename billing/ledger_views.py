@@ -48,6 +48,7 @@ from billing.ledger_services import (
     verify_books,
 )
 from billing.models import Account, JournalEntry, JournalLine
+from billing.services import member_label
 from siteconfig.timezone_utils import get_club_today
 from utils.csv import sanitize_csv_cell
 
@@ -155,15 +156,11 @@ def club_ledger_csv(request):
                     sanitize_csv_cell(entry.reference),
                     sanitize_csv_cell(line.account.code),
                     sanitize_csv_cell(line.account.name),
-                    sanitize_csv_cell(
-                        (member.get_full_name() or member.username) if member else ""
-                    ),
+                    sanitize_csv_cell(member_label(member) if member else ""),
                     f"{line.debit:.2f}" if line.debit else "",
                     f"{line.credit:.2f}" if line.credit else "",
                     sanitize_csv_cell(line.memo),
-                    sanitize_csv_cell(
-                        entry.created_by.get_full_name() or entry.created_by.username
-                    ),
+                    sanitize_csv_cell(member_label(entry.created_by)),
                     sanitize_csv_cell(entry.internal_note),
                 ]
             )

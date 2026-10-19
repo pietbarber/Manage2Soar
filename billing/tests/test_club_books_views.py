@@ -217,7 +217,7 @@ def test_club_ledger_lists_entries_and_cash(client, treasurer, checking):
     content = client.get(reverse("billing:club_ledger")).content.decode()
     assert "Hangar electricity" in content
     assert "Club Checking" in content
-    assert "$-400.00" in content
+    assert "($400.00)" in content
 
 
 def test_club_ledger_filters(client, treasurer, checking):
