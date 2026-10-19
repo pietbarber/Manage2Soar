@@ -27,6 +27,30 @@ def postable_accounts():
     )
 
 
+ACCOUNT_GROUP_LABELS = {
+    Account.Type.ASSET: "Assets (Debit increases)",
+    Account.Type.LIABILITY: "Liabilities (Credit increases)",
+    Account.Type.EQUITY: "Equity (Credit increases)",
+    Account.Type.INCOME: "Income (Credit increases)",
+    Account.Type.EXPENSE: "Expenses (Debit increases)",
+}
+
+
+def grouped_account_choices(queryset, empty_label="---------"):
+    """Select choices with one option group per account type, in chart order."""
+    accounts = list(queryset.order_by("code"))
+    choices = [("", empty_label)]
+    for account_type, label in ACCOUNT_GROUP_LABELS.items():
+        group = [
+            (account.pk, str(account))
+            for account in accounts
+            if account.type == account_type
+        ]
+        if group:
+            choices.append((label, group))
+    return choices
+
+
 class _EntryDetailsForm(forms.Form):
     """Fields shared by every club-books entry form."""
 
@@ -141,7 +165,10 @@ class JournalLineForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["account"].queryset = postable_accounts()
+        field = self.fields["account"]
+        field.queryset = postable_accounts()
+        # Validation still uses the queryset; the groups only change the display.
+        field.choices = grouped_account_choices(field.queryset)
 
     def clean(self):
         cleaned = super().clean()

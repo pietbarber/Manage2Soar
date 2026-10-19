@@ -386,3 +386,23 @@ def test_go_live_page_locked_after_other_entries(client, treasurer):
 def test_go_live_in_club_finances_nav(client, treasurer):
     client.force_login(treasurer)
     assert reverse("billing:go_live") in client.get("/").content.decode()
+
+
+def test_general_journal_groups_accounts_by_type(client, treasurer):
+    client.force_login(treasurer)
+    content = client.get(reverse("billing:general_journal")).content.decode()
+    groups = [
+        "Assets (Debit increases)",
+        "Liabilities (Credit increases)",
+        "Equity (Credit increases)",
+        "Income (Credit increases)",
+        "Expenses (Debit increases)",
+    ]
+    positions = [content.index(f'<optgroup label="{label}">') for label in groups]
+    assert positions == sorted(positions)
+    assets = content[positions[0] : positions[1]]
+    assert "110 Checking" in assets
+    assert "200 Accounts Payable" in content[positions[1] : positions[2]]
+    assert "300 General Fund" in content[positions[2] : positions[3]]
+    # Member Receivables is still never offered.
+    assert "Member Receivables" not in content
