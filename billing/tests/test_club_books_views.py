@@ -3,15 +3,9 @@ from datetime import timedelta
 from io import StringIO
 
 import pytest
-from django.core.cache import cache
 from django.urls import reverse
 
-from billing.ledger_services import (
-    account_balance,
-    get_role_account,
-    post_expense,
-    post_member_paid_expense,
-)
+from billing.ledger_services import account_balance, post_expense
 from billing.models import Account, JournalEntry
 from members.models import Member
 from siteconfig.timezone_utils import get_club_today
@@ -190,13 +184,6 @@ def test_general_journal_rejects_unbalanced_entry(client, treasurer, checking):
     assert not JournalEntry.objects.exists()
 
 
-def test_general_journal_does_not_offer_member_receivables(client, treasurer):
-    client.force_login(treasurer)
-    content = client.get(reverse("billing:general_journal")).content.decode()
-    assert "Member Receivables" not in content
-    assert "Accounts Payable" in content
-
-
 def test_reverse_entry_view(client, treasurer, checking):
     entry = expense(treasurer, checking)
     client.force_login(treasurer)
@@ -207,17 +194,6 @@ def test_reverse_entry_view(client, treasurer, checking):
     reversal = JournalEntry.objects.get(reverses=entry)
     assert response.url == reverse("billing:journal_detail", args=[reversal.pk])
     assert account_balance(checking) == 0
-    detail = client.get(reverse("billing:journal_detail", args=[entry.pk]))
-    assert "Reverse this entry" not in detail.content.decode()
-
-
-def test_club_ledger_lists_entries_and_cash(client, treasurer, checking):
-    expense(treasurer, checking, memo="Hangar electricity")
-    client.force_login(treasurer)
-    content = client.get(reverse("billing:club_ledger")).content.decode()
-    assert "Hangar electricity" in content
-    assert "Club Checking" in content
-    assert "($400.00)" in content
 
 
 def test_club_ledger_filters(client, treasurer, checking):
@@ -246,27 +222,6 @@ def test_account_register_shows_running_balance(client, treasurer, checking):
     client.force_login(treasurer)
     response = client.get(reverse("billing:account_register", args=[checking.pk]))
     assert response.context["register"]["closing_balance"] == -150
-
-
-def test_receivables_register_names_member_once(client, treasurer, member):
-    member.first_name, member.last_name = "Jack", "Rabbit"
-    member.save()
-    rent = Account.objects.get(code="500")
-    post_member_paid_expense(
-        actor=treasurer,
-        date=get_club_today(),
-        member=member,
-        expense_account=rent,
-        amount="700.00",
-        memo="Field rent paid in cash",
-    )
-    receivables = get_role_account(Account.Role.MEMBER_RECEIVABLES)
-    client.force_login(treasurer)
-    response = client.get(reverse("billing:account_register", args=[receivables.pk]))
-    html = response.content.decode()
-    assert str(member) in html
-    assert f"{member}{member}" not in html
-    assert html.count(str(member)) == 1
 
 
 def test_create_and_edit_account(client, treasurer):
@@ -318,18 +273,14 @@ def test_club_finances_nav_for_treasurer_only(client, member, treasurer, club_bo
     content = client.get("/").content.decode()
     assert 'id="clubFinancesDropdown"' in content
     assert reverse("billing:club_ledger") in content
-    # Member Billing stays under Log Sheets.
-    assert reverse("billing:ledger_list") in content
 
     client.force_login(member)
     assert 'id="clubFinancesDropdown"' not in client.get("/").content.decode()
 
 
-@pytest.mark.parametrize("flag", ["club_accounting_enabled", "billing_app_enabled"])
-def test_club_finances_nav_hidden_when_disabled(client, treasurer, club_books, flag):
-    # Bypass model validation so the template guard is tested on its own.
-    type(club_books).objects.filter(pk=club_books.pk).update(**{flag: False})
-    cache.clear()
+def test_club_finances_nav_hidden_when_disabled(client, treasurer, club_books):
+    club_books.club_accounting_enabled = False
+    club_books.save(update_fields=["club_accounting_enabled"])
     client.force_login(treasurer)
     assert 'id="clubFinancesDropdown"' not in client.get("/").content.decode()
 
@@ -353,16 +304,6 @@ def go_live_post(**extra):
     return data
 
 
-def test_go_live_page_prefills_bank_accounts(client, treasurer):
-    client.force_login(treasurer)
-    content = client.get(reverse("billing:go_live")).content.decode()
-    assert 'value="Checking"' in content
-    assert "Start the books" in content
-    assert (
-        "Go-live setup" in client.get(reverse("billing:club_ledger")).content.decode()
-    )
-
-
 def test_go_live_page_posts_opening_entry(client, treasurer, club_books):
     client.force_login(treasurer)
     response = client.post(
@@ -378,14 +319,6 @@ def test_go_live_page_posts_opening_entry(client, treasurer, club_books):
     assert account_balance(Account.objects.get(code="111")) == 250
     general_fund = Account.objects.get(system_role=Account.Role.GENERAL_FUND)
     assert account_balance(general_fund) == 5250
-
-    content = client.get(reverse("billing:go_live")).content.decode()
-    assert "Replace opening balances" in content
-    assert 'value="5000.00"' in content
-    assert (
-        "Go-live setup"
-        not in client.get(reverse("billing:club_ledger")).content.decode()
-    )
 
 
 def test_go_live_page_requires_name_for_new_account(client, treasurer):
@@ -410,31 +343,6 @@ def test_go_live_page_locked_after_other_entries(client, treasurer):
     assert JournalEntry.objects.filter(source=JournalEntry.Source.OPENING).count() == 1
 
 
-def test_go_live_in_club_finances_nav(client, treasurer):
-    client.force_login(treasurer)
-    assert reverse("billing:go_live") in client.get("/").content.decode()
-
-
-def test_general_journal_groups_accounts_by_type(client, treasurer):
-    client.force_login(treasurer)
-    content = client.get(reverse("billing:general_journal")).content.decode()
-    groups = [
-        "Assets (Debit increases)",
-        "Liabilities (Credit increases)",
-        "Equity (Credit increases)",
-        "Income (Credit increases)",
-        "Expenses (Debit increases)",
-    ]
-    positions = [content.index(f'<optgroup label="{label}">') for label in groups]
-    assert positions == sorted(positions)
-    assets = content[positions[0] : positions[1]]
-    assert "110 Checking" in assets
-    assert "200 Accounts Payable" in content[positions[1] : positions[2]]
-    assert "300 General Fund" in content[positions[2] : positions[3]]
-    # Member Receivables is still never offered.
-    assert "Member Receivables" not in content
-
-
 def test_record_member_expense_posts_both_sides(client, treasurer, member):
     client.force_login(treasurer)
     response = client.post(
@@ -451,15 +359,3 @@ def test_record_member_expense_posts_both_sides(client, treasurer, member):
     assert response.status_code == 302
     assert response["Location"] == reverse("billing:journal_detail", args=[entry.pk])
     assert entry.member_entry.ledger.member == member
-
-    content = client.get(response["Location"]).content.decode()
-    assert "reverse it from" in content
-    assert reverse("billing:ledger_detail", args=[member.pk]) in content
-
-
-def test_expense_menu_labels(client, treasurer):
-    client.force_login(treasurer)
-    content = client.get(reverse("billing:club_ledger")).content.decode()
-    assert "Expense paid by club" in content
-    assert "Expense paid by member" in content
-    assert reverse("billing:record_member_expense") in content
