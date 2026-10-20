@@ -17,7 +17,7 @@ from django.db.models import Count, DecimalField, F, Q, Sum, Value
 from django.db.models.functions import Coalesce
 
 from billing.exceptions import ClubAccountingDisabledError
-from billing.models import Account, JournalEntry, JournalLine
+from billing.models import Account, JournalEntry, JournalLine, LedgerEntry
 from billing.periods import lock_period_for_date
 from billing.permissions import require_audit_text, require_manual_transaction_access
 from billing.services import _club_today, _money, member_label
@@ -309,10 +309,11 @@ def post_member_paid_expense(
 
     _require_club_accounting()
     require_manual_transaction_access(actor)
+    if not member_books_live():
+        raise ValidationError("Finish Go-Live Setup before recording member expenses.")
     if expense_account.type != Account.Type.EXPENSE:
         raise ValidationError("Choose an expense account.")
     memo = require_audit_text(memo, "memo")
-    amount = _money(amount)
     member_entry = post_manual_credit(
         member=member,
         actor=actor,
@@ -321,40 +322,179 @@ def post_member_paid_expense(
         description=memo,
         reason=(internal_note or "").strip()
         or f"Paid a club expense ({expense_account.name}).",
+        book_account=expense_account,
+        book_reference=reference,
     )
+    return JournalEntry.objects.get(member_entry=member_entry)
+
+
+def member_books_live():
+    """True once member-ledger entries post to the books.
+
+    That starts when go-live posts the opening entry; before then, member
+    balances are gathered into the opening entry instead.
+    """
+    return club_accounting_enabled() and active_opening_entry() is not None
+
+
+# Where each kind of member entry lands when the treasurer doesn't choose.
+# Flight charges split across tow, rental and instruction revenue instead.
+DEFAULT_OFFSET_ROLES = {
+    LedgerEntry.Kind.MISC_CHARGE: Account.Role.DEFAULT_CHARGE_REVENUE,
+    LedgerEntry.Kind.MANUAL_CHARGE: Account.Role.DEFAULT_CHARGE_REVENUE,
+    LedgerEntry.Kind.GUEST_PAYMENT_PENDING: Account.Role.GUEST_FLIGHT_REVENUE,
+    LedgerEntry.Kind.PAYMENT: Account.Role.UNDEPOSITED_FUNDS,
+    LedgerEntry.Kind.GUEST_REMITTANCE: Account.Role.UNDEPOSITED_FUNDS,
+    LedgerEntry.Kind.CREDIT: Account.Role.MEMBER_CREDITS,
+    LedgerEntry.Kind.OPENING_BALANCE: Account.Role.GENERAL_FUND,
+}
+FLIGHT_REVENUE_ROLES = (
+    ("tow_amount", Account.Role.TOW_REVENUE),
+    ("rental_amount", Account.Role.RENTAL_REVENUE),
+    ("instruction_amount", Account.Role.INSTRUCTION_REVENUE),
+)
+CASH_KINDS = {LedgerEntry.Kind.PAYMENT, LedgerEntry.Kind.GUEST_REMITTANCE}
+
+
+def _is_opening_adjustment(entry):
+    from billing.services import OPENING_OVERRIDE_KEY_PREFIX
+
+    return entry.kind == LedgerEntry.Kind.OPENING_BALANCE or (
+        entry.source_key or ""
+    ).startswith(OPENING_OVERRIDE_KEY_PREFIX)
+
+
+def check_member_offset_account(kind, account):
+    """Refuse an account that doesn't fit this kind of member entry."""
+    if account.system_role == Account.Role.MEMBER_RECEIVABLES:
+        raise ValidationError("Member Receivables can't be the other side.")
+    if not account.is_active:
+        raise ValidationError(f"{account} is inactive.")
+    if kind in CASH_KINDS:
+        if not account.is_cash:
+            raise ValidationError("Payments must go to a cash or bank account.")
+    elif kind == LedgerEntry.Kind.CREDIT:
+        if account.type not in {Account.Type.EXPENSE, Account.Type.INCOME}:
+            raise ValidationError("Credits come from an expense or income account.")
+    elif kind in {LedgerEntry.Kind.MANUAL_CHARGE, LedgerEntry.Kind.MISC_CHARGE}:
+        if account.type != Account.Type.INCOME:
+            raise ValidationError("Charges go to an income account.")
+    else:
+        raise ValidationError("This kind of entry always uses its default account.")
+
+
+def member_entry_lines(entry, account=None):
+    """The journal lines for one member-ledger entry (not a reversal)."""
+    receivables = get_role_account(Account.Role.MEMBER_RECEIVABLES)
+    member = entry.ledger.member
+    amount = entry.amount
+    if account is None and _is_opening_adjustment(entry):
+        account = get_role_account(Account.Role.GENERAL_FUND)
+    if entry.effect == LedgerEntry.Effect.DEBIT:
+        if account is not None:
+            others = [Line(account=account, credit=amount)]
+        elif entry.kind == LedgerEntry.Kind.FLIGHT_CHARGE:
+            snapshot = entry.flight_snapshot
+            others = [
+                Line(account=get_role_account(role), credit=getattr(snapshot, field))
+                for field, role in FLIGHT_REVENUE_ROLES
+                if getattr(snapshot, field)
+            ]
+        else:
+            role = DEFAULT_OFFSET_ROLES[entry.kind]
+            others = [Line(account=get_role_account(role), credit=amount)]
+        return [Line(account=receivables, debit=amount, member=member), *others]
+    if account is None:
+        account = get_role_account(DEFAULT_OFFSET_ROLES[entry.kind])
+    return [
+        Line(account=account, debit=amount),
+        Line(account=receivables, credit=amount, member=member),
+    ]
+
+
+def post_member_entry(entry, *, actor, account=None, reference=""):
+    """Post the club-books side of a member-ledger entry.
+
+    Does nothing until go-live. An entry dated before the books' start date
+    (a late logsheet, say) posts on the start date. Reversals mirror the
+    original's journal entry; if the original was folded into the opening
+    entry, they mirror its default accounts instead.
+    """
+    if not member_books_live():
+        return None
+    existing = JournalEntry.objects.filter(member_entry=entry).first()
+    if existing:
+        return existing
+    start = books_start_date()
+    date = max(entry.effective_date, start)
+    note = entry.internal_note
+    if date != entry.effective_date:
+        note = (
+            f"{note}\nMember ledger date {entry.effective_date:%Y-%m-%d}; "
+            "posted on the books' start date."
+        ).strip()
+    if entry.kind == LedgerEntry.Kind.REVERSAL:
+        original = JournalEntry.objects.filter(member_entry=entry.reverses).first()
+        if original:
+            return _post_reversal(
+                JournalEntry.objects.select_for_update().get(pk=original.pk),
+                actor=actor,
+                date=max(date, original.date),
+                reason=note or "Reversed on the member's ledger.",
+                member_entry=entry,
+            )
+        lines = [
+            Line(
+                account=line.account,
+                debit=line.credit,
+                credit=line.debit,
+                member=line.member,
+            )
+            for line in member_entry_lines(entry.reverses)
+        ]
+    else:
+        if account is not None:
+            check_member_offset_account(entry.kind, account)
+        lines = member_entry_lines(entry, account)
     return post_journal_entry(
         actor=actor,
         date=date,
-        memo=memo,
-        payee=member_label(member),
+        lines=lines,
+        memo=entry.member_description[:255],
+        payee=member_label(entry.ledger.member),
         reference=reference,
-        internal_note=internal_note,
-        lines=[
-            Line(account=expense_account, debit=amount),
-            Line(
-                account=get_role_account(Account.Role.MEMBER_RECEIVABLES),
-                credit=amount,
-                member=member,
-            ),
-        ],
+        internal_note=note,
         source=JournalEntry.Source.MEMBER_POSTING,
-        member_entry=member_entry,
+        source_key=f"member-entry:{entry.pk}",
+        member_entry=entry,
         allow_receivables=True,
     )
 
 
-def reverse_member_posting(*, member_entry, member_reversal, actor, date, reason):
-    """Mirror a member-ledger reversal in the books, if the entry was posted there."""
-    journal = JournalEntry.objects.filter(member_entry=member_entry).first()
-    if journal is None:
-        return None
-    return _post_reversal(
-        JournalEntry.objects.select_for_update().get(pk=journal.pk),
-        actor=actor,
-        date=date,
-        reason=reason,
-        member_entry=member_reversal,
+def member_entries_missing_from_books():
+    """Member entries the books don't account for yet, oldest first.
+
+    Entries dated before the start date that existed at go-live live in the
+    opening entry; everything else should have its own journal entry.
+    """
+    opening = active_opening_entry()
+    if opening is None:
+        return LedgerEntry.objects.none()
+    return (
+        LedgerEntry.objects.filter(journal_entry__isnull=True)
+        .exclude(effective_date__lt=opening.date, created_at__lt=opening.created_at)
+        .select_related("ledger__member", "reverses")
+        .order_by("id")
     )
+
+
+def post_missing_member_entries(*, actor):
+    """Post every member entry the books are missing; return how many."""
+    posted = 0
+    for entry in member_entries_missing_from_books():
+        post_member_entry(entry, actor=actor)
+        posted += 1
+    return posted
 
 
 def post_income(
@@ -487,11 +627,18 @@ def active_opening_entry():
     )
 
 
-def go_live_locked():
-    """True once the books hold anything besides opening entries.
+def _member_postings():
+    """Journal entries posted from member ledgers, including their reversals."""
+    return JournalEntry.objects.filter(
+        Q(source=JournalEntry.Source.MEMBER_POSTING) | Q(member_entry__isnull=False)
+    )
 
-    Until then the go-live wizard may be rerun; replaced opening entries and
-    their reversals don't count.
+
+def go_live_locked():
+    """True once the books hold entries the treasurer posted after go-live.
+
+    Until then the go-live wizard may be rerun. Replaced opening entries,
+    their reversals, and postings from member ledgers don't count.
     """
     return (
         JournalEntry.objects.exclude(source=JournalEntry.Source.OPENING)
@@ -499,8 +646,34 @@ def go_live_locked():
             source=JournalEntry.Source.REVERSAL,
             reverses__source=JournalEntry.Source.OPENING,
         )
+        .exclude(pk__in=_member_postings().values("pk"))
         .exists()
     )
+
+
+def _opening_receivables_lines(start_date):
+    """One Member Receivables line per member, for entries dated before go-live."""
+    balances = defaultdict(lambda: ZERO)
+    members = {}
+    entries = LedgerEntry.objects.filter(
+        effective_date__lt=start_date, journal_entry__isnull=True
+    ).select_related("ledger__member")
+    for entry in entries:
+        member = entry.ledger.member
+        members[member.pk] = member
+        balances[member.pk] += entry.signed_amount
+    receivables = get_role_account(Account.Role.MEMBER_RECEIVABLES)
+    lines = []
+    for member_pk, balance in sorted(balances.items()):
+        if balance > 0:
+            lines.append(
+                Line(account=receivables, debit=balance, member=members[member_pk])
+            )
+        elif balance < 0:
+            lines.append(
+                Line(account=receivables, credit=-balance, member=members[member_pk])
+            )
+    return lines
 
 
 def _next_bank_account_code():
@@ -548,11 +721,14 @@ def _go_live_account(row):
 def go_live(*, actor, start_date, rows):
     """Start the books: set the start date and post the opening bank balances.
 
-    Each row's balance is debited to its bank account (credited if overdrawn)
-    and the total is credited to the General Fund. Until any other entry is
-    posted, running this again reverses the current opening entry and posts a
-    replacement; after that, opening balances are corrected with a general
-    journal entry.
+    Each row's balance is debited to its bank account (credited if overdrawn),
+    each member's ledger balance from before the start date goes to Member
+    Receivables, and the difference is credited to the General Fund. Member
+    entries dated on or after the start date then post one by one.
+
+    Until the treasurer posts any other entry, running this again reverses the
+    current opening entry and posts a replacement; after that, opening
+    balances are corrected with a general journal entry.
     """
     from siteconfig.models import SiteConfiguration
 
@@ -566,6 +742,12 @@ def go_live(*, actor, start_date, rows):
         )
     if start_date > _club_today():
         raise ValidationError("Future dates are not allowed.")
+    current_start = config.club_accounting_start_date
+    if current_start and current_start != start_date and _member_postings().exists():
+        raise ValidationError(
+            "Member ledger activity is already in the books from "
+            f"{current_start:%Y-%m-%d}. Keep that start date."
+        )
     general_fund = get_role_account(Account.Role.GENERAL_FUND)
 
     lines = []
@@ -583,6 +765,9 @@ def go_live(*, actor, start_date, rows):
             total -= _money(-amount)
     if not lines:
         raise ValidationError("Enter at least one bank balance.")
+    for line in _opening_receivables_lines(start_date):
+        lines.append(line)
+        total += line.debit - line.credit
     if total > 0:
         lines.append(Line(account=general_fund, credit=total))
     elif total < 0:
@@ -598,16 +783,19 @@ def go_live(*, actor, start_date, rows):
             date=current.date,
             reason="Replaced by the go-live wizard.",
         )
-    if config.club_accounting_start_date != start_date:
+    if current_start != start_date:
         config.club_accounting_start_date = start_date
         config.save(update_fields=["club_accounting_start_date"])
-    return post_journal_entry(
+    opening = post_journal_entry(
         actor=actor,
         date=start_date,
         lines=lines,
-        memo="Opening bank balances",
+        memo="Opening balances",
         source=JournalEntry.Source.OPENING,
+        allow_receivables=True,
     )
+    post_missing_member_entries(actor=actor)
+    return opening
 
 
 def _line_totals(queryset):
@@ -745,5 +933,35 @@ def verify_books():
     if misplaced_members:
         problems.append(
             f"{misplaced_members} line(s) outside Member Receivables name a member."
+        )
+    problems.extend(_receivables_tie_out())
+    return problems
+
+
+def _receivables_tie_out():
+    """Compare each member's Member Receivables balance with their ledger."""
+    if not member_books_live():
+        return []
+    books = defaultdict(lambda: ZERO)
+    for member_pk, debit, credit in JournalLine.objects.filter(
+        account__system_role=Account.Role.MEMBER_RECEIVABLES
+    ).values_list("member", "debit", "credit"):
+        books[member_pk] += debit - credit
+    ledgers = defaultdict(lambda: ZERO)
+    for entry in LedgerEntry.objects.select_related("ledger"):
+        ledgers[entry.ledger.member_id] += entry.signed_amount
+    from members.models import Member
+
+    mismatched = [pk for pk in set(books) | set(ledgers) if books[pk] != ledgers[pk]]
+    problems = [
+        f"Member Receivables for {member_label(member)} is {books[member.pk]}, "
+        f"but their member ledger balance is {ledgers[member.pk]}."
+        for member in Member.objects.filter(pk__in=mismatched).order_by("pk")
+    ]
+    missing = member_entries_missing_from_books().count()
+    if missing:
+        problems.append(
+            f"{missing} member ledger entr{'y is' if missing == 1 else 'ies are'} "
+            "missing from the books. Run `manage.py sync_member_books --post`."
         )
     return problems

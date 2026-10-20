@@ -668,6 +668,12 @@ def test_only_one_opening_entry_at_a_time(treasurer):
         )
 
 
+@pytest.fixture
+def live_books(treasurer):
+    """Member-paid expenses post only once go-live has started the books."""
+    return go_live(actor=treasurer, start_date=today(), rows=[bank(amount="1000")])
+
+
 def member_paid_rent(treasurer, member, amount="700.00"):
     return post_member_paid_expense(
         actor=treasurer,
@@ -679,7 +685,7 @@ def member_paid_rent(treasurer, member, amount="700.00"):
     )
 
 
-def test_member_paid_expense_credits_member_and_books(treasurer, member):
+def test_member_paid_expense_credits_member_and_books(treasurer, member, live_books):
     from billing.services import get_balance
 
     entry = member_paid_rent(treasurer, member)
@@ -696,7 +702,7 @@ def test_member_paid_expense_credits_member_and_books(treasurer, member):
     assert verify_books() == []
 
 
-def test_member_ledger_reversal_also_reverses_the_books(treasurer, member):
+def test_member_ledger_reversal_also_reverses_the_books(treasurer, member, live_books):
     from billing.services import get_balance, reverse_manual_entry
 
     entry = member_paid_rent(treasurer, member)
@@ -716,25 +722,29 @@ def test_member_ledger_reversal_also_reverses_the_books(treasurer, member):
         reverse_journal_entry(entry=entry, actor=treasurer, date=today(), reason="x")
 
 
-def test_member_paid_expense_is_all_or_nothing(treasurer, member, club_books):
+def test_member_paid_expense_is_all_or_nothing(treasurer, member, live_books):
     from billing.models import LedgerEntry
 
-    club_books.club_accounting_start_date = today()
-    club_books.save(update_fields=["club_accounting_start_date"])
-    with pytest.raises(ValidationError):
-        post_member_paid_expense(
-            actor=treasurer,
-            date=today() - timedelta(days=1),
-            member=member,
-            expense_account=account("500"),
-            amount="700",
-            memo="Before the books start",
-        )
+    BillingPeriod.objects.update_or_create(
+        year=today().year, month=today().month, defaults={"is_closed": True}
+    )
+    with pytest.raises(ValidationError, match="billing period is closed"):
+        member_paid_rent(treasurer, member)
     assert not LedgerEntry.objects.exists()
-    assert not JournalEntry.objects.exists()
+    assert not JournalEntry.objects.filter(member_entry__isnull=False).exists()
 
 
-def test_member_paid_expense_requires_expense_and_treasurer(treasurer, member):
+def test_member_paid_expense_waits_for_go_live(treasurer, member):
+    from billing.models import LedgerEntry
+
+    with pytest.raises(ValidationError, match="Go-Live Setup"):
+        member_paid_rent(treasurer, member)
+    assert not LedgerEntry.objects.exists()
+
+
+def test_member_paid_expense_requires_expense_and_treasurer(
+    treasurer, member, live_books
+):
     with pytest.raises(ValidationError, match="expense account"):
         post_member_paid_expense(
             actor=treasurer,
