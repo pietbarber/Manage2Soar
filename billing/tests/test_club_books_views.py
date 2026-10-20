@@ -345,6 +345,10 @@ def test_go_live_page_locked_after_other_entries(client, treasurer):
 
 def test_record_member_expense_posts_both_sides(client, treasurer, member):
     client.force_login(treasurer)
+    client.post(
+        reverse("billing:go_live"),
+        go_live_post(start_date=get_club_today().isoformat()),
+    )
     response = client.post(
         reverse("billing:record_member_expense"),
         {
@@ -355,7 +359,7 @@ def test_record_member_expense_posts_both_sides(client, treasurer, member):
             "memo": "Field rent paid in cash to landowner",
         },
     )
-    entry = JournalEntry.objects.get()
+    entry = JournalEntry.objects.get(source=JournalEntry.Source.MEMBER_POSTING)
     assert response.status_code == 302
     assert response["Location"] == reverse("billing:journal_detail", args=[entry.pk])
     assert entry.member_entry.ledger.member == member
