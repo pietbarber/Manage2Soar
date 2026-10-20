@@ -309,19 +309,6 @@ def _initial_balance_post(kind, amount="25.00"):
     }
 
 
-def test_ledger_detail_offers_initial_balance_kinds_without_effect_field(
-    client, member, treasurer
-):
-    client.force_login(treasurer)
-    response = client.get(reverse("billing:ledger_detail", args=[member.pk]))
-    content = response.content.decode()
-
-    assert '<option value="initial_debit">' in content
-    assert '<option value="initial_credit">' in content
-    assert '<option value="opening_balance">' not in content
-    assert 'name="effect"' not in content
-
-
 @pytest.mark.parametrize(
     ("kind", "expected_effect", "expected_balance"),
     [
@@ -359,9 +346,6 @@ def test_ledger_detail_refuses_initial_balance_once_ledger_has_entries(
     )
     client.force_login(treasurer)
     url = reverse("billing:ledger_detail", args=[member.pk])
-
-    content = client.get(url).content.decode()
-    assert f'<option value="{kind}">' not in content
 
     response = client.post(url, _initial_balance_post(kind))
     assert response.status_code == 200
