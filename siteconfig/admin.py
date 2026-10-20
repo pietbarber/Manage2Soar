@@ -263,9 +263,10 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
         (
             "Member Display Preferences",
             {
-                "fields": ("member_name_ordering",),
+                "fields": ("member_name_ordering", "allow_inactive_crew_selection"),
                 "description": (
-                    "Choose whether member and pilot dropdowns on logsheets are alphabetized by first or last name."
+                    "Choose member and pilot dropdown sorting and whether inactive members "
+                    "can be selected for flight crew roles on logsheets."
                 ),
                 "classes": ("collapse",),
             },

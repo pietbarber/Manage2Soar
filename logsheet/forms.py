@@ -3,8 +3,7 @@ from typing import Optional
 
 from django import forms
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db import models
-from django.db.models import Case, Exists, IntegerField, OuterRef, Q, When
+from django.db.models import Exists, OuterRef, Q
 from django.forms import BaseModelFormSet, modelformset_factory
 from tinymce.widgets import TinyMCE
 
@@ -22,7 +21,6 @@ from .models import (
     LogsheetCloseout,
     LogsheetTowplane,
     MemberCharge,
-    Towplane,
     TowplaneCloseout,
     TowplaneRentalCharge,
 )
@@ -383,9 +381,9 @@ class FlightForm(forms.ModelForm):
                 elif isinstance(value, str) and len(value) >= 5:
                     self.initial[field_name] = value[:5]
 
-        # Pilot dropdown: optgroups for Active Members, Visiting Pilots, and Inactive Members
-        # Always fetch configuration from database for security-sensitive flags
-        # The visiting_pilot_enabled flag is security-critical and should not be cached
+        # Build role-specific member groups for today's roster, active members, and
+        # inactive members. The day roster is derived from reservations, saved
+        # flights, and accepted/confirmed instruction slots.
         config = SiteConfiguration.objects.first()
         self.site_config = config
         if config is None:
@@ -396,202 +394,160 @@ class FlightForm(forms.ModelForm):
             )
         name_ordering = get_member_name_ordering(config)
         active_statuses = get_active_membership_statuses()
-        pilot_active = (
-            Member.objects.filter(membership_status__in=active_statuses)
-            .exclude(
-                membership_status=(
-                    config.visiting_pilot_status
-                    if config and config.visiting_pilot_status
-                    else "Affiliate Member"
+        roster_member_ids = set()
+        if self.logsheet:
+            from duty_roster.models import GliderReservation, InstructionSlot
+
+            roster_member_ids.update(
+                GliderReservation.objects.filter(
+                    date=self.logsheet.log_date,
+                    status__in=("confirmed", "completed"),
+                ).values_list("member_id", flat=True)
+            )
+            for role_name in ("pilot", "instructor", "tow_pilot", "passenger"):
+                roster_member_ids.update(
+                    self.logsheet.flights.exclude(
+                        **{f"{role_name}__isnull": True}
+                    ).values_list(f"{role_name}_id", flat=True)
                 )
+            instruction_slots = InstructionSlot.objects.filter(
+                assignment__date=self.logsheet.log_date,
+                status="confirmed",
             )
-            .order_by(*name_ordering)
+            for student_id, instructor_id in instruction_slots.values_list(
+                "student_id", "instructor_id"
+            ):
+                roster_member_ids.add(student_id)
+                if instructor_id:
+                    roster_member_ids.add(instructor_id)
+
+        visiting_status = config.visiting_pilot_status or "Affiliate Member"
+        visiting_enabled = config.visiting_pilot_enabled and bool(
+            config.visiting_pilot_status
         )
-        pilot_visiting = Member.objects.none()  # Default empty queryset
-        if config and config.visiting_pilot_enabled and config.visiting_pilot_status:
-            pilot_visiting = Member.objects.filter(
-                membership_status=config.visiting_pilot_status
-            ).order_by(*name_ordering)
 
-        pilot_inactive = Member.objects.filter(membership_status="Inactive").order_by(
-            *name_ordering
-        )
+        def set_member_groups(field_name, *, passenger=False):
+            members = Member.objects.all()
+            if passenger:
+                members = members.exclude(membership_status="Deceased")
 
-        pilot_optgroups = []
-        # Build tuples directly to avoid double iteration
-        pilot_active_choices = [(m.pk, str(m)) for m in pilot_active]
-        if pilot_active_choices:
-            pilot_optgroups.append(("Active Members", pilot_active_choices))
-
-        pilot_visiting_choices = [
-            (m.pk, f"{m} ({m.home_club or 'Unknown Club'})") for m in pilot_visiting
-        ]
-        if pilot_visiting_choices:
-            pilot_optgroups.append(("Visiting Pilots", pilot_visiting_choices))
-
-        pilot_inactive_choices = [(m.pk, str(m)) for m in pilot_inactive]
-        if pilot_inactive_choices:
-            pilot_optgroups.append(("Inactive Members", pilot_inactive_choices))
-        self.fields["pilot"].choices = [("", "-------")] + pilot_optgroups
-
-        # Instructor dropdown: Active Instructors + Visiting Instructor Pilots + Instructors
-        instructor_active = (
-            Member.objects.filter(
-                Q(membership_status__in=active_statuses) & Q(instructor=True)
-            )
-            .exclude(
-                membership_status=(
-                    config.visiting_pilot_status
-                    if config and config.visiting_pilot_status
-                    else "Affiliate Member"
+            if field_name == "instructor":
+                members = members.filter(
+                    Q(instructor=True) | Q(membership_status="Instructor")
                 )
-            )
-            .order_by(*name_ordering)
-        )
+            elif field_name == "tow_pilot":
+                members = members.filter(towpilot=True)
 
-        # Get visiting pilots who are instructors
-        instructor_visiting = Member.objects.none()
-        if config and config.visiting_pilot_enabled and config.visiting_pilot_status:
-            instructor_visiting = Member.objects.filter(
-                Q(membership_status=config.visiting_pilot_status) & Q(instructor=True)
-            ).order_by(*name_ordering)
+            members = members.order_by(*name_ordering)
+            current_member_id = getattr(self.instance, f"{field_name}_id", None)
+            if not current_member_id:
+                current_member_id = self.initial.get(field_name)
+                if hasattr(current_member_id, "pk"):
+                    current_member_id = current_member_id.pk
 
-        instructor_instructors = Member.objects.filter(
-            membership_status="Instructor"
-        ).order_by(*name_ordering)
-
-        instructor_optgroups = []
-        # Build tuples directly to avoid double iteration
-        instructor_active_choices = [(m.pk, str(m)) for m in instructor_active]
-        if instructor_active_choices:
-            instructor_optgroups.append(
-                ("Active Instructors", instructor_active_choices)
-            )
-
-        instructor_visiting_choices = [
-            (m.pk, f"{m} ({m.home_club or 'Unknown Club'})")
-            for m in instructor_visiting
-        ]
-        if instructor_visiting_choices:
-            instructor_optgroups.append(
-                ("Visiting Instructors", instructor_visiting_choices)
-            )
-
-        instructor_instructors_choices = [
-            (m.pk, str(m)) for m in instructor_instructors
-        ]
-        if instructor_instructors_choices:
-            instructor_optgroups.append(("Instructors", instructor_instructors_choices))
-        self.fields["instructor"].choices = [("", "-------")] + instructor_optgroups
-
-        # Tow pilot dropdown: optgroups for Active Tow Pilots, Visiting Tow Pilots, and Inactive Tow Pilots
-        tow_pilot_active = (
-            Member.objects.filter(membership_status__in=active_statuses, towpilot=True)
-            .exclude(
-                membership_status=(
-                    config.visiting_pilot_status
-                    if config and config.visiting_pilot_status
-                    else "Affiliate Member"
+            selectable = [
+                member
+                for member in members
+                if member.membership_status in active_statuses
+                or member.membership_status in {visiting_status, "Inactive"}
+                or (
+                    field_name == "instructor"
+                    and member.membership_status == "Instructor"
                 )
-            )
-            .order_by(*name_ordering)
-        )
+            ]
+            today_members = [
+                member for member in selectable if member.pk in roster_member_ids
+            ]
+            if not passenger and not config.allow_inactive_crew_selection:
+                # Preserve an already-saved inactive crew assignment while
+                # preventing inactive roster members from being newly selected.
+                today_members = [
+                    member
+                    for member in today_members
+                    if member.membership_status != "Inactive"
+                    or str(member.pk) == str(current_member_id)
+                ]
+                selectable = [
+                    member
+                    for member in selectable
+                    if member.membership_status != "Inactive"
+                    or str(member.pk) == str(current_member_id)
+                ]
+            today_ids = {member.pk for member in today_members}
+            active_members = [
+                member
+                for member in selectable
+                if member.pk not in today_ids
+                and member.membership_status in active_statuses
+                and member.membership_status != visiting_status
+            ]
+            visiting_members = [
+                member
+                for member in selectable
+                if member.pk not in today_ids
+                and visiting_enabled
+                and member.membership_status == visiting_status
+            ]
+            inactive_members = [
+                member
+                for member in selectable
+                if member.pk not in today_ids
+                and member.membership_status not in active_statuses
+                and member.membership_status != visiting_status
+            ]
 
-        # Get visiting pilots who are tow pilots
-        tow_pilot_visiting = Member.objects.none()
-        if config and config.visiting_pilot_enabled and config.visiting_pilot_status:
-            tow_pilot_visiting = Member.objects.filter(
-                membership_status=config.visiting_pilot_status, towpilot=True
-            ).order_by(*name_ordering)
-
-        tow_pilot_inactive = Member.objects.filter(
-            membership_status="Inactive", towpilot=True
-        ).order_by(*name_ordering)
-
-        tow_pilot_optgroups = []
-        # Build tuples directly to avoid double iteration
-        tow_pilot_active_choices = [(m.pk, str(m)) for m in tow_pilot_active]
-        if tow_pilot_active_choices:
-            tow_pilot_optgroups.append(("Active Tow Pilots", tow_pilot_active_choices))
-
-        tow_pilot_visiting_choices = [
-            (m.pk, f"{m} ({m.home_club or 'Unknown Club'})") for m in tow_pilot_visiting
-        ]
-        if tow_pilot_visiting_choices:
-            tow_pilot_optgroups.append(
-                ("Visiting Tow Pilots", tow_pilot_visiting_choices)
-            )
-
-        tow_pilot_inactive_choices = [(m.pk, str(m)) for m in tow_pilot_inactive]
-        if tow_pilot_inactive_choices:
-            tow_pilot_optgroups.append(
-                ("Inactive Tow Pilots", tow_pilot_inactive_choices)
-            )
-        self.fields["tow_pilot"].choices = [("", "-------")] + tow_pilot_optgroups
-
-        # Passenger dropdown: active first, visiting pilots, then inactive, exclude deceased
-        if "passenger" in self.fields:
-            deceased_status = ["Deceased"]
-            active_pass = (
-                Member.objects.filter(membership_status__in=active_statuses)
-                .exclude(membership_status__in=deceased_status)
-                .exclude(
-                    membership_status=(
-                        config.visiting_pilot_status
-                        if config and config.visiting_pilot_status
-                        else "Affiliate Member"
+            groups = []
+            if today_members:
+                groups.append(
+                    ("Today’s Roster", [(m.pk, str(m)) for m in today_members])
+                )
+            if active_members:
+                label = "Active Members"
+                if field_name == "instructor":
+                    label = "Active Instructors"
+                elif field_name == "tow_pilot":
+                    label = "Active Tow Pilots"
+                groups.append((label, [(m.pk, str(m)) for m in active_members]))
+            if visiting_members:
+                label = "Visiting Pilots"
+                if field_name == "instructor":
+                    label = "Visiting Instructors"
+                elif field_name == "tow_pilot":
+                    label = "Visiting Tow Pilots"
+                groups.append(
+                    (
+                        label,
+                        [
+                            (m.pk, f"{m} ({m.home_club or 'Unknown Club'})")
+                            for m in visiting_members
+                        ],
                     )
                 )
-                .order_by(*name_ordering)
-            )
+            if inactive_members:
+                label = "Inactive Members" if not passenger else "Not Active Members"
+                if field_name == "instructor":
+                    label = "Inactive Instructors"
+                elif field_name == "tow_pilot":
+                    label = "Inactive Tow Pilots"
+                groups.append((label, [(m.pk, str(m)) for m in inactive_members]))
 
-            # Get visiting pilots for passenger dropdown
-            passenger_visiting = Member.objects.none()
-            if (
-                config
-                and config.visiting_pilot_enabled
-                and config.visiting_pilot_status
-            ):
-                passenger_visiting = Member.objects.filter(
-                    membership_status=config.visiting_pilot_status
-                ).order_by(*name_ordering)
+            # ModelChoiceField validates against its queryset separately from
+            # optgroup choices. Include only the group members plus the existing
+            # value, allowing an old inactive selection to remain editable.
+            group_ids = {
+                member_id
+                for _label, options in groups
+                for member_id, _display in options
+            }
+            if current_member_id and str(current_member_id).isdigit():
+                group_ids.add(int(current_member_id))
+            self.fields[field_name].choices = [("", "-------")] + groups
+            self.fields[field_name].queryset = Member.objects.filter(pk__in=group_ids)
 
-            inactive_pass = Member.objects.filter(
-                membership_status="Inactive"
-            ).order_by(*name_ordering)
-
-            optgroups = []
-            # Build tuples directly to avoid double iteration
-            active_pass_choices = [(m.pk, str(m)) for m in active_pass]
-            if active_pass_choices:
-                optgroups.append(("Active Members", active_pass_choices))
-
-            passenger_visiting_choices = [
-                (m.pk, f"{m} ({m.home_club or 'Unknown Club'})")
-                for m in passenger_visiting
-            ]
-            if passenger_visiting_choices:
-                optgroups.append(("Visiting Pilots", passenger_visiting_choices))
-
-            inactive_pass_choices = [(m.pk, str(m)) for m in inactive_pass]
-            if inactive_pass_choices:
-                optgroups.append(("Not Active Members", inactive_pass_choices))
-            self.fields["passenger"].choices = [("", "-------")] + optgroups
-        tow_pilot_initial = self.initial.get("tow_pilot")
-        tow_pilot_qs = get_active_members_with_role("towpilot").order_by(*name_ordering)
-        if tow_pilot_initial:
-            # Make sure the scheduled tow pilot is in the queryset
-            tow_pilot_qs = tow_pilot_qs | Member.objects.filter(pk=tow_pilot_initial)
-            # Move the scheduled tow pilot to the top for better UX
-            tow_pilot_qs = tow_pilot_qs.distinct().order_by(
-                Case(
-                    When(pk=tow_pilot_initial, then=0),
-                    default=1,
-                    output_field=IntegerField(),
-                ),
-                *name_ordering,
-            )
-        self.fields["tow_pilot"].queryset = tow_pilot_qs
+        set_member_groups("pilot")
+        set_member_groups("instructor")
+        set_member_groups("tow_pilot")
+        set_member_groups("passenger", passenger=True)
 
         # Split with field removed for issue #165
 
@@ -638,27 +594,6 @@ class FlightForm(forms.ModelForm):
         self.fields["release_altitude"].choices = [
             ("", "----"),  # Allow None/blank for flights that haven't set altitude yet
         ] + [(alt, f"{alt} ft") for alt in range(0, 7100, 100)]
-
-        # Always use: active by last name, then inactive by last name
-        active_statuses = get_active_membership_statuses()
-        active_qs = Member.objects.filter(membership_status__in=active_statuses)
-        inactive_qs = Member.objects.filter(membership_status="Inactive")
-        pilot_qs = list(active_qs.order_by(*name_ordering)) + list(
-            inactive_qs.order_by(*name_ordering)
-        )
-        self.fields["pilot"].queryset = Member.objects.filter(
-            pk__in=[m.pk for m in pilot_qs]
-        ).order_by(
-            models.Case(
-                models.When(
-                    membership_status__in=active_statuses, then=models.Value(0)
-                ),
-                models.When(membership_status="Inactive", then=models.Value(1)),
-                default=models.Value(2),
-                output_field=IntegerField(),
-            ),
-            *name_ordering,
-        )
 
         # Removed glider_obj pilot auto-selection logic for clarity and to avoid undefined variable
 
