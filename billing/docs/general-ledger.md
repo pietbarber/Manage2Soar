@@ -76,9 +76,11 @@ and SQLite, reject `UPDATE` and `DELETE`.
 |---|---|
 | `post_journal_entry(actor, date, lines, memo, ...)` | The single write path. |
 | `post_expense`, `post_income`, `post_cash_transfer` | Plain-language wrappers used by the forms. |
-| `post_member_paid_expense(actor, date, member, expense_account, amount, memo, ...)` | A member paid a club bill out of pocket: credits their member ledger and posts Dr expense, Cr Member Receivables (that member) in one transaction. |
+| `post_member_paid_expense(actor, date, member, expense_account, amount, memo, ...)` | A member paid a club bill out of pocket: credits their member ledger and posts Dr expense, Cr Member Receivables (that member) in one transaction. Requires go-live. |
+| `post_member_entry(entry, actor, account=None, reference="")` | Posts the books side of one member ledger entry. `billing/services.py` calls it for every new entry; see [Member ledger postings](#member-ledger-postings). |
+| `post_missing_member_entries(actor)` | Posts member entries the books don't account for yet (go-live and `sync_member_books` use it). |
 | `reverse_journal_entry(entry, actor, date, reason)` | Posts the mirror image. |
-| `go_live(actor, start_date, rows)` | Sets the start date and posts the opening entry for bank balances. |
+| `go_live(actor, start_date, rows)` | Sets the start date and posts the opening entry for bank and member balances. |
 | `account_balance`, `account_balances`, `account_register` | Balances and running-balance registers. |
 | `verify_books()` | Integrity problems as a list of strings. |
 
@@ -101,8 +103,8 @@ entry; a different payload raises.
 Reversals:
 - Only manual entries can be reversed here.
 - Member postings are reversed from the member's ledger. Reversing a member
-  ledger entry that has a journal entry (`reverse_entry` in
-  `billing/services.py`) posts the journal reversal in the same transaction.
+  ledger entry (`reverse_entry` in `billing/services.py`) posts the journal
+  reversal in the same transaction.
 - The opening entry can't be reversed here; the go-live wizard replaces it.
 - A reversal can't predate its original, can't be reversed, and can happen
   only once.
@@ -112,7 +114,12 @@ non-zero when it finds problems. It checks for:
 - unbalanced entries, or entries with fewer than two lines;
 - an unbalanced trial balance;
 - receivables lines without a member;
-- member-tagged lines outside receivables.
+- member-tagged lines outside receivables;
+- once the books are live, any member whose Member Receivables balance
+  differs from their member ledger balance, and member entries missing from
+  the books. `manage.py sync_member_books` lists the missing entries, and
+  `--post --actor <username>` posts them (for example, after club books were
+  turned off for a while).
 
 ### Go-live
 
@@ -123,15 +130,54 @@ non-zero when it finds problems. It checks for:
 - A row without an account creates a new bank account with the next free code
   in 110–119.
 - A positive balance debits the bank account; a negative (overdrawn) balance
-  credits it. The total goes to the **General Fund**, not Opening Balance
-  Equity, because every bank balance is entered at once.
+  credits it.
+- Each member's ledger balance from entries dated **before** the start date
+  becomes one Member Receivables line for that member: a debit if they owe
+  the club, a credit if they hold a credit.
+- The difference goes to the **General Fund**, not Opening Balance Equity,
+  because every balance is entered at once. With $1,000 in the bank and
+  members holding $40 more credit than they owe, the General Fund opens at
+  $960.
 
 It also sets `club_accounting_start_date` and posts one `opening` entry dated on
-it. It can be rerun until any other entry is posted: the current opening entry
-is reversed (on its own date) and replaced, and an unchanged submission posts
-nothing. Once other entries exist, it refuses, and opening balances are
-corrected with a general journal entry. Member receivables aren't part of
-go-live yet; they arrive with member ledger integration.
+it. Member entries dated on or after the start date then post one by one.
+
+It can be rerun until the treasurer posts any other entry (member postings
+don't count): the current opening entry is reversed (on its own date) and
+replaced, and an unchanged submission posts nothing. Once member activity is in
+the books, a rerun must keep the same start date. Once other entries exist, it
+refuses, and opening balances are corrected with a general journal entry.
+
+### Member ledger postings
+
+Once go-live has posted the opening entry, every new member ledger entry
+posts its journal entry in the same transaction, so Member Receivables always
+equals the sum of the member ledgers. If either side fails, neither posts.
+
+| Member ledger entry | Club books |
+|---|---|
+| Flight charge | Dr Member Receivables; Cr Tow Fees, Glider Rental and Instruction, split by the charge's frozen snapshot |
+| Manual or miscellaneous charge | Dr Member Receivables; Cr the chosen income account (default Miscellaneous Charges) |
+| Guest payment pending | Dr Member Receivables; Cr Guest Flights |
+| Payment, guest remittance | Dr the chosen cash or bank account (default Undeposited Funds); Cr Member Receivables |
+| General credit | Dr the chosen expense or income account (default Member Credits and Discounts); Cr Member Receivables |
+| Initial Debit/Credit, opening balance override | Member Receivables against the General Fund |
+| Expense paid by member | Dr the expense; Cr Member Receivables |
+| Reversal | The mirror image of the original's journal entry |
+
+Rules:
+- **Before go-live** nothing posts; go-live gathers those balances instead.
+- **Late entries** dated before the start date (a logsheet finalized late, for
+  example) post on the start date, with the member ledger date in the
+  internal note.
+- **Closed billing periods:** with club books live, a member entry dated in a
+  closed month is refused, because the books can't post there.
+- **Reversing an entry from before go-live** mirrors the default accounts for
+  its kind, since the original is part of the opening entry. Reclassify with a
+  general journal entry if a different account fits better.
+- The member ledger form shows a **Club books account** dropdown once the
+  books are live; leaving it blank uses the default. Guest remittances get a
+  **Deposit to** dropdown.
 
 ## Views (`billing/ledger_views.py`)
 
@@ -158,20 +204,11 @@ Every view requires `billing_app_required`, `treasurer_required`, and
 
 These phases are planned but not yet built:
 
-1. **Member ledger integration.** The first piece is built: an expense a
-   member paid for the club credits their member ledger and posts to Member
-   Receivables together, and reversing it from the member's ledger reverses
-   the books too. Next, every member `LedgerEntry` posts its journal entry in
-   the same transaction:
-   - flight charges split into tow, rental and instruction revenue;
-   - payments go to a chosen deposit account.
-
-   It also adds member-to-member transfers and refunds, member balances in the
-   go-live wizard, and a receivables-vs-member-ledgers tie-out in
-   `verify_books`. Until then, Member Receivables in the books shows only the
-   member-paid expenses, not each member's full balance.
-2. **Reports.** Balance sheet, income statement, trial balance, and a treasurer
-   dashboard.
+1. **Member ledger follow-ups.** Member ledger entries already post to the
+   books (see [Member ledger postings](#member-ledger-postings)). Still to come:
+   member-to-member transfers and refunds paid out of a bank account.
+2. **Reports.** Balance sheet (with member credit balances shown as a
+   liability), income statement, trial balance, and a treasurer dashboard.
 3. **Later.** A bills/payables workflow, recurring transactions, reserve funds,
    and bank reconciliation.
 
@@ -304,8 +341,8 @@ When a member is charged, the flow works like this:
 | Tow Revenue (income) | | 60.00 |
 
 The club has earned revenue and is owed money. When the member pays, Member
-Receivables is credited and cash (or Undeposited Funds) is debited. Both
-legs are planned for the member-ledger integration (Roadmap, phase 1).
+Receivables is credited and cash (or Undeposited Funds) is debited. Both legs
+post automatically from the member's ledger.
 
 **A member pays a club bill out of pocket: $700 field rent in cash**
 (*Expense paid by member*)
@@ -326,6 +363,12 @@ means the club owes its members: for example, the $700 above, until the
 member's charges use it up. Negative amounts are shown in parentheses, as in
 `($700.00)`, the usual accounting style. The same applies to a single member
 on their own ledger, where `($700.00)` is a credit balance in their favor.
+
+Members holding credit are, strictly speaking, a liability: the club owes them
+flying or a refund. They still stay in Member Receivables, so the account
+always ties to the member ledgers. The planned balance sheet will present the
+two sides separately: members who owe as an asset, and members holding credit
+as a liability (Member Prepaid Balances).
 
 ### Mistakes: reverse, don't edit
 

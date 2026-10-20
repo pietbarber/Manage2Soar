@@ -128,6 +128,14 @@
                      {% csrf_token %}
                      <label class="visually-hidden" for="guest-remit-reference-{{ entry.pk }}">Remittance confirmation reference</label>
                      <input id="guest-remit-reference-{{ entry.pk }}" type="text" name="reference" maxlength="100" class="form-control form-control-sm d-inline-block me-2" style="width: 14rem;" placeholder="Confirmation reference">
+                     {% if remittance_form %}
+                     <label class="visually-hidden" for="guest-remit-deposit-{{ entry.pk }}">Deposit to</label>
+                     <select id="guest-remit-deposit-{{ entry.pk }}" name="deposit_account" class="form-select form-select-sm d-inline-block me-2" style="width: 14rem;">
+                       {% for account in remittance_form.fields.deposit_account.queryset %}
+                       <option value="{{ account.pk }}"{% if account.system_role == 'undeposited_funds' %} selected{% endif %}>Deposit to {{ account }}</option>
+                       {% endfor %}
+                     </select>
+                     {% endif %}
                      <button class="btn btn-sm btn-outline-success" type="submit">Confirm full remittance</button>
                    </form>
                    {% elif entry.kind == 'guest_payment_pending' and entry.remittance and not entry.remittance.reversal %}
