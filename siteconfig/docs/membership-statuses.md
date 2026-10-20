@@ -20,6 +20,7 @@ Previously, membership statuses were hardcoded in `members/constants/membership.
 The new system uses the `MembershipStatus` model in the `siteconfig` app to store:
 - **Status name**: The display name (e.g., "Full Member")
 - **Active flag**: Whether this status grants member access
+- **Flight eligibility**: Whether members with this status can be selected as a pilot or passenger on flights
 - **Sort order**: Display order in lists and dropdowns
 - **Description**: Optional explanation of the status
 
@@ -49,12 +50,24 @@ All existing member records continue to work. The migration:
 4. **Edit existing**: Click on any status name to modify
 5. **Delete unused**: Only delete statuses not used by any members
 
+### Flight Eligibility
+
+The Membership Status admin has two flight-selection options:
+
+- **Can be pilot** controls whether a member with this status can be selected in the flight's Pilot field.
+- **Can be passenger** controls whether a member with this status can be selected in the Passenger field.
+
+These flags are checked when rendering and validating the flight form, so posting a member ID that is not eligible for that field is rejected. The member's existing assignment is retained when editing a flight, even if the status's eligibility was later disabled. Members with the **Deceased** status are always excluded from pilot, instructor, tow-pilot, and passenger choices, regardless of these flags.
+
+Existing statuses are initialized during migration: active statuses are pilot-eligible except **Family Member** and **Service Member**; all statuses except **Deceased** are passenger-eligible. New statuses default to not pilot-eligible and passenger-eligible; configure their flags explicitly when creating them.
+
 ### Best Practices
 
 1. **Plan your statuses**: Decide on naming convention before adding many statuses
 2. **Use sort order**: Organize statuses logically (active types first, then inactive)
-3. **Be descriptive**: Add descriptions for complex or unusual status types
-4. **Check before deleting**: Ensure no members have a status before removing it
+3. **Review flight eligibility**: Set pilot and passenger permissions for each status, especially new or inactive statuses
+4. **Be descriptive**: Add descriptions for complex or unusual status types
+5. **Check before deleting**: Ensure no members have a status before removing it
 
 ### Common Status Configurations
 

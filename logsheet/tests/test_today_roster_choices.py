@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from duty_roster.models import GliderReservation
 from logsheet.forms import FlightForm
@@ -190,7 +191,95 @@ def test_custom_status_flight_eligibility_controls_pic_and_passenger_choices(
     assert former_member.pk not in form.fields["pilot"].queryset.values_list(
         "pk", flat=True
     )
+    with pytest.raises(ValidationError):
+        form.fields["pilot"].clean(former_member.pk)
     assert (
         former_member.pk
         in _choice_groups(form.fields["passenger"])["Not Active Members"]
     )
+
+
+@pytest.mark.django_db
+def test_ineligible_status_cannot_be_submitted_for_pilot_or_passenger(
+    active_member, logsheet
+):
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    MembershipStatus.objects.create(
+        name="Ground Member",
+        is_active=False,
+        can_be_pilot=False,
+        can_be_passenger=False,
+        sort_order=10,
+    )
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+    )
+    ground_member = User.objects.create_user(
+        username="ground-member",
+        first_name="Ground",
+        last_name="Member",
+        membership_status="Ground Member",
+    )
+
+    form = FlightForm(logsheet=logsheet)
+    for field_name in ("pilot", "passenger"):
+        assert ground_member.pk not in form.fields[field_name].queryset.values_list(
+            "pk", flat=True
+        )
+        with pytest.raises(ValidationError):
+            form.fields[field_name].clean(ground_member.pk)
+
+
+@pytest.mark.django_db
+def test_deceased_status_never_appears_in_flight_member_choices(
+    active_member, logsheet
+):
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    deceased_status, _ = MembershipStatus.objects.get_or_create(
+        name="Deceased", defaults={"sort_order": 99}
+    )
+    deceased_status.is_active = True
+    deceased_status.can_be_pilot = True
+    deceased_status.can_be_passenger = True
+    deceased_status.save(
+        update_fields=["is_active", "can_be_pilot", "can_be_passenger"]
+    )
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+    )
+    deceased_member = User.objects.create_user(
+        username="deceased-member",
+        first_name="Deceased",
+        last_name="Member",
+        membership_status="Deceased",
+    )
+
+    form = FlightForm(logsheet=logsheet)
+    for field_name in ("pilot", "instructor", "tow_pilot", "passenger"):
+        assert deceased_member.pk not in form.fields[field_name].queryset.values_list(
+            "pk", flat=True
+        )
+        with pytest.raises(ValidationError):
+            form.fields[field_name].clean(deceased_member.pk)

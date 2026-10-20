@@ -437,9 +437,7 @@ class FlightForm(forms.ModelForm):
         )
 
         def set_member_groups(field_name, *, passenger=False):
-            members = Member.objects.all()
-            if passenger:
-                members = members.exclude(membership_status="Deceased")
+            members = Member.objects.exclude(membership_status="Deceased")
 
             if field_name == "instructor":
                 members = members.filter(
@@ -554,8 +552,6 @@ class FlightForm(forms.ModelForm):
                 for _label, options in groups
                 for member_id, _display in options
             }
-            if current_member_id and str(current_member_id).isdigit():
-                group_ids.add(int(current_member_id))
             self.fields[field_name].choices = [("", "-------")] + groups
             self.fields[field_name].queryset = Member.objects.filter(pk__in=group_ids)
 
