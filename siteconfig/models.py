@@ -268,6 +268,13 @@ class MailingList(models.Model):
         return self.get_subscribers().count()
 
 
+class MemberNameOrdering(models.TextChoices):
+    """How member/pilot names are alphabetized in selection dropdowns."""
+
+    FIRST_NAME = "first_name", "First name"
+    LAST_NAME = "last_name", "Last name"
+
+
 class SiteConfiguration(models.Model):
     club_name = models.CharField(max_length=200)
     domain_name = models.CharField(
@@ -316,6 +323,12 @@ class SiteConfiguration(models.Model):
         default=True,
         db_default=True,
         help_text="Allow members to update or request changes to configured profile fields.",
+    )
+    member_name_ordering = models.CharField(
+        max_length=20,
+        choices=MemberNameOrdering,
+        default=MemberNameOrdering.FIRST_NAME,
+        help_text="Sort order for member and pilot dropdowns on logsheets.",
     )
     member_profile_field_policies = models.JSONField(
         default=default_member_profile_field_policies,

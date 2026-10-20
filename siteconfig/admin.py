@@ -261,6 +261,16 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Member Display Preferences",
+            {
+                "fields": ("member_name_ordering",),
+                "description": (
+                    "Choose whether member and pilot dropdowns on logsheets are alphabetized by first or last name."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Scheduling Options",
             {
                 "fields": (

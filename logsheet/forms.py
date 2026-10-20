@@ -12,6 +12,7 @@ from logsheet.models import Glider, MaintenanceIssue, Towplane
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
+from siteconfig.utils import get_member_name_ordering
 
 from .models import (
     Airfield,
@@ -98,13 +99,13 @@ def get_active_members_with_role(role_flag: Optional[str] = None):
     qs = Member.objects.filter(membership_status__in=active_statuses)
     if role_flag:
         qs = qs.filter(**{role_flag: True})
-    return qs.order_by("first_name", "last_name")
+    return qs.order_by(*get_member_name_ordering())
 
 
 def get_active_members():
     active_statuses = get_active_membership_statuses()
     return Member.objects.filter(membership_status__in=active_statuses).order_by(
-        "first_name", "last_name"
+        *get_member_name_ordering()
     )
 
 
@@ -393,7 +394,7 @@ class FlightForm(forms.ModelForm):
             raise ImproperlyConfigured(
                 "Site configuration is missing. Please contact an administrator to set up the required configuration."
             )
-        name_ordering = ("first_name", "last_name")
+        name_ordering = get_member_name_ordering(config)
         active_statuses = get_active_membership_statuses()
         pilot_active = (
             Member.objects.filter(membership_status__in=active_statuses)
@@ -577,7 +578,7 @@ class FlightForm(forms.ModelForm):
                 optgroups.append(("Not Active Members", inactive_pass_choices))
             self.fields["passenger"].choices = [("", "-------")] + optgroups
         tow_pilot_initial = self.initial.get("tow_pilot")
-        tow_pilot_qs = get_active_members_with_role("towpilot")
+        tow_pilot_qs = get_active_members_with_role("towpilot").order_by(*name_ordering)
         if tow_pilot_initial:
             # Make sure the scheduled tow pilot is in the queryset
             tow_pilot_qs = tow_pilot_qs | Member.objects.filter(pk=tow_pilot_initial)
@@ -1208,7 +1209,7 @@ class LogsheetTowplaneForm(forms.ModelForm):
         except Exception:
             config = None
         self.fields["tow_pilot"].queryset = tow_pilot_queryset.order_by(
-            "first_name", "last_name"
+            *get_member_name_ordering(config)
         )
         # Use the configurable tow-pilot role title (SiteConfiguration) so the
         # roster label stays consistent with the duty crew form.

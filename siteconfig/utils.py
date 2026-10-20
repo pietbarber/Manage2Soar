@@ -1,4 +1,22 @@
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import MemberNameOrdering, SiteConfiguration
+
+
+def get_member_name_ordering(site_config=None):
+    """Return the ordering tuple for member/pilot name dropdowns.
+
+    Honors the club's configured preference while always using the other
+    name field as a tie-breaker.
+    """
+    if site_config is None:
+        site_config = SiteConfiguration.objects.first()
+    primary = (
+        site_config.member_name_ordering
+        if site_config and hasattr(site_config, "member_name_ordering")
+        else MemberNameOrdering.FIRST_NAME
+    )
+    if primary == MemberNameOrdering.LAST_NAME:
+        return ("last_name", "first_name")
+    return ("first_name", "last_name")
 
 
 def get_role_title(role):
