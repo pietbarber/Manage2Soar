@@ -98,13 +98,13 @@ def get_active_members_with_role(role_flag: Optional[str] = None):
     qs = Member.objects.filter(membership_status__in=active_statuses)
     if role_flag:
         qs = qs.filter(**{role_flag: True})
-    return qs.order_by("last_name", "first_name")
+    return qs.order_by("first_name", "last_name")
 
 
 def get_active_members():
     active_statuses = get_active_membership_statuses()
     return Member.objects.filter(membership_status__in=active_statuses).order_by(
-        "last_name", "first_name"
+        "first_name", "last_name"
     )
 
 
@@ -393,6 +393,7 @@ class FlightForm(forms.ModelForm):
             raise ImproperlyConfigured(
                 "Site configuration is missing. Please contact an administrator to set up the required configuration."
             )
+        name_ordering = ("first_name", "last_name")
         active_statuses = get_active_membership_statuses()
         pilot_active = (
             Member.objects.filter(membership_status__in=active_statuses)
@@ -403,16 +404,16 @@ class FlightForm(forms.ModelForm):
                     else "Affiliate Member"
                 )
             )
-            .order_by("last_name", "first_name")
+            .order_by(*name_ordering)
         )
         pilot_visiting = Member.objects.none()  # Default empty queryset
         if config and config.visiting_pilot_enabled and config.visiting_pilot_status:
             pilot_visiting = Member.objects.filter(
                 membership_status=config.visiting_pilot_status
-            ).order_by("last_name", "first_name")
+            ).order_by(*name_ordering)
 
         pilot_inactive = Member.objects.filter(membership_status="Inactive").order_by(
-            "last_name", "first_name"
+            *name_ordering
         )
 
         pilot_optgroups = []
@@ -444,7 +445,7 @@ class FlightForm(forms.ModelForm):
                     else "Affiliate Member"
                 )
             )
-            .order_by("last_name", "first_name")
+            .order_by(*name_ordering)
         )
 
         # Get visiting pilots who are instructors
@@ -452,11 +453,11 @@ class FlightForm(forms.ModelForm):
         if config and config.visiting_pilot_enabled and config.visiting_pilot_status:
             instructor_visiting = Member.objects.filter(
                 Q(membership_status=config.visiting_pilot_status) & Q(instructor=True)
-            ).order_by("last_name", "first_name")
+            ).order_by(*name_ordering)
 
         instructor_instructors = Member.objects.filter(
             membership_status="Instructor"
-        ).order_by("last_name", "first_name")
+        ).order_by(*name_ordering)
 
         instructor_optgroups = []
         # Build tuples directly to avoid double iteration
@@ -492,7 +493,7 @@ class FlightForm(forms.ModelForm):
                     else "Affiliate Member"
                 )
             )
-            .order_by("last_name", "first_name")
+            .order_by(*name_ordering)
         )
 
         # Get visiting pilots who are tow pilots
@@ -500,11 +501,11 @@ class FlightForm(forms.ModelForm):
         if config and config.visiting_pilot_enabled and config.visiting_pilot_status:
             tow_pilot_visiting = Member.objects.filter(
                 membership_status=config.visiting_pilot_status, towpilot=True
-            ).order_by("last_name", "first_name")
+            ).order_by(*name_ordering)
 
         tow_pilot_inactive = Member.objects.filter(
             membership_status="Inactive", towpilot=True
-        ).order_by("last_name", "first_name")
+        ).order_by(*name_ordering)
 
         tow_pilot_optgroups = []
         # Build tuples directly to avoid double iteration
@@ -540,7 +541,7 @@ class FlightForm(forms.ModelForm):
                         else "Affiliate Member"
                     )
                 )
-                .order_by("last_name", "first_name")
+                .order_by(*name_ordering)
             )
 
             # Get visiting pilots for passenger dropdown
@@ -552,11 +553,11 @@ class FlightForm(forms.ModelForm):
             ):
                 passenger_visiting = Member.objects.filter(
                     membership_status=config.visiting_pilot_status
-                ).order_by("last_name", "first_name")
+                ).order_by(*name_ordering)
 
             inactive_pass = Member.objects.filter(
                 membership_status="Inactive"
-            ).order_by("last_name", "first_name")
+            ).order_by(*name_ordering)
 
             optgroups = []
             # Build tuples directly to avoid double iteration
@@ -587,8 +588,7 @@ class FlightForm(forms.ModelForm):
                     default=1,
                     output_field=IntegerField(),
                 ),
-                "first_name",
-                "last_name",
+                *name_ordering,
             )
         self.fields["tow_pilot"].queryset = tow_pilot_qs
 
@@ -642,8 +642,8 @@ class FlightForm(forms.ModelForm):
         active_statuses = get_active_membership_statuses()
         active_qs = Member.objects.filter(membership_status__in=active_statuses)
         inactive_qs = Member.objects.filter(membership_status="Inactive")
-        pilot_qs = list(active_qs.order_by("last_name", "first_name")) + list(
-            inactive_qs.order_by("last_name", "first_name")
+        pilot_qs = list(active_qs.order_by(*name_ordering)) + list(
+            inactive_qs.order_by(*name_ordering)
         )
         self.fields["pilot"].queryset = Member.objects.filter(
             pk__in=[m.pk for m in pilot_qs]
@@ -656,8 +656,7 @@ class FlightForm(forms.ModelForm):
                 default=models.Value(2),
                 output_field=IntegerField(),
             ),
-            "last_name",
-            "first_name",
+            *name_ordering,
         )
 
         # Removed glider_obj pilot auto-selection logic for clarity and to avoid undefined variable
@@ -1204,15 +1203,15 @@ class LogsheetTowplaneForm(forms.ModelForm):
                 tow_pilot_queryset
                 | Member.objects.filter(pk=self.instance.tow_pilot_id)
             ).distinct()
-        self.fields["tow_pilot"].queryset = tow_pilot_queryset.order_by(
-            "last_name", "first_name"
-        )
-        # Use the configurable tow-pilot role title (SiteConfiguration) so the
-        # roster label stays consistent with the duty crew form.
         try:
             config = SiteConfiguration.objects.first()
         except Exception:
             config = None
+        self.fields["tow_pilot"].queryset = tow_pilot_queryset.order_by(
+            "first_name", "last_name"
+        )
+        # Use the configurable tow-pilot role title (SiteConfiguration) so the
+        # roster label stays consistent with the duty crew form.
         self.fields["tow_pilot"].label = (
             config.towpilot_title if config else None
         ) or "Tow Pilot"
