@@ -42,7 +42,7 @@
 
           {% for field in form %}
           <div class="mb-3">
-            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% else %} <span class="text-muted fw-normal">(optional)</span>{% endif %}</label>
             {% if field.errors %}
               {% if field.field.widget.input_type == 'select' %}
                 {{ field|add_class:"form-select is-invalid" }}
@@ -179,7 +179,7 @@
           <p class="small text-muted">This posts an audited adjustment; it never changes the original opening-balance entry.</p>
           {% for field in override_form %}
           <div class="mb-3">
-            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% else %} <span class="text-muted fw-normal">(optional)</span>{% endif %}</label>
             {% if field.field.widget.input_type == 'select' %}
               {{ field|add_class:"form-select" }}
             {% elif field.field.widget.input_type == 'textarea' %}
