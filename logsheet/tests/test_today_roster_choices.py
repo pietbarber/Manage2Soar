@@ -21,7 +21,13 @@ def test_today_roster_includes_reserved_and_flown_members_without_duplicates(
 ):
     User = get_user_model()
     MembershipStatus.objects.get_or_create(
-        name="Full Member", defaults={"is_active": True, "sort_order": 1}
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
     )
     MembershipStatus.objects.get_or_create(
         name="Inactive", defaults={"is_active": False, "sort_order": 2}
@@ -91,17 +97,23 @@ def test_today_roster_includes_reserved_and_flown_members_without_duplicates(
 
 
 @pytest.mark.django_db
-def test_inactive_crew_choices_default_off_but_passengers_remain_selectable(
+def test_inactive_members_remain_passengers_and_pilot_eligibility_uses_status(
     active_member, logsheet, glider
 ):
     User = get_user_model()
     MembershipStatus.objects.get_or_create(
-        name="Full Member", defaults={"is_active": True, "sort_order": 1}
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
     )
     MembershipStatus.objects.get_or_create(
         name="Inactive", defaults={"is_active": False, "sort_order": 2}
     )
-    config = SiteConfiguration.objects.create(
+    SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.example.com",
         club_abbreviation="TC",
@@ -126,7 +138,6 @@ def test_inactive_crew_choices_default_off_but_passengers_remain_selectable(
     )
 
     form = FlightForm(logsheet=logsheet)
-    assert config.allow_inactive_crew_selection is False
     assert inactive_member.pk not in form.fields["pilot"].queryset.values_list(
         "pk", flat=True
     )
@@ -134,8 +145,52 @@ def test_inactive_crew_choices_default_off_but_passengers_remain_selectable(
     assert inactive_member.pk in passenger_groups["Today’s Roster"]
     assert inactive_passenger.pk in passenger_groups["Not Active Members"]
 
-    config.allow_inactive_crew_selection = True
-    config.save(update_fields=["allow_inactive_crew_selection"])
+    inactive_status = MembershipStatus.objects.get(name="Inactive")
+    inactive_status.can_be_pilot = True
+    inactive_status.save(update_fields=["can_be_pilot"])
     form = FlightForm(logsheet=logsheet)
     pilot_groups = _choice_groups(form.fields["pilot"])
     assert inactive_member.pk in pilot_groups["Today’s Roster"]
+
+
+@pytest.mark.django_db
+def test_custom_status_flight_eligibility_controls_pic_and_passenger_choices(
+    active_member, logsheet
+):
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    MembershipStatus.objects.create(
+        name="Former Member",
+        is_active=False,
+        can_be_pilot=False,
+        can_be_passenger=True,
+        sort_order=10,
+    )
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+    )
+    former_member = User.objects.create_user(
+        username="former-member",
+        first_name="Former",
+        last_name="Member",
+        membership_status="Former Member",
+    )
+
+    form = FlightForm(logsheet=logsheet)
+    assert former_member.pk not in form.fields["pilot"].queryset.values_list(
+        "pk", flat=True
+    )
+    assert (
+        former_member.pk
+        in _choice_groups(form.fields["passenger"])["Not Active Members"]
+    )

@@ -330,13 +330,6 @@ class SiteConfiguration(models.Model):
         default=MemberNameOrdering.FIRST_NAME,
         help_text="Sort order for member and pilot dropdowns on logsheets.",
     )
-    allow_inactive_crew_selection = models.BooleanField(
-        default=False,
-        help_text=(
-            "Allow inactive members to be selected as pilots, instructors, and tow pilots "
-            "on logsheets. Inactive members remain available as passengers."
-        ),
-    )
     member_profile_field_policies = models.JSONField(
         default=default_member_profile_field_policies,
         db_default=default_member_profile_field_policies(),
@@ -1148,6 +1141,14 @@ class MembershipStatus(models.Model):
     is_active = models.BooleanField(
         default=True,
         help_text="Whether members with this status are considered 'active' and can access member features",
+    )
+    can_be_pilot = models.BooleanField(
+        default=False,
+        help_text="Members with this status may be selected as a pilot on flights.",
+    )
+    can_be_passenger = models.BooleanField(
+        default=True,
+        help_text="Members with this status may be selected as a passenger on flights.",
     )
     sort_order = models.PositiveIntegerField(
         default=100,

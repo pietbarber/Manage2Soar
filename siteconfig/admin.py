@@ -263,11 +263,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
         (
             "Member Display Preferences",
             {
-                "fields": ("member_name_ordering", "allow_inactive_crew_selection"),
-                "description": (
-                    "Choose member and pilot dropdown sorting and whether inactive members "
-                    "can be selected for flight crew roles on logsheets."
-                ),
+                "fields": ("member_name_ordering",),
+                "description": "Choose member and pilot dropdown sorting.",
                 "classes": ("collapse",),
             },
         ),
@@ -519,14 +516,38 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
 
 @admin.register(MembershipStatus)
 class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
-    list_display = ("name", "is_active", "sort_order", "created_at")
-    list_editable = ("is_active", "sort_order")
+    list_display = (
+        "name",
+        "is_active",
+        "can_be_pilot",
+        "can_be_passenger",
+        "sort_order",
+        "created_at",
+    )
+    list_editable = (
+        "is_active",
+        "can_be_pilot",
+        "can_be_passenger",
+        "sort_order",
+    )
     list_filter = ("is_active", "created_at")
     search_fields = ("name", "description")
     ordering = ("sort_order", "name")
 
     fieldsets = (
-        (None, {"fields": ("name", "is_active", "sort_order", "description")}),
+        (
+            None,
+            {
+                "fields": (
+                    "name",
+                    "is_active",
+                    "can_be_pilot",
+                    "can_be_passenger",
+                    "sort_order",
+                    "description",
+                )
+            },
+        ),
         (
             "Timestamps",
             {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},

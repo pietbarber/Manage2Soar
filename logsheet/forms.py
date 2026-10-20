@@ -10,7 +10,7 @@ from tinymce.widgets import TinyMCE
 from logsheet.models import Glider, MaintenanceIssue, Towplane
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import MembershipStatus, SiteConfiguration
 from siteconfig.utils import get_member_name_ordering
 
 from .models import (
@@ -394,6 +394,16 @@ class FlightForm(forms.ModelForm):
             )
         name_ordering = get_member_name_ordering(config)
         active_statuses = get_active_membership_statuses()
+        pilot_eligible_statuses = set(
+            MembershipStatus.objects.filter(can_be_pilot=True).values_list(
+                "name", flat=True
+            )
+        )
+        passenger_eligible_statuses = set(
+            MembershipStatus.objects.filter(can_be_passenger=True).values_list(
+                "name", flat=True
+            )
+        )
         roster_member_ids = set()
         if self.logsheet:
             from duty_roster.models import GliderReservation, InstructionSlot
@@ -445,34 +455,39 @@ class FlightForm(forms.ModelForm):
                 if hasattr(current_member_id, "pk"):
                     current_member_id = current_member_id.pk
 
-            selectable = [
-                member
-                for member in members
-                if member.membership_status in active_statuses
-                or member.membership_status in {visiting_status, "Inactive"}
-                or (
-                    field_name == "instructor"
-                    and member.membership_status == "Instructor"
-                )
-            ]
+            if passenger:
+                selectable = [
+                    member
+                    for member in members
+                    if member.membership_status in passenger_eligible_statuses
+                ]
+            elif field_name == "pilot":
+                selectable = [
+                    member
+                    for member in members
+                    if member.membership_status in pilot_eligible_statuses
+                    and (
+                        member.membership_status != visiting_status or visiting_enabled
+                    )
+                ]
+            else:
+                selectable = [
+                    member
+                    for member in members
+                    if member.membership_status in active_statuses
+                    or member.membership_status in {visiting_status, "Inactive"}
+                    or (
+                        field_name == "instructor"
+                        and member.membership_status == "Instructor"
+                    )
+                ]
+            if current_member_id:
+                current_member = members.filter(pk=current_member_id).first()
+                if current_member and current_member not in selectable:
+                    selectable.append(current_member)
             today_members = [
                 member for member in selectable if member.pk in roster_member_ids
             ]
-            if not passenger and not config.allow_inactive_crew_selection:
-                # Preserve an already-saved inactive crew assignment while
-                # preventing inactive roster members from being newly selected.
-                today_members = [
-                    member
-                    for member in today_members
-                    if member.membership_status != "Inactive"
-                    or str(member.pk) == str(current_member_id)
-                ]
-                selectable = [
-                    member
-                    for member in selectable
-                    if member.membership_status != "Inactive"
-                    or str(member.pk) == str(current_member_id)
-                ]
             today_ids = {member.pk for member in today_members}
             active_members = [
                 member
