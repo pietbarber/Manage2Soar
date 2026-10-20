@@ -7,7 +7,8 @@ it come from and go?": bank and cash balances, expenses such as field rent and
 maintenance, other income, and the General Fund.
 
 Treasurers and superusers reach the books from the **Club Finances** menu.
-Member Billing stays under **Log Sheets**.
+While club books are on, Member Billing moves from **Log Sheets** to that menu,
+below Club Ledger.
 
 ## Enabling
 
