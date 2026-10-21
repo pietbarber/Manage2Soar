@@ -446,7 +446,6 @@ class FlightForm(forms.ModelForm):
             elif field_name == "tow_pilot":
                 members = members.filter(towpilot=True)
 
-            members = members.order_by(*name_ordering)
             current_member_id = getattr(self.instance, f"{field_name}_id", None)
             if not current_member_id:
                 current_member_id = self.initial.get(field_name)
@@ -454,62 +453,71 @@ class FlightForm(forms.ModelForm):
                     current_member_id = current_member_id.pk
 
             if passenger:
-                selectable = [
-                    member
-                    for member in members
-                    if member.membership_status in passenger_eligible_statuses
-                ]
+                selectable_statuses = passenger_eligible_statuses
+                selectable_filter = Q(membership_status__in=selectable_statuses)
             elif field_name == "pilot":
-                selectable = [
-                    member
-                    for member in members
-                    if member.membership_status in pilot_eligible_statuses
-                    and (
-                        member.membership_status != visiting_status or visiting_enabled
-                    )
-                ]
+                selectable_statuses = pilot_eligible_statuses
+                selectable_filter = Q(membership_status__in=selectable_statuses)
+                if not visiting_enabled:
+                    selectable_filter &= ~Q(membership_status=visiting_status)
             else:
-                selectable = [
-                    member
-                    for member in members
-                    if member.membership_status in active_statuses
-                    or member.membership_status in {visiting_status, "Inactive"}
-                    or (
-                        field_name == "instructor"
-                        and member.membership_status == "Instructor"
-                    )
-                ]
+                selectable_statuses = set(active_statuses) | {
+                    visiting_status,
+                    "Inactive",
+                }
+                selectable_filter = Q(membership_status__in=selectable_statuses)
+                if field_name == "instructor":
+                    selectable_filter |= Q(membership_status="Instructor")
+
             if current_member_id:
-                current_member = members.filter(pk=current_member_id).first()
-                if current_member and current_member not in selectable:
-                    selectable.append(current_member)
-            today_members = (
-                [member for member in selectable if member.pk in roster_member_ids]
-                if config.show_today_roster_group
+                selectable_filter |= Q(pk=current_member_id)
+
+            # Filter eligibility and member groups in SQL instead of evaluating a
+            # broad Member queryset and repeatedly filtering the result in Python.
+            # Keep only fields used by Member.__str__ and the choice labels.
+            selectable = members.filter(selectable_filter).only(
+                "pk",
+                "first_name",
+                "last_name",
+                "nickname",
+                "middle_initial",
+                "name_suffix",
+                "membership_status",
+                "home_club",
+            )
+
+            def ordered(queryset):
+                return queryset.order_by(*name_ordering)
+
+            today_members = []
+            if config.show_today_roster_group and roster_member_ids:
+                today_members = list(
+                    ordered(selectable.filter(pk__in=roster_member_ids))
+                )
+            today_ids = {member.pk for member in today_members}
+            remaining = (
+                selectable.exclude(pk__in=today_ids) if today_ids else selectable
+            )
+
+            active_members = list(
+                ordered(
+                    remaining.filter(membership_status__in=active_statuses).exclude(
+                        membership_status=visiting_status
+                    )
+                )
+            )
+            visiting_members = (
+                list(ordered(remaining.filter(membership_status=visiting_status)))
+                if visiting_enabled
                 else []
             )
-            today_ids = {member.pk for member in today_members}
-            active_members = [
-                member
-                for member in selectable
-                if member.pk not in today_ids
-                and member.membership_status in active_statuses
-                and member.membership_status != visiting_status
-            ]
-            visiting_members = [
-                member
-                for member in selectable
-                if member.pk not in today_ids
-                and visiting_enabled
-                and member.membership_status == visiting_status
-            ]
-            inactive_members = [
-                member
-                for member in selectable
-                if member.pk not in today_ids
-                and member.membership_status not in active_statuses
-                and member.membership_status != visiting_status
-            ]
+            inactive_members = list(
+                ordered(
+                    remaining.exclude(membership_status__in=active_statuses).exclude(
+                        membership_status=visiting_status
+                    )
+                )
+            )
 
             groups = []
             if today_members:
