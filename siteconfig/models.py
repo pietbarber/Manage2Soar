@@ -327,7 +327,7 @@ class SiteConfiguration(models.Model):
     member_name_ordering = models.CharField(
         max_length=20,
         choices=MemberNameOrdering,
-        default=MemberNameOrdering.FIRST_NAME,
+        default=MemberNameOrdering.LAST_NAME,
         help_text="Sort order for member and pilot dropdowns on logsheets.",
     )
     member_profile_field_policies = models.JSONField(

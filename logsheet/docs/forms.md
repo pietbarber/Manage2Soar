@@ -10,7 +10,7 @@ This document describes all forms in `logsheet/forms.py`.
 - Members with the **Deceased** status are excluded from all flight participant fields, including pilot, instructor, tow pilot, and passenger, regardless of eligibility flags.
 - Existing assignments remain available for editing if a member's eligibility is later disabled, so unrelated flight edits do not erase the saved assignment.
 - The **Today’s Roster** optgroup highlights otherwise-eligible members with a confirmed/completed glider reservation, an existing flight on the logsheet, or a confirmed instruction slot for that date. Members are not duplicated in the other groups.
-- Member choices use the Site Configuration name-order preference (first name by default, or last name), with the other name as a tie-breaker.
+- Member choices use the Site Configuration name-order preference (last name by default to preserve existing behavior, or first name), with the other name as a tie-breaker.
 
 ## CreateLogsheetForm
 - ModelForm for creating a new daily logsheet.

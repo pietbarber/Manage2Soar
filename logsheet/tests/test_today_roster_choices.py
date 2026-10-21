@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from duty_roster.models import GliderReservation
 from logsheet.forms import FlightForm
 from logsheet.models import Flight
-from siteconfig.models import MembershipStatus, SiteConfiguration
+from siteconfig.models import MemberNameOrdering, MembershipStatus, SiteConfiguration
 
 
 def _choice_groups(field):
@@ -14,6 +14,70 @@ def _choice_groups(field):
         for label, options in field.choices
         if isinstance(label, str) and isinstance(options, (list, tuple))
     }
+
+
+def _group_member_ids(field, group_name):
+    for label, options in field.choices:
+        if label == group_name:
+            return [member_id for member_id, _display in options]
+    return []
+
+
+@pytest.mark.django_db
+def test_pilot_dropdown_defaults_to_last_name_and_honors_name_order_preference(
+    logsheet,
+):
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+    )
+    ada = User.objects.create_user(
+        username="ada-zulu",
+        first_name="Ada",
+        last_name="Zulu",
+        membership_status="Full Member",
+    )
+    zoe = User.objects.create_user(
+        username="zoe-alpha",
+        first_name="Zoe",
+        last_name="Alpha",
+        membership_status="Full Member",
+    )
+    ben = User.objects.create_user(
+        username="ben-alpha",
+        first_name="Ben",
+        last_name="Alpha",
+        membership_status="Full Member",
+    )
+
+    form = FlightForm(logsheet=logsheet)
+    assert config.member_name_ordering == MemberNameOrdering.LAST_NAME
+    expected_member_ids = {ada.pk, zoe.pk, ben.pk}
+    assert [
+        member_id
+        for member_id in _group_member_ids(form.fields["pilot"], "Active Members")
+        if member_id in expected_member_ids
+    ] == [ben.pk, zoe.pk, ada.pk]
+
+    config.member_name_ordering = MemberNameOrdering.FIRST_NAME
+    config.save(update_fields=["member_name_ordering"])
+    form = FlightForm(logsheet=logsheet)
+    assert [
+        member_id
+        for member_id in _group_member_ids(form.fields["pilot"], "Active Members")
+        if member_id in expected_member_ids
+    ] == [ada.pk, ben.pk, zoe.pk]
 
 
 @pytest.mark.django_db

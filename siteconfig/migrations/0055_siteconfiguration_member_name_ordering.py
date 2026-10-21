@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             name="member_name_ordering",
             field=models.CharField(
                 choices=[("first_name", "First name"), ("last_name", "Last name")],
-                default="first_name",
+                default="last_name",
                 help_text="Sort order for member and pilot dropdowns on logsheets.",
                 max_length=20,
             ),
