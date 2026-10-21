@@ -330,6 +330,10 @@ class SiteConfiguration(models.Model):
         default=MemberNameOrdering.LAST_NAME,
         help_text="Sort order for member and pilot dropdowns on logsheets.",
     )
+    show_today_roster_group = models.BooleanField(
+        default=True,
+        help_text="Show members scheduled for the logsheet date in a separate dropdown group.",
+    )
     member_profile_field_policies = models.JSONField(
         default=default_member_profile_field_policies,
         db_default=default_member_profile_field_policies(),

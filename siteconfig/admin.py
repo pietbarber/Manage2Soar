@@ -263,8 +263,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
         (
             "Member Display Preferences",
             {
-                "fields": ("member_name_ordering",),
-                "description": "Choose member and pilot dropdown sorting.",
+                "fields": ("member_name_ordering", "show_today_roster_group"),
+                "description": "Configure member and pilot dropdown display.",
                 "classes": ("collapse",),
             },
         ),

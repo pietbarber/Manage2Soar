@@ -483,9 +483,11 @@ class FlightForm(forms.ModelForm):
                 current_member = members.filter(pk=current_member_id).first()
                 if current_member and current_member not in selectable:
                     selectable.append(current_member)
-            today_members = [
-                member for member in selectable if member.pk in roster_member_ids
-            ]
+            today_members = (
+                [member for member in selectable if member.pk in roster_member_ids]
+                if config.show_today_roster_group
+                else []
+            )
             today_ids = {member.pk for member in today_members}
             active_members = [
                 member

@@ -162,6 +162,43 @@ def test_today_roster_includes_reserved_and_flown_members_without_duplicates(
 
 
 @pytest.mark.django_db
+def test_today_roster_group_can_be_disabled(active_member, logsheet, glider):
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        show_today_roster_group=False,
+    )
+    scheduled_member = User.objects.create_user(
+        username="scheduled-member",
+        first_name="Scheduled",
+        last_name="Member",
+        membership_status="Full Member",
+    )
+    GliderReservation.objects.create(
+        member=scheduled_member,
+        glider=glider,
+        date=logsheet.log_date,
+        status="confirmed",
+    )
+
+    form = FlightForm(logsheet=logsheet)
+    pilot_groups = _choice_groups(form.fields["pilot"])
+    assert "Today’s Roster" not in pilot_groups
+    assert scheduled_member.pk in pilot_groups["Active Members"]
+
+
+@pytest.mark.django_db
 def test_inactive_members_remain_passengers_and_pilot_eligibility_uses_status(
     active_member, logsheet, glider
 ):
