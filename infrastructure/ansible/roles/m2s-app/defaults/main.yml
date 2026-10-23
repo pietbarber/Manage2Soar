@@ -23,6 +23,47 @@ m2s_django_debug: false
 m2s_django_allowed_hosts: "{{ m2s_domain }}"
 m2s_django_static_root: "/var/www/m2s/static"
 m2s_django_media_root: "/var/www/m2s/media"
+# Match the active GKE Django CronJobs on single-host installations. Calendar
+# expressions specify UTC explicitly, independently of the server's timezone.
+m2s_scheduled_jobs:
+  - name: clearsessions
+    calendar: "*-*-* 03:00:00 UTC"
+    timeout: 300
+  - name: notify-aging-logsheets
+    command: notify_aging_logsheets
+    calendar: "*-*-* 08:00:00 UTC"
+    timeout: 900
+  - name: process-finalization-email-outbox
+    command: process_finalization_email_outbox
+    arguments: "--limit=200"
+    calendar: "*-*-* *:00/10:00 UTC"
+    timeout: 600
+  - name: process-stats-dump-outbox
+    command: process_stats_dump_outbox
+    arguments: "--limit=20"
+    calendar: "*-*-* *:00/10:00 UTC"
+    timeout: 1200
+  - name: send-duty-preop-emails
+    command: send_duty_preop_emails
+    calendar: "*-*-* 06:00:00 UTC"
+    timeout: 600
+  - name: send-instructor-summary-emails
+    command: send_instructor_summary_emails
+    arguments: "--hours-ahead=48"
+    calendar: "*-*-* 06:00:00 UTC"
+    timeout: 600
+  - name: expire-ad-hoc-days
+    command: expire_ad_hoc_days
+    calendar: "*-*-* *:00/15:00 UTC"
+    timeout: 300
+  - name: notify-late-sprs
+    command: notify_late_sprs
+    calendar: "Mon *-*-* 10:00:00 UTC"
+    timeout: 1200
+  - name: report-duty-delinquents
+    command: report_duty_delinquents
+    calendar: "*-*-01 07:00:00 UTC"
+    timeout: 1800
 # Private, non-web-served storage for django-import-export temp files.
 # Deliberately OUTSIDE /var/www/m2s/media so Nginx does not expose member
 # import CSVs over the public /media/ URL (issue #1071).

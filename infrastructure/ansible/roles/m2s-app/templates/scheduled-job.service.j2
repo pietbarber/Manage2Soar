@@ -1,0 +1,18 @@
+# Managed by Ansible - DO NOT EDIT MANUALLY
+[Unit]
+Description=Manage2Soar scheduled job: {{ item.name }}
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User={{ m2s_app_user }}
+Group={{ m2s_app_group }}
+WorkingDirectory={{ m2s_app_home }}/app
+EnvironmentFile={{ m2s_app_home }}/app/.env
+ExecStart={{ m2s_venv_path }}/bin/python manage.py {{ item.command | default(item.name) }}{% if item.arguments is defined %} {{ item.arguments }}{% endif %}
+TimeoutStartSec={{ item.timeout }}s
+SyslogIdentifier=m2s-{{ item.name }}
+NoNewPrivileges=true
+PrivateTmp=true

@@ -1,0 +1,35 @@
+---
+- name: Install Django scheduled job services
+  ansible.builtin.template:
+    src: scheduled-job.service.j2
+    dest: "/etc/systemd/system/m2s-{{ item.name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ m2s_scheduled_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: m2s_job_services
+
+- name: Install Django scheduled job timers
+  ansible.builtin.template:
+    src: scheduled-job.timer.j2
+    dest: "/etc/systemd/system/m2s-{{ item.name }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ m2s_scheduled_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: m2s_job_timers
+
+- name: Enable Django scheduled job timers
+  ansible.builtin.systemd:
+    name: "m2s-{{ item.name }}.timer"
+    enabled: true
+    state: "{{ 'restarted' if m2s_job_timers.results[index].changed else 'started' }}"
+    daemon_reload: "{{ m2s_job_services.results[index].changed or m2s_job_timers.results[index].changed }}"
+  loop: "{{ m2s_scheduled_jobs }}"
+  loop_control:
+    index_var: index
+    label: "{{ item.name }}"

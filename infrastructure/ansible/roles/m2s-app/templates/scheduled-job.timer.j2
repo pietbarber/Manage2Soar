@@ -1,0 +1,11 @@
+# Managed by Ansible - DO NOT EDIT MANUALLY
+[Unit]
+Description=Run Manage2Soar {{ item.name }} on schedule
+
+[Timer]
+OnCalendar={{ item.calendar }}
+Persistent=true
+Unit=m2s-{{ item.name }}.service
+
+[Install]
+WantedBy=timers.target

@@ -358,6 +358,27 @@ journalctl -u gunicorn -f
 tail -f /var/log/nginx/access.log
 ```
 
+### Scheduled Django Jobs
+
+The `m2s-app` role installs and enables nine `m2s-*.timer` systemd timers,
+matching the active GKE CronJobs: session cleanup, aging logsheet alerts,
+finalization-email and stats-dump outbox processors, pre-operation and
+instructor emails, ad-hoc day expiration, late SPR alerts, and the monthly
+duty delinquent report. They run as the app user with the same `.env` as
+Gunicorn. Schedules use UTC regardless of the host timezone, and missed runs
+are caught up once when the host comes back online. The configured jobs and
+timeouts are in `infrastructure/ansible/roles/m2s-app/defaults/main.yml`.
+
+```bash
+sudo systemctl list-timers 'm2s-*.timer'
+sudo systemctl status m2s-process-stats-dump-outbox.timer
+sudo journalctl -u m2s-process-stats-dump-outbox.service --since today
+```
+
+The weekly maintenance digest is **not** scheduled: its management command
+does not yet exist, and the GKE job is disabled too. PostgreSQL backup cron
+and systemd-tmpfiles cleanup are separate from these Django timers.
+
 ### Database Operations
 
 ```bash
