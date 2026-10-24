@@ -856,3 +856,35 @@ class TestProposeRosterSessionTracking:
         assert response.context["start_date"] == date(2026, 3, 1)
         assert response.context["end_date"] == date(2026, 3, 31)
         assert response.context["month_span"] == 1
+
+    def test_publish_without_airfield_shows_friendly_error(self, client, rostermeister):
+        """
+        Publishing when no active airfield exists should not crash with
+        DoesNotExist; it should redirect with a friendly error message.
+
+        (Regression test for the dev-environment bug where
+        ``Airfield.objects.get(pk=1)`` raised ``DoesNotExist`` on a fresh DB.)
+        """
+        # Ensure no airfields exist at all.
+        Airfield.objects.all().delete()
+
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+        client.get(url, {"year": 2026, "month": 3})
+
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        session.save()
+
+        response = client.post(
+            url,
+            {"year": 2026, "month": 3, "action": "publish"},
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        # The proposed roster should remain in the session (not published).
+        session = client.session
+        assert "proposed_roster" in session
+        # A friendly error message is shown (not a 500).
+        assert b"airfield" in response.content.lower()
