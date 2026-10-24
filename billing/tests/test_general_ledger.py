@@ -5,6 +5,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.core.management import CommandError, call_command
 from django.db import DatabaseError, connection, transaction
+from django.urls import reverse
 
 from billing.exceptions import ClubAccountingDisabledError
 from billing.ledger_services import (
@@ -413,6 +414,29 @@ def test_system_accounts_are_protected():
     general_fund.is_active = False
     with pytest.raises(ValidationError, match="cannot be deactivated"):
         general_fund.save()
+
+
+def test_account_admin_delete_requires_delete_permission(client, checking):
+    instructor = Member.objects.create_user(
+        username="gl-instructor",
+        instructor=True,
+        is_active=True,
+        membership_status="Full Member",
+    )
+    assert instructor.is_staff
+    delete_url = reverse("admin:billing_account_delete", args=[checking.pk])
+
+    client.force_login(instructor)
+    assert client.post(delete_url, {"post": "yes"}).status_code == 403
+    assert Account.objects.filter(pk=checking.pk).exists()
+
+    superuser = Member.objects.create_superuser(username="gl-admin", password="x")
+    client.force_login(superuser)
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    receivables_url = reverse("admin:billing_account_delete", args=[receivables.pk])
+    assert client.post(receivables_url, {"post": "yes"}).status_code == 403
+    assert client.post(delete_url, {"post": "yes"}).status_code == 302
+    assert not Account.objects.filter(pk=checking.pk).exists()
 
 
 def test_account_type_is_locked_once_posted(treasurer, checking):
