@@ -57,6 +57,7 @@ erDiagram
         string visiting_pilot_token
         datetime visiting_pilot_token_created
         boolean member_profile_self_service_enabled
+        string member_name_ordering
         json member_profile_field_policies
     }
 
@@ -64,6 +65,8 @@ erDiagram
         int id PK
         string name UK
         boolean is_active
+        boolean can_be_pilot
+        boolean can_be_passenger
         int sort_order
         text description
         datetime created_at
@@ -117,13 +120,16 @@ erDiagram
 - **Visiting Pilot Features:** Complete workflow configuration, security token management, auto-approval settings, validation requirements
 - **Member Contact Privacy (Issue #1034):** `share_member_email_by_default`, `share_member_phone_by_default`, and `share_member_address_by_default` set the club-wide default for whether regular members can see each field on another member's profile. A member's own `contact_visibility` preference resolves independently for email, phone, and address: an omitted key is the effective `inherit` state using the corresponding site default, while `share` and `hide` override it.
 - **Member Profile Self-Service (Issue #1034):** `member_profile_self_service_enabled` is the master switch for member self-service profile edits. `member_profile_field_policies` names the profile fields (`email`, `emergency_contacts`, `profile_photo`, `biography`, `password`, `contact_visibility`). The rebuild currently supports `direct` and `disabled`: direct changes apply immediately, while disabled fields reject member control and direct access. The stored `request` value is reserved for future manager-approval workflows and is not a supported rebuild behavior.
+- **Member Name Ordering:** `member_name_ordering` controls whether logsheet member/pilot dropdowns sort by first name or last name; the other name is the tie-breaker. Defaults to last name to preserve existing behavior.
+- **Today’s Roster Group:** `show_today_roster_group` controls whether scheduled members appear in a separate logsheet dropdown group. When disabled, those members remain available in their normal eligibility groups.
 - **Pending email confirmation:** Email changes under a direct policy are staged on the member (`pending_email` and `pending_email_requested_at`) and only replace the current address after the new address confirms the link. Email addresses are not unique; multiple member accounts may share the same address.
 - **Usage:** Accessed via template tags and admin interface, enables multi-club deployment with club-specific branding and contact handling
 
 ## MembershipStatus
 - **Purpose:** Configurable membership statuses that replace hardcoded membership types (Issue #169).
-- **Key Features:** Dynamic membership statuses, active/inactive control, custom sort ordering, deletion protection
-- **Fields:** name (unique), is_active, sort_order, description, timestamps
+- **Key Features:** Dynamic membership statuses, active/inactive control, flight pilot/passenger eligibility, custom sort ordering, deletion protection
+- **Fields:** name (unique), is_active, can_be_pilot, can_be_passenger, sort_order, description, timestamps
+- **Flight selection:** `can_be_pilot` and `can_be_passenger` govern flight form eligibility. Deceased members are excluded from all flight participant fields regardless of these flags. Existing statuses are initialized by migration; future statuses should have both flags reviewed in admin.
 - **Usage:** Referenced by Member model, managed via Django admin, provides flexible membership classification
 
 ## MailingList

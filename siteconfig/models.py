@@ -268,6 +268,13 @@ class MailingList(models.Model):
         return self.get_subscribers().count()
 
 
+class MemberNameOrdering(models.TextChoices):
+    """How member/pilot names are alphabetized in selection dropdowns."""
+
+    FIRST_NAME = "first_name", "First name"
+    LAST_NAME = "last_name", "Last name"
+
+
 class SiteConfiguration(models.Model):
     club_name = models.CharField(max_length=200)
     domain_name = models.CharField(
@@ -316,6 +323,16 @@ class SiteConfiguration(models.Model):
         default=True,
         db_default=True,
         help_text="Allow members to update or request changes to configured profile fields.",
+    )
+    member_name_ordering = models.CharField(
+        max_length=20,
+        choices=MemberNameOrdering,
+        default=MemberNameOrdering.LAST_NAME,
+        help_text="Sort order for member and pilot dropdowns on logsheets.",
+    )
+    show_today_roster_group = models.BooleanField(
+        default=True,
+        help_text="Show members scheduled for the logsheet date in a separate dropdown group.",
     )
     member_profile_field_policies = models.JSONField(
         default=default_member_profile_field_policies,
@@ -1128,6 +1145,14 @@ class MembershipStatus(models.Model):
     is_active = models.BooleanField(
         default=True,
         help_text="Whether members with this status are considered 'active' and can access member features",
+    )
+    can_be_pilot = models.BooleanField(
+        default=False,
+        help_text="Members with this status may be selected as a pilot on flights.",
+    )
+    can_be_passenger = models.BooleanField(
+        default=True,
+        help_text="Members with this status may be selected as a passenger on flights.",
     )
     sort_order = models.PositiveIntegerField(
         default=100,

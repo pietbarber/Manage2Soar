@@ -6,6 +6,12 @@ This document describes all forms in `logsheet/forms.py`.
 
 ## FlightForm
 - ModelForm for entering and validating flight log entries.
+- Pilot and passenger choices are filtered by the member's `MembershipStatus.can_be_pilot` and `can_be_passenger` flags. The same eligible choice queryset validates submitted IDs; ineligible statuses cannot be assigned by posting directly.
+- Members with the **Deceased** status are excluded from all flight participant fields, including pilot, instructor, tow pilot, and passenger, regardless of eligibility flags.
+- Existing assignments remain available for editing if a member's eligibility is later disabled, so unrelated flight edits do not erase the saved assignment.
+- The **Today’s Roster** optgroup highlights otherwise-eligible members with a confirmed/completed glider reservation, an existing flight on the logsheet, or a confirmed instruction slot for that date. Members are not duplicated in the other groups.
+- The **Today’s Roster** group can be disabled in Site Configuration without removing scheduled members from the regular member groups.
+- Member choices use the Site Configuration name-order preference (last name by default to preserve existing behavior, or first name), with the other name as a tie-breaker.
 
 ## CreateLogsheetForm
 - ModelForm for creating a new daily logsheet.
