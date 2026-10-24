@@ -264,7 +264,10 @@ def roster_home(request):
     """
     from .views_swap import _build_volunteer_opportunities
 
-    today = now().date()
+    # Use the *local* date (not UTC) so today's still-fillable slots are
+    # included even for users ahead of UTC (e.g. New York in the evening).
+    # Matches the past-day guard in volunteer_fill_role which uses date.today().
+    today = date.today()
     opportunities = (
         _build_volunteer_opportunities(request.user, today)
         if request.user.is_authenticated

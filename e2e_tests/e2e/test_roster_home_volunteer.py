@@ -125,7 +125,9 @@ class TestRosterHomePage(DjangoPlaywrightTestCase):
 
         # The "Volunteer to fill" button for instructor should be visible,
         # even though schedule_instructors is OFF.
+        # Wait for the actual button to appear (HTMX async response).
         volunteer_link = self.page.locator("a:has-text('Volunteer to fill')")
+        volunteer_link.first.wait_for(state="visible")
         assert volunteer_link.count() >= 1
         volunteer_link.first.click()
 

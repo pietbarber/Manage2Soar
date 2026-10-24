@@ -234,3 +234,29 @@ def test_roster_home_hides_filled_role(client, django_user_model):
         if "instructor" in str(opp.get("role_label", "")).lower():
             # The volunteer cannot fill a slot that is already filled.
             pytest.fail("Filled instructor slot should not be listed")
+
+
+@pytest.mark.django_db
+def test_roster_home_passes_local_date_not_utc(client, django_user_model):
+    """
+    Regression (PR #1121 review): ``roster_home`` must pass the *local* date
+    (``date.today()``) to the opportunity builder, not a UTC-derived date that
+    can be a day ahead for users ahead of UTC (e.g. New York in the evening).
+    A UTC-advanced date would filter out today's still-fillable slots.
+    """
+    from unittest.mock import patch
+
+    _make_config(schedule_instructors=True)
+    user = _make_user(django_user_model, instructor=True)
+    _future_assignment()
+
+    client.force_login(user)
+    with patch("duty_roster.views_swap._build_volunteer_opportunities") as mock_build:
+        mock_build.return_value = []
+        client.get(_home_url())
+
+    # The builder must receive the local (date.today()) date, not a UTC
+    # day-advanced value.
+    assert mock_build.called
+    passed_date = mock_build.call_args[0][1]
+    assert passed_date == date.today()

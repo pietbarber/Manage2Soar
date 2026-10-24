@@ -13,7 +13,7 @@
         <i class="fas fa-calendar-alt me-1"></i>View Calendar
       </a>
     {% else %}
-      <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-primary">
+      <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-primary">
         <i class="fas fa-sign-in-alt me-1"></i>Sign in to volunteer
       </a>
     {% endif %}
@@ -77,7 +77,7 @@
                     {% endif %}
                   </td>
                   <td class="text-end">
-                    <a href="{{ opp.volunteer_url }}"
+                    <a href="{{ opp.volunteer_url }}?next={{ request.get_full_path|urlencode }}"
                        class="btn btn-sm {% if opp.kind == 'surge' %}btn-warning{% else %}btn-danger{% endif %}">
                       <i class="bi bi-hand-index me-1" aria-hidden="true"></i>Volunteer
                     </a>
