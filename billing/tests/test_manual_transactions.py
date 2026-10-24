@@ -240,6 +240,32 @@ def test_opening_balance_can_only_be_posted_once(member, treasurer):
         )
 
 
+def test_opening_balance_is_refused_once_ledger_has_any_entry(member, treasurer):
+    post_manual_charge(
+        member=member,
+        actor=treasurer,
+        amount="10",
+        effective_date=date.today(),
+        description="Existing charge",
+        reason="Posted before the opening balance",
+    )
+
+    with pytest.raises(ValidationError, match="must be the first entry"):
+        post_opening_balance(
+            member=member,
+            actor=treasurer,
+            amount="25",
+            effect=LedgerEntry.Effect.DEBIT,
+            effective_date=date.today(),
+            description="Opening receivable",
+            reason="Imported opening balance",
+        )
+
+    assert not LedgerEntry.objects.filter(
+        kind=LedgerEntry.Kind.OPENING_BALANCE
+    ).exists()
+
+
 def test_opening_balance_override_posts_an_auditable_adjustment(member, treasurer):
     post_opening_balance(
         member=member,

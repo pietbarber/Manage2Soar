@@ -490,13 +490,18 @@ def post_opening_balance(
     if effect not in LedgerEntry.Effect.values:
         raise ValidationError("Opening balance must specify a debit or credit effect.")
     ledger = get_or_create_ledger(member)
-    if (
-        LedgerEntry.objects.select_for_update()
-        .filter(ledger=ledger, kind=LedgerEntry.Kind.OPENING_BALANCE)
-        .exists()
-    ):
+    # Lock the ledger row so the "is the ledger empty?" check below holds
+    # until this entry is written.
+    Ledger.objects.select_for_update().get(pk=ledger.pk)
+    entries = LedgerEntry.objects.filter(ledger=ledger)
+    if entries.filter(kind=LedgerEntry.Kind.OPENING_BALANCE).exists():
         raise ValidationError(
             "An opening balance has already been posted for this account."
+        )
+    if entries.exists():
+        raise ValidationError(
+            "An opening balance must be the first entry on an account; use a "
+            "manual charge or general credit instead."
         )
     return post_entry(
         member=member,

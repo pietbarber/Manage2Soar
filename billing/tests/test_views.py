@@ -77,7 +77,6 @@ def test_member_cannot_access_or_modify_another_members_ledger(
                 "effective_date": date.today().isoformat(),
                 "description": "Unauthorized charge",
                 "reason": "Unauthorized",
-                "effect": "",
             },
         ).status_code
         == 403
@@ -199,7 +198,6 @@ def test_ledger_detail_posts_manual_charge_and_shows_audit(client, member, treas
             "effective_date": date.today().isoformat(),
             "description": "Replacement part",
             "reason": "Approved by treasurer",
-            "effect": "",
         },
     )
 
@@ -228,7 +226,6 @@ def test_reversal_is_post_only_and_redirects_to_member_ledger(
             "effective_date": date.today().isoformat(),
             "description": "Charge",
             "reason": "Reason",
-            "effect": "",
         },
     )
     entry = LedgerEntry.objects.get(ledger__member=member)
@@ -252,7 +249,6 @@ def test_ledger_csv_requires_treasurer_and_sanitizes_cells(client, member, treas
             "effective_date": date.today().isoformat(),
             "description": "=formula",
             "reason": "@internal-note",
-            "effect": "",
         },
     )
     export_url = reverse("billing:ledger_detail_csv", args=[member.pk])
@@ -285,7 +281,7 @@ def test_opening_balance_override_is_separate_from_routine_entries(
 
     response = client.get(detail_url)
     content = response.content.decode()
-    assert '<option value="opening_balance">' not in content
+    assert '<option value="initial_debit">' not in content
     assert "Override opening balance" in content
 
     response = client.post(
@@ -301,3 +297,60 @@ def test_opening_balance_override_is_separate_from_routine_entries(
 
     assert response.status_code == 302
     assert get_balance(member.billing_ledger) == Decimal("-10.00")
+
+
+def _initial_balance_post(kind, amount="25.00"):
+    return {
+        "kind": kind,
+        "amount": amount,
+        "effective_date": date.today().isoformat(),
+        "description": "Imported balance",
+        "reason": "Initial import",
+    }
+
+
+@pytest.mark.parametrize(
+    ("kind", "expected_effect", "expected_balance"),
+    [
+        ("initial_debit", LedgerEntry.Effect.DEBIT, Decimal("25.00")),
+        ("initial_credit", LedgerEntry.Effect.CREDIT, Decimal("-25.00")),
+    ],
+)
+def test_ledger_detail_posts_initial_balance(
+    client, member, treasurer, kind, expected_effect, expected_balance
+):
+    client.force_login(treasurer)
+    response = client.post(
+        reverse("billing:ledger_detail", args=[member.pk]),
+        _initial_balance_post(kind),
+    )
+
+    assert response.status_code == 302
+    entry = LedgerEntry.objects.get(ledger__member=member)
+    assert entry.kind == LedgerEntry.Kind.OPENING_BALANCE
+    assert entry.effect == expected_effect
+    assert get_balance(member.billing_ledger) == expected_balance
+
+
+@pytest.mark.parametrize("kind", ["initial_debit", "initial_credit"])
+def test_ledger_detail_refuses_initial_balance_once_ledger_has_entries(
+    client, member, treasurer, kind
+):
+    post_manual_charge(
+        member=member,
+        actor=treasurer,
+        amount="10.00",
+        effective_date=date.today(),
+        description="Existing charge",
+        reason="Test setup",
+    )
+    client.force_login(treasurer)
+    url = reverse("billing:ledger_detail", args=[member.pk])
+
+    response = client.post(url, _initial_balance_post(kind))
+    assert response.status_code == 200
+    assert "kind" in response.context["form"].errors
+    assert not LedgerEntry.objects.filter(
+        kind=LedgerEntry.Kind.OPENING_BALANCE
+    ).exists()
+    assert get_balance(member.billing_ledger) == Decimal("10.00")

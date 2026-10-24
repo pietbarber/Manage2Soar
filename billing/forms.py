@@ -7,15 +7,18 @@ from billing.services import OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION
 
 
 class ManualEntryForm(forms.Form):
+    # "Initial debit" and "Initial credit" both post the account's one
+    # opening balance; the kind itself carries the debit/credit direction.
+    INITIAL_BALANCE_EFFECTS = {
+        "initial_debit": "debit",
+        "initial_credit": "credit",
+    }
     KIND_CHOICES = (
         ("manual_charge", "Manual charge"),
         ("payment", "Payment"),
         ("credit", "General credit"),
-        ("opening_balance", "Opening balance"),
-    )
-    EFFECT_CHOICES = (
-        ("debit", "Debit: member owes the club"),
-        ("credit", "Credit: member has a credit"),
+        ("initial_debit", "Initial Debit: member owes the club"),
+        ("initial_credit", "Initial Credit: member starts with a credit"),
     )
 
     kind = forms.ChoiceField(choices=KIND_CHOICES)
@@ -27,26 +30,22 @@ class ManualEntryForm(forms.Form):
     )
     description = forms.CharField(max_length=255)
     reason = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}))
-    effect = forms.ChoiceField(choices=EFFECT_CHOICES, required=False)
 
-    def __init__(self, *args, allow_opening_balance=True, **kwargs):
+    def __init__(self, *args, allow_initial_balance=True, **kwargs):
         super().__init__(*args, **kwargs)
-        if not allow_opening_balance:
+        if not allow_initial_balance:
             self.fields["kind"].choices = [
-                choice for choice in self.KIND_CHOICES if choice[0] != "opening_balance"
+                choice
+                for choice in self.KIND_CHOICES
+                if choice[0] not in self.INITIAL_BALANCE_EFFECTS
             ]
-
-    def clean(self):
-        cleaned = super().clean()
-        if cleaned.get("kind") == "opening_balance" and not cleaned.get("effect"):
-            self.add_error(
-                "effect", "Choose whether the opening balance is a debit or credit."
-            )
-        return cleaned
 
 
 class OpeningBalanceOverrideForm(forms.Form):
-    EFFECT_CHOICES = ManualEntryForm.EFFECT_CHOICES
+    EFFECT_CHOICES = (
+        ("debit", "Initial Debit: member owes the club"),
+        ("credit", "Initial Credit: member starts with a credit"),
+    )
 
     amount = forms.DecimalField(
         min_value=Decimal("0.01"), max_digits=12, decimal_places=2
