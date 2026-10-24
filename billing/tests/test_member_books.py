@@ -270,6 +270,23 @@ def test_late_entry_dated_before_start_posts_on_start_date(treasurer, member, li
     assert verify_books() == []
 
 
+def test_cleared_start_date_falls_back_to_the_opening_entry(
+    treasurer, member, live, club_books
+):
+    club_books.club_accounting_start_date = None
+    club_books.save(update_fields=["club_accounting_start_date"])
+
+    entry = charge(member, treasurer, "60", when=TODAY() - timedelta(days=3))
+
+    assert JournalEntry.objects.get(member_entry=entry).date == TODAY()
+    with pytest.raises(ValidationError, match="Keep that start date"):
+        go_live(
+            actor=treasurer,
+            start_date=TODAY() - timedelta(days=1),
+            rows=[BankBalance(account=account("110"), name="Checking", amount="1")],
+        )
+
+
 def test_closed_month_refuses_member_entry_once_books_are_live(treasurer, member, live):
     BillingPeriod.objects.update_or_create(
         year=TODAY().year, month=TODAY().month, defaults={"is_closed": True}

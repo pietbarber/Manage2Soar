@@ -16,7 +16,7 @@ below Club Ledger.
 |---|---|
 | `billing_app_enabled` | Required. Club accounting cannot be on without it. |
 | `club_accounting_enabled` | Shows the Club Finances menu and allows posting. Default `False`. |
-| `club_accounting_start_date` | Optional; set by the go-live wizard. The opening entry is dated on this day; every other entry must be dated on or after it. |
+| `club_accounting_start_date` | Optional; set by the go-live wizard and read-only in Site Configuration. The opening entry is dated on this day; every other entry must be dated on or after it. If the setting is ever cleared, the books use the opening entry's date instead. |
 
 Nothing about a particular club is hard-coded. Bank account names, their
 opening balances, and the start date are data the treasurer enters.
