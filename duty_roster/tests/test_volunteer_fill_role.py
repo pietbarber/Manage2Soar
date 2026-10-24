@@ -333,6 +333,118 @@ def test_holes_visible_in_modal_when_flag_off(client, django_user_model):
 
 
 # ---------------------------------------------------------------------------
+# Cross-role exclusion (Issue #1120 review)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_post_instructor_rejected_when_user_is_towpilot_flag_off(
+    client, django_user_model
+):
+    """
+    A dual-qualified member already assigned as tow_pilot cannot claim the
+    instructor slot (and vice versa), even with the schedule flags OFF.
+    """
+    _make_config(schedule_instructors=False, schedule_tow_pilots=False)
+    user = _make_user(django_user_model, instructor=True, towpilot=True)
+    assignment = _future_assignment()
+    # User is already the tow pilot.
+    assignment.tow_pilot = user
+    assignment.save(update_fields=["tow_pilot"])
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "instructor"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    # Must NOT be assigned to both roles.
+    assert assignment.instructor is None
+    assert assignment.tow_pilot == user
+
+
+@pytest.mark.django_db
+def test_post_towpilot_rejected_when_user_is_instructor_flag_off(
+    client, django_user_model
+):
+    """
+    Inverse direction: a dual-qualified member already assigned as instructor
+    cannot claim the tow_pilot slot, even with the schedule flags OFF.
+    """
+    _make_config(schedule_instructors=False, schedule_tow_pilots=False)
+    user = _make_user(django_user_model, instructor=True, towpilot=True)
+    assignment = _future_assignment()
+    # User is already the instructor.
+    assignment.instructor = user
+    assignment.save(update_fields=["instructor"])
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "tow_pilot"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.tow_pilot is None
+    assert assignment.instructor == user
+
+
+@pytest.mark.django_db
+def test_modal_hides_conflicting_instructor_hole_flag_off(client, django_user_model):
+    """
+    A dual-qualified member already assigned as tow_pilot should NOT see the
+    instructor hole in volunteerable_holes (it is hidden to avoid a conflict).
+    """
+    _make_config(schedule_instructors=False, schedule_tow_pilots=False)
+    user = _make_user(django_user_model, instructor=True, towpilot=True)
+    assignment = _future_assignment()
+    assignment.tow_pilot = user
+    assignment.save(update_fields=["tow_pilot"])
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    # The instructor hole is still an unfilled slot...
+    assert "instructor" in response.context["scheduled_holes"]
+    # ...but the volunteer action is hidden for the conflicting role.
+    assert "instructor" not in response.context["volunteerable_holes"]
+
+
+@pytest.mark.django_db
+def test_modal_hides_conflicting_towpilot_hole_flag_off(client, django_user_model):
+    """
+    Inverse direction: a member already assigned as instructor should NOT see
+    the tow_pilot hole in volunteerable_holes.
+    """
+    _make_config(schedule_instructors=False, schedule_tow_pilots=False)
+    user = _make_user(django_user_model, instructor=True, towpilot=True)
+    assignment = _future_assignment()
+    assignment.instructor = user
+    assignment.save(update_fields=["instructor"])
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert "tow_pilot" in response.context["scheduled_holes"]
+    assert "tow_pilot" not in response.context["volunteerable_holes"]
+
+
+# ---------------------------------------------------------------------------
 # Authentication guard
 # ---------------------------------------------------------------------------
 

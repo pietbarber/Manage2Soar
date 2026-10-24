@@ -1517,6 +1517,17 @@ def calendar_day_detail(request, year, month, day):
 
         if request.user.is_authenticated and scheduled_holes:
             for hole_role in scheduled_holes:
+                # Cross-role exclusion (Issue #1120): a member cannot hold
+                # both the instructor and tow-pilot roles on the same day, so
+                # hide the conflicting volunteer action from the modal.
+                if hole_role == "instructor" and assignment.tow_pilot_id == (
+                    request.user.id
+                ):
+                    continue
+                if hole_role == "tow_pilot" and assignment.instructor_id == (
+                    request.user.id
+                ):
+                    continue
                 qual_attr = _HOLE_FILL_ROLE_MAP[hole_role][0]
                 is_qualified = (
                     _is_commercial_pilot_qualified(request.user)
@@ -3294,12 +3305,52 @@ def propose_roster(request):
             # may not exist in every environment (e.g., fresh dev DBs).
             default_field = Airfield.objects.filter(is_active=True).first()
             if not default_field:
+                # No active airfield: render the existing draft unchanged.
+                # Do NOT redirect to a GET — that path regenerates the draft
+                # and clobbers the saved draft + date range (losing manual
+                # edits and potentially switching to the current month).
                 messages.error(
                     request,
                     "No active airfield found. Please add an airfield "
                     "in Settings before publishing the roster.",
                 )
-                return redirect("duty_roster:propose_roster")
+                failed_draft = request.session.get("proposed_roster", [])
+                failed_display = [
+                    {
+                        "date": dt_date.fromisoformat(e["date"]),
+                        "slots": e["slots"],
+                        "diagnostics": e.get("diagnostics", {}),
+                    }
+                    for e in failed_draft
+                ]
+                failed_start, failed_end = _effective_draft_range(
+                    request, failed_draft, range_start, range_end
+                )
+                return render(
+                    request,
+                    "duty_roster/propose_roster.html",
+                    {
+                        "draft": failed_display,
+                        "year": year,
+                        "month": month,
+                        "start_date": failed_start,
+                        "end_date": failed_end,
+                        "month_span": count_calendar_months_inclusive(
+                            failed_start, failed_end
+                        ),
+                        "incomplete": incomplete,
+                        "enabled_roles": enabled_roles,
+                        "role_labels": role_labels,
+                        "no_scheduling": False,
+                        "operational_info": operational_info,
+                        "filtered_dates": filtered_dates,
+                        "siteconfig": siteconfig,
+                        "use_ortools_scheduler": use_ortools_scheduler,
+                        "removed_dates": _get_removed_dates_from_session(
+                            request, failed_start, failed_end
+                        ),
+                    },
+                )
             created_assignments = []
             draft_entries = request.session.get("proposed_roster", [])
             member_ids = set()
@@ -5606,20 +5657,48 @@ def volunteer_fill_role(request, assignment_id, role):
         return redirect(back_url)
 
     if request.method == "POST":
+        # Cross-role exclusion (Issue #1120): a member cannot hold both the
+        # instructor and tow-pilot roles on the same day.  Detect the conflict
+        # up front for a friendly message, then also enforce it atomically
+        # below so a concurrent change cannot slip through.
+        conflict_role = None
+        if role == "instructor" and assignment.tow_pilot_id == member.id:
+            conflict_role = "tow_pilot"
+        elif role == "tow_pilot" and assignment.instructor_id == member.id:
+            conflict_role = "instructor"
+
         # Atomically claim the slot with a conditional UPDATE so concurrent
         # volunteers cannot both succeed.  filter(..., <field>__isnull=True)
         # matches only if the role is still empty; update() returns the number
-        # of rows actually modified, so 0 means someone else just got there first.
-        rows = DutyAssignment.objects.filter(
+        # of rows actually modified, so 0 means the claim was refused.
+        claim_qs = DutyAssignment.objects.filter(
             pk=assignment.id, **{f"{assign_attr}__isnull": True}
-        ).update(**{assign_attr: member.id})
+        )
+        if role == "instructor":
+            claim_qs = claim_qs.exclude(tow_pilot_id=member.id)
+        elif role == "tow_pilot":
+            claim_qs = claim_qs.exclude(instructor_id=member.id)
+        rows = claim_qs.update(**{assign_attr: member.id})
         if rows == 0:
-            messages.info(
-                request,
-                f"Someone just claimed the {role_label} slot for "
-                f"{assignment.date.strftime('%B %d, %Y')} ahead of you. "
-                "Thank you for offering!",
-            )
+            if conflict_role:
+                other_title = (
+                    getattr(config, _HOLE_FILL_ROLE_MAP[conflict_role][2], None)
+                    if config
+                    else None
+                ) or _HOLE_FILL_ROLE_MAP[conflict_role][3]
+                messages.info(
+                    request,
+                    f"You are already signed up as {other_title} for "
+                    f"{assignment.date.strftime('%B %d, %Y')}. Please rescind "
+                    f"that signup first if you want to be {role_label}.",
+                )
+            else:
+                messages.info(
+                    request,
+                    f"Someone just claimed the {role_label} slot for "
+                    f"{assignment.date.strftime('%B %d, %Y')} ahead of you. "
+                    "Thank you for offering!",
+                )
             return redirect(back_url)
 
         # For ad-hoc days: refresh from DB so notify_ops_status sees the
