@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}General journal entry{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  {% with heading="General journal entry" %}{% include "billing/books/_header.html" %}{% endwith %}
+  <p class="text-muted">For entries the other forms don't cover, such as unpaid bills, depreciation, or setting money aside in a reserve. Total debits must equal total credits. Member balances change only through member ledgers.</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        {% include "billing/books/_form_errors.html" %}
+        {% if formset.non_form_errors %}
+        <div class="alert alert-danger" role="alert">{% for error in formset.non_form_errors %}<div>{{ error }}</div>{% endfor %}</div>
+        {% endif %}
+        <div class="row">
+          {% for field in form %}
+          <div class="{% if field.name == 'internal_note' or field.name == 'memo' %}col-12{% else %}col-md-4{% endif %}">{% include "billing/books/_field.html" %}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {{ formset.management_form }}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th class="text-start" scope="col">Account</th><th class="text-start" scope="col" style="width: 9rem">Debit</th><th class="text-start" scope="col" style="width: 9rem">Credit</th><th class="text-start" scope="col">Line memo</th></tr></thead>
+        <tbody>
+          {% for line in formset %}
+          <tr>
+            <td class="text-start">
+              {{ line.account|add_class:"form-select form-select-sm"|attr:"aria-label:Account" }}
+              {% for error in line.non_field_errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </td>
+            <td class="text-start">{{ line.debit|add_class:"form-control form-control-sm"|attr:"aria-label:Debit" }}</td>
+            <td class="text-start">{{ line.credit|add_class:"form-control form-control-sm"|attr:"aria-label:Credit" }}</td>
+            <td class="text-start">{{ line.memo|add_class:"form-control form-control-sm"|attr:"aria-label:Line memo" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button class="btn btn-primary" type="submit">Post entry</button>
+  </form>
+</div>
+{% endblock %}

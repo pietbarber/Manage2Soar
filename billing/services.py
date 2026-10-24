@@ -16,6 +16,7 @@ CHARGE_KINDS = {
     LedgerEntry.Kind.GUEST_PAYMENT_PENDING,
 }
 REVERSIBLE_KINDS = set(LedgerEntry.Kind.values) - {LedgerEntry.Kind.REVERSAL}
+OPENING_OVERRIDE_KEY_PREFIX = "opening-override:"
 
 
 def _require_billing_enabled():
@@ -31,11 +32,23 @@ def _club_today():
     return get_club_today()
 
 
+def member_label(member):
+    """The name billing shows for a member, the same as the rest of the site."""
+    return member.full_display_name or member.username
+
+
 def _money(amount):
     amount = Decimal(str(amount)).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
     if amount <= 0:
         raise ValidationError("Billing amounts must be greater than zero.")
     return amount
+
+
+def _post_to_books(entry, *, actor, account=None, reference=""):
+    """Post the club-books side of a new member entry (a no-op before setup)."""
+    from billing.ledger_services import post_member_entry
+
+    return post_member_entry(entry, actor=actor, account=account, reference=reference)
 
 
 def get_or_create_ledger(member):
@@ -128,8 +141,15 @@ def post_entry(
     guest_name="",
     payment_method="",
     remits=None,
+    book_account=None,
+    book_reference="",
+    post_to_books=True,
 ):
-    """Post one immutable entry, returning an existing identical source entry."""
+    """Post one immutable entry, returning an existing identical source entry.
+
+    Once the club books are live, the matching journal entry posts in the same
+    transaction; ``book_account`` overrides the default other side.
+    """
     _require_billing_enabled()
     if actor is None:
         raise ValidationError("A posting actor is required.")
@@ -180,7 +200,7 @@ def post_entry(
     )
     try:
         with transaction.atomic():
-            return LedgerEntry.objects.create(**entry_kwargs)
+            entry = LedgerEntry.objects.create(**entry_kwargs)
     except IntegrityError:
         if not source_key:
             raise
@@ -198,6 +218,11 @@ def post_entry(
             payment_method=payment_method,
             remits=remits,
         )
+    if post_to_books:
+        _post_to_books(
+            entry, actor=actor, account=book_account, reference=book_reference
+        )
+    return entry
 
 
 @transaction.atomic
@@ -225,6 +250,7 @@ def post_flight_charges(*, flight, actor, allocations, correction_group=None):
             source_key=source_key,
             flight=flight,
             correction_group=correction_group,
+            post_to_books=False,
         )
         snapshot_defaults = {
             "flight": flight,
@@ -257,6 +283,8 @@ def post_flight_charges(*, flight, actor, allocations, correction_group=None):
                     raise ValidationError(
                         "Existing flight charge snapshot conflicts with allocation."
                     )
+        # Revenue splits by the snapshot, so the books post once it exists.
+        _post_to_books(entry, actor=actor)
         posted.append(entry)
     return posted
 
@@ -318,6 +346,7 @@ def post_charge(
     source_key=None,
     internal_note="",
     flight=None,
+    book_account=None,
 ):
     if kind not in CHARGE_KINDS:
         raise ValidationError("The selected kind is not a charge kind.")
@@ -334,6 +363,7 @@ def post_charge(
         internal_note=internal_note,
         source_key=source_key,
         flight=flight,
+        book_account=book_account,
     )
 
 
@@ -347,6 +377,8 @@ def post_credit(
     kind=LedgerEntry.Kind.PAYMENT,
     source_key=None,
     internal_note="",
+    book_account=None,
+    book_reference="",
 ):
     if kind not in {LedgerEntry.Kind.PAYMENT, LedgerEntry.Kind.CREDIT}:
         raise ValidationError("The selected kind is not a credit kind.")
@@ -360,11 +392,21 @@ def post_credit(
         description=description,
         internal_note=internal_note,
         source_key=source_key,
+        book_account=book_account,
+        book_reference=book_reference,
     )
 
 
 def post_manual_charge(
-    *, member, actor, amount, effective_date, description, reason, source_key=None
+    *,
+    member,
+    actor,
+    amount,
+    effective_date,
+    description,
+    reason,
+    source_key=None,
+    book_account=None,
 ):
     require_manual_transaction_access(actor)
     description = require_audit_text(description, "member description")
@@ -377,6 +419,7 @@ def post_manual_charge(
         description=description,
         source_key=source_key,
         internal_note=reason,
+        book_account=book_account,
     )
 
 
@@ -413,7 +456,9 @@ def post_guest_payment_pending(
 
 
 @transaction.atomic
-def remit_guest_payment(*, entry, actor, effective_date, reference=""):
+def remit_guest_payment(
+    *, entry, actor, effective_date, reference="", deposit_account=None
+):
     """Clear a guest payment in full after treasurer confirmation."""
     require_manual_transaction_access(actor)
     original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
@@ -442,11 +487,21 @@ def remit_guest_payment(*, entry, actor, effective_date, reference=""):
         guest_name=original.guest_name,
         payment_method=original.payment_method,
         remits=original,
+        book_account=deposit_account,
+        book_reference=reference,
     )
 
 
 def post_manual_payment(
-    *, member, actor, amount, effective_date, description, reason, source_key=None
+    *,
+    member,
+    actor,
+    amount,
+    effective_date,
+    description,
+    reason,
+    source_key=None,
+    book_account=None,
 ):
     require_manual_transaction_access(actor)
     description = require_audit_text(description, "member description")
@@ -459,11 +514,21 @@ def post_manual_payment(
         description=description,
         source_key=source_key,
         internal_note=reason,
+        book_account=book_account,
     )
 
 
 def post_manual_credit(
-    *, member, actor, amount, effective_date, description, reason, source_key=None
+    *,
+    member,
+    actor,
+    amount,
+    effective_date,
+    description,
+    reason,
+    source_key=None,
+    book_account=None,
+    book_reference="",
 ):
     require_manual_transaction_access(actor)
     description = require_audit_text(description, "member description")
@@ -477,6 +542,8 @@ def post_manual_credit(
         kind=LedgerEntry.Kind.CREDIT,
         source_key=source_key,
         internal_note=reason,
+        book_account=book_account,
+        book_reference=book_reference,
     )
 
 
@@ -551,7 +618,7 @@ def override_opening_balance(
             "An opening balance must be posted before it can be overridden."
         )
 
-    override_prefix = f"opening-override:{ledger.pk}:"
+    override_prefix = f"{OPENING_OVERRIDE_KEY_PREFIX}{ledger.pk}:"
     opening_entry_ids = {
         entry.pk
         for entry in entries
@@ -649,6 +716,7 @@ def reverse_entry(*, entry, actor, effective_date, reason, correction_group=None
     )
     reversal._service_created = True
     reversal.save()
+    _post_to_books(reversal, actor=actor)
     return reversal
 
 

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}Finances Setup{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 720px">
+  {% with heading="Finances Setup" %}{% include "billing/books/_header.html" %}{% endwith %}
+
+  {% if locked %}
+  <div class="alert alert-info">
+    The books started on {{ start_date|date:"F j, Y" }}{% if opening %} with <a href="{% url 'billing:journal_detail' opening.pk %}">opening entry #{{ opening.pk }}</a>{% endif %}.
+    Other entries have been posted since, so opening balances can no longer be changed here.
+    Correct them with a <a href="{% url 'billing:general_journal' %}">general journal entry</a>.
+  </div>
+  {% else %}
+  <p class="text-muted">
+    Enter what is in each bank account on the day the books start. Each member's ledger balance
+    from before that day is added for you as Member Receivables, and the difference becomes the
+    club's starting General Fund. Member entries from the start date on post one by one. You can
+    come back and change these until you post any other entry.
+  </p>
+  {% if opening %}
+  <div class="alert alert-secondary">
+    Opening balances are already posted in <a href="{% url 'billing:journal_detail' opening.pk %}">entry #{{ opening.pk }}</a>.
+    Saving again replaces that entry.
+  </div>
+  {% endif %}
+  <form method="post" class="card border-0 shadow-sm">
+    <div class="card-body">
+      {% csrf_token %}
+      {% include "billing/books/_form_errors.html" %}
+      {% for field in form %}{% include "billing/books/_field.html" %}{% endfor %}
+
+      {{ formset.management_form }}
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th class="text-start" scope="col">Bank account</th>
+            <th class="text-start" scope="col" style="width: 11rem">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in formset %}
+          <tr>
+            <td class="text-start">
+              {{ row.account }}
+              {% if row.initial.account %}
+              {{ row.name|add_class:"form-control form-control-sm"|attr:"aria-label:Bank account name" }}
+              {% else %}
+              {{ row.name|add_class:"form-control form-control-sm"|attr:"aria-label:New bank account name"|attr:"placeholder:New account (optional)" }}
+              {% endif %}
+              {% for error in row.non_field_errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% for error in row.name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </td>
+            <td class="text-start">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">$</span>
+                {{ row.amount|add_class:"form-control"|attr:"aria-label:Balance"|attr:"inputmode:decimal" }}
+              </div>
+              {% for error in row.amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="form-text">
+        Rename an account to match your bank, for example "Wells Fargo Checking".
+        Use a negative balance for an overdrawn account. To add more than one new account, save and
+        come back, or add it from the <a href="{% url 'billing:chart_of_accounts' %}">Chart of Accounts</a>.
+      </p>
+      <button class="btn btn-primary" type="submit">{% if opening %}Replace opening balances{% else %}Start the books{% endif %}</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
