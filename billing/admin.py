@@ -63,7 +63,11 @@ class AccountAdmin(admin.ModelAdmin):
     actions = None
 
     def has_delete_permission(self, request, obj=None):
-        return obj is not None and not obj.system_role
+        return (
+            super().has_delete_permission(request, obj)
+            and obj is not None
+            and not obj.system_role
+        )
 
 
 class JournalLineInline(admin.TabularInline):
