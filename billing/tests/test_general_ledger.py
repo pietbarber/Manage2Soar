@@ -439,6 +439,24 @@ def test_account_admin_delete_requires_delete_permission(client, checking):
     assert not Account.objects.filter(pk=checking.pk).exists()
 
 
+def test_journal_entry_admin_is_view_only(client, treasurer, checking):
+    entry = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("520"),
+        amount="5",
+        memo="Fuel",
+    )
+    client.force_login(
+        Member.objects.create_superuser(username="gl-viewer", password="x")
+    )
+    url = reverse("admin:billing_journalentry_change", args=[entry.pk])
+
+    assert client.get(url).status_code == 200
+    assert client.post(url, {"_save": "Save"}).status_code == 403
+
+
 def test_account_type_is_locked_once_posted(treasurer, checking):
     post_expense(
         actor=treasurer,
