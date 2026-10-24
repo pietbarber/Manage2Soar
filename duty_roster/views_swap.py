@@ -479,8 +479,7 @@ def _build_volunteer_opportunities(member, today):
         # --- Primary hole opportunities (volunteer_fill_role) ---------------
         if assignment.is_scheduled:
             if (
-                config.schedule_instructors
-                and not assignment.instructor
+                not assignment.instructor
                 and member.instructor
                 # Prevent double-booking: instructors can't also tow the same day
                 and member.id != assignment.tow_pilot_id
@@ -501,8 +500,7 @@ def _build_volunteer_opportunities(member, today):
                     }
                 )
             if (
-                config.schedule_tow_pilots
-                and not assignment.tow_pilot
+                not assignment.tow_pilot
                 and member.towpilot
                 # Prevent double-booking: tow pilots can't also instruct the same day
                 and member.id != assignment.instructor_id
@@ -522,11 +520,7 @@ def _build_volunteer_opportunities(member, today):
                         "assignment": assignment,
                     }
                 )
-            if (
-                config.schedule_duty_officers
-                and not assignment.duty_officer
-                and member.duty_officer
-            ):
+            if not assignment.duty_officer and member.duty_officer:
                 opportunities.append(
                     {
                         "date": d,
@@ -542,11 +536,7 @@ def _build_volunteer_opportunities(member, today):
                         "assignment": assignment,
                     }
                 )
-            if (
-                config.schedule_assistant_duty_officers
-                and not assignment.assistant_duty_officer
-                and member.assistant_duty_officer
-            ):
+            if not assignment.assistant_duty_officer and member.assistant_duty_officer:
                 opportunities.append(
                     {
                         "date": d,
@@ -562,11 +552,7 @@ def _build_volunteer_opportunities(member, today):
                         "assignment": assignment,
                     }
                 )
-            if (
-                config.schedule_commercial_pilots
-                and not assignment.commercial_pilot
-                and member_is_commercial_pilot(member)
-            ):
+            if not assignment.commercial_pilot and member_is_commercial_pilot(member):
                 opportunities.append(
                     {
                         "date": d,

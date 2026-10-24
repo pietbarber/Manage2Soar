@@ -6,7 +6,12 @@ This document describes the main view functions in `duty_roster/views.py` and th
 
 ## Main Views
 
-- **roster_home(request)**: Landing page for the duty roster app.
+- **roster_home(request)**: Public landing page ("Fill a Roster Hole"). Lists open
+  duty-role slots (tow pilot, instructor, duty officer, assistant DO, commercial pilot)
+  on scheduled days in the current + next calendar month that the requesting member is
+  qualified to fill (Issue #1120). Reuses `_build_volunteer_opportunities` from
+  `views_swap`. Anonymous users and members with no matches see an inviting empty state;
+  the page intentionally stays public so it can serve as the app index (see `test_smoke.py`).
 - **blackout_manage(request)**: Allows members to manage their blackout (unavailable) dates.
 - **duty_calendar_view(request, year=None, month=None)**: Renders the main duty calendar for a given month/year.
 - **calendar_day_detail(request, year, month, day)**: Shows details for a specific day, including assignments and signups.

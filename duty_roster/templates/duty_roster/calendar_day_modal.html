@@ -19,7 +19,7 @@
     </div>
     <div class="card-body p-3">
       <div class="row g-2">
-        {% if config.schedule_instructors or assignment.instructor %}
+        {% if assignment.instructor or scheduled_holes.instructor %}
         <div class="col-6">
           <div class="d-flex align-items-start">
             <span class="badge bg-success me-2 mt-1"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
@@ -43,7 +43,7 @@
         </div>
         {% endif %}
 
-        {% if config.schedule_tow_pilots or assignment.tow_pilot %}
+        {% if assignment.tow_pilot or scheduled_holes.tow_pilot %}
         <div class="col-6">
           <div class="d-flex align-items-start">
             <span class="badge bg-danger me-2 mt-1"><i class="bi bi-airplane" aria-hidden="true"></i></span>
@@ -67,7 +67,7 @@
         </div>
         {% endif %}
 
-        {% if config.schedule_duty_officers or assignment.duty_officer %}
+        {% if assignment.duty_officer or scheduled_holes.duty_officer %}
         <div class="col-6">
           <div class="d-flex align-items-start">
             <span class="badge duty-badge badge-duty-officer me-2 mt-1"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
@@ -91,7 +91,7 @@
         </div>
         {% endif %}
 
-        {% if config.schedule_assistant_duty_officers or assignment.assistant_duty_officer %}
+        {% if assignment.assistant_duty_officer or scheduled_holes.assistant_duty_officer %}
         <div class="col-6">
           <div class="d-flex align-items-start">
             <span class="badge bg-secondary me-2 mt-1"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
@@ -115,7 +115,7 @@
         </div>
         {% endif %}
 
-        {% if config.schedule_commercial_pilots or assignment.commercial_pilot %}
+        {% if assignment.commercial_pilot or scheduled_holes.commercial_pilot %}
         <div class="col-6">
           <div class="d-flex align-items-start">
             <span class="badge bg-primary me-2 mt-1"><i class="bi bi-briefcase" aria-hidden="true"></i></span>

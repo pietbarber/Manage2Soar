@@ -7,7 +7,6 @@ from datetime import date as dt_date
 from datetime import time as dt_time
 from datetime import timedelta
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.cache import cache
@@ -250,8 +249,35 @@ def _get_dynamic_role_assignments(
     return dynamic_role_assignments
 
 
+@never_cache
 def roster_home(request):
-    return HttpResponse("Duty Roster Home")
+    """Duty roster app landing page (Issue #1120).
+
+    Public page that lists open duty-role slots in the current + next
+    calendar month that the requesting member is qualified to fill. The
+    actual claim is handled by ``volunteer_fill_role`` — this view only
+    surfaces the opportunities so members have a single entry point.
+
+    Anonymous users (and authenticated members with no matches) see an
+    inviting empty state; the page intentionally stays public so the
+    app index remains a useful landing page (see ``test_smoke.py``).
+    """
+    from .views_swap import _build_volunteer_opportunities
+
+    today = now().date()
+    opportunities = (
+        _build_volunteer_opportunities(request.user, today)
+        if request.user.is_authenticated
+        else []
+    )
+    return render(
+        request,
+        "duty_roster/roster_home.html",
+        {
+            "volunteer_opportunities": opportunities,
+            "is_authenticated": request.user.is_authenticated,
+        },
+    )
 
 
 @active_member_required
@@ -1472,23 +1498,19 @@ def calendar_day_detail(request, year, month, day):
     scheduled_holes = {}
     volunteerable_holes = {}
     if assignment and day_date >= date.today():
-        if site_config:
-            if site_config.schedule_instructors and not assignment.instructor:
-                scheduled_holes["instructor"] = True
-            if site_config.schedule_tow_pilots and not assignment.tow_pilot:
-                scheduled_holes["tow_pilot"] = True
-            if site_config.schedule_duty_officers and not assignment.duty_officer:
-                scheduled_holes["duty_officer"] = True
-            if (
-                site_config.schedule_assistant_duty_officers
-                and not assignment.assistant_duty_officer
-            ):
-                scheduled_holes["assistant_duty_officer"] = True
-            if (
-                site_config.schedule_commercial_pilots
-                and not assignment.commercial_pilot
-            ):
-                scheduled_holes["commercial_pilot"] = True
+        # Issue #1120: surface every empty primary role as a hole so a
+        # qualified member can step in, regardless of the club's
+        # schedule_* flags (which now only control pre-scheduling).
+        if not assignment.instructor:
+            scheduled_holes["instructor"] = True
+        if not assignment.tow_pilot:
+            scheduled_holes["tow_pilot"] = True
+        if not assignment.duty_officer:
+            scheduled_holes["duty_officer"] = True
+        if not assignment.assistant_duty_officer:
+            scheduled_holes["assistant_duty_officer"] = True
+        if not assignment.commercial_pilot:
+            scheduled_holes["commercial_pilot"] = True
 
         if request.user.is_authenticated and scheduled_holes:
             for hole_role in scheduled_holes:
@@ -3265,7 +3287,16 @@ def propose_roster(request):
         elif action == "publish":
             from .utils.email import send_roster_published_notifications
 
-            default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
+            # Use the first active airfield rather than a fixed pk, which
+            # may not exist in every environment (e.g., fresh dev DBs).
+            default_field = Airfield.objects.filter(is_active=True).first()
+            if not default_field:
+                messages.error(
+                    request,
+                    "No active airfield found. Please add an airfield "
+                    "in Settings before publishing the roster.",
+                )
+                return redirect("duty_roster:propose_roster")
             created_assignments = []
             draft_entries = request.session.get("proposed_roster", [])
             member_ids = set()
@@ -5526,10 +5557,13 @@ def volunteer_fill_role(request, assignment_id, role):
 
     Guards:
     * The ``role`` parameter must be one of the known fillable roles.
-    * The role's scheduling flag must be enabled in SiteConfiguration.
     * The user must hold the appropriate qualification flag.
     * The role must still be empty (race-condition guard via conditional UPDATE query).
     * The day must be today or in the future.
+
+    Note (Issue #1120): the club's ``schedule_*`` SiteConfiguration flags only
+    control whether roles are *pre-scheduled* by the roster generator; they no
+    longer gate whether a qualified member may step into an empty slot here.
     """
     assignment = get_object_or_404(DutyAssignment, id=assignment_id)
     back_url = _volunteer_fill_back_url(request, assignment)
@@ -5538,7 +5572,7 @@ def volunteer_fill_role(request, assignment_id, role):
         messages.error(request, "Unknown role specified.")
         return redirect(back_url)
 
-    qual_attr, assign_attr, config_title_attr, default_title, schedule_attr = (
+    qual_attr, assign_attr, config_title_attr, default_title, _schedule_attr = (
         _HOLE_FILL_ROLE_MAP[role]
     )
 
@@ -5553,14 +5587,6 @@ def volunteer_fill_role(request, assignment_id, role):
     # Past days are not fillable.
     if assignment.date < date.today():
         messages.error(request, "You cannot fill roles on past duty days.")
-        return redirect(back_url)
-
-    # Reject if this role is not enabled for scheduling.
-    if not (config and getattr(config, schedule_attr, False)):
-        messages.error(
-            request,
-            f"The {role_label} role is not currently enabled for scheduling.",
-        )
         return redirect(back_url)
 
     # Check qualification.
