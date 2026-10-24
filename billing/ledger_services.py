@@ -70,7 +70,12 @@ def _require_club_accounting():
 
 def books_start_date():
     config = _config()
-    return config.club_accounting_start_date if config else None
+    if config and config.club_accounting_start_date:
+        return config.club_accounting_start_date
+    # The setup wizard saves the date with the opening entry, so fall back to
+    # that entry's date if the setting has been cleared.
+    opening = active_opening_entry()
+    return opening.date if opening else None
 
 
 def get_role_account(role):
@@ -742,7 +747,7 @@ def go_live(*, actor, start_date, rows):
         )
     if start_date > _club_today():
         raise ValidationError("Future dates are not allowed.")
-    current_start = config.club_accounting_start_date
+    current_start = books_start_date()
     if current_start and current_start != start_date and _member_postings().exists():
         raise ValidationError(
             "Member ledger activity is already in the books from "
@@ -783,7 +788,7 @@ def go_live(*, actor, start_date, rows):
             date=current.date,
             reason="Replaced by the go-live wizard.",
         )
-    if current_start != start_date:
+    if config.club_accounting_start_date != start_date:
         config.club_accounting_start_date = start_date
         config.save(update_fields=["club_accounting_start_date"])
     opening = post_journal_entry(
