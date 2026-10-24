@@ -37,7 +37,7 @@ class Line:
 
 @dataclass(frozen=True)
 class BankBalance:
-    """One go-live row: an existing bank account (or a new one) and its balance."""
+    """One Finances Setup row: an existing bank account (or a new one) and its balance."""
 
     name: str
     amount: Decimal = ZERO
@@ -315,7 +315,7 @@ def post_member_paid_expense(
     _require_club_accounting()
     require_manual_transaction_access(actor)
     if not member_books_live():
-        raise ValidationError("Finish Go-Live Setup before recording member expenses.")
+        raise ValidationError("Finish Finances Setup before recording member expenses.")
     if expense_account.type != Account.Type.EXPENSE:
         raise ValidationError("Choose an expense account.")
     memo = require_audit_text(memo, "memo")
@@ -336,7 +336,7 @@ def post_member_paid_expense(
 def member_books_live():
     """True once member-ledger entries post to the books.
 
-    That starts when go-live posts the opening entry; before then, member
+    That starts when Finances Setup posts the opening entry; before then, member
     balances are gathered into the opening entry instead.
     """
     return club_accounting_enabled() and active_opening_entry() is not None
@@ -420,7 +420,7 @@ def member_entry_lines(entry, account=None):
 def post_member_entry(entry, *, actor, account=None, reference=""):
     """Post the club-books side of a member-ledger entry.
 
-    Does nothing until go-live. An entry dated before the books' start date
+    Does nothing until Finances Setup. An entry dated before the books' start date
     (a late logsheet, say) posts on the start date. Reversals mirror the
     original's journal entry; if the original was folded into the opening
     entry, they mirror its default accounts instead.
@@ -479,7 +479,7 @@ def post_member_entry(entry, *, actor, account=None, reference=""):
 def member_entries_missing_from_books():
     """Member entries the books don't account for yet, oldest first.
 
-    Entries dated before the start date that existed at go-live live in the
+    Entries dated before the start date that existed at setup live in the
     opening entry; everything else should have its own journal entry.
     """
     opening = active_opening_entry()
@@ -578,7 +578,7 @@ def reverse_journal_entry(*, entry, actor, date, reason):
         raise ValidationError("Reverse member postings from the member's ledger.")
     if original.source == JournalEntry.Source.OPENING:
         raise ValidationError(
-            "Change opening balances with the go-live wizard instead."
+            "Change opening balances with the Finances Setup wizard instead."
         )
     return _post_reversal(original, actor=actor, date=date, reason=reason)
 
@@ -640,9 +640,9 @@ def _member_postings():
 
 
 def go_live_locked():
-    """True once the books hold entries the treasurer posted after go-live.
+    """True once the books hold entries the treasurer posted after setup.
 
-    Until then the go-live wizard may be rerun. Replaced opening entries,
+    Until then the Finances Setup wizard may be rerun. Replaced opening entries,
     their reversals, and postings from member ledgers don't count.
     """
     return (
@@ -657,7 +657,7 @@ def go_live_locked():
 
 
 def _opening_receivables_lines(start_date):
-    """One Member Receivables line per member, for entries dated before go-live."""
+    """One Member Receivables line per member, for entries dated before setup."""
     balances = defaultdict(lambda: ZERO)
     members = {}
     entries = LedgerEntry.objects.filter(
@@ -742,7 +742,7 @@ def go_live(*, actor, start_date, rows):
     config = SiteConfiguration.objects.select_for_update().first()
     if go_live_locked():
         raise ValidationError(
-            "The books already have entries after go-live. Correct opening "
+            "The books already have entries posted after setup. Correct opening "
             "balances with a general journal entry."
         )
     if start_date > _club_today():
@@ -786,7 +786,7 @@ def go_live(*, actor, start_date, rows):
             current,
             actor=actor,
             date=current.date,
-            reason="Replaced by the go-live wizard.",
+            reason="Replaced by the Finances Setup wizard.",
         )
     if config.club_accounting_start_date != start_date:
         config.club_accounting_start_date = start_date

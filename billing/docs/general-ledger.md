@@ -16,7 +16,7 @@ below Club Ledger.
 |---|---|
 | `billing_app_enabled` | Required. Club accounting cannot be on without it. |
 | `club_accounting_enabled` | Shows the Club Finances menu and allows posting. Default `False`. |
-| `club_accounting_start_date` | Optional; set by the go-live wizard and read-only in Site Configuration. The opening entry is dated on this day; every other entry must be dated on or after it. If the setting is ever cleared, the books use the opening entry's date instead. |
+| `club_accounting_start_date` | Optional; set by the Finances Setup wizard and read-only in Site Configuration. The opening entry is dated on this day; every other entry must be dated on or after it. If the setting is ever cleared, the books use the opening entry's date instead. |
 
 Nothing about a particular club is hard-coded. Bank account names, their
 opening balances, and the start date are data the treasurer enters.
@@ -76,9 +76,9 @@ and SQLite, reject `UPDATE` and `DELETE`.
 |---|---|
 | `post_journal_entry(actor, date, lines, memo, ...)` | The single write path. |
 | `post_expense`, `post_income`, `post_cash_transfer` | Plain-language wrappers used by the forms. |
-| `post_member_paid_expense(actor, date, member, expense_account, amount, memo, ...)` | A member paid a club bill out of pocket: credits their member ledger and posts Dr expense, Cr Member Receivables (that member) in one transaction. Requires go-live. |
+| `post_member_paid_expense(actor, date, member, expense_account, amount, memo, ...)` | A member paid a club bill out of pocket: credits their member ledger and posts Dr expense, Cr Member Receivables (that member) in one transaction. Requires Finances Setup. |
 | `post_member_entry(entry, actor, account=None, reference="")` | Posts the books side of one member ledger entry. `billing/services.py` calls it for every new entry; see [Member ledger postings](#member-ledger-postings). |
-| `post_missing_member_entries(actor)` | Posts member entries the books don't account for yet (go-live and `sync_member_books` use it). |
+| `post_missing_member_entries(actor)` | Posts member entries the books don't account for yet (Finances Setup and `sync_member_books` use it). |
 | `reverse_journal_entry(entry, actor, date, reason)` | Posts the mirror image. |
 | `go_live(actor, start_date, rows)` | Sets the start date and posts the opening entry for bank and member balances. |
 | `account_balance`, `account_balances`, `account_register` | Balances and running-balance registers. |
@@ -105,7 +105,7 @@ Reversals:
 - Member postings are reversed from the member's ledger. Reversing a member
   ledger entry (`reverse_entry` in `billing/services.py`) posts the journal
   reversal in the same transaction.
-- The opening entry can't be reversed here; the go-live wizard replaces it.
+- The opening entry can't be reversed here; the Finances Setup wizard replaces it.
 - A reversal can't predate its original, can't be reversed, and can happen
   only once.
 
@@ -121,7 +121,7 @@ non-zero when it finds problems. It checks for:
   `--post --actor <username>` posts them (for example, after club books were
   turned off for a while).
 
-### Go-live
+### Finances Setup
 
 `go_live(actor, start_date, rows)` starts the books. Each row is a
 `BankBalance(name, amount, account=None)`:
@@ -150,7 +150,7 @@ refuses, and opening balances are corrected with a general journal entry.
 
 ### Member ledger postings
 
-Once go-live has posted the opening entry, every new member ledger entry
+Once Finances Setup has posted the opening entry, every new member ledger entry
 posts its journal entry in the same transaction, so Member Receivables always
 equals the sum of the member ledgers. If either side fails, neither posts.
 
@@ -166,13 +166,13 @@ equals the sum of the member ledgers. If either side fails, neither posts.
 | Reversal | The mirror image of the original's journal entry |
 
 Rules:
-- **Before go-live** nothing posts; go-live gathers those balances instead.
+- **Before Finances Setup** nothing posts; setup gathers those balances instead.
 - **Late entries** dated before the start date (a logsheet finalized late, for
   example) post on the start date, with the member ledger date in the
   internal note.
 - **Closed billing periods:** with club books live, a member entry dated in a
   closed month is refused, because the books can't post there.
-- **Reversing an entry from before go-live** mirrors the default accounts for
+- **Reversing an entry from before setup** mirrors the default accounts for
   its kind, since the original is part of the opening entry. Reclassify with a
   general journal entry if a different account fits better.
 - The member ledger form shows a **Club books account** dropdown once the
@@ -198,7 +198,7 @@ Every view requires `billing_app_required`, `treasurer_required`, and
 | `general_journal` | `books/journal/` | Free-form balanced lines (e.g. unpaid bills, reserves). Member Receivables is not offered. |
 | `journal_detail` | `books/entries/<id>/` | One entry, its lines, and a reversal form. |
 | `journal_reverse` | `books/entries/<id>/reverse/` | POST; date and reason required. |
-| `go_live` | `books/go-live/` | Start date and bank balances; posts or replaces the opening entry. Read-only once other entries exist. |
+| `go_live` | `books/setup/` | Start date and bank balances; posts or replaces the opening entry. Read-only once other entries exist. |
 
 ## Roadmap
 
@@ -320,7 +320,7 @@ second time.
 
 When the books start, the club already has money. The opening entry debits each
 bank account for its starting balance and credits equity (the General Fund) for
-the total, so the entry balances. The **Go-Live Setup** page under Club
+the total, so the entry balances. The **Finances Setup** page under Club
 Finances posts this entry for you.
 
 ### Member accounts
