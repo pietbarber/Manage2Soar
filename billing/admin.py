@@ -12,6 +12,19 @@ from billing.models import (
 )
 
 
+class ViewOnlyAdminMixin:
+    """Admin pages for records that are never edited once posted."""
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Ledger)
 class LedgerAdmin(admin.ModelAdmin):
     list_display = ("member", "created_at")
@@ -34,7 +47,7 @@ class BillingPeriodEventAdmin(admin.ModelAdmin):
 
 
 @admin.register(LedgerEntry)
-class LedgerEntryAdmin(admin.ModelAdmin):
+class LedgerEntryAdmin(ViewOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("ledger", "kind", "effect", "amount", "effective_date")
     list_filter = ("kind", "effect", "effective_date")
     search_fields = ("ledger__member__username", "member_description", "source_key")
@@ -42,7 +55,7 @@ class LedgerEntryAdmin(admin.ModelAdmin):
 
 
 @admin.register(FlightChargeSnapshot)
-class FlightChargeSnapshotAdmin(admin.ModelAdmin):
+class FlightChargeSnapshotAdmin(ViewOnlyAdminMixin, admin.ModelAdmin):
     list_display = (
         "flight",
         "billed_member",
@@ -81,18 +94,9 @@ class JournalLineInline(admin.TabularInline):
 
 
 @admin.register(JournalEntry)
-class JournalEntryAdmin(admin.ModelAdmin):
+class JournalEntryAdmin(ViewOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("id", "date", "memo", "source", "created_by")
     list_filter = ("source", "date")
     search_fields = ("memo", "payee", "reference", "source_key")
     readonly_fields = tuple(field.name for field in JournalEntry._meta.fields)
     inlines = (JournalLineInline,)
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
