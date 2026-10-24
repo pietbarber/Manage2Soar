@@ -45,7 +45,7 @@ def _money(amount):
 
 
 def _post_to_books(entry, *, actor, account=None, reference=""):
-    """Post the club-books side of a new member entry (a no-op before go-live)."""
+    """Post the club-books side of a new member entry (a no-op before setup)."""
     from billing.ledger_services import post_member_entry
 
     return post_member_entry(entry, actor=actor, account=account, reference=reference)

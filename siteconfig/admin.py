@@ -421,7 +421,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "default_instructor_rate_multiplier",
                 ),
                 "description": (
-                    "The books' start date is set on the Go-Live Setup page "
+                    "The books' start date is set on the Finances Setup page "
                     "under Club Finances. "
                     "The billing app switch controls access to the member ledger and "
                     "automatic ledger posting. The remaining settings only apply when "

@@ -59,7 +59,7 @@ urlpatterns = [
     path("books/income/", ledger_views.record_income, name="record_income"),
     path("books/transfer/", ledger_views.cash_transfer, name="cash_transfer"),
     path("books/journal/", ledger_views.general_journal, name="general_journal"),
-    path("books/go-live/", ledger_views.go_live_setup, name="go_live"),
+    path("books/setup/", ledger_views.go_live_setup, name="go_live"),
     path(
         "books/entries/<int:entry_id>/",
         ledger_views.journal_detail,

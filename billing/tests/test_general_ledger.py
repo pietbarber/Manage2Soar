@@ -562,7 +562,7 @@ def test_opening_source_must_use_start_date(
         lines=lines,
         source=JournalEntry.Source.OPENING,
     )
-    with pytest.raises(ValidationError, match="go-live wizard"):
+    with pytest.raises(ValidationError, match="Finances Setup wizard"):
         reverse_journal_entry(entry=entry, actor=treasurer, date=today(), reason="x")
 
 
@@ -694,7 +694,7 @@ def test_only_one_opening_entry_at_a_time(treasurer):
 
 @pytest.fixture
 def live_books(treasurer):
-    """Member-paid expenses post only once go-live has started the books."""
+    """Member-paid expenses post only once Finances Setup has started the books."""
     return go_live(actor=treasurer, start_date=today(), rows=[bank(amount="1000")])
 
 
@@ -761,7 +761,7 @@ def test_member_paid_expense_is_all_or_nothing(treasurer, member, live_books):
 def test_member_paid_expense_waits_for_go_live(treasurer, member):
     from billing.models import LedgerEntry
 
-    with pytest.raises(ValidationError, match="Go-Live Setup"):
+    with pytest.raises(ValidationError, match="Finances Setup"):
         member_paid_rent(treasurer, member)
     assert not LedgerEntry.objects.exists()
 

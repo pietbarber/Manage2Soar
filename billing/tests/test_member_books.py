@@ -133,7 +133,7 @@ def test_member_entries_wait_for_go_live(treasurer, member):
 
     start_books(treasurer)
 
-    # Dated on the start date, so go-live posts it on its own.
+    # Dated on the start date, so Finances Setup posts it on its own.
     journal = JournalEntry.objects.get(member_entry=entry)
     assert journal.date == TODAY()
     assert account_balance(account("450")) == D("60.00")

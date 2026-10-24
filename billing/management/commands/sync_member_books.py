@@ -25,7 +25,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if not member_books_live():
-            raise CommandError("Club books aren't live; run Go-Live Setup first.")
+            raise CommandError("Club books aren't live; run Finances Setup first.")
         missing = list(member_entries_missing_from_books())
         for entry in missing:
             self.stdout.write(
