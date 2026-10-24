@@ -856,3 +856,72 @@ class TestProposeRosterSessionTracking:
         assert response.context["start_date"] == date(2026, 3, 1)
         assert response.context["end_date"] == date(2026, 3, 31)
         assert response.context["month_span"] == 1
+
+    def test_publish_without_airfield_shows_friendly_error(
+        self, client, rostermeister, instructor_member
+    ):
+        """
+        Publishing when no active airfield exists should not crash with
+        DoesNotExist; it should show a friendly error AND preserve the saved
+        draft + date range (not regenerate them).
+
+        (Regression test for the dev-environment bug where
+        ``Airfield.objects.get(pk=1)`` raised ``DoesNotExist`` on a fresh DB,
+        plus the PR #1121 review finding that the failed-publish redirect to a
+        GET regenerated the draft and clobbered manual edits.)
+        """
+        # Ensure no airfields exist at all.
+        Airfield.objects.all().delete()
+
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+        client.get(url, {"year": 2026, "month": 3})
+
+        # Establish a saved draft with a manual edit (instructor assigned) and
+        # an explicit March 2026 date range (NOT the current month).
+        manual_draft = [
+            {"date": "2026-03-07", "slots": {"instructor": str(instructor_member.pk)}},
+            {"date": "2026-03-14", "slots": {}},
+        ]
+        session = client.session
+        session["proposed_roster"] = manual_draft
+        session["proposed_roster_range"] = {
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+        }
+        session.save()
+
+        response = client.post(
+            url,
+            {
+                "year": 2026,
+                "month": 3,
+                "start_date": "2026-03-01",
+                "end_date": "2026-03-31",
+                "action": "publish",
+            },
+        )
+
+        # The failed POST should render the draft (200), not redirect (302).
+        assert response.status_code == 200
+        # A friendly error message is shown (not a 500).
+        assert b"airfield" in response.content.lower()
+
+        # The saved draft must be preserved — same dates and the manual edit.
+        session = client.session
+        assert session.get("proposed_roster") == manual_draft
+
+        # The rendered draft must match what was saved (manual edit intact).
+        rendered_dates = [e["date"].isoformat() for e in response.context["draft"]]
+        assert "2026-03-07" in rendered_dates
+        assert "2026-03-14" in rendered_dates
+        instructor_row = next(
+            e
+            for e in response.context["draft"]
+            if e["date"].isoformat() == "2026-03-07"
+        )
+        assert str(instructor_member.pk) in instructor_row["slots"].values()
+
+        # The date range must not have switched to the current month.
+        assert response.context["start_date"] == date(2026, 3, 1)
+        assert response.context["end_date"] == date(2026, 3, 31)

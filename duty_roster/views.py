@@ -7,7 +7,6 @@ from datetime import date as dt_date
 from datetime import time as dt_time
 from datetime import timedelta
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.cache import cache
@@ -250,8 +249,38 @@ def _get_dynamic_role_assignments(
     return dynamic_role_assignments
 
 
+@never_cache
 def roster_home(request):
-    return HttpResponse("Duty Roster Home")
+    """Duty roster app landing page (Issue #1120).
+
+    Public page that lists open duty-role slots in the current + next
+    calendar month that the requesting member is qualified to fill. The
+    actual claim is handled by ``volunteer_fill_role`` — this view only
+    surfaces the opportunities so members have a single entry point.
+
+    Anonymous users (and authenticated members with no matches) see an
+    inviting empty state; the page intentionally stays public so the
+    app index remains a useful landing page (see ``test_smoke.py``).
+    """
+    from .views_swap import _build_volunteer_opportunities
+
+    # Use the *local* date (not UTC) so today's still-fillable slots are
+    # included even for users ahead of UTC (e.g. New York in the evening).
+    # Matches the past-day guard in volunteer_fill_role which uses date.today().
+    today = date.today()
+    opportunities = (
+        _build_volunteer_opportunities(request.user, today)
+        if request.user.is_authenticated
+        else []
+    )
+    return render(
+        request,
+        "duty_roster/roster_home.html",
+        {
+            "volunteer_opportunities": opportunities,
+            "is_authenticated": request.user.is_authenticated,
+        },
+    )
 
 
 @active_member_required
@@ -1472,26 +1501,33 @@ def calendar_day_detail(request, year, month, day):
     scheduled_holes = {}
     volunteerable_holes = {}
     if assignment and day_date >= date.today():
-        if site_config:
-            if site_config.schedule_instructors and not assignment.instructor:
-                scheduled_holes["instructor"] = True
-            if site_config.schedule_tow_pilots and not assignment.tow_pilot:
-                scheduled_holes["tow_pilot"] = True
-            if site_config.schedule_duty_officers and not assignment.duty_officer:
-                scheduled_holes["duty_officer"] = True
-            if (
-                site_config.schedule_assistant_duty_officers
-                and not assignment.assistant_duty_officer
-            ):
-                scheduled_holes["assistant_duty_officer"] = True
-            if (
-                site_config.schedule_commercial_pilots
-                and not assignment.commercial_pilot
-            ):
-                scheduled_holes["commercial_pilot"] = True
+        # Issue #1120: surface every empty primary role as a hole so a
+        # qualified member can step in, regardless of the club's
+        # schedule_* flags (which now only control pre-scheduling).
+        if not assignment.instructor:
+            scheduled_holes["instructor"] = True
+        if not assignment.tow_pilot:
+            scheduled_holes["tow_pilot"] = True
+        if not assignment.duty_officer:
+            scheduled_holes["duty_officer"] = True
+        if not assignment.assistant_duty_officer:
+            scheduled_holes["assistant_duty_officer"] = True
+        if not assignment.commercial_pilot:
+            scheduled_holes["commercial_pilot"] = True
 
         if request.user.is_authenticated and scheduled_holes:
             for hole_role in scheduled_holes:
+                # Cross-role exclusion (Issue #1120): a member cannot hold
+                # both the instructor and tow-pilot roles on the same day, so
+                # hide the conflicting volunteer action from the modal.
+                if hole_role == "instructor" and assignment.tow_pilot_id == (
+                    request.user.id
+                ):
+                    continue
+                if hole_role == "tow_pilot" and assignment.instructor_id == (
+                    request.user.id
+                ):
+                    continue
                 qual_attr = _HOLE_FILL_ROLE_MAP[hole_role][0]
                 is_qualified = (
                     _is_commercial_pilot_qualified(request.user)
@@ -3265,7 +3301,56 @@ def propose_roster(request):
         elif action == "publish":
             from .utils.email import send_roster_published_notifications
 
-            default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
+            # Use the first active airfield rather than a fixed pk, which
+            # may not exist in every environment (e.g., fresh dev DBs).
+            default_field = Airfield.objects.filter(is_active=True).first()
+            if not default_field:
+                # No active airfield: render the existing draft unchanged.
+                # Do NOT redirect to a GET — that path regenerates the draft
+                # and clobbers the saved draft + date range (losing manual
+                # edits and potentially switching to the current month).
+                messages.error(
+                    request,
+                    "No active airfield found. Please add an airfield "
+                    "in Settings before publishing the roster.",
+                )
+                failed_draft = request.session.get("proposed_roster", [])
+                failed_display = [
+                    {
+                        "date": dt_date.fromisoformat(e["date"]),
+                        "slots": e["slots"],
+                        "diagnostics": e.get("diagnostics", {}),
+                    }
+                    for e in failed_draft
+                ]
+                failed_start, failed_end = _effective_draft_range(
+                    request, failed_draft, range_start, range_end
+                )
+                return render(
+                    request,
+                    "duty_roster/propose_roster.html",
+                    {
+                        "draft": failed_display,
+                        "year": year,
+                        "month": month,
+                        "start_date": failed_start,
+                        "end_date": failed_end,
+                        "month_span": count_calendar_months_inclusive(
+                            failed_start, failed_end
+                        ),
+                        "incomplete": incomplete,
+                        "enabled_roles": enabled_roles,
+                        "role_labels": role_labels,
+                        "no_scheduling": False,
+                        "operational_info": operational_info,
+                        "filtered_dates": filtered_dates,
+                        "siteconfig": siteconfig,
+                        "use_ortools_scheduler": use_ortools_scheduler,
+                        "removed_dates": _get_removed_dates_from_session(
+                            request, failed_start, failed_end
+                        ),
+                    },
+                )
             created_assignments = []
             draft_entries = request.session.get("proposed_roster", [])
             member_ids = set()
@@ -5526,10 +5611,13 @@ def volunteer_fill_role(request, assignment_id, role):
 
     Guards:
     * The ``role`` parameter must be one of the known fillable roles.
-    * The role's scheduling flag must be enabled in SiteConfiguration.
     * The user must hold the appropriate qualification flag.
     * The role must still be empty (race-condition guard via conditional UPDATE query).
     * The day must be today or in the future.
+
+    Note (Issue #1120): the club's ``schedule_*`` SiteConfiguration flags only
+    control whether roles are *pre-scheduled* by the roster generator; they no
+    longer gate whether a qualified member may step into an empty slot here.
     """
     assignment = get_object_or_404(DutyAssignment, id=assignment_id)
     back_url = _volunteer_fill_back_url(request, assignment)
@@ -5538,7 +5626,7 @@ def volunteer_fill_role(request, assignment_id, role):
         messages.error(request, "Unknown role specified.")
         return redirect(back_url)
 
-    qual_attr, assign_attr, config_title_attr, default_title, schedule_attr = (
+    qual_attr, assign_attr, config_title_attr, default_title, _schedule_attr = (
         _HOLE_FILL_ROLE_MAP[role]
     )
 
@@ -5555,14 +5643,6 @@ def volunteer_fill_role(request, assignment_id, role):
         messages.error(request, "You cannot fill roles on past duty days.")
         return redirect(back_url)
 
-    # Reject if this role is not enabled for scheduling.
-    if not (config and getattr(config, schedule_attr, False)):
-        messages.error(
-            request,
-            f"The {role_label} role is not currently enabled for scheduling.",
-        )
-        return redirect(back_url)
-
     # Check qualification.
     is_qualified = (
         _is_commercial_pilot_qualified(member)
@@ -5577,20 +5657,48 @@ def volunteer_fill_role(request, assignment_id, role):
         return redirect(back_url)
 
     if request.method == "POST":
+        # Cross-role exclusion (Issue #1120): a member cannot hold both the
+        # instructor and tow-pilot roles on the same day.  Detect the conflict
+        # up front for a friendly message, then also enforce it atomically
+        # below so a concurrent change cannot slip through.
+        conflict_role = None
+        if role == "instructor" and assignment.tow_pilot_id == member.id:
+            conflict_role = "tow_pilot"
+        elif role == "tow_pilot" and assignment.instructor_id == member.id:
+            conflict_role = "instructor"
+
         # Atomically claim the slot with a conditional UPDATE so concurrent
         # volunteers cannot both succeed.  filter(..., <field>__isnull=True)
         # matches only if the role is still empty; update() returns the number
-        # of rows actually modified, so 0 means someone else just got there first.
-        rows = DutyAssignment.objects.filter(
+        # of rows actually modified, so 0 means the claim was refused.
+        claim_qs = DutyAssignment.objects.filter(
             pk=assignment.id, **{f"{assign_attr}__isnull": True}
-        ).update(**{assign_attr: member.id})
+        )
+        if role == "instructor":
+            claim_qs = claim_qs.exclude(tow_pilot_id=member.id)
+        elif role == "tow_pilot":
+            claim_qs = claim_qs.exclude(instructor_id=member.id)
+        rows = claim_qs.update(**{assign_attr: member.id})
         if rows == 0:
-            messages.info(
-                request,
-                f"Someone just claimed the {role_label} slot for "
-                f"{assignment.date.strftime('%B %d, %Y')} ahead of you. "
-                "Thank you for offering!",
-            )
+            if conflict_role:
+                other_title = (
+                    getattr(config, _HOLE_FILL_ROLE_MAP[conflict_role][2], None)
+                    if config
+                    else None
+                ) or _HOLE_FILL_ROLE_MAP[conflict_role][3]
+                messages.info(
+                    request,
+                    f"You are already signed up as {other_title} for "
+                    f"{assignment.date.strftime('%B %d, %Y')}. Please rescind "
+                    f"that signup first if you want to be {role_label}.",
+                )
+            else:
+                messages.info(
+                    request,
+                    f"Someone just claimed the {role_label} slot for "
+                    f"{assignment.date.strftime('%B %d, %Y')} ahead of you. "
+                    "Thank you for offering!",
+                )
             return redirect(back_url)
 
         # For ad-hoc days: refresh from DB so notify_ops_status sees the

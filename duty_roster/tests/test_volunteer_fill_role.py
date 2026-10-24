@@ -237,11 +237,11 @@ def test_post_rejected_for_unqualified_member(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_post_does_not_assign_when_role_scheduling_disabled(client, django_user_model):
+def test_post_assigns_when_flag_off_but_qualified(client, django_user_model):
     """
-    Volunteering is rejected when the role's scheduling flag is disabled in
-    SiteConfiguration, even if the user has the correct qualification.
-    This prevents a direct URL bypass of the scheduling configuration.
+    Issue #1120: a qualified member can volunteer to fill an empty slot even
+    when the club's ``schedule_instructors`` flag is OFF. The flag now only
+    controls pre-scheduling, not whether self-volunteering is permitted.
     """
     _make_config(schedule_instructors=False)
     user = _make_user(django_user_model, instructor=True)
@@ -252,7 +252,196 @@ def test_post_does_not_assign_when_role_scheduling_disabled(client, django_user_
 
     assert response.status_code == 302
     assignment.refresh_from_db()
+    assert assignment.instructor == user
+
+
+@pytest.mark.django_db
+def test_get_shows_confirm_when_flag_off(client, django_user_model):
+    """Issue #1120: qualified member sees the confirm page when flag is off."""
+    _make_config(schedule_tow_pilots=False)
+    user = _make_user(django_user_model, towpilot=True)
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.get(_url(assignment.id, "tow_pilot"))
+
+    assert response.status_code == 200
+    assert b"Volunteer to Fill" in response.content
+
+
+@pytest.mark.django_db
+def test_post_rejects_unqualified_when_flag_off(client, django_user_model):
+    """Issue #1120: unqualified member is still rejected when flag is off."""
+    _make_config(schedule_tow_pilots=False)
+    user = _make_user(django_user_model, towpilot=False)
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "tow_pilot"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.tow_pilot is None
+
+
+@pytest.mark.django_db
+def test_concurrent_claim_flag_off(client, django_user_model):
+    """Issue #1120: concurrent volunteer race guard works with flag off."""
+    _make_config(schedule_instructors=False)
+    first = _make_user(django_user_model, username="first", instructor=True)
+    second = _make_user(django_user_model, username="second", instructor=True)
+    assignment = _future_assignment()
+
+    # First claims the slot
+    client.force_login(first)
+    client.post(_url(assignment.id, "instructor"))
+    assignment.refresh_from_db()
+    assert assignment.instructor == first
+
+    # Second is rejected (slot already filled)
+    client.force_login(second)
+    response = client.post(_url(assignment.id, "instructor"))
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.instructor == first
+
+
+@pytest.mark.django_db
+def test_holes_visible_in_modal_when_flag_off(client, django_user_model):
+    """
+    Issue #1120: scheduled_holes and volunteerable_holes are populated in the
+    day-detail context even when the club's schedule_tow_pilots flag is off.
+    """
+    _make_config(schedule_tow_pilots=False)
+    user = _make_user(django_user_model, towpilot=True)
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert "tow_pilot" in response.context["scheduled_holes"]
+    assert "tow_pilot" in response.context["volunteerable_holes"]
+
+
+# ---------------------------------------------------------------------------
+# Cross-role exclusion (Issue #1120 review)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_post_instructor_rejected_when_user_is_towpilot_flag_off(
+    client, django_user_model
+):
+    """
+    A dual-qualified member already assigned as tow_pilot cannot claim the
+    instructor slot (and vice versa), even with the schedule flags OFF.
+    """
+    _make_config(schedule_instructors=False, schedule_tow_pilots=False)
+    user = _make_user(django_user_model, instructor=True, towpilot=True)
+    assignment = _future_assignment()
+    # User is already the tow pilot.
+    assignment.tow_pilot = user
+    assignment.save(update_fields=["tow_pilot"])
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "instructor"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    # Must NOT be assigned to both roles.
     assert assignment.instructor is None
+    assert assignment.tow_pilot == user
+
+
+@pytest.mark.django_db
+def test_post_towpilot_rejected_when_user_is_instructor_flag_off(
+    client, django_user_model
+):
+    """
+    Inverse direction: a dual-qualified member already assigned as instructor
+    cannot claim the tow_pilot slot, even with the schedule flags OFF.
+    """
+    _make_config(schedule_instructors=False, schedule_tow_pilots=False)
+    user = _make_user(django_user_model, instructor=True, towpilot=True)
+    assignment = _future_assignment()
+    # User is already the instructor.
+    assignment.instructor = user
+    assignment.save(update_fields=["instructor"])
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "tow_pilot"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.tow_pilot is None
+    assert assignment.instructor == user
+
+
+@pytest.mark.django_db
+def test_modal_hides_conflicting_instructor_hole_flag_off(client, django_user_model):
+    """
+    A dual-qualified member already assigned as tow_pilot should NOT see the
+    instructor hole in volunteerable_holes (it is hidden to avoid a conflict).
+    """
+    _make_config(schedule_instructors=False, schedule_tow_pilots=False)
+    user = _make_user(django_user_model, instructor=True, towpilot=True)
+    assignment = _future_assignment()
+    assignment.tow_pilot = user
+    assignment.save(update_fields=["tow_pilot"])
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    # The instructor hole is still an unfilled slot...
+    assert "instructor" in response.context["scheduled_holes"]
+    # ...but the volunteer action is hidden for the conflicting role.
+    assert "instructor" not in response.context["volunteerable_holes"]
+
+
+@pytest.mark.django_db
+def test_modal_hides_conflicting_towpilot_hole_flag_off(client, django_user_model):
+    """
+    Inverse direction: a member already assigned as instructor should NOT see
+    the tow_pilot hole in volunteerable_holes.
+    """
+    _make_config(schedule_instructors=False, schedule_tow_pilots=False)
+    user = _make_user(django_user_model, instructor=True, towpilot=True)
+    assignment = _future_assignment()
+    assignment.instructor = user
+    assignment.save(update_fields=["instructor"])
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert "tow_pilot" in response.context["scheduled_holes"]
+    assert "tow_pilot" not in response.context["volunteerable_holes"]
 
 
 # ---------------------------------------------------------------------------
