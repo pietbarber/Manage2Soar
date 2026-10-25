@@ -449,7 +449,7 @@ class FlightForm(forms.ModelForm):
             current_member_id = getattr(self.instance, f"{field_name}_id", None)
             if not current_member_id:
                 current_member_id = self.initial.get(field_name)
-                if hasattr(current_member_id, "pk"):
+                if current_member_id is not None and hasattr(current_member_id, "pk"):
                     current_member_id = current_member_id.pk
 
             if passenger:
