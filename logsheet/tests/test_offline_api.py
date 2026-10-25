@@ -503,3 +503,379 @@ class TestSyncStatusEndpoint:
         assert "serverTime" in data
         assert "user" in data
         assert data["user"]["id"] == active_member.id
+
+
+# ============================================================
+# Regression tests for PR #1118 threads 2 & 3
+# ============================================================
+
+
+class TestReferenceDataRoleEligibility:
+    """Thread 3: offline reference data must include role-eligibility flags."""
+
+    def test_member_flags_present(self, db, authenticated_client, active_member):
+        """Each member dict should expose isPilotEligible / isPassengerEligible."""
+        url = reverse("logsheet:api_offline_reference_data")
+        response = authenticated_client.get(url)
+        data = response.json()
+        member = next(m for m in data["members"] if m["id"] == active_member.id)
+        assert "isPilotEligible" in member
+        assert "isPassengerEligible" in member
+        assert "isInstructor" in member
+        assert "isTowpilot" in member
+
+    def test_full_member_is_pilot_and_passenger_eligible(
+        self, db, authenticated_client, active_member
+    ):
+        """'Full Member' (can_be_pilot=True) should be eligible for both roles."""
+        url = reverse("logsheet:api_offline_reference_data")
+        response = authenticated_client.get(url)
+        data = response.json()
+        member = next(m for m in data["members"] if m["id"] == active_member.id)
+        assert member["isPilotEligible"] is True
+        assert member["isPassengerEligible"] is True
+
+    def test_ineligible_pilot_status_flagged_false(self, db, authenticated_client):
+        """A status with can_be_pilot=False must be flagged isPilotEligible=False."""
+        from django.contrib.auth import get_user_model
+
+        from siteconfig.models import MembershipStatus
+
+        User = get_user_model()
+        MembershipStatus.objects.get_or_create(
+            name="Full Member",
+            defaults={
+                "is_active": True,
+                "can_be_pilot": True,
+                "can_be_passenger": True,
+                "sort_order": 1,
+            },
+        )
+        family, _ = MembershipStatus.objects.get_or_create(
+            name="Family Member",
+            defaults={
+                "is_active": True,
+                "can_be_pilot": False,
+                "can_be_passenger": True,
+                "sort_order": 50,
+            },
+        )
+        family.can_be_pilot = False
+        family.can_be_passenger = True
+        family.save(update_fields=["can_be_pilot", "can_be_passenger"])
+        family_member = User.objects.create_user(
+            username="family-x",
+            first_name="Family",
+            last_name="Member",
+            membership_status=family.name,
+        )
+        url = reverse("logsheet:api_offline_reference_data")
+        response = authenticated_client.get(url)
+        data = response.json()
+        m = next(m for m in data["members"] if m["id"] == family_member.id)
+        assert m["isPilotEligible"] is False
+        assert m["isPassengerEligible"] is True
+
+
+class TestFlightsSyncEligibility:
+    """Thread 2: the offline sync endpoint must enforce eligibility."""
+
+    @pytest.fixture
+    def site_config(self, db):
+        from siteconfig.models import SiteConfiguration
+
+        return SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.example.com",
+            club_abbreviation="TC",
+            visiting_pilot_enabled=False,
+            visiting_pilot_status="Affiliate Member",
+        )
+
+    @pytest.fixture
+    def ineligible_pilot(self, site_config, db):
+        """A member whose status has can_be_pilot=False."""
+        from django.contrib.auth import get_user_model
+
+        from siteconfig.models import MembershipStatus
+
+        User = get_user_model()
+        MembershipStatus.objects.get_or_create(
+            name="Full Member",
+            defaults={
+                "is_active": True,
+                "can_be_pilot": True,
+                "can_be_passenger": True,
+                "sort_order": 1,
+            },
+        )
+        ground, _ = MembershipStatus.objects.get_or_create(
+            name="Grounded",
+            defaults={
+                "is_active": True,
+                "can_be_pilot": False,
+                "can_be_passenger": False,
+                "sort_order": 90,
+            },
+        )
+        ground.can_be_pilot = False
+        ground.can_be_passenger = False
+        ground.save(update_fields=["can_be_pilot", "can_be_passenger"])
+        return User.objects.create_user(
+            username="grounded-pilot",
+            first_name="Grounded",
+            last_name="Pilot",
+            membership_status=ground.name,
+        )
+
+    @pytest.fixture
+    def deceased_member(self, site_config, db):
+        """A Deceased member (always blocked)."""
+        from django.contrib.auth import get_user_model
+
+        from siteconfig.models import MembershipStatus
+
+        User = get_user_model()
+        deceased, _ = MembershipStatus.objects.get_or_create(
+            name="Deceased",
+            defaults={
+                "is_active": False,
+                "can_be_pilot": False,
+                "can_be_passenger": False,
+                "sort_order": 99,
+            },
+        )
+        deceased.can_be_pilot = False
+        deceased.can_be_passenger = False
+        deceased.save(update_fields=["can_be_pilot", "can_be_passenger"])
+        return User.objects.create_user(
+            username="deceased-pilot",
+            first_name="Deceased",
+            last_name="Pilot",
+            membership_status=deceased.name,
+        )
+
+    @pytest.fixture
+    def unqualified_towpilot(self, site_config, db):
+        """A 'Full Member' without the towpilot=True flag."""
+        from django.contrib.auth import get_user_model
+
+        return get_user_model().objects.create_user(
+            username="not-a-towpilot",
+            first_name="NotTow",
+            last_name="Pilot",
+            membership_status="Full Member",
+            towpilot=False,
+        )
+
+    def test_create_rejects_ineligible_pilot(
+        self, authenticated_client, logsheet, glider, ineligible_pilot
+    ):
+        """Assigning a can_be_pilot=False member as pilot must be rejected."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "elig-create-inelig-pilot",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": ineligible_pilot.id,
+                        "glider_id": glider.id,
+                        "flight_type": "solo",
+                    },
+                }
+            ]
+        }
+        response = authenticated_client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        data = response.json()
+        assert data["results"][0]["status"] == "error"
+        assert "not eligible to be a pilot" in data["results"][0]["error"]
+        # No flight should be created.
+        assert Flight.objects.filter(logsheet=logsheet).count() == 0
+
+    def test_create_rejects_deceased_pilot(
+        self, authenticated_client, logsheet, glider, deceased_member
+    ):
+        """Deceased members are always blocked as pilot."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "elig-create-deceased",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": deceased_member.id,
+                        "glider_id": glider.id,
+                        "flight_type": "solo",
+                    },
+                }
+            ]
+        }
+        response = authenticated_client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        data = response.json()
+        assert data["results"][0]["status"] == "error"
+        assert "deceased" in data["results"][0]["error"].lower()
+
+    def test_create_rejects_unqualified_tow_pilot(
+        self,
+        authenticated_client,
+        logsheet,
+        glider,
+        active_member,
+        unqualified_towpilot,
+    ):
+        """A member without towpilot=True must not be assignable as tow_pilot."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "elig-create-towpilot",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": active_member.id,
+                        "glider_id": glider.id,
+                        "tow_pilot_id": unqualified_towpilot.id,
+                        "flight_type": "solo",
+                    },
+                }
+            ]
+        }
+        response = authenticated_client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        data = response.json()
+        assert data["results"][0]["status"] == "error"
+        assert "not qualified as a tow pilot" in data["results"][0]["error"]
+
+    def test_update_rejects_change_to_ineligible_pilot(
+        self,
+        authenticated_client,
+        logsheet,
+        glider,
+        active_member,
+        ineligible_pilot,
+    ):
+        """Updating a flight to assign an ineligible pilot must be rejected."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        # Create a valid flight first.
+        create_payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "elig-update-setup",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": active_member.id,
+                        "glider_id": glider.id,
+                        "flight_type": "solo",
+                    },
+                }
+            ]
+        }
+        resp = authenticated_client.post(
+            url, data=json.dumps(create_payload), content_type="application/json"
+        )
+        flight_id = resp.json()["results"][0]["serverId"]
+
+        # Now attempt to change the pilot to an ineligible member.
+        update_payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "elig-update-inelig",
+                    "action": "update",
+                    "data": {
+                        "id": flight_id,
+                        "pilot_id": ineligible_pilot.id,
+                    },
+                }
+            ]
+        }
+        resp = authenticated_client.post(
+            url, data=json.dumps(update_payload), content_type="application/json"
+        )
+        data = resp.json()
+        assert data["results"][0]["status"] == "error"
+        assert "not eligible to be a pilot" in data["results"][0]["error"]
+        # Flight's pilot must still be the original eligible member.
+        flight = Flight.objects.get(id=flight_id)
+        assert flight.pilot_id == active_member.id
+
+    def test_update_preserves_unchanged_ineligible_assignment_exception(
+        self,
+        authenticated_client,
+        logsheet,
+        glider,
+        inactive_pilot,
+    ):
+        """An unchanged non-deceased assignment is allowed even if currently
+        ineligible, per the existing-assignment exception."""
+
+        # First create the flight with the inactive member as pilot by bypassing
+        # eligibility (e.g. legacy import path). This simulates a flight that
+        # already exists in the database with an inactive pilot.
+        from logsheet.models import Flight
+
+        flight = Flight.objects.create(
+            logsheet=logsheet,
+            pilot=inactive_pilot,
+            glider=glider,
+            flight_type="solo",
+        )
+
+        # Now update the flight but keep the same pilot (unchanged).
+        url = reverse("logsheet:api_offline_flights_sync")
+        update_payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "elig-update-unchanged",
+                    "action": "update",
+                    "data": {
+                        "id": flight.id,
+                        "pilot_id": inactive_pilot.id,
+                        "notes": "touched",
+                    },
+                }
+            ]
+        }
+        resp = authenticated_client.post(
+            url, data=json.dumps(update_payload), content_type="application/json"
+        )
+        data = resp.json()
+        assert data["results"][0]["status"] == "success", data
+        flight.refresh_from_db()
+        assert flight.pilot_id == inactive_pilot.id
+        assert flight.notes == "touched"
+
+    @pytest.fixture
+    def inactive_pilot(self, site_config, db):
+        """A member whose status is not in the active list (inactive)."""
+        from django.contrib.auth import get_user_model
+
+        from siteconfig.models import MembershipStatus
+
+        User = get_user_model()
+        inactive, _ = MembershipStatus.objects.get_or_create(
+            name="Inactive",
+            defaults={
+                "is_active": False,
+                "can_be_pilot": False,
+                "can_be_passenger": False,
+                "sort_order": 10,
+            },
+        )
+        inactive.can_be_pilot = False
+        inactive.can_be_passenger = False
+        inactive.save(update_fields=["can_be_pilot", "can_be_passenger"])
+        return User.objects.create_user(
+            username="inactive-pilot",
+            first_name="Inactive",
+            last_name="Pilot",
+            membership_status=inactive.name,
+        )

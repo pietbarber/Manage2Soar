@@ -458,8 +458,6 @@ class FlightForm(forms.ModelForm):
             elif field_name == "pilot":
                 selectable_statuses = pilot_eligible_statuses
                 selectable_filter = Q(membership_status__in=selectable_statuses)
-                if not visiting_enabled:
-                    selectable_filter &= ~Q(membership_status=visiting_status)
             else:
                 selectable_statuses = set(active_statuses) | {
                     visiting_status,
@@ -468,6 +466,14 @@ class FlightForm(forms.ModelForm):
                 selectable_filter = Q(membership_status__in=selectable_statuses)
                 if field_name == "instructor":
                     selectable_filter |= Q(membership_status="Instructor")
+
+            # Apply the disabled-visiting exclusion to every participant field
+            # BEFORE adding the existing-assignment exception, so a display
+            # preference (visiting pilots off) cannot be bypassed by roster /
+            # flight / instruction membership to make a disabled-visiting
+            # member eligible in any role.
+            if not visiting_enabled:
+                selectable_filter &= ~Q(membership_status=visiting_status)
 
             if current_member_id:
                 selectable_filter |= Q(pk=current_member_id)
@@ -511,6 +517,35 @@ class FlightForm(forms.ModelForm):
                 if visiting_enabled
                 else []
             )
+            # When visiting pilots are disabled, the base filter excludes the
+            # visiting status for every role. If the current assignment IS a
+            # visiting member, retain it in the visiting group so the existing
+            # selection stays editable and the validation queryset keeps it
+            # (otherwise an unchanged value is rejected and unrelated flight
+            # edits are blocked).
+            if (
+                not visiting_enabled
+                and current_member_id
+                and current_member_id not in {m.pk for m in visiting_members}
+            ):
+                current_visiting = (
+                    Member.objects.filter(
+                        pk=current_member_id, membership_status=visiting_status
+                    )
+                    .only(
+                        "pk",
+                        "first_name",
+                        "last_name",
+                        "nickname",
+                        "middle_initial",
+                        "name_suffix",
+                        "membership_status",
+                        "home_club",
+                    )
+                    .first()
+                )
+                if current_visiting:
+                    visiting_members.append(current_visiting)
             inactive_members = list(
                 ordered(
                     remaining.exclude(membership_status__in=active_statuses).exclude(

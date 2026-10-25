@@ -384,3 +384,176 @@ def test_deceased_status_never_appears_in_flight_member_choices(
         )
         with pytest.raises(ValidationError):
             form.fields[field_name].clean(deceased_member.pk)
+
+
+# ============================================================
+# Regression tests for PR #1118 threads 1 & 4
+# ============================================================
+
+
+@pytest.mark.django_db
+def test_visiting_disabled_blocks_eligible_visiting_participants_in_every_role(
+    active_member, logsheet, glider
+):
+    """Thread 1: when visiting pilots are disabled, an eligible visiting
+    instructor / tow pilot / passenger must NOT be selectable or submittable
+    via any participant field, even when they appear in Today's Roster via
+    a reservation or a confirmed instruction slot."""
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    MembershipStatus.objects.get_or_create(
+        name="Inactive", defaults={"is_active": False, "sort_order": 2}
+    )
+    visiting_status, _ = MembershipStatus.objects.get_or_create(
+        name="Affiliate Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 5,
+        },
+    )
+    visiting_status.can_be_pilot = True
+    visiting_status.can_be_passenger = True
+    visiting_status.save(update_fields=["can_be_pilot", "can_be_passenger"])
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        visiting_pilot_enabled=False,
+        visiting_pilot_status="Affiliate Member",
+        show_today_roster_group=True,
+    )
+    visiting_instructor = User.objects.create_user(
+        username="visiting-instructor",
+        first_name="Visiting",
+        last_name="Instructor",
+        membership_status="Affiliate Member",
+        instructor=True,
+    )
+    visiting_towpilot = User.objects.create_user(
+        username="visiting-towpilot",
+        first_name="Visiting",
+        last_name="TowPilot",
+        membership_status="Affiliate Member",
+        towpilot=True,
+    )
+    visiting_passenger = User.objects.create_user(
+        username="visiting-passenger",
+        first_name="Visiting",
+        last_name="Passenger",
+        membership_status="Affiliate Member",
+    )
+    # Put each of them on Today's Roster (via saved flights) so the
+    # roster-based exception would otherwise admit them.
+    Flight.objects.create(logsheet=logsheet, pilot=visiting_instructor, glider=glider)
+    Flight.objects.create(logsheet=logsheet, pilot=visiting_towpilot, glider=glider)
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        passenger=visiting_passenger,
+        glider=glider,
+    )
+
+    form = FlightForm(logsheet=logsheet)
+    # With visiting disabled, a newly-selected visiting member must NOT
+    # appear in the Today's Roster group (the display preference must not
+    # change eligibility).  Each of the three visiting members is on the
+    # roster via the saved flights above, so without the fix they would
+    # leak into the roster group.
+    for field_name in ("pilot", "instructor", "tow_pilot", "passenger"):
+        roster_group = _choice_groups(form.fields[field_name]).get("Today’s Roster", {})
+        assert (
+            visiting_instructor.pk not in roster_group
+        ), f"{field_name}: visiting instructor should not be in roster group"
+        assert (
+            visiting_towpilot.pk not in roster_group
+        ), f"{field_name}: visiting tow pilot should not be in roster group"
+        assert (
+            visiting_passenger.pk not in roster_group
+        ), f"{field_name}: visiting passenger should not be in roster group"
+
+    # Newly-selected visiting members must not be submittable in their
+    # natural roles either (the disabled-visiting filter applies to every
+    # participant field, not just pilot).
+    for field_name, member in (
+        ("instructor", visiting_instructor),
+        ("tow_pilot", visiting_towpilot),
+        ("passenger", visiting_passenger),
+    ):
+        assert member.pk not in form.fields[field_name].queryset.values_list(
+            "pk", flat=True
+        ), f"{field_name}: visiting member should not be selectable"
+        with pytest.raises(ValidationError):
+            form.fields[field_name].clean(member.pk)
+
+
+@pytest.mark.django_db
+def test_existing_visiting_assignment_retained_when_visiting_and_roster_disabled(
+    active_member, logsheet, glider
+):
+    """Thread 4: with visiting pilots AND Today's Roster grouping both
+    disabled, an existing visiting assignment must remain in the visiting
+    group so the unchanged value stays editable and the validation queryset
+    does not reject it (which would block unrelated flight edits)."""
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    visiting_status, _ = MembershipStatus.objects.get_or_create(
+        name="Affiliate Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 5,
+        },
+    )
+    visiting_status.can_be_pilot = True
+    visiting_status.can_be_passenger = True
+    visiting_status.save(update_fields=["can_be_pilot", "can_be_passenger"])
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        visiting_pilot_enabled=False,
+        visiting_pilot_status="Affiliate Member",
+        show_today_roster_group=False,
+    )
+    visiting_pilot = User.objects.create_user(
+        username="existing-visiting-pilot",
+        first_name="Existing",
+        last_name="Visiting",
+        membership_status="Affiliate Member",
+    )
+    # An existing flight with the visiting member as pilot.
+    existing_flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=visiting_pilot,
+        glider=glider,
+    )
+
+    form = FlightForm(instance=existing_flight, logsheet=logsheet)
+    # The current visiting pilot must be present in the visiting group ...
+    visiting_group = _choice_groups(form.fields["pilot"]).get("Visiting Pilots", {})
+    assert visiting_pilot.pk in visiting_group
+    # ... and in the validation queryset so the unchanged value is accepted.
+    assert visiting_pilot.pk in form.fields["pilot"].queryset.values_list(
+        "pk", flat=True
+    )
+    # An unrelated field can still be edited without rejecting the pilot.
+    form.fields["pilot"].clean(visiting_pilot.pk)
