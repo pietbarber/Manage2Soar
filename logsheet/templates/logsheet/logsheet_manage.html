@@ -1428,7 +1428,15 @@ document.addEventListener("click", async function(e) {
             displayName: member.display_name,
             nickname: member.nickname,
             lastName: member.name.split(' ').pop(), // For sorting
-            isActive: true
+            isActive: true,
+            // Role-eligibility flags computed server-side (logsheet/api.py::
+            // reference_data) and consumed by the offline form selectors in
+            // static/js/offline/offline-form-bundle.js. Omitting these here
+            // would silently revert the offline dropdowns to "all members".
+            isPilotEligible: !!member.isPilotEligible,
+            isPassengerEligible: !!member.isPassengerEligible,
+            isInstructor: !!member.isInstructor,
+            isTowpilot: !!member.isTowpilot
           });
         }
 

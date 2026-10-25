@@ -141,9 +141,27 @@
         const commercialRidesEnabled = options.commercialRidesEnabled !== false;
 
         // Separate members by role hints (if available)
-        const allMembers = members;
+        // The `isPilotEligible` / `isPassengerEligible` / `isInstructor` /
+        // `isTowpilot` flags come from the server-side eligibility context and
+        // already encode visiting-pilot and allowed-status restrictions, so
+        // the offline selectors must mirror the same validation rules as the
+        // online sync endpoint.
+        const pilots = members.filter(m => m.isPilotEligible);
+        const passengers = members.filter(m => m.isPassengerEligible);
         const instructors = members.filter(m => m.isInstructor);
         const towPilots = members.filter(m => m.isTowpilot);
+
+        // When editing a saved flight, retain the currently assigned member in
+        // the relevant selector even if the server now marks them ineligible
+        // (e.g. the member was deactivated after the flight was saved). This
+        // matches the existing-assignment exception enforced by FlightForm.
+        const withPrefill = (list, prefillId) => {
+            if (prefillId == null) return list;
+            const exists = list.some(m => String(m.id) === String(prefillId));
+            if (exists) return list;
+            const current = members.find(m => String(m.id) === String(prefillId));
+            return current ? [...list, current] : list;
+        };
 
         // Separate gliders by type
         const clubGliders = gliders.filter(g => g.clubOwned === true);
@@ -214,7 +232,7 @@
                                 </label>
                                 <select name="pilot" id="id_pilot" class="form-select">
                                     <option value="">--------</option>
-                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.pilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
+                                    ${withPrefill(pilots, prefillData?.pilot).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.pilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -225,7 +243,7 @@
                                 </label>
                                 <select name="instructor" id="id_instructor" class="form-select">
                                     <option value="">--------</option>
-                                    ${(instructors.length > 0 ? instructors : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.instructor)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
+                                    ${withPrefill(instructors, prefillData?.instructor).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.instructor)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -236,7 +254,7 @@
                                 </label>
                                 <select name="passenger" id="id_passenger" class="form-select">
                                     <option value="">--------</option>
-                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.passenger)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
+                                    ${withPrefill(passengers, prefillData?.passenger).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.passenger)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -283,7 +301,7 @@
                                 </label>
                                 <select name="tow_pilot" id="id_tow_pilot" class="form-select">
                                     <option value="">--------</option>
-                                    ${(towPilots.length > 0 ? towPilots : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.towPilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
+                                    ${withPrefill(towPilots, prefillData?.towPilot).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.towPilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
