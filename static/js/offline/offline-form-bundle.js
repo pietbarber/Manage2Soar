@@ -102,8 +102,12 @@
      * @returns {number}
      */
     function compareMembersByOrdering(a, b, nameOrdering) {
-        const firstA = a.firstName || a.lastName || '';
-        const firstB = b.firstName || b.lastName || '';
+        // Use the ACTUAL name fields, falling back only to an empty string.
+        // Do NOT substitute the surname for an empty given name (or vice
+        // versa): that would change the sort key and the tie-breaker relative
+        // to the online form, which orders by (first_name, last_name).
+        const firstA = a.firstName || '';
+        const firstB = b.firstName || '';
         const lastA = a.lastName || '';
         const lastB = b.lastName || '';
         const primaryA = nameOrdering === 'first_name' ? firstA : lastA;

@@ -1,8 +1,32 @@
 import pytest
 
 from duty_roster.models import DutyRoleDefinition
-from siteconfig.models import SiteConfiguration
-from siteconfig.utils import get_role_title
+from siteconfig.models import MemberNameOrdering, SiteConfiguration
+from siteconfig.utils import get_member_name_ordering, get_role_title
+
+
+@pytest.mark.django_db
+def test_get_member_name_ordering_defaults_to_last_name_without_config():
+    """With no SiteConfiguration, the fallback must match the model/migration
+    default (last-name ordering) — not first-name — so CreateLogsheetForm and
+    LogsheetDutyCrewForm keep their existing behavior when configuration is
+    absent."""
+    assert SiteConfiguration.objects.count() == 0
+    assert get_member_name_ordering() == ("last_name", "first_name")
+    assert get_member_name_ordering(None) == ("last_name", "first_name")
+
+
+@pytest.mark.django_db
+def test_get_member_name_ordering_honors_configured_first_name():
+    """An explicit first-name preference is honored with last-name tie-breaker."""
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        member_name_ordering=MemberNameOrdering.FIRST_NAME,
+    )
+    config = SiteConfiguration.objects.first()
+    assert get_member_name_ordering(config) == ("first_name", "last_name")
 
 
 @pytest.mark.django_db

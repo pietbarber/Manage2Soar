@@ -1446,8 +1446,12 @@ document.addEventListener("click", async function(e) {
             // Keep the individual name fields so the offline selectors can
             // honor the club's name-ordering preference (with the other name
             // field as the tie-breaker) instead of a hardcoded last-name sort.
+            // Cache the ACTUAL surname (including empty) — do NOT fall back to
+            // the last word of `name`, which would invent a surname and change
+            // the member's offline primary ordering and tie-breaker position
+            // relative to the online form.
             firstName: member.first_name || '',
-            lastName: member.last_name || member.name.split(' ').pop(),
+            lastName: member.last_name || ''
             isActive: true,
             // Role-eligibility flags computed server-side (logsheet/api.py::
             // reference_data) and consumed by the offline form selectors in

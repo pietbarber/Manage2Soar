@@ -12,7 +12,7 @@ def get_member_name_ordering(site_config=None):
     primary = (
         site_config.member_name_ordering
         if site_config and hasattr(site_config, "member_name_ordering")
-        else MemberNameOrdering.FIRST_NAME
+        else MemberNameOrdering.LAST_NAME
     )
     if primary == MemberNameOrdering.LAST_NAME:
         return ("last_name", "first_name")
