@@ -168,3 +168,46 @@ def validate_flight_assignments(
         if error:
             errors[field_name] = error
     return errors
+
+
+def validate_participant_combination(
+    pilot=None, instructor=None, tow_pilot=None, passenger=None
+) -> dict:
+    """
+    Validate that no member holds two mutually-exclusive roles on the same
+    flight.
+
+    Mirrors ``FlightForm.clean()`` role-conflict checks so the offline sync
+    API (which has no form) enforces the same rules as the web form:
+      * pilot == instructor
+      * pilot == passenger
+      * instructor == passenger
+      * pilot == tow_pilot
+
+    Args:
+        pilot, instructor, tow_pilot, passenger: Member instances or None.
+
+    Returns:
+        dict mapping ``"<role_a>_vs_<role_b>"`` -> error message for each
+        conflict found.  Empty dict means the combination is valid.
+    """
+    errors = {}
+
+    if pilot and instructor and pilot.pk == instructor.pk:
+        errors["pilot_vs_instructor"] = (
+            f"{pilot} cannot be both pilot and instructor on the same flight."
+        )
+    if pilot and passenger and pilot.pk == passenger.pk:
+        errors["pilot_vs_passenger"] = (
+            f"{pilot} cannot be both pilot and passenger on the same flight."
+        )
+    if instructor and passenger and instructor.pk == passenger.pk:
+        errors["instructor_vs_passenger"] = (
+            f"{instructor} cannot be both instructor and passenger on the same flight."
+        )
+    if pilot and tow_pilot and pilot.pk == tow_pilot.pk:
+        errors["pilot_vs_tow_pilot"] = (
+            f"{pilot} cannot be both pilot and tow pilot on the same flight."
+        )
+
+    return errors

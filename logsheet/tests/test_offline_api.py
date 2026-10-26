@@ -1007,7 +1007,17 @@ class TestFlightsSyncEligibility:
         self, authenticated_client, logsheet, glider, active_member
     ):
         """An unchanged non-deceased passenger keeps the exception, so an
-        unrelated edit still succeeds."""
+        unrelated edit still succeeds.  The passenger is a *distinct* member
+        from the pilot (pilot == passenger is now rejected by the
+        participant-combination rule)."""
+        from django.contrib.auth import get_user_model
+
+        passenger = get_user_model().objects.create_user(
+            username="upd-pax-exception",
+            first_name="Upd",
+            last_name="Pax",
+            membership_status="Full Member",
+        )
         url = reverse("logsheet:api_offline_flights_sync")
         create_payload = {
             "flights": [
@@ -1017,7 +1027,7 @@ class TestFlightsSyncEligibility:
                     "data": {
                         "logsheet_id": logsheet.id,
                         "pilot_id": active_member.id,
-                        "passenger_id": active_member.id,
+                        "passenger_id": passenger.id,
                         "glider_id": glider.id,
                         "flight_type": "passenger",
                     },
@@ -1045,7 +1055,7 @@ class TestFlightsSyncEligibility:
         data = resp.json()
         assert data["results"][0]["status"] == "success", data
         flight = Flight.objects.get(id=flight_id)
-        assert flight.passenger_id == active_member.id
+        assert flight.passenger_id == passenger.id
         assert flight.notes == "still here"
 
 
@@ -1251,3 +1261,228 @@ class TestReferenceDataVisitingAndStatusFlags:
         # allowance), proving the two allowed sets are distinct.
         m2 = next(mm for mm in data["members"] if mm["id"] == instr_only.id)
         assert m2["isInstructor"] is True
+
+
+# ============================================================
+# Participant combination validation (passenger == pilot/instructor)
+# ============================================================
+
+
+class TestParticipantCombination:
+    """The offline sync endpoint must reject a member holding two mutually
+    exclusive roles on the same flight, mirroring FlightForm.clean()."""
+
+    @pytest.fixture
+    def site_config(self, db):
+        from siteconfig.models import SiteConfiguration
+
+        return SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.example.com",
+            club_abbreviation="TC",
+            visiting_pilot_enabled=True,
+            visiting_pilot_status="Affiliate Member",
+        )
+
+    @pytest.fixture
+    def second_member(self, site_config, db):
+        from django.contrib.auth import get_user_model
+
+        return get_user_model().objects.create_user(
+            username="second-pilot",
+            first_name="Second",
+            last_name="Pilot",
+            membership_status="Full Member",
+            instructor=True,
+            towpilot=True,
+        )
+
+    def test_create_rejects_pilot_equal_passenger(
+        self, authenticated_client, logsheet, glider, active_member, site_config
+    ):
+        """A member cannot be both pilot and passenger on the same flight."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "combo-create-pilot-pax",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": active_member.id,
+                        "passenger_id": active_member.id,
+                        "glider_id": glider.id,
+                        "flight_type": "solo",
+                    },
+                }
+            ]
+        }
+        response = authenticated_client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        data = response.json()
+        assert data["results"][0]["status"] == "error"
+        assert "both pilot and passenger" in data["results"][0]["error"]
+        assert Flight.objects.filter(logsheet=logsheet).count() == 0
+
+    def test_create_rejects_pilot_equal_instructor(
+        self, authenticated_client, logsheet, glider, second_member, site_config
+    ):
+        """A member cannot be both pilot and instructor on the same flight.
+
+        ``second_member`` has ``instructor=True`` so it passes the instructor
+        eligibility check; the rejection must then come from the combination
+        rule (not from instructor qualification)."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "combo-create-pilot-instr",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": second_member.id,
+                        "instructor_id": second_member.id,
+                        "glider_id": glider.id,
+                        "flight_type": "solo",
+                    },
+                }
+            ]
+        }
+        response = authenticated_client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        data = response.json()
+        assert data["results"][0]["status"] == "error"
+        assert "both pilot and instructor" in data["results"][0]["error"]
+        assert Flight.objects.filter(logsheet=logsheet).count() == 0
+
+    def test_update_rejects_passenger_equal_pilot(
+        self, authenticated_client, logsheet, glider, active_member, second_member
+    ):
+        """Updating a valid flight so passenger_id == pilot_id must be
+        rejected (the comment's exact scenario)."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        # Create a valid two-seat flight: pilot=active, passenger=second.
+        create_payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "combo-update-setup",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": active_member.id,
+                        "passenger_id": second_member.id,
+                        "glider_id": glider.id,
+                        "flight_type": "towed",
+                    },
+                }
+            ]
+        }
+        resp = authenticated_client.post(
+            url, data=json.dumps(create_payload), content_type="application/json"
+        )
+        flight_id = resp.json()["results"][0]["serverId"]
+
+        # Now set the passenger to be the same member as the pilot.
+        update_payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "combo-update-pax-eq-pilot",
+                    "action": "update",
+                    "data": {
+                        "id": flight_id,
+                        "passenger_id": active_member.id,
+                    },
+                }
+            ]
+        }
+        resp = authenticated_client.post(
+            url, data=json.dumps(update_payload), content_type="application/json"
+        )
+        data = resp.json()
+        assert data["results"][0]["status"] == "error"
+        assert "both pilot and passenger" in data["results"][0]["error"]
+        # The flight's passenger must still be the original distinct member.
+        flight = Flight.objects.get(id=flight_id)
+        assert flight.passenger_id == second_member.id
+        assert flight.pilot_id == active_member.id
+
+    def test_update_rejects_passenger_equal_instructor(
+        self, authenticated_client, logsheet, glider, active_member, second_member
+    ):
+        """Updating a flight so passenger_id == instructor_id must be
+        rejected."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        # Create a valid flight: pilot=active, instructor=second.
+        create_payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "combo-update-instr-setup",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": active_member.id,
+                        "instructor_id": second_member.id,
+                        "glider_id": glider.id,
+                        "flight_type": "towed",
+                    },
+                }
+            ]
+        }
+        resp = authenticated_client.post(
+            url, data=json.dumps(create_payload), content_type="application/json"
+        )
+        flight_id = resp.json()["results"][0]["serverId"]
+
+        # Now set the passenger to be the same member as the instructor.
+        update_payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "combo-update-pax-eq-instr",
+                    "action": "update",
+                    "data": {
+                        "id": flight_id,
+                        "passenger_id": second_member.id,
+                    },
+                }
+            ]
+        }
+        resp = authenticated_client.post(
+            url, data=json.dumps(update_payload), content_type="application/json"
+        )
+        data = resp.json()
+        assert data["results"][0]["status"] == "error"
+        assert "both instructor and passenger" in data["results"][0]["error"]
+        flight = Flight.objects.get(id=flight_id)
+        assert flight.passenger_id is None
+
+    def test_create_allows_distinct_pilot_and_passenger(
+        self, authenticated_client, logsheet, glider, active_member, second_member
+    ):
+        """A flight with distinct pilot and passenger must still be accepted."""
+        url = reverse("logsheet:api_offline_flights_sync")
+        payload = {
+            "flights": [
+                {
+                    "idempotencyKey": "combo-create-valid",
+                    "action": "create",
+                    "data": {
+                        "logsheet_id": logsheet.id,
+                        "pilot_id": active_member.id,
+                        "passenger_id": second_member.id,
+                        "glider_id": glider.id,
+                        "flight_type": "towed",
+                    },
+                }
+            ]
+        }
+        response = authenticated_client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        data = response.json()
+        assert data["results"][0]["status"] == "success", data
+        assert Flight.objects.filter(logsheet=logsheet).count() == 1
+        flight = Flight.objects.get(logsheet=logsheet)
+        assert flight.pilot_id == active_member.id
+        assert flight.passenger_id == second_member.id

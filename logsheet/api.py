@@ -20,7 +20,7 @@ from django.views.decorators.http import require_GET, require_POST
 from members.decorators import active_member_required
 from members.models import Member
 
-from .eligibility import validate_flight_assignments
+from .eligibility import validate_flight_assignments, validate_participant_combination
 from .models import Airfield, Flight, Glider, Logsheet, Towplane
 
 logger = logging.getLogger(__name__)
@@ -484,6 +484,22 @@ def _create_flight_from_offline(flight_data, user):
                     ),
                 }
 
+            # Validate the participant combination (mirrors FlightForm.clean):
+            # no member may hold two mutually-exclusive roles on the same flight.
+            combination_errors = validate_participant_combination(
+                pilot=pilot,
+                instructor=instructor,
+                tow_pilot=tow_pilot,
+                passenger=passenger,
+            )
+            if combination_errors:
+                return {
+                    "success": False,
+                    "error": "; ".join(
+                        msg for msg in sorted(combination_errors.values())
+                    ),
+                }
+
             airfield = None
             if flight_data.get("airfield_id"):
                 try:
@@ -631,6 +647,23 @@ def _update_flight_from_offline(flight_data, user):
                     "error": "; ".join(
                         f"{field}: {msg}"
                         for field, msg in sorted(eligibility_errors.items())
+                    ),
+                }
+
+            # Validate the resulting participant combination (mirrors
+            # FlightForm.clean): no member may hold two mutually-exclusive
+            # roles on the same flight.
+            combination_errors = validate_participant_combination(
+                pilot=flight.pilot,
+                instructor=flight.instructor,
+                tow_pilot=flight.tow_pilot,
+                passenger=flight.passenger,
+            )
+            if combination_errors:
+                return {
+                    "success": False,
+                    "error": "; ".join(
+                        msg for msg in sorted(combination_errors.values())
                     ),
                 }
 
