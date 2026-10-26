@@ -244,12 +244,30 @@
         // the relevant selector even if the server now marks them ineligible
         // (e.g. the member was deactivated after the flight was saved). This
         // matches the existing-assignment exception enforced by FlightForm.
+        //
+        // The eligible `list` is already a filtered, order-preserving view of
+        // the configured name ordering applied by getReferenceData(). The
+        // current member must be spliced back in at the position the
+        // configured ordering assigns them — NOT appended at the end — so the
+        // ordering is preserved even when the retained member is ineligible.
         const withPrefill = (list, prefillId) => {
             if (prefillId == null) return list;
-            const exists = list.some(m => String(m.id) === String(prefillId));
-            if (exists) return list;
             const current = members.find(m => String(m.id) === String(prefillId));
-            return current ? [...list, current] : list;
+            if (!current) return list;
+            if (list.includes(current)) return list;
+            // `list` is a filtered, order-preserving slice of `members`. The
+            // current member's position in the ordered result equals the count
+            // of eligible members that precede it in the master order.
+            const currentIdx = members.indexOf(current);
+            let insertAt = 0;
+            for (let i = 0; i < currentIdx; i++) {
+                if (list.includes(members[i])) insertAt++;
+            }
+            return [
+                ...list.slice(0, insertAt),
+                current,
+                ...list.slice(insertAt),
+            ];
         };
 
         // Separate gliders by type

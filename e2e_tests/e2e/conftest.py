@@ -82,14 +82,27 @@ class DjangoPlaywrightTestCase(StaticLiveServerTestCase):
 
     def create_test_member(self, username="testuser", is_superuser=False, **kwargs):
         """Create a test member for authentication."""
-        # Ensure we have a membership status
+        # Ensure we have a membership status. can_be_pilot / can_be_passenger
+        # must be enabled so test members pass the FlightForm eligibility
+        # filters (pilot, passenger) that the copy-flight browser tests rely
+        # on — the live-server test DB is flushed between tests, so the
+        # fixture must set these explicitly rather than depend on prior state.
         status, _ = MembershipStatus.objects.get_or_create(
             name="Full Member",
             defaults={
                 "is_active": True,
+                "can_be_pilot": True,
+                "can_be_passenger": True,
                 "sort_order": 1,
             },
         )
+        # get_or_create defaults only apply on creation; explicitly ensure the
+        # eligibility flags are set so a pre-existing "Full Member" (recreated
+        # after a DB flush) still allows test members to act as pilot/passenger.
+        if not (status.can_be_pilot and status.can_be_passenger):
+            status.can_be_pilot = True
+            status.can_be_passenger = True
+            status.save(update_fields=["can_be_pilot", "can_be_passenger"])
 
         defaults = {
             "first_name": "Test",
