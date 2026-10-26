@@ -62,18 +62,24 @@ def reference_data(request):
             "towpilot",
         )
 
-        # Pre-compute the disabled-visiting check and the allowed-status set
-        # (active ∪ {visiting, "Inactive"} ∪ {"Instructor"}) shared by every
-        # role flag so the offline cache never advertises assignments the sync
-        # validator would reject.
+        # Pre-compute the disabled-visiting check and the allowed-status sets
+        # mirroring validate_member_for_role / FlightForm.set_member_groups so
+        # the offline cache never advertises assignments the sync validator
+        # would reject.
+        #
+        # The "Instructor" status is a special allowance granted ONLY for the
+        # instructor field.  A tow pilot whose status is the (possibly
+        # inactive) "Instructor" status is NOT eligible for the tow-pilot
+        # role, so the tow-pilot allowed set must not include it.
         visiting_disabled_excluded = not eligibility_ctx["visiting_enabled"] and bool(
             eligibility_ctx["visiting_status"]
         )
-        allowed_role_statuses = set(eligibility_ctx["active_statuses"]) | {
+        base_role_statuses = set(eligibility_ctx["active_statuses"]) | {
             eligibility_ctx["visiting_status"],
             "Inactive",
-            "Instructor",
         }
+        instructor_role_statuses = base_role_statuses | {"Instructor"}
+        towpilot_role_statuses = base_role_statuses
 
         member_list = []
         for m in members:
@@ -102,18 +108,21 @@ def reference_data(request):
             )
 
             # Instructor: role flag (instructor=True OR status "Instructor"),
-            # status within allowed set, and not excluded by the visiting filter.
+            # status within the instructor allowed set (which includes the
+            # special "Instructor" allowance), and not excluded by the visiting
+            # filter.
             is_instructor = (
                 (bool(m["instructor"]) or status == "Instructor")
-                and status in allowed_role_statuses
+                and status in instructor_role_statuses
                 and not visiting_excluded
             )
 
-            # Tow pilot: role flag (towpilot=True), status within allowed set,
-            # and not excluded by the visiting filter.
+            # Tow pilot: role flag (towpilot=True), status within the tow-pilot
+            # allowed set (which does NOT include the "Instructor" allowance,
+            # matching the validator), and not excluded by the visiting filter.
             is_towpilot = (
                 bool(m["towpilot"])
-                and status in allowed_role_statuses
+                and status in towpilot_role_statuses
                 and not visiting_excluded
             )
 

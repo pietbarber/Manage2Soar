@@ -1192,3 +1192,62 @@ class TestReferenceDataVisitingAndStatusFlags:
         assert m["isTowpilot"] is True
         assert m["isPilotEligible"] is True
         assert m["isPassengerEligible"] is True
+
+    def test_instructor_status_not_offered_as_towpilot(self, db, authenticated_client):
+        """The special 'Instructor' status allowance applies only to the
+        instructor flag. A member with an inactive 'Instructor' status and
+        towpilot=True must NOT be advertised as tow-pilot eligible (the sync
+        validator rejects it), even though the same status grants the
+        instructor flag."""
+        from django.contrib.auth import get_user_model
+
+        from siteconfig.models import MembershipStatus, SiteConfiguration
+
+        User = get_user_model()
+        MembershipStatus.objects.get_or_create(
+            name="Full Member",
+            defaults={
+                "is_active": True,
+                "can_be_pilot": True,
+                "can_be_passenger": True,
+                "sort_order": 1,
+            },
+        )
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.example.com",
+            club_abbreviation="TC",
+            visiting_pilot_enabled=True,
+            visiting_pilot_status="Affiliate Member",
+        )
+        # An INACTIVE status named exactly "Instructor" (the special allowance
+        # status) that is not otherwise active/visiting/"Inactive".
+        instr_status, _ = MembershipStatus.objects.get_or_create(
+            name="Instructor", defaults={"is_active": False, "sort_order": 30}
+        )
+        instr_status.is_active = False
+        instr_status.save(update_fields=["is_active"])
+        instr_tp = User.objects.create_user(
+            username="instr-status-tp",
+            first_name="InstrStatus",
+            last_name="Tp",
+            membership_status="Instructor",
+            towpilot=True,
+        )
+        instr_only = User.objects.create_user(
+            username="instr-status-only",
+            first_name="InstrStatus",
+            last_name="Only",
+            membership_status="Instructor",
+            instructor=True,
+        )
+        url = reverse("logsheet:api_offline_reference_data")
+        data = authenticated_client.get(url).json()
+        m = next(mm for mm in data["members"] if mm["id"] == instr_tp.id)
+        # Tow-pilot flag must be False: the "Instructor" allowance is not part
+        # of the tow-pilot allowed set.
+        assert m["isTowpilot"] is False
+        # The same status still grants the instructor flag (the special
+        # allowance), proving the two allowed sets are distinct.
+        m2 = next(mm for mm in data["members"] if mm["id"] == instr_only.id)
+        assert m2["isInstructor"] is True
