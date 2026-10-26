@@ -557,3 +557,176 @@ def test_existing_visiting_assignment_retained_when_visiting_and_roster_disabled
     )
     # An unrelated field can still be edited without rejecting the pilot.
     form.fields["pilot"].clean(visiting_pilot.pk)
+
+
+# ============================================================
+# Regression tests: role-flag removal + initial-value eligibility
+# (PR #1118 follow-up, forms.py set_member_groups)
+# ============================================================
+
+
+@pytest.mark.django_db
+def test_existing_assignment_retained_when_role_flag_removed(
+    active_member, logsheet, glider
+):
+    """A saved instructor / tow pilot must stay editable after their role flag
+    is removed.  ``validate_member_for_role`` allows the unchanged assignment
+    regardless of qualification, so the form's validation queryset must keep
+    the member selectable — even though the base role filter would otherwise
+    drop them.  (Deceased members are still hard-excluded.)"""
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+    )
+
+    # --- Instructor: flag removed after the flight was saved ---------------
+    removed_instructor = User.objects.create_user(
+        username="removed-instructor",
+        first_name="Removed",
+        last_name="Instructor",
+        membership_status="Full Member",
+        instructor=True,
+    )
+    instructor_flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        instructor=removed_instructor,
+        glider=glider,
+    )
+    removed_instructor.instructor = False
+    removed_instructor.save(update_fields=["instructor"])
+
+    instructor_form = FlightForm(instance=instructor_flight, logsheet=logsheet)
+    assert removed_instructor.pk in instructor_form.fields[
+        "instructor"
+    ].queryset.values_list(
+        "pk", flat=True
+    ), "saved instructor must stay selectable after the instructor flag is removed"
+    instructor_form.fields["instructor"].clean(removed_instructor.pk)
+
+    # --- Tow pilot: flag removed after the flight was saved -----------------
+    removed_towpilot = User.objects.create_user(
+        username="removed-towpilot",
+        first_name="Removed",
+        last_name="TowPilot",
+        membership_status="Full Member",
+        towpilot=True,
+    )
+    towpilot_flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        tow_pilot=removed_towpilot,
+        glider=glider,
+    )
+    removed_towpilot.towpilot = False
+    removed_towpilot.save(update_fields=["towpilot"])
+
+    towpilot_form = FlightForm(instance=towpilot_flight, logsheet=logsheet)
+    assert removed_towpilot.pk in towpilot_form.fields[
+        "tow_pilot"
+    ].queryset.values_list(
+        "pk", flat=True
+    ), "saved tow pilot must stay selectable after the towpilot flag is removed"
+    towpilot_form.fields["tow_pilot"].clean(removed_towpilot.pk)
+
+    # A different, flag-less member must NOT become selectable through the
+    # exception (the exception is scoped to the saved participant only).
+    unqualified = User.objects.create_user(
+        username="unqualified",
+        first_name="Unqualified",
+        last_name="Member",
+        membership_status="Full Member",
+        instructor=False,
+        towpilot=False,
+    )
+    assert unqualified.pk not in instructor_form.fields[
+        "instructor"
+    ].queryset.values_list("pk", flat=True)
+    assert unqualified.pk not in towpilot_form.fields["tow_pilot"].queryset.values_list(
+        "pk", flat=True
+    )
+
+
+@pytest.mark.django_db
+def test_initial_value_does_not_make_disallowed_member_selectable(
+    active_member, logsheet, glider
+):
+    """``add_flight`` supplies the scheduled tow pilot through ``initial``.
+    An initial value must only PRESELECT otherwise-eligible choices: it must
+    not make a disallowed member selectable on GET and then have that same
+    selection rejected on POST.  Here the disallowed member has the visiting
+    status while visiting pilots are disabled."""
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    visiting_status, _ = MembershipStatus.objects.get_or_create(
+        name="Affiliate Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 5,
+        },
+    )
+    visiting_status.can_be_pilot = True
+    visiting_status.can_be_passenger = True
+    visiting_status.save(update_fields=["can_be_pilot", "can_be_passenger"])
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        visiting_pilot_enabled=False,
+        visiting_pilot_status="Affiliate Member",
+    )
+
+    disallowed_towpilot = User.objects.create_user(
+        username="disallowed-towpilot",
+        first_name="Disallowed",
+        last_name="TowPilot",
+        membership_status="Affiliate Member",
+        towpilot=True,
+    )
+    eligible_towpilot = User.objects.create_user(
+        username="eligible-towpilot",
+        first_name="Eligible",
+        last_name="TowPilot",
+        membership_status="Full Member",
+        towpilot=True,
+    )
+
+    # Mirrors add_flight's initial={"tow_pilot": logsheet.tow_pilot_id}.
+    form = FlightForm(initial={"tow_pilot": disallowed_towpilot.pk}, logsheet=logsheet)
+    # The preselection value is still carried (so the widget can render the
+    # default) ...
+    assert form.initial.get("tow_pilot") == disallowed_towpilot.pk
+    # ... but the disallowed member is NOT made selectable / submittable.
+    assert disallowed_towpilot.pk not in form.fields["tow_pilot"].queryset.values_list(
+        "pk", flat=True
+    ), "an initial value must not make a disallowed member selectable"
+    with pytest.raises(ValidationError):
+        form.fields["tow_pilot"].clean(disallowed_towpilot.pk)
+
+    # An otherwise-eligible initial value still preselects and is selectable.
+    form2 = FlightForm(initial={"tow_pilot": eligible_towpilot.pk}, logsheet=logsheet)
+    assert eligible_towpilot.pk in form2.fields["tow_pilot"].queryset.values_list(
+        "pk", flat=True
+    )
+    form2.fields["tow_pilot"].clean(eligible_towpilot.pk)

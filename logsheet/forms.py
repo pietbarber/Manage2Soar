@@ -437,20 +437,33 @@ class FlightForm(forms.ModelForm):
         )
 
         def set_member_groups(field_name, *, passenger=False):
+            # The existing-assignment exception applies ONLY to persisted
+            # flight assignments (``self.instance``).  A value supplied via
+            # ``initial`` (e.g. the scheduled tow pilot in ``add_flight``)
+            # must NOT bypass the status / visiting eligibility filters: it may
+            # preselect an otherwise-eligible choice, but it must not make a
+            # disallowed member selectable on GET and then reject that same
+            # selection on POST.  ``initial`` therefore only preselects
+            # otherwise-eligible choices.
+            current_member_id = getattr(self.instance, f"{field_name}_id", None)
+
             members = Member.objects.exclude(membership_status="Deceased")
 
             if field_name == "instructor":
-                members = members.filter(
-                    Q(instructor=True) | Q(membership_status="Instructor")
-                )
+                # Retain the saved instructor in the role filter even if their
+                # ``instructor`` flag or "Instructor" status was later removed,
+                # so the unchanged value stays editable (mirrors the unchanged
+                # assignment exception in ``validate_member_for_role``).  The
+                # Deceased exclusion on ``members`` is retained.
+                role_filter = Q(instructor=True) | Q(membership_status="Instructor")
+                if current_member_id:
+                    role_filter |= Q(pk=current_member_id)
+                members = members.filter(role_filter)
             elif field_name == "tow_pilot":
-                members = members.filter(towpilot=True)
-
-            current_member_id = getattr(self.instance, f"{field_name}_id", None)
-            if not current_member_id:
-                current_member_id = self.initial.get(field_name)
-                if current_member_id is not None and hasattr(current_member_id, "pk"):
-                    current_member_id = current_member_id.pk
+                role_filter = Q(towpilot=True)
+                if current_member_id:
+                    role_filter |= Q(pk=current_member_id)
+                members = members.filter(role_filter)
 
             if passenger:
                 selectable_statuses = passenger_eligible_statuses
