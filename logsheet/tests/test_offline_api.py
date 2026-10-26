@@ -1486,3 +1486,70 @@ class TestParticipantCombination:
         flight = Flight.objects.get(logsheet=logsheet)
         assert flight.pilot_id == active_member.id
         assert flight.passenger_id == second_member.id
+
+
+# ============================================================
+# Name-ordering preference propagation for offline selectors
+# ============================================================
+
+
+class TestReferenceDataNameOrdering:
+    """The reference-data endpoint must propagate the club's member name
+    ordering preference and both name fields so the offline cache can sort
+    participant selectors the same way the online dropdowns do."""
+
+    def _get_member(self, data, member):
+        return next((m for m in data["members"] if m["id"] == member.id), None)
+
+    def test_response_includes_name_ordering_preference(
+        self, db, authenticated_client, active_member
+    ):
+        """The response carries the configured member_name_ordering so the
+        offline cache can honor it (default is last_name)."""
+        from siteconfig.models import SiteConfiguration
+
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.example.com",
+            club_abbreviation="TC",
+            member_name_ordering="last_name",
+        )
+        url = reverse("logsheet:api_offline_reference_data")
+        data = authenticated_client.get(url).json()
+        assert data["member_name_ordering"] == "last_name"
+
+    def test_first_name_preference_is_propagated(
+        self, db, authenticated_client, active_member
+    ):
+        """A club selecting first-name ordering gets 'first_name' back."""
+        from siteconfig.models import SiteConfiguration
+
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.example.com",
+            club_abbreviation="TC",
+            member_name_ordering="first_name",
+        )
+        url = reverse("logsheet:api_offline_reference_data")
+        data = authenticated_client.get(url).json()
+        assert data["member_name_ordering"] == "first_name"
+
+    def test_members_include_first_and_last_name(
+        self, db, authenticated_client, active_member
+    ):
+        """Each cached member carries firstName and lastName fields so the
+        offline selectors can apply the ordering and a secondary tie-breaker."""
+        from siteconfig.models import SiteConfiguration
+
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.example.com",
+            club_abbreviation="TC",
+            member_name_ordering="first_name",
+        )
+        url = reverse("logsheet:api_offline_reference_data")
+        data = authenticated_client.get(url).json()
+        member = self._get_member(data, active_member)
+        assert member is not None
+        assert member["first_name"] == active_member.first_name
+        assert member["last_name"] == active_member.last_name

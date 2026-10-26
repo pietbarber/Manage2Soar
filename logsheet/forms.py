@@ -536,13 +536,19 @@ class FlightForm(forms.ModelForm):
             # selection stays editable and the validation queryset keeps it
             # (otherwise an unchanged value is rejected and unrelated flight
             # edits are blocked).
+            #
+            # Query ``remaining`` (not the full ``Member`` queryset) so a saved
+            # visiting participant that is ALREADY in Today's Roster via the
+            # existing-assignment exception is not added a second time to the
+            # visiting group. ``remaining`` excludes those members while still
+            # preserving the Deceased exclusion inherited from ``members``.
             if (
                 not visiting_enabled
                 and current_member_id
                 and current_member_id not in {m.pk for m in visiting_members}
             ):
                 current_visiting = (
-                    Member.objects.filter(
+                    remaining.filter(
                         pk=current_member_id, membership_status=visiting_status
                     )
                     .only(

@@ -36,8 +36,40 @@
     // REFERENCE DATA FUNCTIONS
     // =========================================================
 
+    // Bump whenever the cached member schema changes in a way that affects the
+    // offline selectors. Caches written before this version lack the role-
+    // eligibility flags (isPilotEligible/isPassengerEligible/isInstructor/
+    // isTowpilot) and would render empty participant dropdowns.
+    const REFERENCE_DATA_SCHEMA_VERSION = 2;
+
     /**
-     * Check if we have cached reference data for offline use
+     * True when every cached member carries the role-eligibility flags that the
+     * offline selectors rely on. Previously cached members lack these fields,
+     * so a count-based cache check would accept them and produce empty
+     * participant dropdowns.
+     * @param {Array} members - Cached member records
+     * @returns {boolean}
+     */
+    function membersHaveEligibilityFlags(members) {
+        return (
+            Array.isArray(members) &&
+            members.length > 0 &&
+            members.every(
+                m =>
+                    'isPilotEligible' in m &&
+                    'isPassengerEligible' in m &&
+                    'isInstructor' in m &&
+                    'isTowpilot' in m
+            )
+        );
+    }
+
+    /**
+     * Check if we have cached reference data that is safe for offline use.
+     * In addition to record counts, the cached members must carry the
+     * eligibility-flag schema; otherwise the cache is considered incompatible
+     * and callers should refresh it (or show a reconnect requirement) rather
+     * than render empty participant dropdowns.
      * @returns {Promise<boolean>}
      */
     async function hasReferenceData() {
@@ -46,9 +78,61 @@
             await db.openDatabase();
             const members = await db.getAll('members');
             const gliders = await db.getAll('gliders');
-            return members.length > 0 && gliders.length > 0;
+            const compatible = membersHaveEligibilityFlags(members);
+            if (members.length > 0 && gliders.length > 0 && !compatible) {
+                console.warn(
+                    '[OfflineForm] Cached members lack the eligibility-flag schema; ' +
+                    'treating reference data as incompatible (cache from schema v' +
+                    REFERENCE_DATA_SCHEMA_VERSION + ' or older).'
+                );
+            }
+            return compatible && gliders.length > 0;
         } catch (e) {
             console.error('[OfflineForm] Error checking reference data:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Compare two cached members by the club's configured name ordering,
+     * always using the other name field as a secondary tie-breaker.
+     * @param {object} a - Member with firstName/lastName
+     * @param {object} b - Member with firstName/lastName
+     * @param {string} nameOrdering - 'first_name' or 'last_name'
+     * @returns {number}
+     */
+    function compareMembersByOrdering(a, b, nameOrdering) {
+        const firstA = a.firstName || a.lastName || '';
+        const firstB = b.firstName || b.lastName || '';
+        const lastA = a.lastName || '';
+        const lastB = b.lastName || '';
+        const primaryA = nameOrdering === 'first_name' ? firstA : lastA;
+        const primaryB = nameOrdering === 'first_name' ? firstB : lastB;
+        const secondaryA = nameOrdering === 'first_name' ? lastA : firstA;
+        const secondaryB = nameOrdering === 'first_name' ? lastB : firstB;
+        const c = primaryA.localeCompare(primaryB);
+        if (c !== 0) return c;
+        return secondaryA.localeCompare(secondaryB);
+    }
+
+    /**
+     * True when reference data is present but incompatible (e.g. an old cache
+     * whose members lack the eligibility-flag schema). Callers should use this
+     * to show an explicit reconnect requirement: the cache cannot be refreshed
+     * while offline, but it will be refreshed the next time the device comes
+     * back online (see the `online` event handler in the logsheet template).
+     * @returns {Promise<boolean>}
+     */
+    async function hasIncompatibleReferenceData() {
+        try {
+            const db = getDB();
+            await db.openDatabase();
+            const members = await db.getAll('members');
+            const gliders = await db.getAll('gliders');
+            const present = members.length > 0 || gliders.length > 0;
+            return present && !membersHaveEligibilityFlags(members);
+        } catch (e) {
+            console.error('[OfflineForm] Error checking cache compatibility:', e);
             return false;
         }
     }
@@ -66,8 +150,13 @@
             const towplanes = await db.getAll('towplanes');
             const airfields = await db.getAll('airfields');
 
+            // Honor the club's configured name ordering (stored at cache time),
+            // falling back to last-name ordering for legacy caches.
+            const orderMeta = await db.get('metadata', 'referenceDataNameOrdering');
+            const nameOrdering = (orderMeta && orderMeta.value) || 'last_name';
+
             return {
-                members: members.sort((a, b) => (a.lastName || '').localeCompare(b.lastName || '')),
+                members: members.slice().sort((a, b) => compareMembersByOrdering(a, b, nameOrdering)),
                 gliders: gliders.filter(g => g.isActive !== false),
                 towplanes: towplanes.filter(t => t.isActive !== false),
                 airfields: airfields.filter(a => a.isActive !== false),
@@ -694,6 +783,7 @@
 
     global.M2SOffline = {
         hasReferenceData,
+        hasIncompatibleReferenceData,
         getReferenceData,
         renderOfflineFlightForm,
         initOfflineFormHandlers,

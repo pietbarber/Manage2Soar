@@ -559,6 +559,80 @@ def test_existing_visiting_assignment_retained_when_visiting_and_roster_disabled
     form.fields["pilot"].clean(visiting_pilot.pk)
 
 
+@pytest.mark.django_db
+def test_visiting_not_duplicated_when_roster_enabled_and_visiting_disabled(
+    active_member, logsheet, glider
+):
+    """With visiting pilots disabled but Today's Roster grouping enabled, a
+    saved visiting participant is already present in Today's Roster via the
+    existing-assignment exception. The disabled-visiting fallback must NOT add
+    the same member to the Visiting group again (which would produce duplicate
+    options when editing the flight).  Querying ``remaining`` (which excludes
+    rostered members) keeps the Deceased exclusion and avoids the duplicate."""
+    User = get_user_model()
+    MembershipStatus.objects.get_or_create(
+        name="Full Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 1,
+        },
+    )
+    visiting_status, _ = MembershipStatus.objects.get_or_create(
+        name="Affiliate Member",
+        defaults={
+            "is_active": True,
+            "can_be_pilot": True,
+            "can_be_passenger": True,
+            "sort_order": 5,
+        },
+    )
+    visiting_status.can_be_pilot = True
+    visiting_status.can_be_passenger = True
+    visiting_status.save(update_fields=["can_be_pilot", "can_be_passenger"])
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.example.com",
+        club_abbreviation="TC",
+        visiting_pilot_enabled=False,
+        visiting_pilot_status="Affiliate Member",
+        show_today_roster_group=True,
+    )
+    visiting_pilot = User.objects.create_user(
+        username="dup-visiting-pilot",
+        first_name="Dup",
+        last_name="Visiting",
+        membership_status="Affiliate Member",
+    )
+    existing_flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=visiting_pilot,
+        glider=glider,
+    )
+
+    form = FlightForm(instance=existing_flight, logsheet=logsheet)
+    # Count how many times the visiting pilot appears across every optgroup.
+    occurrences = sum(
+        1
+        for _label, options in form.fields["pilot"].choices
+        if isinstance(options, (list, tuple))
+        for member_id, _display in options
+        if member_id == visiting_pilot.pk
+    )
+    # The member is on the roster (existing-assignment exception), so they must
+    # appear exactly once — in Today's Roster — and NOT again in the Visiting
+    # group (no duplicate).
+    assert occurrences == 1, (
+        f"visiting pilot should appear exactly once, found {occurrences}; "
+        f"groups: {_choice_groups(form.fields['pilot'])}"
+    )
+    assert visiting_pilot.pk in _choice_groups(form.fields["pilot"])["Today’s Roster"]
+    assert "Visiting Pilots" not in _choice_groups(form.fields["pilot"])
+    # The unchanged value must still be accepted by the validation queryset.
+    form.fields["pilot"].clean(visiting_pilot.pk)
+
+
 # ============================================================
 # Regression tests: role-flag removal + initial-value eligibility
 # (PR #1118 follow-up, forms.py set_member_groups)

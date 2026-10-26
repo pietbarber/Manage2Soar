@@ -19,6 +19,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from members.decorators import active_member_required
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 from .eligibility import validate_flight_assignments, validate_participant_combination
 from .models import Airfield, Flight, Glider, Logsheet, Towplane
@@ -132,6 +133,8 @@ def reference_data(request):
                 {
                     "id": m["id"],
                     "name": f"{first} {last}".strip(),
+                    "first_name": first,
+                    "last_name": last,
                     "nickname": m["nickname"] or "",
                     "display_name": display_name,
                     "isPilotEligible": is_pilot_eligible,
@@ -238,10 +241,21 @@ def reference_data(request):
         # Use a combination of data modification timestamps
         version = int(timezone.now().timestamp())
 
+        # Propagate the club's member name-ordering preference so the offline
+        # cache can sort the participant selectors the same way the online
+        # dropdowns do (with the other name field as the tie-breaker).
+        site_config = SiteConfiguration.objects.first()
+        member_name_ordering = (
+            site_config.member_name_ordering
+            if site_config and hasattr(site_config, "member_name_ordering")
+            else "last_name"
+        )
+
         return JsonResponse(
             {
                 "success": True,
                 "version": version,
+                "member_name_ordering": member_name_ordering,
                 "members": member_list,
                 "gliders": glider_list,
                 "towplanes": towplane_list,

@@ -1172,10 +1172,26 @@ document.addEventListener("click", async function(e) {
       }
     }
 
-      // Helper: Show "no cached data" offline modal without duplicating HTML
-      function showOfflineNoCacheModal() {
+      // Helper: Show "no cached data" offline modal without duplicating HTML.
+      // Distinguishes "no cache at all" from "cache present but incompatible"
+      // (an old cache whose members lack the eligibility-flag schema), showing
+      // an explicit reconnect requirement in the latter case: it cannot be
+      // refreshed while offline, but will be refreshed automatically the next
+      // time the device reconnects.
+      async function showOfflineNoCacheModal() {
         const container = document.getElementById('flightModalContent');
         if (!container) return;
+        let incompatible = false;
+        try {
+          if (window.M2SOffline) {
+            incompatible = await window.M2SOffline.hasIncompatibleReferenceData();
+          }
+        } catch (e) {
+          incompatible = false;
+        }
+        const message = incompatible
+          ? "Your offline cache is out of date and is missing the data needed to show eligible participants. Reconnect to the internet once to refresh it — it will update automatically as soon as you're back online, then you can continue offline."
+          : "No cached data available for offline entry. Please connect to the internet at least once to cache flight data.";
         container.innerHTML = `
           <div class="modal-header">
             <h5 class="modal-title"><i class="bi bi-wifi-off me-2"></i>You're Offline</h5>
@@ -1184,7 +1200,7 @@ document.addEventListener("click", async function(e) {
           <div class="modal-body">
             <div class="alert alert-warning">
               <i class="bi bi-exclamation-triangle me-2"></i>
-              No cached data available for offline entry. Please connect to the internet at least once to cache flight data.
+              ${message}
             </div>
           </div>
           <div class="modal-footer">
@@ -1427,7 +1443,11 @@ document.addEventListener("click", async function(e) {
             name: member.name,
             displayName: member.display_name,
             nickname: member.nickname,
-            lastName: member.name.split(' ').pop(), // For sorting
+            // Keep the individual name fields so the offline selectors can
+            // honor the club's name-ordering preference (with the other name
+            // field as the tie-breaker) instead of a hardcoded last-name sort.
+            firstName: member.first_name || '',
+            lastName: member.last_name || member.name.split(' ').pop(),
             isActive: true,
             // Role-eligibility flags computed server-side (logsheet/api.py::
             // reference_data) and consumed by the offline form selectors in
@@ -1488,6 +1508,19 @@ document.addEventListener("click", async function(e) {
         await db.put('metadata', {
           key: 'referenceDataVersion',
           value: data.version
+        });
+        // Store the club's name-ordering preference and the schema version of
+        // the cached members so offline-form-bundle.js can sort the selectors
+        // accordingly and detect incompatible (flag-less) caches.
+        if (data.member_name_ordering) {
+          await db.put('metadata', {
+            key: 'referenceDataNameOrdering',
+            value: data.member_name_ordering
+          });
+        }
+        await db.put('metadata', {
+          key: 'referenceDataSchemaVersion',
+          value: 2
         });
 
         console.log('[Offline] Reference data cached successfully');
