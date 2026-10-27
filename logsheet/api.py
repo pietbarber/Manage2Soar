@@ -19,7 +19,9 @@ from django.views.decorators.http import require_GET, require_POST
 
 from members.decorators import active_member_required
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
+from .eligibility import validate_flight_assignments, validate_participant_combination
 from .models import Airfield, Flight, Glider, Logsheet, Towplane
 
 logger = logging.getLogger(__name__)
@@ -45,29 +47,100 @@ def reference_data(request):
     - release_altitudes: list of valid release altitude choices
     """
     try:
-        # Get active members who can appear on flights
-        # Include pilots, instructors, tow pilots
-        members = Member.objects.filter(is_active=True).values(
+        # Get eligible members who can appear on flights.
+        # Exclude Deceased members (hard block for all roles).
+        from .eligibility import get_eligibility_context
+
+        eligibility_ctx = get_eligibility_context()
+
+        members = Member.objects.exclude(membership_status="Deceased").values(
             "id",
             "first_name",
             "last_name",
             "nickname",
-            "is_staff",
+            "membership_status",
+            "instructor",
+            "towpilot",
         )
 
-        # Determine member capabilities from related permissions
+        # Pre-compute the disabled-visiting check and the allowed-status sets
+        # mirroring validate_member_for_role / FlightForm.set_member_groups so
+        # the offline cache never advertises assignments the sync validator
+        # would reject.
+        #
+        # The "Instructor" status is a special allowance granted ONLY for the
+        # instructor field.  A tow pilot whose status is the (possibly
+        # inactive) "Instructor" status is NOT eligible for the tow-pilot
+        # role, so the tow-pilot allowed set must not include it.
+        visiting_disabled_excluded = not eligibility_ctx["visiting_enabled"] and bool(
+            eligibility_ctx["visiting_status"]
+        )
+        base_role_statuses = set(eligibility_ctx["active_statuses"]) | {
+            eligibility_ctx["visiting_status"],
+            "Inactive",
+        }
+        instructor_role_statuses = base_role_statuses | {"Instructor"}
+        towpilot_role_statuses = base_role_statuses
+
         member_list = []
         for m in members:
+            status = m["membership_status"]
+            first = m["first_name"] or ""
+            last = m["last_name"] or ""
+
+            # Shared visiting-status exclusion (applies to every role flag).
+            visiting_excluded = (
+                visiting_disabled_excluded
+                and status == eligibility_ctx["visiting_status"]
+            )
+
+            # Pilot eligibility: status must be can_be_pilot AND not excluded
+            # by the visiting filter (mirrors FlightForm.set_member_groups).
+            is_pilot_eligible = (
+                status in eligibility_ctx["pilot_eligible_statuses"]
+                and not visiting_excluded
+            )
+
+            # Passenger eligibility: status must be can_be_passenger AND not
+            # excluded by the visiting filter.
+            is_passenger_eligible = (
+                status in eligibility_ctx["passenger_eligible_statuses"]
+                and not visiting_excluded
+            )
+
+            # Instructor: role flag (instructor=True OR status "Instructor"),
+            # status within the instructor allowed set (which includes the
+            # special "Instructor" allowance), and not excluded by the visiting
+            # filter.
+            is_instructor = (
+                (bool(m["instructor"]) or status == "Instructor")
+                and status in instructor_role_statuses
+                and not visiting_excluded
+            )
+
+            # Tow pilot: role flag (towpilot=True), status within the tow-pilot
+            # allowed set (which does NOT include the "Instructor" allowance,
+            # matching the validator), and not excluded by the visiting filter.
+            is_towpilot = (
+                bool(m["towpilot"])
+                and status in towpilot_role_statuses
+                and not visiting_excluded
+            )
+
+            display_name = m["nickname"] if m["nickname"] else f"{first} {last}".strip()
+
             member_list.append(
                 {
                     "id": m["id"],
-                    "name": f"{m['first_name']} {m['last_name']}".strip(),
+                    "name": f"{first} {last}".strip(),
+                    "first_name": first,
+                    "last_name": last,
                     "nickname": m["nickname"] or "",
-                    "display_name": (
-                        m["nickname"]
-                        if m["nickname"]
-                        else f"{m['first_name']} {m['last_name']}".strip()
-                    ),
+                    "display_name": display_name,
+                    "isPilotEligible": is_pilot_eligible,
+                    "isPassengerEligible": is_passenger_eligible,
+                    "isInstructor": is_instructor,
+                    "isTowpilot": is_towpilot,
                 }
             )
 
@@ -168,10 +241,21 @@ def reference_data(request):
         # Use a combination of data modification timestamps
         version = int(timezone.now().timestamp())
 
+        # Propagate the club's member name-ordering preference so the offline
+        # cache can sort the participant selectors the same way the online
+        # dropdowns do (with the other name field as the tie-breaker).
+        site_config = SiteConfiguration.objects.first()
+        member_name_ordering = (
+            site_config.member_name_ordering
+            if site_config and hasattr(site_config, "member_name_ordering")
+            else "last_name"
+        )
+
         return JsonResponse(
             {
                 "success": True,
                 "version": version,
+                "member_name_ordering": member_name_ordering,
                 "members": member_list,
                 "gliders": glider_list,
                 "towplanes": towplane_list,
@@ -393,6 +477,43 @@ def _create_flight_from_offline(flight_data, user):
                 except Member.DoesNotExist:
                     return {"success": False, "error": "Passenger not found"}
 
+            # Shared eligibility validation (mirrors FlightForm.set_member_groups):
+            # blocks ineligible pilots/passengers, unqualified instructors/tow
+            # pilots, Deceased participants, and disabled-visiting assignments.
+            # A new flight has no existing assignment, so no exception applies.
+            eligibility_errors = validate_flight_assignments(
+                {
+                    "pilot": pilot,
+                    "instructor": instructor,
+                    "tow_pilot": tow_pilot,
+                    "passenger": passenger,
+                }
+            )
+            if eligibility_errors:
+                return {
+                    "success": False,
+                    "error": "; ".join(
+                        f"{field}: {msg}"
+                        for field, msg in sorted(eligibility_errors.items())
+                    ),
+                }
+
+            # Validate the participant combination (mirrors FlightForm.clean):
+            # no member may hold two mutually-exclusive roles on the same flight.
+            combination_errors = validate_participant_combination(
+                pilot=pilot,
+                instructor=instructor,
+                tow_pilot=tow_pilot,
+                passenger=passenger,
+            )
+            if combination_errors:
+                return {
+                    "success": False,
+                    "error": "; ".join(
+                        msg for msg in sorted(combination_errors.values())
+                    ),
+                }
+
             airfield = None
             if flight_data.get("airfield_id"):
                 try:
@@ -465,6 +586,15 @@ def _update_flight_from_offline(flight_data, user):
                         "serverData": _flight_to_dict(flight),
                     }
 
+            # Capture the server-side existing assignment IDs BEFORE applying
+            # any updates so the unchanged-assignment exception works correctly.
+            existing_assignments = {
+                "pilot": flight.pilot_id,
+                "instructor": flight.instructor_id,
+                "tow_pilot": flight.tow_pilot_id,
+                "passenger": flight.passenger_id,
+            }
+
             # Apply updates
             if "pilot_id" in flight_data:
                 if flight_data["pilot_id"]:
@@ -480,6 +610,22 @@ def _update_flight_from_offline(flight_data, user):
                 else:
                     flight.instructor = None
 
+            if "tow_pilot_id" in flight_data:
+                if flight_data["tow_pilot_id"]:
+                    flight.tow_pilot = Member.objects.get(
+                        id=flight_data["tow_pilot_id"]
+                    )
+                else:
+                    flight.tow_pilot = None
+
+            if "passenger_id" in flight_data:
+                if flight_data["passenger_id"]:
+                    flight.passenger = Member.objects.get(
+                        id=flight_data["passenger_id"]
+                    )
+                else:
+                    flight.passenger = None
+
             if "glider_id" in flight_data:
                 if flight_data["glider_id"]:
                     flight.glider = Glider.objects.get(id=flight_data["glider_id"])
@@ -494,13 +640,46 @@ def _update_flight_from_offline(flight_data, user):
                 else:
                     flight.towplane = None
 
-            if "tow_pilot_id" in flight_data:
-                if flight_data["tow_pilot_id"]:
-                    flight.tow_pilot = Member.objects.get(
-                        id=flight_data["tow_pilot_id"]
-                    )
-                else:
-                    flight.tow_pilot = None
+            # Shared eligibility validation (mirrors FlightForm.set_member_groups):
+            # the unchanged non-deceased assignment is allowed (exception); Deceased
+            # is always blocked. Validates all four participant roles (pilot,
+            # instructor, tow_pilot, passenger) against the captured prior values
+            # so an unchanged assignment — including a passenger later marked
+            # Deceased — is handled consistently with the create path.
+            eligibility_errors = validate_flight_assignments(
+                {
+                    "pilot": flight.pilot,
+                    "instructor": flight.instructor,
+                    "tow_pilot": flight.tow_pilot,
+                    "passenger": flight.passenger,
+                },
+                existing_assignments=existing_assignments,
+            )
+            if eligibility_errors:
+                return {
+                    "success": False,
+                    "error": "; ".join(
+                        f"{field}: {msg}"
+                        for field, msg in sorted(eligibility_errors.items())
+                    ),
+                }
+
+            # Validate the resulting participant combination (mirrors
+            # FlightForm.clean): no member may hold two mutually-exclusive
+            # roles on the same flight.
+            combination_errors = validate_participant_combination(
+                pilot=flight.pilot,
+                instructor=flight.instructor,
+                tow_pilot=flight.tow_pilot,
+                passenger=flight.passenger,
+            )
+            if combination_errors:
+                return {
+                    "success": False,
+                    "error": "; ".join(
+                        msg for msg in sorted(combination_errors.values())
+                    ),
+                }
 
             if "launch_time" in flight_data:
                 flight.launch_time = flight_data["launch_time"]

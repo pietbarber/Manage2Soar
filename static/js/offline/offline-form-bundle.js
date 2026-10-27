@@ -36,8 +36,40 @@
     // REFERENCE DATA FUNCTIONS
     // =========================================================
 
+    // Bump whenever the cached member schema changes in a way that affects the
+    // offline selectors. Caches written before this version lack the role-
+    // eligibility flags (isPilotEligible/isPassengerEligible/isInstructor/
+    // isTowpilot) and would render empty participant dropdowns.
+    const REFERENCE_DATA_SCHEMA_VERSION = 2;
+
     /**
-     * Check if we have cached reference data for offline use
+     * True when every cached member carries the role-eligibility flags that the
+     * offline selectors rely on. Previously cached members lack these fields,
+     * so a count-based cache check would accept them and produce empty
+     * participant dropdowns.
+     * @param {Array} members - Cached member records
+     * @returns {boolean}
+     */
+    function membersHaveEligibilityFlags(members) {
+        return (
+            Array.isArray(members) &&
+            members.length > 0 &&
+            members.every(
+                m =>
+                    'isPilotEligible' in m &&
+                    'isPassengerEligible' in m &&
+                    'isInstructor' in m &&
+                    'isTowpilot' in m
+            )
+        );
+    }
+
+    /**
+     * Check if we have cached reference data that is safe for offline use.
+     * In addition to record counts, the cached members must carry the
+     * eligibility-flag schema; otherwise the cache is considered incompatible
+     * and callers should refresh it (or show a reconnect requirement) rather
+     * than render empty participant dropdowns.
      * @returns {Promise<boolean>}
      */
     async function hasReferenceData() {
@@ -46,9 +78,65 @@
             await db.openDatabase();
             const members = await db.getAll('members');
             const gliders = await db.getAll('gliders');
-            return members.length > 0 && gliders.length > 0;
+            const compatible = membersHaveEligibilityFlags(members);
+            if (members.length > 0 && gliders.length > 0 && !compatible) {
+                console.warn(
+                    '[OfflineForm] Cached members lack the eligibility-flag schema; ' +
+                    'treating reference data as incompatible (cache from schema v' +
+                    REFERENCE_DATA_SCHEMA_VERSION + ' or older).'
+                );
+            }
+            return compatible && gliders.length > 0;
         } catch (e) {
             console.error('[OfflineForm] Error checking reference data:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Compare two cached members by the club's configured name ordering,
+     * always using the other name field as a secondary tie-breaker.
+     * @param {object} a - Member with firstName/lastName
+     * @param {object} b - Member with firstName/lastName
+     * @param {string} nameOrdering - 'first_name' or 'last_name'
+     * @returns {number}
+     */
+    function compareMembersByOrdering(a, b, nameOrdering) {
+        // Use the ACTUAL name fields, falling back only to an empty string.
+        // Do NOT substitute the surname for an empty given name (or vice
+        // versa): that would change the sort key and the tie-breaker relative
+        // to the online form, which orders by (first_name, last_name).
+        const firstA = a.firstName || '';
+        const firstB = b.firstName || '';
+        const lastA = a.lastName || '';
+        const lastB = b.lastName || '';
+        const primaryA = nameOrdering === 'first_name' ? firstA : lastA;
+        const primaryB = nameOrdering === 'first_name' ? firstB : lastB;
+        const secondaryA = nameOrdering === 'first_name' ? lastA : firstA;
+        const secondaryB = nameOrdering === 'first_name' ? lastB : firstB;
+        const c = primaryA.localeCompare(primaryB);
+        if (c !== 0) return c;
+        return secondaryA.localeCompare(secondaryB);
+    }
+
+    /**
+     * True when reference data is present but incompatible (e.g. an old cache
+     * whose members lack the eligibility-flag schema). Callers should use this
+     * to show an explicit reconnect requirement: the cache cannot be refreshed
+     * while offline, but it will be refreshed the next time the device comes
+     * back online (see the `online` event handler in the logsheet template).
+     * @returns {Promise<boolean>}
+     */
+    async function hasIncompatibleReferenceData() {
+        try {
+            const db = getDB();
+            await db.openDatabase();
+            const members = await db.getAll('members');
+            const gliders = await db.getAll('gliders');
+            const present = members.length > 0 || gliders.length > 0;
+            return present && !membersHaveEligibilityFlags(members);
+        } catch (e) {
+            console.error('[OfflineForm] Error checking cache compatibility:', e);
             return false;
         }
     }
@@ -66,8 +154,13 @@
             const towplanes = await db.getAll('towplanes');
             const airfields = await db.getAll('airfields');
 
+            // Honor the club's configured name ordering (stored at cache time),
+            // falling back to last-name ordering for legacy caches.
+            const orderMeta = await db.get('metadata', 'referenceDataNameOrdering');
+            const nameOrdering = (orderMeta && orderMeta.value) || 'last_name';
+
             return {
-                members: members.sort((a, b) => (a.lastName || '').localeCompare(b.lastName || '')),
+                members: members.slice().sort((a, b) => compareMembersByOrdering(a, b, nameOrdering)),
                 gliders: gliders.filter(g => g.isActive !== false),
                 towplanes: towplanes.filter(t => t.isActive !== false),
                 airfields: airfields.filter(a => a.isActive !== false),
@@ -141,9 +234,45 @@
         const commercialRidesEnabled = options.commercialRidesEnabled !== false;
 
         // Separate members by role hints (if available)
-        const allMembers = members;
+        // The `isPilotEligible` / `isPassengerEligible` / `isInstructor` /
+        // `isTowpilot` flags come from the server-side eligibility context and
+        // already encode visiting-pilot and allowed-status restrictions, so
+        // the offline selectors must mirror the same validation rules as the
+        // online sync endpoint.
+        const pilots = members.filter(m => m.isPilotEligible);
+        const passengers = members.filter(m => m.isPassengerEligible);
         const instructors = members.filter(m => m.isInstructor);
         const towPilots = members.filter(m => m.isTowpilot);
+
+        // When editing a saved flight, retain the currently assigned member in
+        // the relevant selector even if the server now marks them ineligible
+        // (e.g. the member was deactivated after the flight was saved). This
+        // matches the existing-assignment exception enforced by FlightForm.
+        //
+        // The eligible `list` is already a filtered, order-preserving view of
+        // the configured name ordering applied by getReferenceData(). The
+        // current member must be spliced back in at the position the
+        // configured ordering assigns them — NOT appended at the end — so the
+        // ordering is preserved even when the retained member is ineligible.
+        const withPrefill = (list, prefillId) => {
+            if (prefillId == null) return list;
+            const current = members.find(m => String(m.id) === String(prefillId));
+            if (!current) return list;
+            if (list.includes(current)) return list;
+            // `list` is a filtered, order-preserving slice of `members`. The
+            // current member's position in the ordered result equals the count
+            // of eligible members that precede it in the master order.
+            const currentIdx = members.indexOf(current);
+            let insertAt = 0;
+            for (let i = 0; i < currentIdx; i++) {
+                if (list.includes(members[i])) insertAt++;
+            }
+            return [
+                ...list.slice(0, insertAt),
+                current,
+                ...list.slice(insertAt),
+            ];
+        };
 
         // Separate gliders by type
         const clubGliders = gliders.filter(g => g.clubOwned === true);
@@ -214,7 +343,7 @@
                                 </label>
                                 <select name="pilot" id="id_pilot" class="form-select">
                                     <option value="">--------</option>
-                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.pilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
+                                    ${withPrefill(pilots, prefillData?.pilot).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.pilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -225,7 +354,7 @@
                                 </label>
                                 <select name="instructor" id="id_instructor" class="form-select">
                                     <option value="">--------</option>
-                                    ${(instructors.length > 0 ? instructors : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.instructor)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
+                                    ${withPrefill(instructors, prefillData?.instructor).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.instructor)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -236,7 +365,7 @@
                                 </label>
                                 <select name="passenger" id="id_passenger" class="form-select">
                                     <option value="">--------</option>
-                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.passenger)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
+                                    ${withPrefill(passengers, prefillData?.passenger).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.passenger)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -283,7 +412,7 @@
                                 </label>
                                 <select name="tow_pilot" id="id_tow_pilot" class="form-select">
                                     <option value="">--------</option>
-                                    ${(towPilots.length > 0 ? towPilots : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.towPilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
+                                    ${withPrefill(towPilots, prefillData?.towPilot).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.towPilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -676,6 +805,7 @@
 
     global.M2SOffline = {
         hasReferenceData,
+        hasIncompatibleReferenceData,
         getReferenceData,
         renderOfflineFlightForm,
         initOfflineFormHandlers,
