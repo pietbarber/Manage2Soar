@@ -1,7 +1,7 @@
 Django>=5.2.17,<5.3
 Authlib
 bleach
-black
+black>=26.10.1
 crispy-bootstrap4
 django-crispy-forms
 django-extensions
@@ -22,7 +22,7 @@ identify
 isort
 Jinja2
 ortools
-pillow
+pillow>=13.0.0
 pip-audit
 pydenticon
 playwright
@@ -39,3 +39,5 @@ ruff
 social-auth-app-django
 social-auth-core
 tinycss2
+filelock>=4.2.1
+opentelemetry-api>=1.45.1

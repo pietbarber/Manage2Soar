@@ -13,7 +13,7 @@ asgiref==3.12.1
     #   social-auth-app-django
 authlib==1.8.0
     # via -r requirements.in
-black==26.5.1
+black==26.10.1
     # via -r requirements.in
 bleach==6.4.0
     # via -r requirements.in
@@ -90,8 +90,10 @@ django-tinymce==5.0.0
     # via -r requirements.in
 django-widget-tweaks==1.5.1
     # via -r requirements.in
-filelock==3.32.7
-    # via cachecontrol
+filelock==4.2.4
+    # via
+    #   -r requirements.in
+    #   cachecontrol
 flake8==7.4.1
     # via -r requirements.in
 google-api-core==2.39.0
@@ -170,8 +172,10 @@ oauthlib==4.0.0
     # via
     #   requests-oauthlib
     #   social-auth-core
-opentelemetry-api==1.45.0
-    # via google-api-core
+opentelemetry-api==1.45.1
+    # via
+    #   -r requirements.in
+    #   google-api-core
 ortools==9.15.6755
     # via -r requirements.in
 packageurl-python==0.17.6
@@ -186,7 +190,7 @@ pandas==3.0.6
     # via ortools
 pathspec==1.1.1
     # via black
-pillow==12.3.0
+pillow==13.0.0
     # via
     #   -r requirements.in
     #   pydenticon
