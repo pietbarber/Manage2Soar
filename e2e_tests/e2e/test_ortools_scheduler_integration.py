@@ -7,6 +7,7 @@ switches between them without breaking the UI.
 """
 
 from duty_roster.models import DutyPreference
+from logsheet.models import Airfield
 from siteconfig.models import SiteConfiguration
 
 from .conftest import DjangoPlaywrightTestCase
@@ -32,6 +33,11 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
             operations_start_period="First weekend of March",
             operations_end_period="Last weekend of November",
         )
+
+        # Publishing requires an active airfield (the publish action looks up
+        # Airfield.objects.filter(is_active=True).first() and shows an error if
+        # none exists), so seed one for the publish tests.
+        self.airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
 
         # Create rostermeister with permissions
         self.rostermeister = self.create_test_member(
