@@ -525,8 +525,8 @@
         - not ansible_check_mode
         - gke_normalize_pdf_iframes | default(true) | bool
       register: tenant_pdf_normalization
-      retries: "{{ gke_management_command_retries | int }}"
-      delay: "{{ gke_management_command_retry_delay | int }}"
+      retries: "{{ gke_management_command_retries | default(3) | int }}"
+      delay: "{{ gke_management_command_retry_delay | default(10) | int }}"
       until: tenant_pdf_normalization.rc == 0
       tags: [deploy, verify]
 
