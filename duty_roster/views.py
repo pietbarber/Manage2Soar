@@ -72,7 +72,7 @@ from .roster_generator import (
     resolve_roster_date_range,
 )
 from .utils.role_resolution import RoleResolutionService
-from .utils.roles import member_is_commercial_pilot
+from .utils.roles import commercial_duty_enabled, member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views")
 
@@ -1512,7 +1512,12 @@ def calendar_day_detail(request, year, month, day):
             scheduled_holes["duty_officer"] = True
         if not assignment.assistant_duty_officer:
             scheduled_holes["assistant_duty_officer"] = True
-        if not assignment.commercial_pilot:
+        # Issue #1129: unlike the other primary roles, the commercial-pilot
+        # hole is only offered to clubs that actually run commercial-ride duty
+        # (both ``commercial_rides_enabled`` AND ``schedule_commercial_pilots``).
+        # PR #1121 un-gated every role while fixing #1120; this restores the
+        # commercial-pilot gate so clubs like ssc no longer show a spurious hole.
+        if not assignment.commercial_pilot and commercial_duty_enabled(site_config):
             scheduled_holes["commercial_pilot"] = True
 
         if request.user.is_authenticated and scheduled_holes:
@@ -5618,6 +5623,10 @@ def volunteer_fill_role(request, assignment_id, role):
     Note (Issue #1120): the club's ``schedule_*`` SiteConfiguration flags only
     control whether roles are *pre-scheduled* by the roster generator; they no
     longer gate whether a qualified member may step into an empty slot here.
+
+    Exception (Issue #1129): the ``commercial_pilot`` role IS gated — it is only
+    fillable when the club enables commercial rides (``commercial_rides_enabled``)
+    AND schedules commercial pilots (``schedule_commercial_pilots``).
     """
     assignment = get_object_or_404(DutyAssignment, id=assignment_id)
     back_url = _volunteer_fill_back_url(request, assignment)
@@ -5637,6 +5646,17 @@ def volunteer_fill_role(request, assignment_id, role):
     role_label = (
         getattr(config, config_title_attr, None) if config else None
     ) or default_title
+
+    # Issue #1129: the commercial-pilot duty role is only offered to clubs that
+    # both enable commercial rides and schedule commercial pilots. Guard the
+    # endpoint server-side so a direct URL hit is also blocked on other clubs;
+    # the other four roles keep the #1120 behavior (no flag gate here).
+    if role == "commercial_pilot" and not commercial_duty_enabled(config):
+        messages.error(
+            request,
+            "Commercial pilot duties are not enabled at this club.",
+        )
+        return redirect(back_url)
 
     # Past days are not fillable.
     if assignment.date < date.today():

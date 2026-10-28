@@ -179,3 +179,121 @@ class TestRosterHomeUnqualified(DjangoPlaywrightTestCase):
         self.page.wait_for_selector(
             "text=No openings match your qualifications right now."
         )
+
+
+class TestCommercialPilotHoleGate(DjangoPlaywrightTestCase):
+    """Issue #1129: the Commercial Pilot "hole to fill" is only offered to
+    clubs that BOTH enable commercial rides and schedule commercial pilots.
+    Clubs like ssc (both flags OFF) should see no Commercial Pilot card.
+    """
+
+    def setUp(self):
+        super().setUp()
+        config, _ = SiteConfiguration.objects.get_or_create(
+            defaults={
+                "club_name": "Test Soaring Club",
+                "club_abbreviation": "TSC",
+                "domain_name": "test.org",
+            }
+        )
+        # Start with both commercial flags OFF (the ssc case). Individual tests
+        # override this to exercise the positive path.
+        config.schedule_instructors = True
+        config.schedule_tow_pilots = True
+        config.commercial_rides_enabled = False
+        config.schedule_commercial_pilots = False
+        config.save(
+            update_fields=[
+                "schedule_instructors",
+                "schedule_tow_pilots",
+                "commercial_rides_enabled",
+                "schedule_commercial_pilots",
+            ]
+        )
+
+    def test_modal_hides_commercial_when_flags_off(self):
+        """Calendar day modal does NOT render the Commercial Pilot card when
+        both commercial flags are OFF (default: ssc-like club). Issue #1129."""
+        self.create_test_member(
+            username="cp_off",
+            glider_rating="commercial",
+            membership_status="Full Member",
+        )
+        self.login(username="cp_off")
+
+        target_day = date.today() + timedelta(days=9)
+        DutyAssignment.objects.create(date=target_day)
+
+        self.page.goto(
+            f"{self.live_server_url}/duty_roster/calendar/"
+            f"{target_day.year}/{target_day.month}/"
+        )
+        self.page.wait_for_selector("#calendar-body")
+
+        day_cell = self.page.locator(
+            f'td[hx-get="/duty_roster/calendar/day/'
+            f'{target_day.year}/{target_day.month}/{target_day.day}/"]'
+        )
+        day_cell.first.click()
+        self.page.wait_for_selector("#modal-body")
+
+        # The commercial-pilot card should not be rendered at all.
+        commercial_label = self.page.locator("text=Commercial Pilot")
+        assert commercial_label.count() == 0
+
+        # No "Volunteer to fill" button for commercial pilot.
+        self.page.wait_for_timeout(200)  # allow HTMX response to settle
+        volunteer_commercial = self.page.locator("a[href*='/commercial_pilot/']")
+        assert volunteer_commercial.count() == 0
+
+    def test_modal_shows_commercial_when_both_flags_on(self):
+        """Calendar day modal DOES render the Commercial Pilot card with a
+        "Volunteer to fill" button when both flags are ON. Issue #1129."""
+        config = SiteConfiguration.objects.first()
+        config.commercial_rides_enabled = True
+        config.schedule_commercial_pilots = True
+        config.save(
+            update_fields=["commercial_rides_enabled", "schedule_commercial_pilots"]
+        )
+
+        self.create_test_member(
+            username="cp_on",
+            glider_rating="commercial",
+            membership_status="Full Member",
+        )
+        self.login(username="cp_on")
+
+        target_day = date.today() + timedelta(days=11)
+        assignment = DutyAssignment.objects.create(date=target_day)
+
+        self.page.goto(
+            f"{self.live_server_url}/duty_roster/calendar/"
+            f"{target_day.year}/{target_day.month}/"
+        )
+        self.page.wait_for_selector("#calendar-body")
+
+        day_cell = self.page.locator(
+            f'td[hx-get="/duty_roster/calendar/day/'
+            f'{target_day.year}/{target_day.month}/{target_day.day}/"]'
+        )
+        day_cell.first.click()
+        self.page.wait_for_selector("#modal-body")
+
+        # The commercial-pilot card should be rendered.
+        commercial_label = self.page.locator("text=Commercial Pilot")
+        assert commercial_label.count() >= 1
+
+        # And a "Volunteer to fill" button pointing at commercial_pilot.
+        volunteer_link = self.page.locator(
+            "a[href*='/commercial_pilot/']:has-text('Volunteer')"
+        )
+        volunteer_link.first.wait_for(state="visible")
+        assert volunteer_link.count() >= 1
+
+        volunteer_link.first.click()
+        self.page.wait_for_selector("text=Volunteer to Fill")
+
+        self.page.get_by_role("button", name="Yes, I'll fill this role").click()
+
+        assignment.refresh_from_db()
+        assert assignment.commercial_pilot is not None
