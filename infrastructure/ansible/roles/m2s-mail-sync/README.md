@@ -2,6 +2,17 @@
 
 This role syncs mailing list membership from the M2S Django API to Postfix virtual aliases and sender whitelists.
 
+Administrators with Webmaster access can also create **Email Aliases** in
+Django Admin (`Site Configuration → Email Aliases`).
+Each enabled alias forwards an individual address such as `admin@club.org`
+to one external mailbox without adding it to a mailing list or the sender
+whitelist. External senders can use these aliases; regular mail/spam checks
+still apply. A destination on the club's domain is rejected to prevent loops.
+The API exposes these under `forwarding_aliases`; the sync writes them to the
+virtual map after list addresses. In dev mode, both list and direct aliases
+redirect to the configured test inbox instead of their real targets.
+Disabling or deleting an alias removes it at the next sync (every 15 minutes).
+
 ## Overview
 
 - **Sync script**: `/opt/m2s-mail-sync/sync-aliases.py` (Python 3)

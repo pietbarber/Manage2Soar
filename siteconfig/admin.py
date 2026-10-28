@@ -10,6 +10,7 @@ from utils.admin_helpers import AdminHelperMixin
 from .models import (
     MEMBER_PROFILE_POLICY_FIELDS,
     ChargeableItem,
+    EmailAlias,
     MailingList,
     MailingListCriterion,
     MembershipBillingRule,
@@ -777,6 +778,32 @@ class MembershipGliderRentalRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
         "rental overrides for matrix billing mode. Example: Junior + Glider X = "
         "$0.00/hr while other junior gliders still use status-wide or base rates."
     )
+
+
+@admin.register(EmailAlias)
+class EmailAliasAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = ("name", "destination", "description", "is_active")
+    list_editable = ("is_active",)
+    search_fields = ("name", "destination", "description")
+    list_filter = ("is_active",)
+
+    def _has_webmaster_permission(self, request):
+        return (
+            request.user.is_superuser
+            or request.user.groups.filter(name="Webmasters").exists()
+        )
+
+    def has_view_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    def has_add_permission(self, request):
+        return self._has_webmaster_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
 
 
 @admin.register(MailingList)

@@ -2,7 +2,7 @@
 """
 Mailman-style header rewriter for Postfix (Content Filter)
 Rewrites From header to list address and sets Reply-To to original sender
-Uses X-Original-To header to find the original list recipient before alias expansion
+Uses X-Original-To header to find the original recipient before alias expansion
 """
 import email
 import os
@@ -12,6 +12,7 @@ from email.utils import formataddr, getaddresses, parseaddr
 
 # List of mailing list addresses this server handles
 # Format: set of lowercase email addresses
+ADMIN_FORWARD_MARKER = '# --- Administrative forwarding aliases ---'
 MAILING_LISTS = {
 {% for club in club_domains %}
 {% if club.domains is defined %}
@@ -50,6 +51,8 @@ def _load_lists_from_virtual(virtual_file='/etc/postfix/virtual'):
         with open(virtual_file, 'r') as f:
             for line in f:
                 line = line.strip()
+                if line == ADMIN_FORWARD_MARKER:
+                    break
                 if not line or line.startswith('#'):
                     continue
                 parts = line.split(None, 1)
@@ -62,6 +65,23 @@ def _load_lists_from_virtual(virtual_file='/etc/postfix/virtual'):
             f"maillist-rewriter: warning: could not read {virtual_file}: {e}\n"
         )
     return lists
+
+
+def _load_forwarding_aliases_from_virtual(virtual_file='/etc/postfix/virtual'):
+    """Load direct forwards separately from discussion lists."""
+    aliases = set()
+    try:
+        with open(virtual_file, 'r') as f:
+            content = f.read()
+        if ADMIN_FORWARD_MARKER not in content:
+            return aliases
+        for line in content.split(ADMIN_FORWARD_MARKER, 1)[1].splitlines():
+            parts = line.split(None, 1)
+            if len(parts) == 2 and '@' in parts[0]:
+                aliases.add(parts[0].lower())
+    except OSError as e:
+        sys.stderr.write(f"maillist-rewriter: warning: could not read forwards: {e}\n")
+    return aliases
 
 
 def _is_bounces_alias(addr):
@@ -90,10 +110,14 @@ def _is_bounces_alias(addr):
 # /etc/postfix/virtual; we must include them here so they are not bounced.
 # ``*-bounces@`` delivery aliases are excluded so they are never treated as a
 # detectable mailing list (see _is_bounces_alias and issue #1038).
+FORWARDING_ALIASES = {
+    addr for addr in _load_forwarding_aliases_from_virtual()
+    if not _is_bounces_alias(addr)
+}
 ALL_KNOWN_LISTS = {
     addr
     for addr in (MAILING_LISTS | _load_lists_from_virtual())
-    if not _is_bounces_alias(addr)
+    if not _is_bounces_alias(addr) and addr not in FORWARDING_ALIASES
 }
 
 
@@ -231,15 +255,22 @@ def find_list_from_recipients(recipients, preferred_domain=None):
         sys.stderr.write(f"maillist-rewriter: error reading /etc/postfix/virtual in find_list_from_recipients: {e}\n")
 
 
-def detect_original_list(msg, recipients):
+def detect_original_recipient(msg, recipients):
     """
-    Identify the mailing list recipient in priority order:
-    1) To header
-    2) Cc headers
-    3) SMTP envelope recipients
-    4) Reverse-lookup via /etc/postfix/virtual (exact/subset match)
+    Identify the original recipient in priority order.
+
+    Direct forwarding aliases and mailing lists are deliberately returned as
+    separate routing classes.  X-Original-To is authoritative because the
+    content filter may receive recipients after virtual-alias expansion.
     """
     original_to = None
+
+    # Postfix preserves the pre-expansion recipient here when available.
+    # Check this before message headers and recipient expansion because a
+    # direct alias may share its development redirect with a mailing list.
+    for _, addr in getaddresses(msg.get_all('X-Original-To', [])):
+        if addr and addr.lower() in (ALL_KNOWN_LISTS | FORWARDING_ALIASES):
+            return addr.lower()
 
     # Try To header first (most reliable for content filters).
     # Use getaddresses() so multi-address To headers are parsed correctly.
@@ -256,6 +287,14 @@ def detect_original_list(msg, recipients):
                 original_to = cc_addr.lower()
                 break
 
+    # A direct forward may share the dev-mode destination with every list.
+    # Detect it by the original To/Cc address before reverse-lookup would
+    # incorrectly classify it as one of those lists.
+    if not original_to:
+        for _, addr in to_addresses + getaddresses(msg.get_all('Cc', []) + msg.get_all('CC', [])):
+            if addr and addr.lower() in FORWARDING_ALIASES:
+                return addr.lower()
+
     # Extract preferred domain from To/CC header for reverse-lookup fallback
     preferred_domain = None
     if original_to and '@' in original_to:
@@ -265,7 +304,8 @@ def detect_original_list(msg, recipients):
         if first_to_addr and '@' in first_to_addr:
             preferred_domain = first_to_addr.split('@')[1].lower()
 
-    # Envelope recipients catch direct BCC where list address is still present.
+    # Envelope recipients catch direct BCC where the original address is
+    # still present. Prefer an explicit list, then a direct alias.
     if not original_to:
         for recipient in recipients:
             if recipient.lower() in ALL_KNOWN_LISTS:
@@ -273,10 +313,37 @@ def detect_original_list(msg, recipients):
                 break
 
     if not original_to:
+        for recipient in recipients:
+            if recipient.lower() in FORWARDING_ALIASES:
+                return recipient.lower()
+
+    if not original_to:
+        # Bounces should be delivered as-is, not mistaken for a list just
+        # because their destination matches one of the dev-mode recipients.
+        for _, addr in to_addresses + getaddresses(msg.get_all('Cc', [])):
+            if addr and _is_bounces_alias(addr):
+                return None
         # Fallback supports post-expansion recipients via subset matching.
         original_to = find_list_from_recipients(recipients, preferred_domain)
 
     return original_to
+
+
+# Kept as a compatibility name for local integrations and older tests.
+detect_original_list = detect_original_recipient
+
+
+def routing_class(recipient):
+    """Return ``mailing_list``, ``forwarding_alias``, or ``None``."""
+    if not recipient:
+        return None
+    normalized = recipient.lower()
+    if normalized in FORWARDING_ALIASES:
+        return "forwarding_alias"
+    if normalized in ALL_KNOWN_LISTS:
+        return "mailing_list"
+    return None
+
 
 def main():
     """
@@ -295,7 +362,7 @@ def main():
     original_msg = sys.stdin.buffer.read()
     msg = email.message_from_bytes(original_msg)
 
-    original_to = detect_original_list(msg, recipients)
+    original_to = detect_original_recipient(msg, recipients)
 
     # If list detection failed entirely, this is a transactional email (e.g. password
     # reset, notification) — not a mailing list message.  Pass it through to the
@@ -316,10 +383,12 @@ def main():
             sys.stderr.write(f"maillist-rewriter: SMTP passthrough failed: {e}\n")
             sys.exit(os.EX_TEMPFAIL)
 
-    # Rewrite if this is going to a mailing list.
-    # Pass the SMTP envelope sender so the passthrough guard uses a
-    # Postfix-verified address instead of the (spoofable) From header.
-    if original_to and original_to.lower() in ALL_KNOWN_LISTS:
+    # Rewrite only actual mailing-list recipients. Direct forwarding aliases
+    # must retain their original headers and envelope sender.
+    is_mailing_list = routing_class(original_to) == "mailing_list"
+    if is_mailing_list:
+        # Pass the SMTP envelope sender so the passthrough guard uses a
+        # Postfix-verified address instead of the (spoofable) From header.
         msg = rewrite_headers(msg, original_to, envelope_sender=sender)
 
     # Reinject to port 10025 (bypasses content_filter)
@@ -327,9 +396,12 @@ def main():
     # SMTP2Go checks both envelope sender AND From header domain
     try:
         smtp = smtplib.SMTP('127.0.0.1', 10025)
-        # Extract envelope sender from rewritten From header
-        from_header = msg.get("From", "")
-        _, envelope_sender = parseaddr(from_header)
+        # Mailing-list reinjection uses the rewritten From address. Direct
+        # aliases and unknown recipients retain the original envelope sender.
+        envelope_sender = sender
+        if is_mailing_list:
+            from_header = msg.get("From", "")
+            _, envelope_sender = parseaddr(from_header)
         # Ensure we never use an empty envelope sender; prefer verified mailing list addresses
         if not envelope_sender:
             sys.stderr.write("maillist-rewriter: Warning: Rewritten From header is empty or unparsable; this indicates a potential bug in rewrite_headers. Falling back to a verified mailing list envelope sender.\n")

@@ -6,7 +6,61 @@ from django.db import IntegrityError
 
 from logsheet.models import Glider
 from members.models import Member
-from siteconfig.models import MailingList, MailingListCriterion, MembershipStatus
+from siteconfig.models import (
+    EmailAlias,
+    MailingList,
+    MailingListCriterion,
+    MembershipStatus,
+    SiteConfiguration,
+)
+
+
+@pytest.mark.django_db
+class TestEmailAlias:
+    def test_external_forward(self):
+        alias = EmailAlias(name="admin", destination="inbox@example.com")
+        alias.full_clean()
+        alias.save()
+        assert str(alias) == "admin"
+
+    def test_list_name_collision(self):
+        MailingList.objects.create(
+            name="board", criteria=[MailingListCriterion.DIRECTOR]
+        )
+        with pytest.raises(ValidationError):
+            EmailAlias(name="board", destination="inbox@example.com").full_clean()
+
+    def test_new_list_cannot_shadow_alias(self):
+        EmailAlias.objects.create(name="board", destination="inbox@example.com")
+        with pytest.raises(ValidationError):
+            MailingList(
+                name="board", criteria=[MailingListCriterion.DIRECTOR]
+            ).full_clean()
+        with pytest.raises(ValidationError):
+            MailingList(
+                name="board-bounces", criteria=[MailingListCriterion.DIRECTOR]
+            ).full_clean()
+
+    def test_bounce_address_cannot_shadow_list(self):
+        MailingList.objects.create(
+            name="board-bounces", criteria=[MailingListCriterion.DIRECTOR]
+        )
+        with pytest.raises(ValidationError):
+            EmailAlias(name="board", destination="inbox@example.com").full_clean()
+
+    @pytest.mark.parametrize(
+        "name", ["bad name", "UPPER", "bad@domain", "test-bounces", "a..b"]
+    )
+    def test_rejects_invalid_names(self, name):
+        with pytest.raises(ValidationError):
+            EmailAlias(name=name, destination="inbox@example.com").full_clean()
+
+    def test_rejects_club_domain_loop(self):
+        SiteConfiguration.objects.create(
+            club_name="Club", club_abbreviation="CLUB", domain_name="example.org"
+        )
+        with pytest.raises(ValidationError):
+            EmailAlias(name="contact", destination="contact@example.org").full_clean()
 
 
 @pytest.fixture

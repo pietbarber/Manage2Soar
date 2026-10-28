@@ -150,6 +150,23 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
 
         lines.append("")
 
+    # Direct forwarding addresses are not mailing lists. Keep their section
+    # distinct so the header rewriter can distinguish them from list aliases.
+    lines.append("# --- Administrative forwarding aliases ---")
+    for domain, data in clubs_data.items():
+        if not data:
+            continue
+        for name, destination in data.get('forwarding_aliases', {}).items():
+            alias_address = f"{name}@{domain}"
+            if not is_valid_email(alias_address) or not is_valid_email(destination):
+                print(f"[{datetime.now()}] WARNING: Invalid forwarding alias for {domain}, skipping")
+                continue
+            recipient = dev_redirect if dev_enabled else destination
+            if not is_valid_email(recipient) or recipient.lower() == alias_address.lower():
+                print(f"[{datetime.now()}] WARNING: Invalid forwarding destination for {alias_address}, skipping")
+                continue
+            lines.append(f"{alias_address}  {recipient}")
+
     return '\n'.join(lines)
 
 

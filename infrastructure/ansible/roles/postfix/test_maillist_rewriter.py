@@ -79,6 +79,81 @@ def get_callable(namespace, name):
     return cast(Callable[..., Any], namespace[name])
 
 
+def test_administrative_forward_not_detected_as_list(tmp_path):
+    ns = load_template_namespace()
+    virtual = tmp_path / "virtual"
+    virtual.write_text(
+        "test@skylinesoaring.org  inbox@example.com\n"
+        "# --- Administrative forwarding aliases ---\n"
+        "admin@skylinesoaring.org  inbox@example.com\n"
+        "admin-bounces@skylinesoaring.org  inbox@example.com\n"
+    )
+    load_lists = get_callable(ns, "_load_lists_from_virtual")
+    load_forwards = get_callable(ns, "_load_forwarding_aliases_from_virtual")
+    assert load_lists(str(virtual)) == {"test@skylinesoaring.org"}
+    assert "admin@skylinesoaring.org" in load_forwards(str(virtual))
+
+    ns["FORWARDING_ALIASES"] = {"admin@skylinesoaring.org"}
+    msg = EmailMessage()
+    msg["From"] = "sender@example.com"
+    msg["To"] = "admin@skylinesoaring.org"
+    msg.set_content("Body")
+    assert (
+        get_callable(ns, "detect_original_list")(msg, ["inbox@example.com"])
+        == "admin@skylinesoaring.org"
+    )
+
+    assert (
+        get_callable(ns, "routing_class")("admin@skylinesoaring.org")
+        == "forwarding_alias"
+    )
+
+
+def test_direct_forward_is_detected_without_being_a_list():
+    ns = load_template_namespace()
+    msg = EmailMessage()
+    msg["X-Original-To"] = "admin@skylinesoaring.org"
+    msg["To"] = "preview@example.com"
+    msg["From"] = "sender@example.com"
+    msg.set_content("Body")
+
+    ns["FORWARDING_ALIASES"] = {"admin@skylinesoaring.org"}
+    detect = get_callable(ns, "detect_original_recipient")
+    assert detect(msg, ["preview@example.com"]) == "admin@skylinesoaring.org"
+    assert "admin@skylinesoaring.org" not in ns["ALL_KNOWN_LISTS"]
+    assert (
+        get_callable(ns, "routing_class")("admin@skylinesoaring.org")
+        == "forwarding_alias"
+    )
+    assert (
+        get_callable(ns, "routing_class")("webmaster@skylinesoaring.org")
+        == "mailing_list"
+    )
+
+
+def test_forward_shadowing_legacy_list_is_not_treated_as_list():
+    ns = load_template_namespace()
+    ns["FORWARDING_ALIASES"] = {"webmaster@skylinesoaring.org"}
+    ns["ALL_KNOWN_LISTS"] = ns["MAILING_LISTS"] - ns["FORWARDING_ALIASES"]
+    msg = EmailMessage()
+    msg["To"] = "webmaster@skylinesoaring.org"
+    msg["From"] = "sender@example.com"
+    msg.set_content("Body")
+    assert (
+        get_callable(ns, "detect_original_list")(msg, ["preview@gmail.com"])
+        == "webmaster@skylinesoaring.org"
+    )
+
+
+def test_bounce_to_shared_dev_inbox_is_not_rewritten_as_list():
+    ns = load_template_namespace()
+    msg = EmailMessage()
+    msg["To"] = "admin-bounces@skylinesoaring.org"
+    msg["From"] = "mailer-daemon@example.com"
+    msg.set_content("Bounce")
+    assert get_callable(ns, "detect_original_list")(msg, ["preview@gmail.com"]) is None
+
+
 def test_to_header_detection():
     """List in To header is detected by production logic."""
     ns = load_template_namespace()
