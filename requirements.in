@@ -5,6 +5,7 @@ bleach
 black>=26.10.1
 msgpack>=1.2.3
 crispy-bootstrap4
+django-axes>=8.0,<9
 django-crispy-forms
 django-extensions
 django-htmx

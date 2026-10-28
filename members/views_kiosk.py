@@ -17,17 +17,11 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
+from utils.ip_utils import get_client_ip
+
 from .models import KioskAccessLog, KioskToken
 
 logger = logging.getLogger(__name__)
-
-
-def get_client_ip(request):
-    """Extract client IP address from request, handling proxies."""
-    x_forwarded_for = request.headers.get("x-forwarded-for")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
 
 
 def log_kiosk_access(
