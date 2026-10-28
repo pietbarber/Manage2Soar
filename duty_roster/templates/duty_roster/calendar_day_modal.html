@@ -115,6 +115,7 @@
         </div>
         {% endif %}
 
+        {# Issue #1129: the commercial-pilot card only renders on clubs that run commercial-ride duty. The view gates scheduled_holes.commercial_pilot on both flags; on a non-commercial club assignment.commercial_pilot is always NULL, so this condition is sufficient. #}
         {% if assignment.commercial_pilot or scheduled_holes.commercial_pilot %}
         <div class="col-6">
           <div class="d-flex align-items-start">

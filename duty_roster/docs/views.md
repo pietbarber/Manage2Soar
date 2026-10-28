@@ -12,6 +12,9 @@ This document describes the main view functions in `duty_roster/views.py` and th
   qualified to fill (Issue #1120). Reuses `_build_volunteer_opportunities` from
   `views_swap`. Anonymous users and members with no matches see an inviting empty state;
   the page intentionally stays public so it can serve as the app index (see `test_smoke.py`).
+  **Note (Issue #1129):** the commercial-pilot hole is only offered on clubs that BOTH
+  enable commercial rides (`commercial_rides_enabled`) AND schedule commercial pilots
+  (`schedule_commercial_pilots`); the other four roles keep the #1120 un-gated behavior.
 - **blackout_manage(request)**: Allows members to manage their blackout (unavailable) dates.
 - **duty_calendar_view(request, year=None, month=None)**: Renders the main duty calendar for a given month/year.
 - **calendar_day_detail(request, year, month, day)**: Shows details for a specific day, including assignments and signups.

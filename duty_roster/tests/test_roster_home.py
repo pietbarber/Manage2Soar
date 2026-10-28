@@ -260,3 +260,69 @@ def test_roster_home_passes_local_date_not_utc(client, django_user_model):
     assert mock_build.called
     passed_date = mock_build.call_args[0][1]
     assert passed_date == date.today()
+
+
+# ---------------------------------------------------------------------------
+# Issue #1129: commercial-pilot hole gated on BOTH commercial_rides_enabled
+# AND schedule_commercial_pilots on the "Fill a Roster Hole" page.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_roster_home_hides_commercial_when_flags_off(client, django_user_model):
+    """A commercial-qualified member does NOT see the commercial-pilot hole on
+    roster_home when either flag is OFF (default: both OFF, e.g. ssc).
+    Issue #1129."""
+    _make_config(commercial_rides_enabled=False, schedule_commercial_pilots=False)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    _future_assignment()
+
+    client.force_login(user)
+    response = client.get(_home_url())
+
+    assert response.status_code == 200
+    opportunities = response.context["volunteer_opportunities"]
+    for opp in opportunities:
+        assert "commercial" not in str(opp.get("role_label", "")).lower()
+
+
+@pytest.mark.django_db
+def test_roster_home_hides_commercial_when_one_flag_off(client, django_user_model):
+    """The commercial-pilot hole is still hidden if only ONE of the two flags
+    is ON. Issue #1129."""
+    _make_config(commercial_rides_enabled=True, schedule_commercial_pilots=False)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    _future_assignment()
+
+    client.force_login(user)
+    response = client.get(_home_url())
+
+    assert response.status_code == 200
+    opportunities = response.context["volunteer_opportunities"]
+    for opp in opportunities:
+        assert "commercial" not in str(opp.get("role_label", "")).lower()
+
+
+@pytest.mark.django_db
+def test_roster_home_lists_commercial_when_both_flags_on(client, django_user_model):
+    """A commercial-qualified member sees the commercial-pilot hole on
+    roster_home when BOTH flags are ON and the slot is empty. Issue #1129."""
+    _make_config(commercial_rides_enabled=True, schedule_commercial_pilots=True)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.get(_home_url())
+
+    assert response.status_code == 200
+    opportunities = response.context["volunteer_opportunities"]
+    commercial_opp = next(
+        (
+            o
+            for o in opportunities
+            if "commercial" in str(o.get("role_label", "")).lower()
+        ),
+        None,
+    )
+    assert commercial_opp is not None
+    assert f"/{assignment.id}/commercial_pilot/" in commercial_opp["volunteer_url"]

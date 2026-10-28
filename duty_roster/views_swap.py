@@ -41,7 +41,7 @@ from .models import (
 )
 from .utils.ics import generate_swap_ics
 from .utils.role_resolution import RoleResolutionService
-from .utils.roles import member_is_commercial_pilot
+from .utils.roles import commercial_duty_enabled, member_is_commercial_pilot
 
 logger = logging.getLogger("duty_roster.views_swap")
 
@@ -552,7 +552,14 @@ def _build_volunteer_opportunities(member, today):
                         "assignment": assignment,
                     }
                 )
-            if not assignment.commercial_pilot and member_is_commercial_pilot(member):
+            # Issue #1129: only offer the commercial-pilot hole on clubs that
+            # both enable commercial rides and schedule commercial pilots
+            # (PR #1121 un-gated this while fixing #1120).
+            if (
+                not assignment.commercial_pilot
+                and member_is_commercial_pilot(member)
+                and commercial_duty_enabled(config)
+            ):
                 opportunities.append(
                     {
                         "date": d,

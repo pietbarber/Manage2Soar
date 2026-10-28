@@ -30,6 +30,12 @@ def _make_config(**kwargs):
         schedule_duty_officers=True,
         schedule_assistant_duty_officers=True,
         schedule_commercial_pilots=True,
+        # Issue #1129: the commercial-pilot duty hole is only offered when BOTH
+        # commercial rides and commercial-pilot scheduling are enabled. The
+        # defaults here keep the pre-#1129 "all roles fillable" behavior for the
+        # existing five-role tests; individual tests override either flag to
+        # exercise the new gate.
+        commercial_rides_enabled=True,
     )
     defaults.update(kwargs)
     existing = SiteConfiguration.objects.first()
@@ -546,6 +552,140 @@ def test_commercial_hole_requires_commercial_rating(client, django_user_model):
     assert response.status_code == 200
     holes = response.context["volunteerable_holes"]
     assert "commercial_pilot" in holes
+
+
+# ---------------------------------------------------------------------------
+# Issue #1129: commercial-pilot hole gated on BOTH commercial_rides_enabled
+# AND schedule_commercial_pilots. The other four roles keep the #1120
+# behavior (no flag gate).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_commercial_post_rejected_when_rides_disabled(client, django_user_model):
+    """POST is rejected when commercial_rides_enabled is OFF (even if the
+    schedule flag is ON). Issue #1129."""
+    _make_config(commercial_rides_enabled=False, schedule_commercial_pilots=True)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "commercial_pilot"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.commercial_pilot is None
+
+
+@pytest.mark.django_db
+def test_commercial_post_rejected_when_scheduling_disabled(client, django_user_model):
+    """POST is rejected when schedule_commercial_pilots is OFF (even if rides
+    are enabled). Issue #1129."""
+    _make_config(commercial_rides_enabled=True, schedule_commercial_pilots=False)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "commercial_pilot"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.commercial_pilot is None
+
+
+@pytest.mark.django_db
+def test_commercial_post_rejected_when_both_flags_off(client, django_user_model):
+    """POST is rejected when both commercial flags are OFF (the default case,
+    e.g. ssc). Issue #1129."""
+    _make_config(commercial_rides_enabled=False, schedule_commercial_pilots=False)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "commercial_pilot"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.commercial_pilot is None
+
+
+@pytest.mark.django_db
+def test_commercial_get_confirms_when_both_flags_on(client, django_user_model):
+    """GET shows the confirm page when BOTH flags are ON and the member is
+    qualified. Issue #1129."""
+    _make_config(commercial_rides_enabled=True, schedule_commercial_pilots=True)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.get(_url(assignment.id, "commercial_pilot"))
+
+    assert response.status_code == 200
+    assert b"Volunteer to Fill" in response.content
+
+
+@pytest.mark.django_db
+def test_commercial_post_assigns_when_both_flags_on(client, django_user_model):
+    """POST assigns the commercial-pilot role when BOTH flags are ON and the
+    member is qualified. Issue #1129."""
+    _make_config(commercial_rides_enabled=True, schedule_commercial_pilots=True)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "commercial_pilot"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.commercial_pilot == user
+
+
+@pytest.mark.django_db
+def test_commercial_hole_absent_from_modal_when_flags_off(client, django_user_model):
+    """The commercial-pilot hole is NOT in scheduled_holes /
+    volunteerable_holes when BOTH flags are OFF. Issue #1129."""
+    _make_config(commercial_rides_enabled=False, schedule_commercial_pilots=False)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert "commercial_pilot" not in response.context["scheduled_holes"]
+    assert "commercial_pilot" not in response.context["volunteerable_holes"]
+
+
+@pytest.mark.django_db
+def test_commercial_hole_present_in_modal_when_both_flags_on(client, django_user_model):
+    """The commercial-pilot hole IS surfaced when BOTH flags are ON and the
+    slot is empty. Issue #1129."""
+    _make_config(commercial_rides_enabled=True, schedule_commercial_pilots=True)
+    user = _make_user(django_user_model, username="cp", glider_rating="commercial")
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert "commercial_pilot" in response.context["scheduled_holes"]
+    assert "commercial_pilot" in response.context["volunteerable_holes"]
 
 
 @pytest.mark.django_db
