@@ -236,13 +236,16 @@ class TestCommercialPilotHoleGate(DjangoPlaywrightTestCase):
         )
         day_cell.first.click()
         self.page.wait_for_selector("#modal-body")
+        # Wait for the HTMX response content to load so locator.count() (which
+        # does not retry) inspects the fully rendered modal, not the loading
+        # spinner. .modal-header-content is response-only content.
+        self.page.wait_for_selector("#modal-body .modal-header-content")
 
         # The commercial-pilot card should not be rendered at all.
         commercial_label = self.page.locator("text=Commercial Pilot")
         assert commercial_label.count() == 0
 
         # No "Volunteer to fill" button for commercial pilot.
-        self.page.wait_for_timeout(200)  # allow HTMX response to settle
         volunteer_commercial = self.page.locator("a[href*='/commercial_pilot/']")
         assert volunteer_commercial.count() == 0
 
@@ -278,9 +281,14 @@ class TestCommercialPilotHoleGate(DjangoPlaywrightTestCase):
         )
         day_cell.first.click()
         self.page.wait_for_selector("#modal-body")
+        # Wait for the HTMX response content to load so locator.count() (which
+        # does not retry) inspects the fully rendered modal, not the loading
+        # spinner. .modal-header-content is response-only content.
+        self.page.wait_for_selector("#modal-body .modal-header-content")
 
         # The commercial-pilot card should be rendered.
         commercial_label = self.page.locator("text=Commercial Pilot")
+        commercial_label.first.wait_for(state="visible")
         assert commercial_label.count() >= 1
 
         # And a "Volunteer to fill" button pointing at commercial_pilot.
