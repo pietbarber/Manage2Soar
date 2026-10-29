@@ -23,7 +23,7 @@ class MailingListAdminForm(forms.ModelForm):
     """Custom form with multi-select widget for criteria."""
 
     criteria_select = forms.MultipleChoiceField(
-        choices=MailingListCriterion.choices,
+        choices=(),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label="Membership Criteria",
@@ -41,6 +41,66 @@ class MailingListAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from members.models import MemberTag, RoleMetadata
+
+        selected = list(self.instance.criteria or []) if self.instance else []
+        role_choices = [
+            (f"role:{role.key}", role.display_name)
+            for role in RoleMetadata.objects.filter(mailing_list_eligible=True)
+        ]
+        tag_choices = [
+            (f"tag:{tag.key}", tag.display_label)
+            for tag in MemberTag.objects.filter(is_active=True)
+        ]
+        known_values = {value for value, _label in MailingListCriterion.choices}
+        known_values.update(value for value, _label in role_choices)
+        known_values.update(value for value, _label in tag_choices)
+        # Keep legacy/stale values selectable while editing an existing list;
+        # model validation still prevents newly accepting an ineligible role.
+        selected_roles = {
+            role_key: criterion
+            for criterion in selected
+            if (role_key := MailingList._role_key_from_selector(criterion))
+        }
+        role_metadata = {
+            role.key: role
+            for role in RoleMetadata.objects.filter(key__in=selected_roles)
+        }
+        selected_tag_keys = {
+            tag_key: criterion
+            for criterion in selected
+            if (tag_key := MailingList._tag_key_from_selector(criterion))
+        }
+        tags = {
+            tag.key: tag for tag in MemberTag.objects.filter(key__in=selected_tag_keys)
+        }
+        preserved = []
+        for value in selected:
+            if value in known_values:
+                continue
+            role_key = MailingList._role_key_from_selector(value)
+            role = role_metadata.get(role_key)
+            if role_key:
+                if role is None:
+                    label = f"⚠️ {value} (stale/missing role metadata)"
+                else:
+                    label = MailingList._role_display(role_key, role)
+            elif tag_key := MailingList._tag_key_from_selector(value):
+                tag = tags.get(tag_key)
+                if tag is None:
+                    label = f"⚠️ {value} (stale/missing tag)"
+                else:
+                    label = MailingList._tag_display(tag_key, tag)
+            else:
+                label = f"⚠️ {value} (stale criterion)"
+            preserved.append((value, label))
+
+        self.fields["criteria_select"].choices = [
+            *MailingListCriterion.choices,
+            *role_choices,
+            *tag_choices,
+            *preserved,
+        ]
         # Pre-populate criteria_select from the JSON field
         if self.instance and self.instance.pk:
             self.fields["criteria_select"].initial = self.instance.criteria or []
