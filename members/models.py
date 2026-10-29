@@ -5,7 +5,8 @@ from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
-from django.db import models, transaction
+from django.core.exceptions import ValidationError
+from django.db import models, router, transaction
 from django.db.models import Q
 from tinymce.models import HTMLField
 
@@ -57,6 +58,127 @@ class Biography(models.Model):
 
     def __str__(self):
         return f"Biography of {self.member.get_full_name()}"
+
+
+class RoleMetadata(models.Model):
+    """Stable, user-facing metadata for a Django authentication Group."""
+
+    group = models.OneToOneField(
+        Group,
+        on_delete=models.CASCADE,
+        related_name="role_metadata",
+    )
+    key = models.CharField(max_length=100, unique=True)
+    display_name = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    is_builtin = models.BooleanField(default=False)
+    is_protected = models.BooleanField(default=False)
+    is_system_managed = models.BooleanField(default=False)
+    is_assignable = models.BooleanField(default=True)
+    mailing_list_eligible = models.BooleanField(default=False)
+    qualification_permission_bundle = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow this Group to be selected as a permission bundle for a "
+            "current member qualification."
+        ),
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "display_name", "pk")
+
+    def __str__(self):
+        return self.display_name
+
+    def clean(self):
+        super().clean()
+        if self.qualification_permission_bundle and (
+            self.is_protected or self.is_system_managed or self.is_builtin
+        ):
+            raise ValidationError(
+                {
+                    "qualification_permission_bundle": (
+                        "Protected, system-managed, and built-in roles cannot "
+                        "be qualification permission bundles."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class MemberRoleAssignment(models.Model):
+    """An auditable reason a member belongs to an auth Group."""
+
+    SOURCE_CHOICES = (
+        ("manual", "Manual"),
+        ("status", "Status"),
+        ("legacy", "Legacy role flag"),
+    )
+
+    member = models.ForeignKey(
+        "Member", on_delete=models.CASCADE, related_name="role_assignments"
+    )
+    group = models.ForeignKey(
+        Group, on_delete=models.CASCADE, related_name="member_role_assignments"
+    )
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
+    source_key = models.CharField(max_length=100)
+    actor = models.ForeignKey(
+        "Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="role_assignments_made",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(
+                fields=("member", "group", "source", "source_key"),
+                name="unique_member_role_assignment_provenance",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.member} - {self.group} ({self.source}:{self.source_key})"
+
+
+class MemberTag(models.Model):
+    """A permissionless, reusable label that may be assigned to members.
+
+    This first slice intentionally supports only manually managed assignments.
+    Template variables, audience resolution, aircraft-derived instances, and
+    profile visibility are follow-up work and are not represented here.
+    """
+
+    key = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Stable identifier for this tag; changing it is discouraged.",
+    )
+    display_label = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    members = models.ManyToManyField(
+        "Member",
+        through="MemberTagAssignment",
+        related_name="member_tags",
+    )
+
+    class Meta:
+        ordering = ("sort_order", "display_label", "pk")
+        default_permissions = ()
+
+    def __str__(self):
+        return self.display_label
 
 
 #########################
@@ -362,16 +484,56 @@ class Member(AbstractUser):
             names.append("Treasurer")
         return names
 
-    def _sync_groups(self):
-        # Only safe after PK exists
+    def _sync_groups(self, using=None):
+        """Reconcile role-flag assignments without touching other grants."""
         if not self.pk:
             return
-        desired = []
-        for name in self._desired_group_names():
-            grp, _ = Group.objects.get_or_create(name=name)
-            desired.append(grp)
-        # Atomic replace; avoids add/remove churn
-        self.groups.set(desired)
+        using = (
+            using or self._state.db or router.db_for_write(type(self), instance=self)
+        )
+        with transaction.atomic(using=using):
+            desired = {
+                name: key
+                for name, key in (
+                    ("Rostermeisters", "rostermeister"),
+                    ("Instructor Admins", "instructor"),
+                    ("Member Managers", "member_manager"),
+                    ("Webmasters", "webmaster"),
+                    ("Secretary", "secretary"),
+                    ("Treasurer", "treasurer"),
+                )
+                if getattr(self, key)
+            }
+            for name, source_key in desired.items():
+                group, _ = Group.objects.using(using).get_or_create(name=name)
+                MemberRoleAssignment.objects.using(using).get_or_create(
+                    member=self,
+                    group=group,
+                    source="legacy",
+                    source_key=source_key,
+                )
+
+            stale = MemberRoleAssignment.objects.using(using).filter(
+                member_id=self.pk, source="legacy"
+            )
+            if desired:
+                stale = stale.exclude(source_key__in=desired.values())
+            for assignment in stale.select_related("group"):
+                assignment.delete(using=using)
+                if (
+                    not MemberRoleAssignment.objects.using(using)
+                    .filter(member_id=self.pk, group_id=assignment.group_id)
+                    .exists()
+                ):
+                    self.groups.db_manager(using).remove(assignment.group)
+
+            # Existing and newly-created provenance rows must be reflected in
+            # the M2M table, but this deliberately never replaces the member's groups.
+            self.groups.db_manager(using).add(
+                *Group.objects.using(using)
+                .filter(member_role_assignments__member_id=self.pk)
+                .distinct()
+            )
 
     @classmethod
     def get_membership_status_choices(cls):
@@ -448,7 +610,12 @@ class Member(AbstractUser):
                     )
 
         # 5) now safe to touch M2M
-        transaction.on_commit(self._sync_groups)
+        using = (
+            kwargs.get("using")
+            or self._state.db
+            or router.db_for_write(type(self), instance=self)
+        )
+        transaction.on_commit(lambda: self._sync_groups(using=using), using=using)
 
     class Meta:
         verbose_name = "user"
@@ -564,6 +731,34 @@ class MemberBadge(models.Model):
 
     def __str__(self):
         return f"{self.member} - {self.badge.name}"
+
+
+class MemberTagAssignment(models.Model):
+    """Manual membership of a member in a permissionless :class:`MemberTag`."""
+
+    tag = models.ForeignKey(
+        MemberTag,
+        on_delete=models.CASCADE,
+        related_name="assignments",
+    )
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="tag_assignments",
+    )
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tag", "member"),
+                name="unique_member_tag_assignment",
+            )
+        ]
+        ordering = ("member__last_name", "member__first_name", "pk")
+
+    def __str__(self):
+        return f"{self.member} - {self.tag.display_label}"
 
 
 #########################

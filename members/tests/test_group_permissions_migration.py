@@ -7,6 +7,8 @@ all migrations at setup time, the groups and permissions should already exist
 when these tests run -- we simply assert the expected state.
 """
 
+from importlib import import_module
+
 import pytest
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
@@ -49,6 +51,36 @@ def test_all_canonical_groups_exist():
         assert Group.objects.filter(
             name=name
         ).exists(), f"Group '{name}' was not created by migration 0021"
+
+
+@pytest.mark.django_db
+def test_every_canonical_permission_is_backfilled_after_all_migrations():
+    """0025 must complete any assignments unavailable when 0021 first runs."""
+    mapping = import_module(
+        "members.migrations.0021_setup_all_group_permissions"
+    ).GROUP_PERMISSIONS
+    missing = []
+
+    for group_name, permission_tuples in mapping.items():
+        group = Group.objects.filter(name=group_name).first()
+        if group is None:
+            missing.append(f"{group_name}: group missing")
+            continue
+        for app_label, model_name, codename in permission_tuples:
+            permission = Permission.objects.filter(
+                content_type__app_label=app_label,
+                content_type__model=model_name,
+                codename=codename,
+            ).first()
+            if (
+                permission is None
+                or not group.permissions.filter(pk=permission.pk).exists()
+            ):
+                missing.append(f"{group_name}: {app_label}.{model_name}.{codename}")
+
+    assert (
+        not missing
+    ), "Canonical Group permissions missing after migrations:\n" + "\n".join(missing)
 
 
 # ---------------------------------------------------------------------------
