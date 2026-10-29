@@ -7,6 +7,7 @@ from django.contrib.auth.models import Group, Permission
 from django.test import RequestFactory
 from django.urls import reverse
 
+import members.admin as members_admin_module
 from members.admin import MemberAdmin, RoleMetadataInline, SuperuserOnlyGroupAdmin
 from members.models import Member, MemberRoleAssignment, RoleMetadata
 from siteconfig.models import MailingList, MembershipStatus
@@ -270,6 +271,136 @@ def test_member_admin_group_add_and_remove_records_manual_provenance(superuser):
     member.groups.remove(custom_group)
     member_admin.save_related(request, form, [], change=True)
     assert not MemberRoleAssignment.objects.filter(pk=assignment.pk).exists()
+
+
+@pytest.mark.django_db
+def test_member_admin_removes_only_its_manual_source(superuser):
+    member = Member.objects.create_user(username="admin-multi-source-member")
+    group = Group.objects.create(name="Multi-source role")
+    request = RequestFactory().post("/admin/")
+    request.user = superuser
+    member_admin = MemberAdmin(Member, admin.site)
+    form = SimpleNamespace(instance=member, changed_data=[], save_m2m=lambda: None)
+
+    member_admin.save_model(request, member, form, change=True)
+    member.groups.add(group)
+    member_admin.save_related(request, form, [], change=True)
+    committee = MemberRoleAssignment.objects.create(
+        member=member,
+        group=group,
+        source="manual",
+        source_key="committee",
+    )
+
+    member_admin.save_model(request, member, form, change=True)
+    member.groups.remove(group)
+    member_admin.save_related(request, form, [], change=True)
+
+    assert MemberRoleAssignment.objects.filter(pk=committee.pk).exists()
+    assert not MemberRoleAssignment.objects.filter(
+        member=member, group=group, source="manual", source_key="admin"
+    ).exists()
+    assert member.groups.filter(pk=group.pk).exists()
+
+
+@pytest.mark.django_db
+def test_real_member_admin_form_routes_groups_through_role_service(
+    superuser, monkeypatch
+):
+    member = Member.objects.create_user(username="real-admin-form-member")
+    group = Group.objects.create(name="Real form selected role")
+    request = RequestFactory().post("/admin/")
+    request.user = superuser
+    member_admin = MemberAdmin(Member, admin.site)
+    form_class = member_admin.get_form(request, member)
+    form = form_class(
+        data={
+            "username": member.username,
+            "date_joined_0": member.date_joined.strftime("%Y-%m-%d"),
+            "date_joined_1": member.date_joined.strftime("%H:%M:%S"),
+            "glider_rating": member.glider_rating,
+            "contact_visibility_email": "inherit",
+            "contact_visibility_phone": "inherit",
+            "contact_visibility_address": "inherit",
+            "is_active": "on",
+            "groups": [str(group.pk)],
+        },
+        instance=member,
+    )
+    assert form.is_valid(), form.errors
+    form.instance = form.save(commit=False)
+    member_admin.save_model(request, form.instance, form, change=True)
+
+    original_save_m2m = form.save_m2m
+    groups_present_during_save_m2m = None
+
+    def observed_save_m2m():
+        nonlocal groups_present_during_save_m2m
+        groups_present_during_save_m2m = "groups" in form.cleaned_data
+        original_save_m2m()
+
+    form.save_m2m = observed_save_m2m
+    calls = []
+    real_set_manual_role = members_admin_module.set_manual_role
+
+    def observed_set_manual_role(*args, **kwargs):
+        calls.append((args, kwargs))
+        return real_set_manual_role(*args, **kwargs)
+
+    monkeypatch.setattr(
+        members_admin_module, "set_manual_role", observed_set_manual_role
+    )
+
+    member_admin.save_related(request, form, [], change=True)
+
+    assert groups_present_during_save_m2m is False
+    assert len(calls) == 1
+    assert calls[0][0][:2] == (member, group)
+    assert calls[0][1] == {"enabled": True, "actor": superuser}
+    assert MemberRoleAssignment.objects.filter(
+        member=member,
+        group=group,
+        source="manual",
+        source_key="admin",
+        actor=superuser,
+    ).exists()
+    assert member.groups.filter(pk=group.pk).exists()
+
+
+@pytest.mark.django_db
+def test_member_admin_permission_summary_shows_every_group_source(superuser):
+    MembershipStatus.objects.get_or_create(
+        name="Full Member", defaults={"is_active": True}
+    )
+    member = Member.objects.create_user(
+        username="permission-summary-member", membership_status="Full Member"
+    )
+    group = Group.objects.create(name="Summary role")
+    permission = Permission.objects.get(
+        content_type__app_label="auth", codename="view_group"
+    )
+    group.permissions.add(permission)
+    member.groups.add(group)
+    MemberRoleAssignment.objects.create(
+        member=member,
+        group=group,
+        source="manual",
+        source_key="admin",
+        actor=superuser,
+    )
+    MemberRoleAssignment.objects.create(
+        member=member,
+        group=group,
+        source="status",
+        source_key="Full Member",
+    )
+
+    summary = str(MemberAdmin(Member, admin.site).permission_source_summary(member))
+
+    assert "auth.view_group [effective]" in summary
+    assert "Group Summary role (manual:admin)" in summary
+    assert f"actor member #{superuser.pk}" in summary
+    assert "Group Summary role (status:Full Member)" in summary
 
 
 @pytest.mark.django_db

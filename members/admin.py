@@ -27,7 +27,6 @@ from .models import (
     KioskToken,
     Member,
     MemberBadge,
-    MemberRoleAssignment,
     MemberTag,
     MemberTagAssignment,
     RoleMetadata,
@@ -35,12 +34,14 @@ from .models import (
     VisitingPilotVisit,
 )
 from .models_applications import MembershipApplication
+from .permission_sources import get_permission_sources
 from .resources import (
     MEMBER_CSV_FIELDS,
     MemberResource,
     serialize_contact_visibility,
     serialize_emergency_contacts,
 )
+from .services.role_assignments import set_manual_role
 from .utils.image_processing import generate_profile_thumbnails
 
 logger = logging.getLogger(__name__)
@@ -580,7 +581,11 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             writer.writerow(row)
         return response
 
-    readonly_fields = ("profile_photo_preview", "redact_contact")
+    readonly_fields = (
+        "profile_photo_preview",
+        "redact_contact",
+        "permission_source_summary",
+    )
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
@@ -685,6 +690,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "is_superuser",
                     "groups",
                     "user_permissions",
+                    "permission_source_summary",
                 )
             },
         ),
@@ -791,33 +797,84 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         if not change and form.cleaned_data.get("send_account_setup_email"):
             transaction.on_commit(lambda: self._send_account_setup_email_safely(obj))
 
+    @admin.display(description="Effective permissions and all sources")
+    def permission_source_summary(self, obj):
+        if obj is None or not obj.pk:
+            return "Save the member before inspecting permission sources."
+
+        breakdown = get_permission_sources(obj)
+        lines = []
+        if breakdown["superuser_override"]:
+            lines.append("SUPERUSER OVERRIDE: all permissions")
+        for permission, detail in breakdown["permissions"].items():
+            state = "effective" if detail["effective"] else "not effective"
+            lines.append(f"{permission} [{state}]")
+            for source in detail["sources"]:
+                source_type = source["type"]
+                if source_type == "direct":
+                    label = "direct member permission"
+                elif source_type == "group":
+                    role = source.get("role_label") or source["group_name"]
+                    provenance = source.get("source")
+                    source_key = source.get("source_key")
+                    reason = (
+                        f"{provenance}:{source_key}"
+                        if source_key is not None
+                        else provenance
+                    )
+                    label = f"Group {role} ({reason})"
+                    if source.get("actor_id"):
+                        label += f", actor member #{source['actor_id']}"
+                elif source_type == "qualification":
+                    label = (
+                        "qualification "
+                        f"{source['qualification_code']} "
+                        f"(record #{source['member_qualification_id']})"
+                    )
+                else:
+                    label = source_type
+                if not source.get("effective", False):
+                    reason = source.get("ineffective_reason")
+                    label += f" [not effective{f': {reason}' if reason else ''}]"
+                lines.append(f"  - {label}")
+        if not lines:
+            lines.append("No configured permission sources.")
+        lines.append("")
+        lines.append(breakdown["cache_warning"])
+        return format_html(
+            "<pre style='white-space: pre-wrap'>{}</pre>", "\n".join(lines)
+        )
+
     def save_related(self, request, form, formsets, change):
-        super().save_related(request, form, formsets, change)
         member = form.instance
         using = getattr(member, "_admin_db", None) or _instance_db(member)
         before = getattr(member, "_admin_groups_before", set())
-        after = set(member.groups.db_manager(using).values_list("pk", flat=True))
-        added = after - before
-        removed = before - after
-        for group_id in added:
-            group = Group.objects.using(using).get(pk=group_id)
-            # A selected canonical group is owned by the deferred role-flag
-            # reconciliation while its corresponding flag is enabled.  Do
-            # not add a redundant manual source for the same grant.
+        cleaned_data = getattr(form, "cleaned_data", None)
+        # ModelForm.save_m2m would replace Groups before provenance is written.
+        # Save every other M2M/inline normally, but route the Groups selection
+        # exclusively through the source-specific manual role service.
+        selected_groups = None
+        if cleaned_data is not None and "groups" in cleaned_data:
+            selected_groups = cleaned_data.pop("groups")
+        try:
+            super().save_related(request, form, formsets, change)
+        finally:
+            if selected_groups is not None:
+                cleaned_data["groups"] = selected_groups
+
+        after = (
+            {group.pk for group in selected_groups}
+            if selected_groups is not None
+            else set(member.groups.db_manager(using).values_list("pk", flat=True))
+        )
+        for group in Group.objects.using(using).filter(pk__in=after - before):
+            # Legacy flag reconciliation owns this source while the flag is set.
             source_key = self.legacy_role_groups.get(group.name)
             if source_key and getattr(member, source_key, False):
                 continue
-            MemberRoleAssignment.objects.using(using).get_or_create(
-                member=member,
-                group=group,
-                source="manual",
-                source_key="admin",
-                defaults={"actor_id": request.user.pk},
-            )
-        if removed:
-            MemberRoleAssignment.objects.using(using).filter(
-                member_id=member.pk, group_id__in=removed, source="manual"
-            ).delete()
+            set_manual_role(member, group, enabled=True, actor=request.user)
+        for group in Group.objects.using(using).filter(pk__in=before - after):
+            set_manual_role(member, group, enabled=False)
 
     @staticmethod
     def _send_account_setup_email_safely(member):
