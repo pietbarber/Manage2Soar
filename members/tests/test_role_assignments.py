@@ -1,5 +1,4 @@
 import pytest
-from django.contrib.auth.models import Group
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
@@ -11,35 +10,40 @@ def test_role_assignment_migration_preserves_memberships_and_classifies_them():
     before = ("members", "0035_member_tags")
     after = ("members", "0036_member_role_assignments")
 
-    executor.migrate([before])
-    old_apps = executor.loader.project_state([before]).apps
-    OldGroup = old_apps.get_model("auth", "Group")
-    OldMember = old_apps.get_model("members", "Member")
-    OldPermission = old_apps.get_model("auth", "Permission")
-
-    mapped, _ = OldGroup.objects.get_or_create(name="Instructor Admins")
-    safety_group = OldGroup.objects.create(name="User-created Safety Coordinators")
-    equipment_group = OldGroup.objects.create(
-        name="User-created Equipment Coordinators"
-    )
-    member = OldMember.objects.create(username="migration-provenance", instructor=True)
-    second_member = OldMember.objects.create(username="second-manual-member")
-    member.groups.add(mapped, safety_group)
-    second_member.groups.add(safety_group, equipment_group)
-    permissions = list(OldPermission.objects.order_by("pk")[:2])
-    assert len(permissions) == 2
-    safety_group.permissions.add(permissions[0])
-    equipment_group.permissions.add(permissions[1])
-    before_memberships = {
-        user.pk: set(user.groups.values_list("pk", flat=True))
-        for user in (member, second_member)
-    }
-    before_permissions = {
-        group.name: set(group.permissions.values_list("pk", flat=True))
-        for group in (mapped, safety_group, equipment_group)
-    }
-
     try:
+        executor.migrate([before])
+        old_apps = executor.loader.project_state([before]).apps
+        OldGroup = old_apps.get_model("auth", "Group")
+        OldMember = old_apps.get_model("members", "Member")
+        OldPermission = old_apps.get_model("auth", "Permission")
+
+        # A preceding transaction=True test may have flushed data seeded by
+        # migrations.  0036 only needs this historical canonical Group; do not
+        # rely on the data migration having populated it.
+        mapped, _ = OldGroup.objects.get_or_create(name="Instructor Admins")
+        safety_group = OldGroup.objects.create(name="User-created Safety Coordinators")
+        equipment_group = OldGroup.objects.create(
+            name="User-created Equipment Coordinators"
+        )
+        member = OldMember.objects.create(
+            username="migration-provenance", instructor=True
+        )
+        second_member = OldMember.objects.create(username="second-manual-member")
+        member.groups.add(mapped, safety_group)
+        second_member.groups.add(safety_group, equipment_group)
+        permissions = list(OldPermission.objects.order_by("pk")[:2])
+        assert len(permissions) == 2
+        safety_group.permissions.add(permissions[0])
+        equipment_group.permissions.add(permissions[1])
+        before_memberships = {
+            user.pk: set(user.groups.values_list("pk", flat=True))
+            for user in (member, second_member)
+        }
+        before_permissions = {
+            group.name: set(group.permissions.values_list("pk", flat=True))
+            for group in (mapped, safety_group, equipment_group)
+        }
+
         # MigrationExecutor caches applied migrations; refresh it after moving
         # to the historical state before calculating the forward plan.
         executor = MigrationExecutor(connection)

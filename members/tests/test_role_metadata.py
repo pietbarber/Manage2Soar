@@ -2,6 +2,7 @@ from importlib import import_module
 from types import SimpleNamespace
 
 import pytest
+from django.apps import apps as django_apps
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import connection
@@ -78,6 +79,15 @@ def _fake_canonical_groups():
     ]
 
 
+def _ensure_current_canonical_role_metadata():
+    """Restore migration-seeded rows after a transaction test flushes them."""
+    for group_name in CANONICAL_ROLES:
+        Group.objects.get_or_create(name=group_name)
+    role_metadata_migration.seed_canonical_role_metadata(
+        django_apps, SimpleNamespace(connection=connection)
+    )
+
+
 def test_metadata_seed_fails_for_missing_canonical_group():
     groups = _fake_canonical_groups()[:-1]
 
@@ -109,6 +119,10 @@ def test_metadata_seed_fails_for_stable_key_collision():
 
 @pytest.mark.django_db
 def test_canonical_groups_have_stable_role_metadata():
+    # A preceding transaction=True migration test can flush data migrations
+    # without changing the recorded schema state.  Re-establish the same
+    # migration output so this test does not depend on file order.
+    _ensure_current_canonical_role_metadata()
     metadata = RoleMetadata.objects.select_related("group").order_by("sort_order")
 
     assert metadata.count() == len(CANONICAL_ROLES)
@@ -168,35 +182,41 @@ def test_metadata_migration_preserves_groups_memberships_and_permissions():
     before = ("members", "0033_member_manager_emergency_contact_permissions")
     after = ("members", "0034_role_metadata")
 
-    executor.migrate([before])
-    old_apps = executor.loader.project_state([before]).apps
-    OldGroup = old_apps.get_model("auth", "Group")
-    OldMember = old_apps.get_model("members", "Member")
-    OldPermission = old_apps.get_model("auth", "Permission")
-
-    legacy_group = OldGroup.objects.create(name="Legacy custom group")
-    equipment_group = OldGroup.objects.create(name="Club Equipment Coordinators")
-    member = OldMember.objects.create(username="legacy-group-member")
-    second_member = OldMember.objects.create(username="legacy-equipment-member")
-    permission_rows = list(OldPermission.objects.order_by("pk")[:2])
-    assert len(permission_rows) == 2
-    legacy_group.user_set.add(member, second_member)
-    equipment_group.user_set.add(second_member)
-    legacy_group.permissions.add(permission_rows[0])
-    equipment_group.permissions.add(permission_rows[1])
-
-    def snapshot():
-        return {
-            group.name: {
-                "members": set(group.user_set.values_list("pk", flat=True)),
-                "permissions": set(group.permissions.values_list("pk", flat=True)),
-            }
-            for group in OldGroup.objects.order_by("pk")
-        }
-
-    group_snapshot = snapshot()
-
     try:
+        executor.migrate([before])
+        old_apps = executor.loader.project_state([before]).apps
+        OldGroup = old_apps.get_model("auth", "Group")
+        OldMember = old_apps.get_model("members", "Member")
+        OldPermission = old_apps.get_model("auth", "Permission")
+
+        # 0034 is deliberately strict about these rows.  They are normally
+        # seeded by an earlier migration, but transaction=True tests can flush
+        # that data while leaving the migration state at 0033.
+        for group_name in CANONICAL_ROLES:
+            OldGroup.objects.get_or_create(name=group_name)
+
+        legacy_group = OldGroup.objects.create(name="Legacy custom group")
+        equipment_group = OldGroup.objects.create(name="Club Equipment Coordinators")
+        member = OldMember.objects.create(username="legacy-group-member")
+        second_member = OldMember.objects.create(username="legacy-equipment-member")
+        permission_rows = list(OldPermission.objects.order_by("pk")[:2])
+        assert len(permission_rows) == 2
+        legacy_group.user_set.add(member, second_member)
+        equipment_group.user_set.add(second_member)
+        legacy_group.permissions.add(permission_rows[0])
+        equipment_group.permissions.add(permission_rows[1])
+
+        def snapshot():
+            return {
+                group.name: {
+                    "members": set(group.user_set.values_list("pk", flat=True)),
+                    "permissions": set(group.permissions.values_list("pk", flat=True)),
+                }
+                for group in OldGroup.objects.order_by("pk")
+            }
+
+        group_snapshot = snapshot()
+
         # MigrationExecutor caches applied migrations; refresh it after moving
         # to the historical state before calculating the forward plan.
         executor = MigrationExecutor(connection)
