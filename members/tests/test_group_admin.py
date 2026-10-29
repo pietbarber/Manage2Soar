@@ -368,6 +368,56 @@ def test_real_member_admin_form_routes_groups_through_role_service(
 
 
 @pytest.mark.django_db
+def test_active_member_manager_form_cannot_edit_account_privileges(db):
+    MembershipStatus.objects.get_or_create(
+        name="Full Member", defaults={"is_active": True}
+    )
+    manager = get_user_model().objects.create_user(
+        username="limited-member-manager",
+        membership_status="Full Member",
+        is_active=True,
+    )
+    manager.user_permissions.add(
+        Permission.objects.get(
+            content_type__app_label="members", codename="change_member"
+        )
+    )
+    member = Member.objects.create_user(username="ordinary-edit-target")
+
+    request = RequestFactory().get("/admin/")
+    request.user = manager
+    member_admin = MemberAdmin(Member, admin.site)
+    form_class = member_admin.get_form(request, member)
+    forbidden = member_admin.privilege_fields
+    assert forbidden.isdisjoint(form_class.base_fields)
+    assert "first_name" in form_class.base_fields
+
+    # A crafted POST containing privilege fields cannot change them because
+    # those fields are not part of the real admin form.
+    form = form_class(
+        data={
+            "username": member.username,
+            "membership_status": member.membership_status,
+            "date_joined_0": member.date_joined.strftime("%Y-%m-%d"),
+            "date_joined_1": member.date_joined.strftime("%H:%M:%S"),
+            "glider_rating": member.glider_rating,
+            "contact_visibility_email": "inherit",
+            "contact_visibility_phone": "inherit",
+            "contact_visibility_address": "inherit",
+            "is_superuser": "on",
+            "is_staff": "on",
+            "webmaster": "on",
+        },
+        instance=member,
+    )
+    assert form.is_valid()
+    changed = form.save(commit=False)
+    assert changed.is_superuser is False
+    assert changed.is_staff is False
+    assert changed.webmaster is False
+
+
+@pytest.mark.django_db
 def test_member_admin_permission_summary_shows_every_group_source(superuser):
     MembershipStatus.objects.get_or_create(
         name="Full Member", defaults={"is_active": True}
@@ -435,3 +485,46 @@ def test_member_admin_canonical_group_with_enabled_flag_is_not_manual(superuser)
         ).count()
         == 1
     )
+
+
+@pytest.mark.django_db
+def test_member_admin_keeps_selected_canonical_group_when_flag_is_disabled(
+    superuser, django_capture_on_commit_callbacks
+):
+    member = Member.objects.create_user(
+        username="admin-disabled-flag-manual-role", instructor=True
+    )
+    canonical_group, _ = Group.objects.get_or_create(name="Instructor Admins")
+    member._sync_groups()
+    assert member.groups.filter(pk=canonical_group.pk).exists()
+
+    request = RequestFactory().post("/admin/")
+    request.user = superuser
+    member_admin = MemberAdmin(Member, admin.site)
+    member.instructor = False
+    selected_groups = Group.objects.filter(pk=canonical_group.pk)
+    form = SimpleNamespace(
+        instance=member,
+        changed_data=["instructor"],
+        cleaned_data={"groups": selected_groups},
+        save_m2m=lambda: None,
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        member_admin.save_model(request, member, form, change=True)
+        member_admin.save_related(request, form, [], change=True)
+
+    assert MemberRoleAssignment.objects.filter(
+        member=member,
+        group=canonical_group,
+        source="manual",
+        source_key="admin",
+        actor=superuser,
+    ).exists()
+    assert not MemberRoleAssignment.objects.filter(
+        member=member,
+        group=canonical_group,
+        source="legacy",
+        source_key="instructor",
+    ).exists()
+    assert member.groups.filter(pk=canonical_group.pk).exists()

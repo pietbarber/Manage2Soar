@@ -13,6 +13,25 @@ from utils.upload_entropy import upload_biography
 
 
 class MemberModelTests(TestCase):
+    def test_role_sync_callback_uses_fresh_locked_flags(self):
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            member = Member.objects.create_user(
+                username="stale_callback_member",
+                membership_status="Full Member",
+                instructor=True,
+            )
+            # Simulate another writer committing before the queued callback.
+            Member.objects.filter(pk=member.pk).update(instructor=False)
+
+        for callback in callbacks:
+            callback()
+
+        self.assertFalse(
+            MemberRoleAssignment.objects.filter(
+                member=member, source="legacy", source_key="instructor"
+            ).exists()
+        )
+
     def test_role_sync_preserves_manual_group_when_flag_is_removed(self):
         with self.captureOnCommitCallbacks(execute=True):
             member = Member.objects.create_user(

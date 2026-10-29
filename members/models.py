@@ -93,6 +93,19 @@ class RoleMetadata(models.Model):
 
     def clean(self):
         super().clean()
+        if self.pk:
+            using = self._state.db or router.db_for_read(type(self), instance=self)
+            persisted_key = (
+                type(self)
+                .objects.using(using)
+                .filter(pk=self.pk)
+                .values_list("key", flat=True)
+                .first()
+            )
+            if persisted_key is not None and persisted_key != self.key:
+                raise ValidationError(
+                    {"key": "Role keys are stable and cannot be changed."}
+                )
         if self.qualification_permission_bundle and (
             self.is_protected or self.is_system_managed or self.is_builtin
         ):
@@ -492,6 +505,13 @@ class Member(AbstractUser):
             using or self._state.db or router.db_for_write(type(self), instance=self)
         )
         with transaction.atomic(using=using):
+            # Save callbacks can run after a newer in-memory instance has
+            # changed (and several callbacks can be queued in one request).
+            # Lock and re-read the row so this reconciliation is serialized
+            # with set_manual_role and always reflects committed values.
+            locked_member = (
+                type(self).objects.using(using).select_for_update().get(pk=self.pk)
+            )
             desired = {
                 name: key
                 for name, key in (
@@ -502,19 +522,19 @@ class Member(AbstractUser):
                     ("Secretary", "secretary"),
                     ("Treasurer", "treasurer"),
                 )
-                if getattr(self, key)
+                if getattr(locked_member, key)
             }
             for name, source_key in desired.items():
                 group, _ = Group.objects.using(using).get_or_create(name=name)
                 MemberRoleAssignment.objects.using(using).get_or_create(
-                    member=self,
+                    member=locked_member,
                     group=group,
                     source="legacy",
                     source_key=source_key,
                 )
 
             stale = MemberRoleAssignment.objects.using(using).filter(
-                member_id=self.pk, source="legacy"
+                member_id=locked_member.pk, source="legacy"
             )
             if desired:
                 stale = stale.exclude(source_key__in=desired.values())
@@ -522,16 +542,16 @@ class Member(AbstractUser):
                 assignment.delete(using=using)
                 if (
                     not MemberRoleAssignment.objects.using(using)
-                    .filter(member_id=self.pk, group_id=assignment.group_id)
+                    .filter(member_id=locked_member.pk, group_id=assignment.group_id)
                     .exists()
                 ):
-                    self.groups.db_manager(using).remove(assignment.group)
+                    locked_member.groups.db_manager(using).remove(assignment.group)
 
             # Existing and newly-created provenance rows must be reflected in
             # the M2M table, but this deliberately never replaces the member's groups.
-            self.groups.db_manager(using).add(
+            locked_member.groups.db_manager(using).add(
                 *Group.objects.using(using)
-                .filter(member_role_assignments__member_id=self.pk)
+                .filter(member_role_assignments__member_id=locked_member.pk)
                 .distinct()
             )
 

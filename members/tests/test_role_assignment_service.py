@@ -1,7 +1,8 @@
 import pytest
 from django.contrib.auth.models import Group
+from django.core.exceptions import PermissionDenied, ValidationError
 
-from members.models import Member, MemberRoleAssignment
+from members.models import Member, MemberRoleAssignment, RoleMetadata
 from members.services.role_assignments import set_manual_role
 
 
@@ -90,6 +91,53 @@ def test_wrong_source_revocation_does_not_remove_group_or_assignment(member, gro
     assert MemberRoleAssignment.objects.filter(
         member=member, group=group, source="manual", source_key="committee"
     ).exists()
+
+
+@pytest.mark.django_db
+def test_new_manual_grant_rejects_non_assignable_role(member, group):
+    RoleMetadata.objects.create(
+        group=group,
+        key="non_assignable",
+        display_name="Non-assignable",
+        is_assignable=False,
+    )
+
+    with pytest.raises(PermissionDenied, match="not assignable"):
+        set_manual_role(member, group, enabled=True)
+
+    assert not MemberRoleAssignment.objects.filter(member=member, group=group).exists()
+    assert not member.groups.filter(pk=group.pk).exists()
+
+
+@pytest.mark.django_db
+def test_existing_manual_grant_can_be_preserved_when_role_becomes_non_assignable(
+    member, group
+):
+    set_manual_role(member, group, enabled=True)
+    RoleMetadata.objects.create(
+        group=group,
+        key="later_locked",
+        display_name="Later locked",
+        is_assignable=False,
+    )
+
+    set_manual_role(member, group, enabled=True)
+    assert MemberRoleAssignment.objects.filter(member=member, group=group).exists()
+    set_manual_role(member, group, enabled=False)
+    assert not MemberRoleAssignment.objects.filter(member=member, group=group).exists()
+
+
+@pytest.mark.django_db
+def test_role_metadata_key_is_immutable(group):
+    metadata = RoleMetadata.objects.create(
+        group=group,
+        key="stable_role_key",
+        display_name="Stable role",
+    )
+    metadata.key = "renamed_role_key"
+
+    with pytest.raises(ValidationError, match="stable"):
+        metadata.save()
 
 
 @pytest.mark.django_db

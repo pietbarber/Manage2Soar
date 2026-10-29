@@ -555,6 +555,24 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         "Secretary": "secretary",
         "Treasurer": "treasurer",
     }
+    privilege_fields = {
+        "is_superuser",
+        "is_staff",
+        "groups",
+        "user_permissions",
+        "instructor",
+        "towpilot",
+        "duty_officer",
+        "assistant_duty_officer",
+        "director",
+        "member_manager",
+        "rostermeister",
+        "webmaster",
+        "secretary",
+        "treasurer",
+        "stats_monger",
+        "safety_officer",
+    }
     resource_classes = [MemberResource]
     actions = ["export_members_csv", "mark_inactive"]
 
@@ -715,6 +733,36 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         ),
     )
 
+    def _limited_member_editor(self, request):
+        """Member managers may edit members, but never account privileges."""
+        user = getattr(request, "user", None)
+        return bool(
+            user
+            and user.is_active
+            and not user.is_superuser
+            and user.has_perm("members.change_member")
+        )
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if not self._limited_member_editor(request) or obj is None:
+            return fieldsets
+        return tuple(
+            (
+                title,
+                {
+                    **options,
+                    "fields": tuple(
+                        field
+                        for field in options.get("fields", ())
+                        if (field if isinstance(field, str) else field[0])
+                        not in self.privilege_fields
+                    ),
+                },
+            )
+            for title, options in fieldsets
+        )
+
     @admin.display(description="Current Photo")
     def profile_photo_preview(self, obj):
         if obj.profile_photo:
@@ -873,8 +921,25 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             if source_key and getattr(member, source_key, False):
                 continue
             set_manual_role(member, group, enabled=True, actor=request.user)
+        # If an administrator disables a legacy flag but deliberately leaves
+        # its canonical Group selected, convert that selected membership to an
+        # explicit manual source before the deferred legacy sync removes it.
+        changed_fields = set(getattr(form, "changed_data", ()))
+        for group in Group.objects.using(using).filter(pk__in=after):
+            source_key = self.legacy_role_groups.get(group.name)
+            if (
+                source_key
+                and source_key in changed_fields
+                and not getattr(member, source_key, False)
+            ):
+                set_manual_role(member, group, enabled=True, actor=request.user)
         for group in Group.objects.using(using).filter(pk__in=before - after):
             set_manual_role(member, group, enabled=False)
+            # The role-assignment backfill used this source for memberships
+            # that had no recognizable legacy flag.  Removing a group in the
+            # admin must revoke that source too, without touching any other
+            # manual/status/legacy provenance.
+            set_manual_role(member, group, enabled=False, source_key="migration")
 
     @staticmethod
     def _send_account_setup_email_safely(member):
