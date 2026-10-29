@@ -443,6 +443,29 @@ def prevent_referenced_member_tag_deletion(sender, instance, using, **kwargs):
         )
 
 
+def _mailing_list_uses_role_key(role_key, using):
+    """Return whether a mailing list still contains the role selector."""
+    return any(
+        f"role:{role_key}" in (criteria or [])
+        for criteria in MailingList.objects.using(using).values_list(
+            "criteria", flat=True
+        )
+    )
+
+
+@receiver(pre_delete, sender="members.RoleMetadata")
+def prevent_referenced_role_metadata_deletion(sender, instance, using, **kwargs):
+    """Keep configured mailing-list audiences from becoming dangling."""
+    if _mailing_list_uses_role_key(instance.key, using):
+        raise ValidationError(
+            f"Cannot delete role '{instance.key}' while a mailing list uses it."
+        )
+
+
+# Group deletion cascades through RoleMetadata and therefore reaches the same
+# guard. RoleMetadata.save() separately enforces stable-key immutability.
+
+
 class MemberNameOrdering(models.TextChoices):
     """How member/pilot names are alphabetized in selection dropdowns."""
 

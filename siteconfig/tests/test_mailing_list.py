@@ -561,6 +561,62 @@ class TestMailingListSubscribers:
         mailing_list.save(update_fields=["criteria"])
         tag.delete()
 
+    @pytest.mark.django_db(transaction=True)
+    def test_role_metadata_deletion_is_guarded_until_selector_removed(self):
+        group = Group.objects.create(name="Protected Mail Role")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="protected_mail_role",
+            display_name="Protected Mail Role",
+            mailing_list_eligible=True,
+        )
+        mailing_list = MailingList.objects.create(
+            name="protected-role-list", criteria=[f"role:{role.key}"]
+        )
+
+        with pytest.raises(ValidationError, match="mailing list uses it"):
+            role.delete()
+
+        mailing_list.criteria = [MailingListCriterion.ACTIVE_MEMBER]
+        mailing_list.save(update_fields=["criteria"])
+        role.delete()
+
+    @pytest.mark.django_db(transaction=True)
+    def test_role_metadata_queryset_deletion_is_guarded(self):
+        group = Group.objects.create(name="Queryset Protected Mail Role")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="queryset_protected_mail_role",
+            display_name="Queryset Protected Mail Role",
+            mailing_list_eligible=True,
+        )
+        MailingList.objects.create(
+            name="queryset-protected-role-list", criteria=[f"role:{role.key}"]
+        )
+
+        with pytest.raises(ValidationError, match="mailing list uses it"):
+            RoleMetadata.objects.filter(pk=role.pk).delete()
+
+    @pytest.mark.django_db(transaction=True)
+    def test_role_group_deletion_is_guarded_until_selector_removed(self):
+        group = Group.objects.create(name="Cascading Protected Mail Role")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="cascading_protected_mail_role",
+            display_name="Cascading Protected Mail Role",
+            mailing_list_eligible=True,
+        )
+        mailing_list = MailingList.objects.create(
+            name="cascading-protected-role-list", criteria=[f"role:{role.key}"]
+        )
+
+        with pytest.raises(ValidationError, match="mailing list uses it"):
+            group.delete()
+
+        mailing_list.criteria = [MailingListCriterion.ACTIVE_MEMBER]
+        mailing_list.save(update_fields=["criteria"])
+        group.delete()
+
     def test_tag_assignment_does_not_grant_group_permissions(self, active_member):
         group = Group.objects.create(name="Permission Group")
         tag = MemberTag.objects.create(key="labels-only", display_label="Labels only")
