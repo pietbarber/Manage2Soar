@@ -8,8 +8,18 @@ from django.test import RequestFactory
 from django.urls import reverse
 
 import members.admin as members_admin_module
-from members.admin import MemberAdmin, RoleMetadataInline, SuperuserOnlyGroupAdmin
-from members.models import Member, MemberRoleAssignment, RoleMetadata
+from members.admin import (
+    MemberAdmin,
+    MemberRoleAssignmentEventAdmin,
+    RoleMetadataInline,
+    SuperuserOnlyGroupAdmin,
+)
+from members.models import (
+    Member,
+    MemberRoleAssignment,
+    MemberRoleAssignmentEvent,
+    RoleMetadata,
+)
 from siteconfig.models import MailingList, MembershipStatus
 
 
@@ -33,6 +43,23 @@ def staff_user(db):
     )
     get_user_model().objects.filter(pk=user.pk).update(is_active=True)
     return user
+
+
+@pytest.mark.django_db
+def test_role_assignment_event_admin_is_superuser_read_only(superuser, staff_user):
+    model_admin = MemberRoleAssignmentEventAdmin(MemberRoleAssignmentEvent, admin.site)
+    request = RequestFactory().get("/admin/")
+
+    request.user = superuser
+    assert model_admin.has_module_permission(request)
+    assert model_admin.has_view_permission(request)
+    assert not model_admin.has_add_permission(request)
+    assert not model_admin.has_change_permission(request)
+    assert not model_admin.has_delete_permission(request)
+
+    request.user = staff_user
+    assert not model_admin.has_module_permission(request)
+    assert not model_admin.has_view_permission(request)
 
 
 @pytest.mark.django_db
@@ -271,6 +298,11 @@ def test_member_admin_group_add_and_remove_records_manual_provenance(superuser):
     member.groups.remove(custom_group)
     member_admin.save_related(request, form, [], change=True)
     assert not MemberRoleAssignment.objects.filter(pk=assignment.pk).exists()
+    revoke = MemberRoleAssignmentEvent.objects.get(
+        member=member, group=custom_group, action="revoke", source_key="admin"
+    )
+    assert revoke.actor == superuser
+    assert revoke.actor_id_snapshot == superuser.pk
 
 
 @pytest.mark.django_db

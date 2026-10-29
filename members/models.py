@@ -163,6 +163,77 @@ class MemberRoleAssignment(models.Model):
         return f"{self.member} - {self.group} ({self.source}:{self.source_key})"
 
 
+class MemberRoleAssignmentEventQuerySet(models.QuerySet):
+    """Keep ordinary bulk ORM APIs from bypassing event immutability."""
+
+    def update(self, **kwargs):
+        raise ValidationError("Role assignment audit events are immutable.")
+
+    def delete(self):
+        raise ValidationError("Role assignment audit events cannot be deleted.")
+
+
+class MemberRoleAssignmentEvent(models.Model):
+    """Append-only audit record for a provenance-aware role change.
+
+    The nullable foreign keys are conveniences for navigating current rows;
+    the snapshot fields are the audit record.  In particular, deleting a
+    Group or assignment must not make the event lose the role's identity.
+    Database administrators can still bypass model methods, so immutability
+    here is an application-level guarantee rather than a database-admin one.
+    """
+
+    ACTION_CHOICES = (("grant", "Grant"), ("revoke", "Revoke"))
+
+    member = models.ForeignKey(
+        "Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="role_assignment_events",
+    )
+    member_id_snapshot = models.PositiveBigIntegerField()
+    member_username = models.CharField(max_length=150)
+    group = models.ForeignKey(
+        Group,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="role_assignment_events",
+    )
+    group_id_snapshot = models.PositiveBigIntegerField()
+    group_name = models.CharField(max_length=150)
+    role_key = models.CharField(max_length=100, blank=True)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    actor = models.ForeignKey(
+        "Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="role_assignment_events_made",
+    )
+    actor_id_snapshot = models.PositiveBigIntegerField(null=True, blank=True)
+    actor_username = models.CharField(max_length=150, blank=True)
+    source = models.CharField(max_length=20)
+    source_key = models.CharField(max_length=100)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("timestamp", "pk")
+
+    objects = models.Manager.from_queryset(MemberRoleAssignmentEventQuerySet)()
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValidationError("Role assignment audit events are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Role assignment audit events cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.action} {self.member_id_snapshot} -> {self.group_name}"
+
+
 class MemberTag(models.Model):
     """A permissionless, reusable label that may be assigned to members.
 

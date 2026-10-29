@@ -8,7 +8,12 @@ this service will not remove them when a manual source is absent.
 from django.core.exceptions import PermissionDenied
 from django.db import router, transaction
 
-from members.models import Member, MemberRoleAssignment, RoleMetadata
+from members.models import (
+    Member,
+    MemberRoleAssignment,
+    MemberRoleAssignmentEvent,
+    RoleMetadata,
+)
 
 
 def set_manual_role(member, group, *, enabled: bool, actor=None, source_key="admin"):
@@ -44,16 +49,54 @@ def set_manual_role(member, group, *, enabled: bool, actor=None, source_key="adm
                     raise PermissionDenied(
                         f"The role {group.name!r} is not assignable."
                     )
-            MemberRoleAssignment.objects.using(using).get_or_create(
+            _, created = MemberRoleAssignment.objects.using(using).get_or_create(
                 member_id=locked_member.pk,
                 group_id=group.pk,
                 source="manual",
                 source_key=source_key,
                 defaults={"actor_id": actor.pk if actor else None},
             )
+            if created:
+                role_metadata = (
+                    RoleMetadata.objects.using(using).filter(group_id=group.pk).first()
+                )
+                MemberRoleAssignmentEvent.objects.using(using).create(
+                    member_id=locked_member.pk,
+                    member_id_snapshot=locked_member.pk,
+                    member_username=locked_member.get_username(),
+                    group_id=group.pk,
+                    group_id_snapshot=group.pk,
+                    group_name=group.name,
+                    role_key=role_metadata.key if role_metadata else "",
+                    action="grant",
+                    actor_id=actor.pk if actor else None,
+                    actor_id_snapshot=actor.pk if actor else None,
+                    actor_username=actor.get_username() if actor else "",
+                    source="manual",
+                    source_key=source_key,
+                )
             locked_member.groups.db_manager(using).add(group.pk)
         else:
             deleted, _ = assignments.delete()
+            if deleted:
+                role_metadata = (
+                    RoleMetadata.objects.using(using).filter(group_id=group.pk).first()
+                )
+                MemberRoleAssignmentEvent.objects.using(using).create(
+                    member_id=locked_member.pk,
+                    member_id_snapshot=locked_member.pk,
+                    member_username=locked_member.get_username(),
+                    group_id=group.pk,
+                    group_id_snapshot=group.pk,
+                    group_name=group.name,
+                    role_key=role_metadata.key if role_metadata else "",
+                    action="revoke",
+                    actor_id=actor.pk if actor else None,
+                    actor_id_snapshot=actor.pk if actor else None,
+                    actor_username=actor.get_username() if actor else "",
+                    source="manual",
+                    source_key=source_key,
+                )
             remaining = (
                 MemberRoleAssignment.objects.using(using)
                 .filter(member_id=locked_member.pk, group_id=group.pk)

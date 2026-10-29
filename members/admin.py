@@ -27,6 +27,7 @@ from .models import (
     KioskToken,
     Member,
     MemberBadge,
+    MemberRoleAssignmentEvent,
     MemberTag,
     MemberTagAssignment,
     RoleMetadata,
@@ -168,6 +169,51 @@ class SuperuserOnlyGroupAdmin(DjangoGroupAdmin):
 if admin.site.is_registered(Group):
     admin.site.unregister(Group)
 admin.site.register(Group, SuperuserOnlyGroupAdmin)
+
+
+@admin.register(MemberRoleAssignmentEvent)
+class MemberRoleAssignmentEventAdmin(admin.ModelAdmin):
+    """Read-only assignment history for the bootstrap administrator boundary."""
+
+    list_display = (
+        "timestamp",
+        "action",
+        "member_username",
+        "group_name",
+        "source",
+        "source_key",
+        "actor_username",
+    )
+    list_filter = ("action", "source")
+    search_fields = (
+        "member_username",
+        "group_name",
+        "role_key",
+        "actor_username",
+        "source_key",
+    )
+    ordering = ("-timestamp", "-pk")
+
+    @staticmethod
+    def _is_authorized(request):
+        return bool(
+            request.user and request.user.is_active and request.user.is_superuser
+        )
+
+    def has_module_permission(self, request):
+        return self._is_authorized(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self._is_authorized(request)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class SuperuserOnlyTagAdmin(admin.ModelAdmin):
@@ -934,12 +980,18 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             ):
                 set_manual_role(member, group, enabled=True, actor=request.user)
         for group in Group.objects.using(using).filter(pk__in=before - after):
-            set_manual_role(member, group, enabled=False)
+            set_manual_role(member, group, enabled=False, actor=request.user)
             # The role-assignment backfill used this source for memberships
             # that had no recognizable legacy flag.  Removing a group in the
             # admin must revoke that source too, without touching any other
             # manual/status/legacy provenance.
-            set_manual_role(member, group, enabled=False, source_key="migration")
+            set_manual_role(
+                member,
+                group,
+                enabled=False,
+                actor=request.user,
+                source_key="migration",
+            )
 
     @staticmethod
     def _send_account_setup_email_safely(member):

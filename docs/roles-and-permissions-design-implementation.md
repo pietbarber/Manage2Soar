@@ -334,6 +334,13 @@ source, timestamp, and relevant before/after state. Qualification award,
 expiry/revocation, and resulting permission changes should be attributable to
 the underlying qualification record and actor where available.
 
+The current implementation now appends immutable, snapshot-backed grant/revoke
+events for source-specific manual changes made through `set_manual_role()` and
+exposes them read-only to active superusers. Automatic legacy/status changes,
+role permission edits, and qualification lifecycle events still need equivalent
+event coverage; direct M2M writes remain outside this audit boundary until the
+enforcement plan in `direct-group-write-enforcement.md` is implemented.
+
 ## 6. Admin experience requirements
 
 Platform Administrators should be able to:
