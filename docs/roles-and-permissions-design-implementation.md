@@ -171,9 +171,13 @@ sets, including direct boolean, group-name, `is_staff`, and `is_superuser`
 checks.
 
 `Member._desired_group_names()` and `_sync_groups()` in `members/models.py`
-derive Groups from selected booleans and replace the user's Group memberships.
-This must be redesigned: automatic reconciliation must not erase manual Group
-memberships.
+derive Groups from selected booleans. The current `_sync_groups()` has a first
+provenance-aware slice: it reconciles `legacy` assignment rows and no longer
+replaces all Group memberships. This is **not** a completed assignment service:
+Member admin now routes its Group edits through the source-specific manual-role
+service, but arbitrary direct `member.groups` and through-table writes still
+need a defined enforcement/migration contract before retiring legacy flags or
+relying on assignment rows as the sole authorization source.
 
 Existing Groups/permissions not explained by known automatic defaults are
 classified as **manual and preserved** during backfill. The migration should
@@ -258,12 +262,15 @@ the baseline.
 
 ### Mailing lists
 
-`siteconfig.MailingList` currently stores hard-coded criteria in JSON, and
-`get_subscribers()` resolves them against status, boolean fields, or computed
-ownership. Add eligible stable-key role criteria while preserving current
-criteria, active-member/email filtering, OR behavior, and the mail-server API
-response. Each club has a separate deployment/database, so role assignments do
-not need a tenant foreign key.
+`siteconfig.MailingList` stores criteria in JSON. Its `get_subscribers()` and
+`_criterion_to_query()` currently support legacy status/boolean/ownership
+criteria **and additive** `role:<stable-key>` (and `tag:<key>`) selectors. Role
+selectors match actual Group membership, not permission inheritance; eligibility
+limits new selection, not continued resolution of existing configured selectors.
+Do not replace or remove the legacy selectors. Preserve active-member/email
+filtering, OR behavior, and the mail-server API response when changing audiences.
+Each club has a separate deployment/database, so role assignments do not need
+a tenant foreign key.
 
 ### Notifications
 
@@ -310,6 +317,16 @@ remove a Group still granted by another source. Direct Groups edited through
 Django admin must either be recorded as manual assignments or the UI must route
 edits through the assignment service. Make reconciliation idempotent and
 transaction-safe; define behavior for concurrent edits.
+
+Manual role grant/removal is a single source-specific service operation (for
+example `set_manual_role(member, group, enabled=..., source_key=..., actor=...)`).
+Revoking `manual:admin` must not delete `manual:import`, `status:...`, or
+`legacy:...` reasons for the same Group. A member permission breakdown must
+show *every* contributing source for a permission: direct user grant, each
+granting Group with its separate assignment reasons (including unknown legacy
+Group memberships), and active approved qualification grants. The superuser
+override is displayed separately. A tag is never a permission source. An
+effective allow/deny result alone is not an adequate explanation.
 
 Audit role/permission changes and automatic assignment changes. Platform
 Administrators can review the audit history. Record actor, target member, role,
@@ -402,23 +419,56 @@ conventions and provide an operator-visible backfill report and recovery
 instructions. Review migration reversibility rather than assuming every data
 migration can reconstruct its prior state.
 
+**Maintainer-visible access change:** Membership-application management
+(`members:membership_applications_list`, `membership_application_detail`, and
+`membership_waitlist`) now rejects shared kiosk sessions before the legacy role
+check. Previously a kiosk Role Account bearing `member_manager=True` could view
+applications and POST updated review notes. The new restriction applies even
+when that account bears a manager/webmaster flag; public applicant routes are
+unchanged. See the endpoint-level matrix and regression tests in
+`roles-and-permissions-authorization-inventory.md` and
+`members/tests/test_membership_application_access_matrix.py`. Call out the
+intentional narrowing in the merge/deployment notes.
+
 ## 9. Phases and parallel work
 
-### Phase 1 — Baseline and contract (gate)
+### Phase 1 — Baseline and contract (gate for authorization behavior changes)
 
 - Inventory current checks and build allow/deny behavior matrix.
 - Agree model/service contracts for metadata, grants, permission resolution,
   qualification validity, and audit attribution.
 - Record migration classification rules.
 
-This is the dependency gate; avoid implementing role forms or switching
-authorization before the contracts are agreed.
+The **incomplete, unapproved** first-pass static inventory and behavior matrix
+are tracked in
+[`roles-and-permissions-authorization-inventory.md`](roles-and-permissions-authorization-inventory.md).
+Review and extend it with exact source checks and endpoint/method-level allow
+and deny tests before changing legacy authorization behavior. No summary row
+is itself a migration specification. The membership application list/detail/
+waitlist matrix is a worked first pass, not an approved policy mapping; the
+baseline tests in `members/tests/test_membership_applications.py`
+cover some cases but do not use a resolver and do not complete the baseline.
+
+This gate **does not block additive foundation** (metadata/provenance schema,
+diagnostics, narrowly scoped qualification permission bundles, additive
+mailing-list selectors, tests or admin UX design) that does not alter the
+existing legacy checks. It **does** block switching application/admin/API/
+service/CMS checks to a resolver, removing legacy flags, or asserting equivalent
+access until the relevant contract and route-level baseline are approved. Do
+not treat a foundation slice as proof of authorization parity.
+
+Before that switch, explicitly resolve: direct Group writes and the
+provenance-aware assignment service (including concurrent edits), status-to-role
+mappings, a positive per-action qualification permission allowlist, audit events
+and attribution, the fate of legacy flags/consumers, and baseline/contract
+approval. Existing deny filters alone are not the positive allowlist. These
+are blockers for behavior migration, not for non-behavior-changing foundation.
 
 ### Phase 2 — Parallel design/foundation work
 
 **Backend:** role metadata/provenance models, permission resolver design,
-qualification Group mapping, status mapping, bootstrap/last-admin policy,
-migration and diagnostic report.
+qualification Group mapping design (not enabling legacy mappings), status
+mapping design, bootstrap/last-admin policy, migration and diagnostic report.
 
 **Admin UX:** wireframes/workflow for role editor, member assignment, permission
 display, qualification mapping, notification topics, mailing-list eligibility,
@@ -434,7 +484,7 @@ After resolver/API contracts stabilize, work can proceed in parallel on:
 
 - application/admin/API/service authorization checks;
 - CMS migration and CMS-specific regression tests;
-- mailing-list role criteria;
+- further mailing-list audience integration (additive role criteria already exist);
 - notification topic audience integration;
 - admin forms and member-facing role/tag display.
 
@@ -524,18 +574,20 @@ These do not reopen the agreed semantics; resolve them before or during Phase 1:
   duty roles, assignments, and qualification eligibility.
 - `cms/models.py`: `PageRolePermission`, `PageMemberPermission`, and page access
   policies; `cms/admin.py` contains admin integration.
-- `siteconfig/models.py` and `siteconfig/admin.py`: mailing-list criteria and
-  configuration, including `role:<stable-key>` audiences. Eligibility limits
-  new selections; already configured role audiences remain active until
-  explicitly removed. Group deletion is blocked while a mailing list references
-  its stable role key.
+- `siteconfig/models.py` and `siteconfig/admin.py`: legacy mailing-list criteria
+  remain alongside additive `role:<stable-key>`/`tag:<key>` audiences. Eligibility
+  limits new role selections; already configured role audiences remain active
+  until explicitly removed. Group deletion is blocked while a mailing list
+  references its stable role key.
 - `members/api.py`: mail-server list API.
 - `docs/runbooks/ansible-playbook-guide.md` and
   `docs/runbooks/deployment-updates.md`: superuser bootstrap and migrations.
 
 ## 13. Qualification permission slice: implementation handoff
 
-The qualification permission slice is implemented in the current working tree:
+The qualification permission slice is **narrow foundation**, implemented in the
+current working tree; it is not qualification eligibility migration or a
+replacement for the legacy authorization checks:
 
 - `ClubQualificationType.permission_group` is an optional, protected ForeignKey
   to `auth.Group`; saving a qualification type validates that the group has
@@ -544,7 +596,9 @@ The qualification permission slice is implemented in the current working tree:
   the Group. Custom names alone do not establish safety: unapproved
   `manage_*`/`impersonate_*`/`export_*` actions are ignored. CRUD/view,
   auth/admin, member-management, and qualification-administration permissions
-  cannot be opted in. No current qualification type is mapped.
+  cannot be opted in. No current qualification type is mapped. Grant rows and
+  deny filters are **not** a reviewed positive allowlist of business actions;
+  approve one before mapping types or broadening qualification-derived grants.
 - `QualificationPermissionGrant` is manageable only by active superusers in
   Django admin. Group choices require opted-in metadata and exclude
   built-in/protected/system-managed Groups. Permission choices are limited to
@@ -572,8 +626,11 @@ The qualification permission slice is implemented in the current working tree:
   superuser-only grant management and safe choice filtering.
 
 The slice does not yet map any existing instructor, tow-pilot, duty, or legacy
-boolean qualification to a permission bundle. Those mappings require an
-explicit permission matrix and inventory; similarly, contextual/object policy
-integration, role provenance completion, CMS migration, mailing-list and
-notification integrations, and role preview remain future work. Do not infer a
-mapping from a similar qualification name.
+boolean qualification to a permission bundle; neither operational eligibility
+nor boolean-role semantics are implemented by the backend. Those mappings
+require an approved positive allowlist, explicit permission matrix, and
+eligibility inventory. Contextual/object policy integration, assignment-service
+and audit completion, status mappings, CMS migration, notification integration,
+and role preview remain future work. Mailing-list role selectors already exist
+additively; further audience migration is future work. Do not infer a mapping
+from a similar qualification name.
