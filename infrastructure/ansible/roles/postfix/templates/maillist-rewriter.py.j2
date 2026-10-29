@@ -178,10 +178,36 @@ def rewrite_headers(msg, recipient, envelope_sender=None):
     msg['From'] = formataddr((new_from_name, list_bounces_addr))
 
     # Add Reply-To if not already present
-    if not msg.get('Reply-To'):
+    if not msg.get('Reply-To') and original_from:
         msg['Reply-To'] = original_from
 
     return msg
+
+
+def rewrite_forward_headers(msg, alias_address):
+    """Make a direct forward acceptable to authenticated SMTP relays.
+
+    Relays commonly reject an arbitrary external ``From`` domain. Keep the
+    original sender available for replies and auditing, but use the verified
+    club alias as the visible/envelope sender.
+    """
+    original_from = msg.get('From', '')
+    original_reply_to = msg.get('Reply-To') or original_from
+    original_name, _ = parseaddr(original_from)
+    alias_local = alias_address.split('@', 1)[0]
+    display_name = f"{original_name} via {alias_local}" if original_name else alias_local
+
+    if original_from:
+        msg['X-Original-From'] = original_from
+    if 'From' in msg:
+        del msg['From']
+    msg['From'] = formataddr((display_name, alias_address))
+    if 'Reply-To' in msg:
+        del msg['Reply-To']
+    if original_reply_to:
+        msg['Reply-To'] = original_reply_to
+    return msg
+
 
 def find_list_from_recipients(recipients, preferred_domain=None):
     """
@@ -383,23 +409,27 @@ def main():
             sys.stderr.write(f"maillist-rewriter: SMTP passthrough failed: {e}\n")
             sys.exit(os.EX_TEMPFAIL)
 
-    # Rewrite only actual mailing-list recipients. Direct forwarding aliases
-    # must retain their original headers and envelope sender.
-    is_mailing_list = routing_class(original_to) == "mailing_list"
+    # Rewrite mailing-list recipients and normalize direct forwards to a
+    # verified club sender accepted by authenticated SMTP relays.
+    route = routing_class(original_to)
+    is_mailing_list = route == "mailing_list"
+    is_forwarding_alias = route == "forwarding_alias"
     if is_mailing_list:
         # Pass the SMTP envelope sender so the passthrough guard uses a
         # Postfix-verified address instead of the (spoofable) From header.
         msg = rewrite_headers(msg, original_to, envelope_sender=sender)
+    elif is_forwarding_alias:
+        msg = rewrite_forward_headers(msg, original_to)
 
     # Reinject to port 10025 (bypasses content_filter)
     # CRITICAL: Use rewritten From header as envelope sender for SMTP2Go verification
     # SMTP2Go checks both envelope sender AND From header domain
     try:
         smtp = smtplib.SMTP('127.0.0.1', 10025)
-        # Mailing-list reinjection uses the rewritten From address. Direct
-        # aliases and unknown recipients retain the original envelope sender.
+        # Mailing-list and direct-forward reinjection use verified club
+        # addresses. Unknown recipients retain the original envelope sender.
         envelope_sender = sender
-        if is_mailing_list:
+        if is_mailing_list or is_forwarding_alias:
             from_header = msg.get("From", "")
             _, envelope_sender = parseaddr(from_header)
         # Ensure we never use an empty envelope sender; prefer verified mailing list addresses

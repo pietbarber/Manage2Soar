@@ -11,13 +11,13 @@ still apply. A destination on the club's domain is rejected to prevent loops.
 The API exposes these under `forwarding_aliases`; the sync writes them to the
 virtual map after list addresses. In dev mode, both list and direct aliases
 redirect to the configured test inbox instead of their real targets.
-Disabling or deleting an alias removes it at the next sync (every 15 minutes).
+Disabling or deleting an alias removes it at the next sync (within about one minute).
 
 ## Overview
 
 - **Sync script**: `/opt/m2s-mail-sync/sync-aliases.py` (Python 3)
 - **Configuration**: `/opt/m2s-mail-sync/config.yml` (contains API key)
-- **Cron job**: Runs every 15 minutes as root
+- **Cron job**: Runs every minute as root
 - **Log file**: `/var/log/m2s-sync.log`
 
 ## Dependencies

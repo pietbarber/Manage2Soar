@@ -107,6 +107,12 @@ def test_administrative_forward_not_detected_as_list(tmp_path):
         get_callable(ns, "routing_class")("admin@skylinesoaring.org")
         == "forwarding_alias"
     )
+    forwarded = get_callable(ns, "rewrite_forward_headers")(
+        msg, "admin@skylinesoaring.org"
+    )
+    assert "admin@skylinesoaring.org" in forwarded["From"]
+    assert forwarded["Reply-To"] == "sender@example.com"
+    assert forwarded["X-Original-From"] == "sender@example.com"
 
 
 def test_direct_forward_is_detected_without_being_a_list():
@@ -129,6 +135,36 @@ def test_direct_forward_is_detected_without_being_a_list():
         get_callable(ns, "routing_class")("webmaster@skylinesoaring.org")
         == "mailing_list"
     )
+
+
+def test_forward_headers_use_verified_alias_and_preserve_reply_target():
+    ns = load_template_namespace()
+    msg = EmailMessage()
+    msg["From"] = "Sender <sender@example.com>"
+    msg["Reply-To"] = "replies@example.com"
+    msg["To"] = "preview@example.com"
+    msg.set_content("Body")
+
+    forwarded = get_callable(ns, "rewrite_forward_headers")(
+        msg, "admin@skylinesoaring.org"
+    )
+    assert forwarded["From"] == "Sender via admin <admin@skylinesoaring.org>"
+    assert forwarded["Reply-To"] == "replies@example.com"
+    assert forwarded["X-Original-From"] == "Sender <sender@example.com>"
+
+
+def test_forward_headers_do_not_create_empty_reply_to():
+    ns = load_template_namespace()
+    msg = EmailMessage()
+    msg["To"] = "preview@example.com"
+    msg.set_content("System-generated message")
+
+    forwarded = get_callable(ns, "rewrite_forward_headers")(
+        msg, "admin@skylinesoaring.org"
+    )
+    assert forwarded["From"] == "admin <admin@skylinesoaring.org>"
+    assert "Reply-To" not in forwarded
+    assert "X-Original-From" not in forwarded
 
 
 def test_forward_shadowing_legacy_list_is_not_treated_as_list():

@@ -782,6 +782,9 @@ class MembershipGliderRentalRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
 
 @admin.register(EmailAlias)
 class EmailAliasAdmin(AdminHelperMixin, admin.ModelAdmin):
+    admin_helper_message = (
+        "Email aliases are synchronized to the mail server about once per minute."
+    )
     list_display = ("name", "destination", "description", "is_active")
     list_editable = ("is_active",)
     search_fields = ("name", "destination", "description")
