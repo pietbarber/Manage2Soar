@@ -78,30 +78,47 @@ LIMIT = 5
 
 @pytest.mark.django_db
 class TestSingleIPThrottle:
-    """Repeated failed logins from one IP are throttled."""
+    """Repeated failed logins from one IP are throttled.
+
+    To isolate the *per-IP* bucket (and prove it fires independently of the
+    per-username bucket), the failures below are distributed across **distinct
+    usernames** that all share a single IP.  If the per-IP bucket were not in
+    effect, distinct usernames would each carry their own per-username budget
+    and none of them would be throttled at LIMIT.
+    """
+
+    @staticmethod
+    def _ip_users(prefix="ipuser"):
+        return [f"{prefix}{i}" for i in range(LIMIT)]
 
     def test_failures_below_limit_allowed(self):
-        """Failures 1-(LIMIT-1) should NOT be throttled."""
-        _make_member("alice")
+        """(LIMIT-1) distinct-username failures from one IP should NOT be throttled."""
         _reset_axes()
+        for u in self._ip_users()[: LIMIT - 1]:
+            _make_member(u)
         client = Client()
-        for i in range(LIMIT - 1):
-            resp = _failed_login(client, "alice", ip="10.0.0.1")
+        for i, u in enumerate(self._ip_users()[: LIMIT - 1]):
+            resp = _failed_login(client, u, ip="10.0.0.1")
             assert resp.status_code == 200, f"Attempt {i+1} unexpectedly throttled"
 
     def test_failure_at_limit_throttled(self):
-        """The LIMIT-th failure (5th with the default setting) is throttled.
+        """The LIMIT-th distinct-username failure from one IP is throttled.
 
         django-axes uses ``>=`` for the lockout check, so the Nth failure
-        already exceeds the budget of N-1 prior failures.
+        already exceeds the budget of N-1 prior failures.  Because every
+        failure here is a *different* username, the only bucket that can trip
+        is the per-IP one.
         """
-        _make_member("alice")
         _reset_axes()
+        for u in self._ip_users():
+            _make_member(u)
         client = Client()
-        for i in range(LIMIT - 1):
-            _failed_login(client, "alice", ip="10.0.0.1")
-        resp = _failed_login(client, "alice", ip="10.0.0.1")
-        assert resp.status_code == 429, f"{LIMIT}th attempt should be throttled"
+        for u in self._ip_users()[: LIMIT - 1]:
+            _failed_login(client, u, ip="10.0.0.1")
+        resp = _failed_login(client, self._ip_users()[-1], ip="10.0.0.1")
+        assert (
+            resp.status_code == 429
+        ), f"Per-IP bucket should trip on the {LIMIT}th distinct-username failure"
 
     def test_different_ip_with_different_username_not_throttled(self):
         """A different (username, IP) pair should have its own budget.
@@ -264,6 +281,137 @@ class TestThrottledResponseGeneric:
         # Both should contain the same generic error text
         assert "correct username and password" in body_normal
         assert "correct username and password" in body_throttled
+
+
+@pytest.mark.django_db
+class TestCooldownNotRenewed:
+    """A failed attempt made while already locked out must NOT extend the
+    cooldown window (``AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT=False``).
+
+    If the cooldown were being renewed, an attacker could keep a victim (or a
+    shared-office NAT) locked out indefinitely by retrying.  axes implements
+    this by short-circuiting ``user_login_failed`` while locked out, so no new
+    attempt record is created and the original attempt_time is preserved.
+    """
+
+    def test_failure_during_lockout_does_not_add_record(self):
+        _make_member("carl")
+        _reset_axes()
+        client = Client()
+        for _ in range(LIMIT - 1):
+            _failed_login(client, "carl", ip="10.11.0.1")
+        _failed_login(client, "carl", ip="10.11.0.1")  # now locked
+
+        from axes.models import AccessAttempt
+
+        rows_before = AccessAttempt.objects.filter(ip_address="10.11.0.1").count()
+        times_before = list(
+            AccessAttempt.objects.filter(ip_address="10.11.0.1").values_list(
+                "attempt_time", flat=True
+            )
+        )
+
+        # A further failed attempt while locked out must be a no-op on the
+        # records (cooldown not renewed).
+        resp = _failed_login(client, "carl", ip="10.11.0.1")
+        assert resp.status_code == 429
+
+        rows_after = AccessAttempt.objects.filter(ip_address="10.11.0.1").count()
+        times_after = list(
+            AccessAttempt.objects.filter(ip_address="10.11.0.1").values_list(
+                "attempt_time", flat=True
+            )
+        )
+        assert rows_before == rows_after, (
+            "A failure during lockout should not create a new attempt record "
+            "(that would renew the cooldown)."
+        )
+        assert times_before == times_after, (
+            "A failure during lockout should not update the attempt time "
+            "(that would extend the cooldown window)."
+        )
+
+
+@pytest.mark.django_db
+class TestNoResetOnSuccess:
+    """A successful login must NOT wipe prior failure records
+    (``AXES_RESET_ON_SUCCESS=False``).
+
+    Preserving the records means a correct password cannot clear an in-flight
+    lockout, and the audit trail of prior failures in the window is retained.
+    """
+
+    def test_success_keeps_prior_failures(self):
+        _make_member("dora")
+        _reset_axes()
+        client = Client()
+        for _ in range(3):
+            _failed_login(client, "dora", ip="10.12.0.1")
+
+        from axes.models import AccessAttempt
+
+        rows_before = AccessAttempt.objects.filter(ip_address="10.12.0.1").count()
+        assert rows_before >= 1
+
+        # Successful login from the same IP/username.
+        resp = client.post(
+            reverse("login"),
+            {"username": "dora", "password": "testpass123!"},
+            HTTP_X_FORWARDED_FOR="10.12.0.1",
+        )
+        assert resp.status_code == 302, "Successful login should redirect"
+
+        rows_after = AccessAttempt.objects.filter(ip_address="10.12.0.1").count()
+        assert rows_after == rows_before, (
+            "Successful login should NOT delete prior failure records "
+            "(AXES_RESET_ON_SUCCESS is disabled)."
+        )
+
+
+@pytest.mark.django_db
+class TestLockoutResponseRendering:
+    """The throttled response re-renders the real login form with a generic
+    error, using a single consistent status for both HTML and XHR clients
+    (``AXES_LOCKOUT_CALLABLE``)."""
+
+    @staticmethod
+    def _lock(ip):
+        _make_member("locky")
+        _reset_axes()
+        client = Client()
+        for _ in range(LIMIT - 1):
+            _failed_login(client, "locky", ip=ip)
+        _failed_login(client, "locky", ip=ip)
+        return _failed_login(client, "locky", ip=ip)
+
+    def test_html_lockout_renders_login_form_with_generic_error(self):
+        resp = self._lock("10.13.0.1")
+        assert resp.status_code == 429
+        assert "text/html" in resp.get("Content-Type", "")
+        body = resp.content.decode()
+        # The real login form is rendered (not a bare message/redirect).
+        assert "<form" in body
+        # Same generic error as an ordinary failed login.
+        assert "correct username and password" in body
+        # No lockout-specific disclosure.
+        assert "locked" not in body.lower()
+        assert "suspended" not in body.lower()
+
+    def test_xhr_lockout_uses_same_status(self):
+        _make_member("locky")
+        _reset_axes()
+        client = Client()
+        for _ in range(LIMIT - 1):
+            _failed_login(client, "locky", ip="10.14.0.1")
+        _failed_login(client, "locky", ip="10.14.0.1")
+        resp = client.post(
+            reverse("login"),
+            {"username": "locky", "password": "wrong"},
+            HTTP_X_FORWARDED_FOR="10.14.0.1",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        # Consistent status for XHR (same 429 as the HTML path).
+        assert resp.status_code == 429
 
 
 @pytest.mark.django_db

@@ -418,7 +418,8 @@ AUTHENTICATION_BACKENDS = (
 #   the django-axes docs and StackOverflow).  We point axes at the
 #   shared utils.ip_utils.get_client_ip helper — the same helper already
 #   used by the kiosk middleware, cms.views, and members.views_kiosk —
-#   which reads the left-most X-Forwarded-For entry set by the LB.
+#   which reads the right-most X-Forwarded-For entry (the one the LB
+#   appended itself, and therefore the one a client cannot spoof).
 #
 # Per-IP / per-username counters:
 #   AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"] makes axes
@@ -451,13 +452,30 @@ AXES_COOLOFF_TIME = timedelta(
 AXES_CLIENT_IP_CALLABLE = "utils.ip_utils.get_client_ip"
 # Lock out when EITHER username OR IP exceeds the limit (independent buckets)
 AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
-AXES_RESET_ON_SUCCESS = (
-    True  # clear the counter on a successful login (per-IP + per-username)
-)
+# Do NOT wipe the failure counters on a successful login.  Keeping the
+# counters means a correct password cannot be used to "reset" a lockout that
+# is already in flight (e.g. an attacker who learns a valid credential keeps
+# throttling the victim until the cooldown expires), and it preserves the
+# audit trail of prior failures in the same window.  Stale rows are still
+# cleaned up by the cleanup_login_attempts CronJob (retention-based).
+AXES_RESET_ON_SUCCESS = False
+# Do NOT extend the cooldown when a failed attempt is made while already
+# locked out.  With the default (True) every additional failed attempt
+# during the cooldown refreshes the lockout, effectively letting an attacker
+# keep a victim (or a shared-office NAT) locked out indefinitely by retrying.
+# False keeps the cooldown fixed to its original start time so it expires
+# after a bounded window.
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_VERBOSE = False
 AXES_HTTP_RESPONSE_CODE = (
     429  # return 429 (not 403) when throttled — generic, no lockout disclosure
 )
+# Issue #1110: custom lockout rendering.  Instead of the default bare-text/
+# JSON/redirect lockout body, this callable re-renders the real login form
+# with the same generic "correct username and password" error and returns a
+# single consistent 429 status for both HTML and XHR clients.  The result is
+# indistinguishable from an ordinary failed login — no lockout disclosure.
+AXES_LOCKOUT_CALLABLE = "utils.axes_views.lockout_response"
 # Issue #1110: the lockout response must NOT reveal that the account is
 # "locked" — an attacker could use the message difference to fingerprint
 # which usernames exist.  Mirror the same generic error text that
