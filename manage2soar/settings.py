@@ -18,6 +18,7 @@ import os
 import re
 import sys
 import tempfile
+from datetime import timedelta
 from pathlib import Path
 
 from django.contrib.messages import constants as messages
@@ -66,6 +67,11 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "social_django",
+    # Issue #1110: Rate-limit /login/ against brute force, password spraying,
+    # and credential stuffing.  Counters persist in PostgreSQL (axes'
+    # AccessAttempt / AccessFailureLog models), shared across the 3 gunicorn
+    # workers in the GKE pod.
+    "axes",
     "tinymce",
     "members",
     "billing.apps.BillingConfig",
@@ -98,6 +104,11 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Issue #1110: Login throttling middleware (django-axes).
+    # Must run AFTER AuthenticationMiddleware (needs request.user) and BEFORE
+    # KioskAutoLoginMiddleware to preserve the Issue #709 ordering contract
+    # (Kiosk must run before CsrfViewMiddleware).
+    "axes.middleware.AxesMiddleware",
     # Issue #709: KioskAutoLoginMiddleware MUST run before CsrfViewMiddleware.
     # login() calls rotate_token(), which replaces request.META["CSRF_COOKIE"].
     # CsrfViewMiddleware.process_request (running after) overwrites that with
@@ -380,8 +391,104 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTHENTICATION_BACKENDS = (
+    # Issue #1110: Must be FIRST.  Checks the lockout status and raises
+    # AxesBackendPermissionDenied if the username or IP has exceeded
+    # AXES_FAILURE_LIMIT.  The other backends below still run for non-locked-out
+    # attempts and perform the actual authentication.  We use AxesCompatBackend
+    # (a thin wrapper) so it tolerates Django's test-client
+    # Client.login(username, password) shortcut, which calls authenticate() with
+    # no request — see utils/auth_backends.py for the full rationale.
+    "utils.auth_backends.AxesCompatBackend",
     "social_core.backends.google.GoogleOAuth2",
     "django.contrib.auth.backends.ModelBackend",
+)
+
+
+#############################################################
+# Login throttling (Issue #1110)
+#############################################################
+# Protects POST /login/ against brute force (single IP), password spraying
+# (single username from many IPs), and credential stuffing (breach replay).
+#
+# Critical — AXES_CLIENT_IP_CALLABLE:
+#   The app runs on GKE behind a managed L7 load balancer, so REMOTE_ADDR
+#   inside the pod is the LB node IP, not the end-user IP.  Using it
+#   verbatim would put every internet user in one throttle bucket and let
+#   a single attacker lock out the whole club (the "gotcha" called out in
+#   the django-axes docs and StackOverflow).  We point axes at the
+#   shared utils.ip_utils.get_client_ip helper — the same helper already
+#   used by the kiosk middleware, cms.views, and members.views_kiosk —
+#   which reads the right-most X-Forwarded-For entry (the one the LB
+#   appended itself, and therefore the one a client cannot spoof).
+#
+# Per-IP / per-username counters:
+#   AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"] makes axes
+#   lock out when EITHER the username OR the IP exceeds AXES_FAILURE_LIMIT
+#   (independent buckets).  This gives us both the per-IP brute-force
+#   guard AND the per-username spray guard required by the acceptance
+#   criteria in Issue #1110.
+#
+# Limits are deliberately generous (5 failures / 15 min cooldown) so that
+# members behind a shared office NAT don't trip the budget.  Per-username
+# counters (via the "username" entry in AXES_LOCKOUT_PARAMETERS) are the
+# real spray guard.
+#
+# No hard account lock: axes uses a bounded cooldown window (AXES_COOLOFF_TIME),
+# which avoids the DoS vector of an attacker deliberately locking a victim out
+# (called out in Issue #1110 design notes).
+# Kiosk auto-login (Issue #364, utils/middleware.py) is unaffected — it
+# authenticates via middleware before AxesMiddleware ever sees the request.
+# Stale AccessAttempt / AccessFailureLog rows are cleaned by the
+# cleanup_login_attempts CronJob (utils/management/commands/cleanup_login_attempts.py,
+# k8s-cronjobs.yaml) running hourly.
+AXES_ENABLED = True
+AXES_FAILURE_LIMIT = (
+    5  # max failures before throttle kicks in (per IP AND per username)
+)
+AXES_COOLOFF_TIME = timedelta(
+    minutes=15
+)  # how long the throttle lasts after the limit is hit
+# Use the shared X-Forwarded-For-aware helper instead of REMOTE_ADDR (LB in front)
+AXES_CLIENT_IP_CALLABLE = "utils.ip_utils.get_client_ip"
+# The GKE global external LB appends exactly one trusted address (its own IP)
+# after the real client in the XFF chain, so the client is second-from-right.
+# See utils.ip_utils.get_client_ip and the GCP external LB X-Forwarded-For docs.
+CLIENT_IP_TRAILING_PROXIES = 1
+# Lock out when EITHER username OR IP exceeds the limit (independent buckets)
+AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
+# Do NOT wipe the failure counters on a successful login.  Keeping the
+# counters means a correct password cannot be used to "reset" a lockout that
+# is already in flight (e.g. an attacker who learns a valid credential keeps
+# throttling the victim until the cooldown expires), and it preserves the
+# audit trail of prior failures in the same window.  Stale rows are still
+# cleaned up by the cleanup_login_attempts CronJob (retention-based).
+AXES_RESET_ON_SUCCESS = False
+# Do NOT extend the cooldown when a failed attempt is made while already
+# locked out.  With the default (True) every additional failed attempt
+# during the cooldown refreshes the lockout, effectively letting an attacker
+# keep a victim (or a shared-office NAT) locked out indefinitely by retrying.
+# False keeps the cooldown fixed to its original start time so it expires
+# after a bounded window.
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
+AXES_VERBOSE = False
+AXES_HTTP_RESPONSE_CODE = (
+    429  # return 429 (not 403) when throttled — generic, no lockout disclosure
+)
+# Issue #1110: custom lockout rendering.  Instead of the default bare-text/
+# JSON/redirect lockout body, this callable re-renders the real login form
+# with the same generic "correct username and password" error and returns a
+# single consistent 429 status for both HTML and XHR clients.  The result is
+# indistinguishable from an ordinary failed login — no lockout disclosure.
+AXES_LOCKOUT_CALLABLE = "utils.axes_views.lockout_response"
+# Issue #1110: the lockout response must NOT reveal that the account is
+# "locked" — an attacker could use the message difference to fingerprint
+# which usernames exist.  Mirror the same generic error text that
+# AuthenticationForm uses for a wrong password ("Please enter a correct
+# username and password...") so the throttled path is indistinguishable
+# from an ordinary failed login.
+AXES_COOLOFF_MESSAGE = (
+    "Please enter a correct username and password. "
+    "Note that both fields may be case-sensitive."
 )
 
 
