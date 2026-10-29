@@ -10,6 +10,8 @@ Usage:
 
 import os
 import re
+import sys
+import tempfile
 
 # Basic Django settings
 from pathlib import Path
@@ -21,13 +23,28 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
+# Keep test settings independent of the deployment bootstrap.  In
+# particular, migration tests may import this module through a temporary
+# settings module rather than through pytest-django's normal settings path.
+_settings_module = os.getenv("DJANGO_SETTINGS_MODULE", "").lower()
+TESTING = (
+    os.getenv("DJANGO_TESTING", "").lower() in ("true", "1", "yes")
+    or "test" in _settings_module
+    or "pytest" in sys.modules
+    or any(Path(arg).name in {"pytest", "py.test", "test"} for arg in sys.argv)
+)
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY not set in environment!")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
+DEBUG = os.getenv("DJANGO_DEBUG", "True" if TESTING else "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
@@ -163,7 +180,14 @@ MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/var/www/m2s/media")
 # which defaults to this same path. Do not point IMPORT_EXPORT_TMP_DIR at an
 # unprovisioned path, or the directory may not exist and abandoned member CSVs
 # will bypass the retention policy (issue #1071).
-IMPORT_EXPORT_TMP_DIR = os.getenv("IMPORT_EXPORT_TMP_DIR", "/opt/m2s/import-export-tmp")
+IMPORT_EXPORT_TMP_DIR = os.getenv(
+    "IMPORT_EXPORT_TMP_DIR",
+    (
+        str(Path(tempfile.gettempdir()) / "m2s-import-export-tmp")
+        if TESTING or DEBUG
+        else "/opt/m2s/import-export-tmp"
+    ),
+)
 
 STORAGES = {
     "default": {
@@ -256,6 +280,14 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
+
+# Kiosk cookies follow the same rule as session/CSRF cookies: secure by
+# default for a real single-host deployment, but usable over HTTP in local
+# development and tests.  Always define the setting because kiosk views are
+# also exercised while migrations are being applied.
+KIOSK_COOKIE_SECURE = os.getenv(
+    "KIOSK_COOKIE_SECURE", "False" if TESTING or DEBUG else "True"
+).lower() in ("true", "1", "yes")
 
 # TinyMCE configuration
 TINYMCE_PDF_TRUSTED_URL_PREFIXES = [

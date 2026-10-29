@@ -30,8 +30,17 @@ from google.oauth2 import service_account
 # This calculates the path to the directory containing 'manage.py'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Detect if we're running in a test environment to prevent test pollution
-TESTING = any(arg.startswith("test") for arg in sys.argv[1:2])
+# Detect test runners as well as ``manage.py test``.  The first argument to
+# pytest is normally the pytest executable, so checking only argv[1] makes
+# settings depend on how the suite was started (and is especially fragile
+# when a migration runner imports a test settings module).
+_settings_module = os.getenv("DJANGO_SETTINGS_MODULE", "").lower()
+TESTING = (
+    os.getenv("DJANGO_TESTING", "").lower() in ("true", "1", "yes")
+    or "test" in _settings_module
+    or "pytest" in sys.modules
+    or any(Path(arg).name in {"pytest", "py.test", "test"} for arg in sys.argv)
+)
 
 # Load environment variables from the .env file located in the BASE_DIR.
 # This ensures that sensitive information and configuration can be managed
