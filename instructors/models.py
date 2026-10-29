@@ -1,10 +1,27 @@
 import re
 
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from tinymce.models import HTMLField
 
-from members.models import Member
+from members.models import Member, RoleMetadata
 from utils.upload_entropy import upload_quals_icon
+
+QUALIFICATION_ADMIN_PERMISSION_CODENAMES = (
+    "add_clubqualificationtype",
+    "change_clubqualificationtype",
+    "delete_clubqualificationtype",
+    "add_memberqualification",
+    "change_memberqualification",
+    "delete_memberqualification",
+)
+QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES = (
+    "add_",
+    "change_",
+    "delete_",
+    "view_",
+)
 
 SCORE_CHOICES = [
     ("1", "1 - Introduced (Discussed/Demonstrated)"),
@@ -346,9 +363,142 @@ class ClubQualificationType(models.Model):
     )
     is_obsolete = models.BooleanField(default=False)
     tooltip = models.TextField(blank=True)
+    permission_group = models.ForeignKey(
+        "auth.Group",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="qualification_types",
+        help_text=(
+            "Optional opted-in Group whose explicit custom action permissions "
+            "apply while qualified; standard add/change/delete/view permissions "
+            "are not allowed."
+        ),
+    )
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        super().clean()
+        if not self.permission_group_id:
+            return
+        try:
+            metadata = self.permission_group.role_metadata
+        except RoleMetadata.DoesNotExist:
+            metadata = None
+        if (
+            metadata is None
+            or not metadata.qualification_permission_bundle
+            or metadata.is_builtin
+            or metadata.is_protected
+            or metadata.is_system_managed
+        ):
+            raise ValidationError(
+                {
+                    "permission_group": (
+                        "Select an opted-in, non-built-in, non-protected, "
+                        "non-system-managed Group."
+                    )
+                }
+            )
+        if self.permission_group.permissions.filter(
+            Q(content_type__app_label__in=("admin", "auth", "contenttypes", "sessions"))
+            | Q(
+                content_type__app_label="members",
+                content_type__model__in=(
+                    "member",
+                    "rolemetadata",
+                    "memberroleassignment",
+                ),
+            )
+            | Q(
+                content_type__app_label="instructors",
+                codename__in=QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
+            )
+            | Q(
+                codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
+                    0
+                ]
+            )
+            | Q(
+                codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
+                    1
+                ]
+            )
+            | Q(
+                codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
+                    2
+                ]
+            )
+            | Q(
+                codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
+                    3
+                ]
+            )
+        ).exists():
+            raise ValidationError(
+                {
+                    "permission_group": (
+                        "Qualification bundles cannot include broad "
+                        "authentication or administration permissions."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class QualificationPermissionGrant(models.Model):
+    """Explicit per-permission approval for a qualification bundle action."""
+
+    group = models.ForeignKey("auth.Group", on_delete=models.CASCADE)
+    permission = models.ForeignKey("auth.Permission", on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("group", "permission"),
+                name="unique_qualification_permission_grant",
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+        codename = self.permission.codename if self.permission_id else ""
+        if (
+            not self.group_id
+            or not self.permission_id
+            or codename.startswith(QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES)
+            or self.permission.content_type.app_label
+            in ("admin", "auth", "contenttypes", "sessions")
+            or (
+                self.permission.content_type.app_label == "members"
+                and self.permission.content_type.model
+                in ("member", "rolemetadata", "memberroleassignment")
+            )
+            or (
+                self.permission.content_type.app_label == "instructors"
+                and codename in QUALIFICATION_ADMIN_PERMISSION_CODENAMES
+            )
+        ):
+            raise ValidationError(
+                "Only explicitly approved, non-CRUD custom action permissions may be qualification-derived."
+            )
+        if (
+            self.group_id
+            and self.permission_id
+            and not self.group.permissions.filter(pk=self.permission_id).exists()
+        ):
+            raise ValidationError(
+                "The permission must already be assigned to the selected bundle Group."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 ####################################################

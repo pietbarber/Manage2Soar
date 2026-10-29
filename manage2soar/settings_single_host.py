@@ -189,6 +189,7 @@ AUTH_USER_MODEL = "members.Member"
 AUTHENTICATION_BACKENDS = (
     "social_core.backends.google.GoogleOAuth2",
     "django.contrib.auth.backends.ModelBackend",
+    "members.auth_backends.QualificationPermissionBackend",
 )
 
 # Social Auth configuration (Google OAuth)
