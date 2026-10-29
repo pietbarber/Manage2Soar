@@ -450,6 +450,10 @@ AXES_COOLOFF_TIME = timedelta(
 )  # how long the throttle lasts after the limit is hit
 # Use the shared X-Forwarded-For-aware helper instead of REMOTE_ADDR (LB in front)
 AXES_CLIENT_IP_CALLABLE = "utils.ip_utils.get_client_ip"
+# The GKE global external LB appends exactly one trusted address (its own IP)
+# after the real client in the XFF chain, so the client is second-from-right.
+# See utils.ip_utils.get_client_ip and the GCP external LB X-Forwarded-For docs.
+CLIENT_IP_TRAILING_PROXIES = 1
 # Lock out when EITHER username OR IP exceeds the limit (independent buckets)
 AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
 # Do NOT wipe the failure counters on a successful login.  Keeping the

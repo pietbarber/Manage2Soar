@@ -23,9 +23,18 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.forms import AuthenticationForm
+from django.forms.forms import NON_FIELD_ERRORS
+from django.forms.utils import ErrorDict, ErrorList
 from django.http import HttpRequest, HttpResponse, HttpResponseBase, JsonResponse
 from django.template import loader
-from django.utils.translation import gettext_lazy as _
+
+# The generic invalid-credential error, identical to the one Django's
+# AuthenticationForm emits for a wrong password, so the throttled response is
+# indistinguishable from an ordinary failed login.
+_GENERIC_AUTH_ERROR = (
+    "Please enter a correct username and password. "
+    "Note that both fields may be case-sensitive."
+)
 
 
 def lockout_response(
@@ -40,14 +49,16 @@ def lockout_response(
     status code (429) for both HTML and XHR clients, and never reveals whether
     the throttle is IP-based or username-based.
     """
-    form = AuthenticationForm(request, data=request.POST or None)
-    form.add_error(
-        None,
-        _(
-            "Please enter a correct username and password. "
-            "Note that both fields may be case-sensitive."
-        ),
+    # Use a display-only (unbound) form so nothing re-authenticates the rejected
+    # credentials: binding the POST data would run ``clean()``/``authenticate()``
+    # again and add a second, duplicate invalid-login error on top of ours.
+    # ``initial`` prefills the username (matching an ordinary failed login)
+    # without validating, and ``_errors`` carries exactly one generic non-field
+    # error.  The result renders the generic message exactly once.
+    form = AuthenticationForm(
+        request, initial={"username": request.POST.get("username", "")}
     )
+    form._errors = ErrorDict({NON_FIELD_ERRORS: ErrorList([_GENERIC_AUTH_ERROR])})
 
     context = {
         "form": form,

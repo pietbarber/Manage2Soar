@@ -369,6 +369,65 @@ class TestNoResetOnSuccess:
 
 
 @pytest.mark.django_db
+class TestClientIpSelection:
+    """``get_client_ip`` must pick the client entry the trusted upstream proxy
+    observed, not a client-controlled (spoofable) entry and not the shared
+    load-balancer IP.
+
+    Per the GCP external Application Load Balancer docs, the LB appends
+    ``<client-ip>, <load-balancer-ip>`` to the right of any client-supplied
+    ``X-Forwarded-For`` value:
+
+        XFF: <existing spoofable entries>, <client-ip>, <load-balancer-ip>
+
+    So the trustworthy client entry is the second-from-right entry (default
+    ``CLIENT_IP_TRAILING_PROXIES = 1``), while the right-most entry is the
+    shared LB address.
+    """
+
+    @staticmethod
+    def _ip(xff, remote="1.1.1.1"):
+        from django.test import RequestFactory
+
+        from utils.ip_utils import get_client_ip
+
+        r = RequestFactory().get("/x")
+        if xff is not None:
+            r.META["HTTP_X_FORWARDED_FOR"] = xff
+        r.META["REMOTE_ADDR"] = remote
+        return get_client_ip(r)
+
+    def test_selects_second_from_right_for_gke_header(self):
+        """Realistic GKE header: ``<spoof>, <client>, <load-balancer>`` → client."""
+        ip = self._ip("8.8.8.8, 203.0.113.5, 198.51.100.99")
+        assert ip == "203.0.113.5", (
+            "The second-from-right entry is the client the LB observed; the "
+            "right-most is the shared LB IP and the left is client-controlled."
+        )
+
+    def test_clean_two_entry_header(self):
+        """Clean header with no spoofing: ``<client>, <load-balancer>`` → client."""
+        assert self._ip("198.51.100.7, 198.51.100.99") == "198.51.100.7"
+
+    def test_single_hop_proxy_falls_back_to_last(self):
+        """Single-hop proxy (e.g. single-host nginx) appends only the client,
+        so the chain is ``<client>`` and the last entry is correct."""
+        assert self._ip("198.51.100.7") == "198.51.100.7"
+
+    def test_no_xff_uses_remote_addr(self):
+        """No XFF header (local dev / tests) falls back to REMOTE_ADDR."""
+        assert self._ip(None, remote="10.0.0.9") == "10.0.0.9"
+
+    def test_multi_entry_does_not_pick_shared_lb_ip(self):
+        """A multi-hop chain must not select the shared (right-most) address."""
+        ip = self._ip("1.2.3.4, 5.6.7.8, 9.9.9.9, 10.10.10.10")
+        assert ip == "9.9.9.9", (
+            "Must select the client entry (second from right), not the shared "
+            "load-balancer IP (right-most)."
+        )
+
+
+@pytest.mark.django_db
 class TestLockoutResponseRendering:
     """The throttled response re-renders the real login form with a generic
     error, using a single consistent status for both HTML and XHR clients
@@ -396,6 +455,32 @@ class TestLockoutResponseRendering:
         # No lockout-specific disclosure.
         assert "locked" not in body.lower()
         assert "suspended" not in body.lower()
+
+    def test_lockout_error_renders_exactly_once(self):
+        """The throttled login form must show the generic error exactly once.
+
+        Using a bound form (with the POST data) would re-authenticate the
+        rejected credentials and stack a second invalid-login error on top of
+        the one we add.  The form must be display-only so the error appears
+        exactly once — matching an ordinary failed login, which also shows it
+        once.
+        """
+        _make_member("oncey")
+        _reset_axes()
+        client = Client()
+        # A normal (not yet throttled) failed login shows the error exactly once.
+        normal = _failed_login(client, "oncey", ip="10.15.0.1")
+        assert normal.content.decode().count("correct username and password") == 1
+
+        # Now lock the client and verify the throttled body also shows it once.
+        for _ in range(LIMIT - 1):
+            _failed_login(client, "oncey", ip="10.15.0.2")
+        _failed_login(client, "oncey", ip="10.15.0.2")
+        throttled = _failed_login(client, "oncey", ip="10.15.0.2")
+        assert throttled.status_code == 429
+        assert (
+            throttled.content.decode().count("correct username and password") == 1
+        ), "The throttled error must appear exactly once (no duplicated message)."
 
     def test_xhr_lockout_uses_same_status(self):
         _make_member("locky")
