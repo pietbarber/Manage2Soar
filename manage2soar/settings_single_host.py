@@ -230,6 +230,7 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
     )
 
 # Email configuration
+M2S_MAIL_API_KEY = os.getenv("M2S_MAIL_API_KEY", "")
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )

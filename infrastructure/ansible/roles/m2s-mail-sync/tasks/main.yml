@@ -47,8 +47,8 @@
 - name: Create cron job for alias sync
   ansible.builtin.cron:
     name: "Sync M2S email aliases"
-    minute: "*/15"
-    job: "{{ m2s_sync_dir }}/sync-aliases.py >> /var/log/m2s-sync.log 2>&1"
+    minute: "*"
+    job: "/usr/bin/flock -n /run/lock/m2s-mail-sync.lock {{ m2s_sync_dir }}/sync-aliases.py >> /var/log/m2s-sync.log 2>&1"
     user: root
 
 - name: Create log rotation for sync logs

@@ -53,6 +53,16 @@
           Mail Server: {{ mail_server_enabled | default(false) }}
           ========================================
 
+    - name: Require mail API and SMTP2GO credentials for inbound lists
+      ansible.builtin.assert:
+        that:
+          - vault_m2s_api_key is defined and vault_m2s_api_key | length > 0
+          - vault_email_host_user is defined and vault_email_host_user | length > 0
+          - vault_email_host_password is defined and vault_email_host_password | length > 0
+        fail_msg: "Set vault_m2s_api_key and SMTP2GO vault_email_host_user/password in the single-host vault before enabling inbound lists."
+      when: (mail_server_enabled | default(false) | bool) and (mail_server_receive_enabled | default(false) | bool)
+      no_log: true
+
   roles:
     # PostgreSQL database
     - role: postgresql
@@ -79,6 +89,10 @@
       tags: [mail, spam, rspamd]
       when: (mail_server_enabled | default(false)) and (mail_server_receive_enabled | default(false))
 
+    - role: m2s-mail-sync
+      tags: [mail, sync]
+      when: (mail_server_enabled | default(false) | bool) and (mail_server_receive_enabled | default(false) | bool)
+
   post_tasks:
     - name: Display DKIM DNS records (if mail enabled)
       ansible.builtin.debug:
@@ -89,7 +103,7 @@
 
           Add this TXT record to your DNS:
 
-          Name: {{ dkim_selector | default('default') }}._domainkey.{{ m2s_domain }}
+          Name: {{ dkim_selector | default('default') }}._domainkey.{{ mail_domain }}
           Type: TXT
           Value: (see file on server - path shown below)
 
