@@ -372,6 +372,22 @@ def test_mark_issue_resolved_authorized(client, meister_member, maintenance_issu
 
 
 @pytest.mark.django_db
+def test_maintenance_mark_resolved_forbidden_for_unassigned_member(
+    client, active_member, maintenance_issue
+):
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:maintenance_mark_resolved", args=[maintenance_issue.pk]),
+        {"resolution_notes": "Attempted unauthorized resolution."},
+    )
+
+    assert response.status_code == 403
+    maintenance_issue.refresh_from_db()
+    assert maintenance_issue.resolved is False
+    assert maintenance_issue.resolved_by is None
+
+
+@pytest.mark.django_db
 def test_resolve_maintenance_issue_post(client, meister_member, maintenance_issue):
     client.force_login(meister_member)
     response = client.post(
