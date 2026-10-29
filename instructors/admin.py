@@ -274,6 +274,28 @@ class ClubQualificationTypeAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_filter = ("applies_to", "is_obsolete")
     ordering = ("code",)
 
+    def _can_manage_permission_group(self, request):
+        """Keep qualification permission bundles in the bootstrap admin boundary."""
+        return bool(
+            request.user and request.user.is_active and request.user.is_superuser
+        )
+
+    def get_list_display(self, request):
+        fields = super().get_list_display(request)
+        if not self._can_manage_permission_group(request):
+            return tuple(field for field in fields if field != "permission_group")
+        return fields
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        # Excluding the field from the form, rather than merely hiding its
+        # widget, also makes a forged permission_group POST a no-op.  Django's
+        # ModelForm then preserves the existing value when saving other fields.
+        exclude = list(kwargs.pop("exclude", ()) or ())
+        if not self._can_manage_permission_group(request):
+            exclude.append("permission_group")
+        kwargs["exclude"] = exclude
+        return super().get_form(request, obj, change=change, **kwargs)
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "permission_group":
             kwargs["queryset"] = (
