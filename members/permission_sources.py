@@ -13,8 +13,6 @@ are checked afresh by QualificationPermissionBackend.
 
 from collections import defaultdict
 
-from django.contrib.auth.models import Permission
-from django.db.models import Q
 from django.utils import timezone
 
 from instructors.models import (
@@ -29,6 +27,27 @@ from members.models import MemberRoleAssignment
 
 def _permission_name(permission):
     return f"{permission.content_type.app_label}.{permission.codename}"
+
+
+def _is_unsafe_permission(permission):
+    """Keep this denylist in step with QualificationPermissionBackend."""
+    content_type = permission.content_type
+    if content_type.app_label in ("admin", "auth", "contenttypes", "sessions"):
+        return True
+    if content_type.app_label == "members" and content_type.model in (
+        "member",
+        "rolemetadata",
+        "memberroleassignment",
+    ):
+        return True
+    if (
+        content_type.app_label == "instructors"
+        and permission.codename in QUALIFICATION_ADMIN_PERMISSION_CODENAMES
+    ):
+        return True
+    return permission.codename.startswith(
+        QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES
+    )
 
 
 def get_permission_sources(member, permission=None):
@@ -110,27 +129,11 @@ def get_permission_sources(member, permission=None):
                 )
 
     today = timezone.localdate()
+    # Do not filter these records by current backend eligibility.  A configured
+    # grant is useful provenance even after its bundle or permission changes.
     qualification_records = MemberQualification.objects.filter(
-        member=member,
-        qualification__permission_group__role_metadata__qualification_permission_bundle=True,
-        qualification__permission_group__role_metadata__is_builtin=False,
-        qualification__permission_group__role_metadata__is_protected=False,
-        qualification__permission_group__role_metadata__is_system_managed=False,
-    )
-
-    excluded = (
-        Q(content_type__app_label__in=("admin", "auth", "contenttypes", "sessions"))
-        | Q(
-            content_type__app_label="members",
-            content_type__model__in=("member", "rolemetadata", "memberroleassignment"),
-        )
-        | Q(
-            content_type__app_label="instructors",
-            codename__in=QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
-        )
-    )
-    for prefix in QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES:
-        excluded |= Q(codename__startswith=prefix)
+        member=member, qualification__permission_group__isnull=False
+    ).select_related("qualification__permission_group__role_metadata")
 
     # Restrict to approved (group, permission) pairs AND actual group grants.
     # The backend is also consulted so no row claims a grant it would reject.
@@ -142,19 +145,41 @@ def get_permission_sources(member, permission=None):
             and not record.qualification.is_obsolete
             and (record.expiration_date is None or record.expiration_date >= today)
         )
-        safe_permissions = Permission.objects.filter(group__id=group_id).exclude(
-            excluded
-        )
         for grant in (
             QualificationPermissionGrant.objects.filter(
-                group_id=group_id, permission__in=safe_permissions
+                group_id=group_id,
             )
             .select_related("permission__content_type")
             .order_by("permission_id")
         ):
             name = _permission_name(grant.permission)
+            try:
+                metadata = record.qualification.permission_group.role_metadata
+            except (
+                record.qualification.permission_group.__class__.role_metadata.RelatedObjectDoesNotExist
+            ):
+                metadata = None
+            bundle_enabled = bool(
+                metadata
+                and metadata.qualification_permission_bundle
+                and not metadata.is_builtin
+                and not metadata.is_protected
+                and not metadata.is_system_managed
+            )
+            permission_in_group = (
+                record.qualification.permission_group.permissions.filter(
+                    pk=grant.permission_id
+                ).exists()
+            )
+            unsafe = _is_unsafe_permission(grant.permission)
             effective = (
-                user_active and active_member and is_current and name in backend_grants
+                user_active
+                and active_member
+                and is_current
+                and bundle_enabled
+                and permission_in_group
+                and not unsafe
+                and name in backend_grants
             )
             ineffective_reason = None
             if not record.is_qualified:
@@ -167,6 +192,12 @@ def get_permission_sources(member, permission=None):
                 ineffective_reason = "inactive_account"
             elif not active_member:
                 ineffective_reason = "inactive_membership"
+            elif not bundle_enabled:
+                ineffective_reason = "bundle_disabled"
+            elif not permission_in_group:
+                ineffective_reason = "permission_removed"
+            elif unsafe:
+                ineffective_reason = "unsafe_permission"
             elif name not in backend_grants:
                 ineffective_reason = "backend_rejected"
             sources[name].append(

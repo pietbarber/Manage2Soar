@@ -46,6 +46,25 @@ def name_of(permission):
     return f"{permission.content_type.app_label}.{permission.codename}"
 
 
+def configured_qualification(member, permission, code):
+    group = Group.objects.create(name=f"{code} bundle")
+    RoleMetadata.objects.create(
+        group=group,
+        key=f"{code.lower()}_bundle",
+        display_name=code,
+        qualification_permission_bundle=True,
+    )
+    group.permissions.add(permission)
+    QualificationPermissionGrant.objects.create(group=group, permission=permission)
+    qualification = ClubQualificationType.objects.create(
+        code=code, name=code, permission_group=group
+    )
+    record = MemberQualification.objects.create(
+        member=member, qualification=qualification
+    )
+    return group, record
+
+
 @pytest.mark.django_db
 def test_direct_and_duplicate_group_provenance_remains_separate(
     member, action_permission
@@ -155,6 +174,47 @@ def test_qualification_requires_current_approved_safe_grant(member, action_permi
     assert revoked["sources"][0]["type"] == "qualification"
     assert not revoked["sources"][0]["effective"]
     assert revoked["sources"][0]["ineffective_reason"] == "revoked"
+
+
+@pytest.mark.django_db
+def test_qualification_source_shows_disabled_bundle(member, action_permission):
+    group, _ = configured_qualification(member, action_permission, "DISABLED")
+    RoleMetadata.objects.filter(group=group).update(
+        qualification_permission_bundle=False
+    )
+
+    key = name_of(action_permission)
+    source = get_permission_sources(member, key)["permissions"][key]["sources"][0]
+    assert source["effective"] is False
+    assert source["ineffective_reason"] == "bundle_disabled"
+    assert not member.has_perm(key)
+
+
+@pytest.mark.django_db
+def test_qualification_source_shows_removed_permission(member, action_permission):
+    group, _ = configured_qualification(member, action_permission, "REMOVED")
+    group.permissions.remove(action_permission)
+
+    key = name_of(action_permission)
+    source = get_permission_sources(member, key)["permissions"][key]["sources"][0]
+    assert source["effective"] is False
+    assert source["ineffective_reason"] == "permission_removed"
+    assert not member.has_perm(key)
+
+
+@pytest.mark.django_db
+def test_qualification_source_shows_permission_that_became_unsafe(
+    member, action_permission
+):
+    configured_qualification(member, action_permission, "UNSAFE")
+    Permission.objects.filter(pk=action_permission.pk).update(codename="view_unsafe")
+    action_permission.refresh_from_db()
+
+    key = name_of(action_permission)
+    source = get_permission_sources(member, key)["permissions"][key]["sources"][0]
+    assert source["effective"] is False
+    assert source["ineffective_reason"] == "unsafe_permission"
+    assert not member.has_perm(key)
 
 
 @pytest.mark.django_db
