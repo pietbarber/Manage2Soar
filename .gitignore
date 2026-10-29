@@ -270,3 +270,4 @@ infrastructure/ansible/group_vars/all/vault.yml
 
 .mcp.json
 .claude.json
+graphify-out
