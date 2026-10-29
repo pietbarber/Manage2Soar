@@ -12,7 +12,7 @@ from django.views.decorators.http import require_http_methods
 from siteconfig.models import SiteConfiguration
 
 from .account_emails import send_account_setup_email
-from .decorators import active_member_required
+from .decorators import non_kiosk_member_required
 from .forms_applications import (
     MembershipApplicationForm,
     MembershipApplicationReviewForm,
@@ -156,7 +156,7 @@ def membership_application(request):
     )
 
 
-@active_member_required
+@non_kiosk_member_required
 def membership_applications_list(request):
     """
     List of membership applications for authorized club roles.
@@ -229,7 +229,7 @@ def membership_applications_list(request):
     )
 
 
-@active_member_required
+@non_kiosk_member_required
 def membership_application_detail(request, application_id):
     """
     Detailed view of a membership application.
@@ -421,7 +421,7 @@ def membership_application_detail(request, application_id):
     )
 
 
-@active_member_required
+@non_kiosk_member_required
 def membership_waitlist(request):
     """
     View/manage the membership waiting list.
