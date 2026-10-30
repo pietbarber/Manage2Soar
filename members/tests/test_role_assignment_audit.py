@@ -342,3 +342,7 @@ def test_event_model_rejects_mutation_and_deletion(audit_member, audit_group):
         MemberRoleAssignmentEvent._base_manager.all().update(group_name="changed")
     with pytest.raises(ValidationError, match="cannot be deleted"):
         MemberRoleAssignmentEvent._base_manager.all().delete()
+
+    event.pk = None
+    with pytest.raises(ValidationError, match="appended individually"):
+        MemberRoleAssignmentEvent.objects.bulk_create([event])

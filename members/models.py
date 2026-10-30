@@ -233,6 +233,11 @@ class MemberRoleAssignmentEventQuerySet(models.QuerySet):
             return super().update(**kwargs)
         raise ValidationError("Role assignment audit events are immutable.")
 
+    def bulk_create(self, *args, **kwargs):
+        raise ValidationError(
+            "Role assignment audit events must be appended individually."
+        )
+
     def delete(self):
         raise ValidationError("Role assignment audit events cannot be deleted.")
 
