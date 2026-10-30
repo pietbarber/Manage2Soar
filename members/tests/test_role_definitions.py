@@ -35,6 +35,7 @@ def test_legacy_sync_registry_preserves_existing_flag_driven_groups():
         "Secretary": "secretary",
         "Treasurer": "treasurer",
         "Directors": "director",
+        "Safety Officers": "safety_officer",
     }
 
 

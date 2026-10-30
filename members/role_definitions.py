@@ -56,6 +56,7 @@ LEGACY_SYNC_ROLES = tuple(
         "secretary",
         "treasurer",
         "directors",
+        "safety_officers",
     }
 )
 
