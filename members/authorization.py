@@ -64,6 +64,8 @@ def has_membership_application_view_access(user):
     """Return whether *user* may view application-management screens."""
     if not user or not getattr(user, "is_authenticated", False):
         return False
+    if not getattr(user, "is_active", False) or not is_active_member(user):
+        return False
     return bool(
         user.has_perm("members.view_membership_applications")
         or getattr(user, "director", False)
@@ -75,6 +77,8 @@ def has_membership_application_view_access(user):
 def has_membership_application_modify_access(user):
     """Return whether *user* may modify application-management screens."""
     if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if not getattr(user, "is_active", False) or not is_active_member(user):
         return False
     return bool(
         getattr(user, "member_manager", False)

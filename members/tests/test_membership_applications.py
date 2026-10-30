@@ -14,6 +14,7 @@ from django.urls import reverse
 from members.forms_applications import MembershipApplicationForm
 from members.models import Member
 from members.models_applications import MembershipApplication
+from members.views_applications import _application_withdrawal_token
 
 
 @pytest.mark.django_db
@@ -807,6 +808,65 @@ class MembershipApplicationViewTests(TestCase):
             reverse("members:membership_application_status", args=[uuid.uuid4()])
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_application_uuid_alone_cannot_withdraw_application(self):
+        app = MembershipApplication.objects.create(
+            first_name="John",
+            last_name="Doe",
+            email="john@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn gliding",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        response = self.client.post(
+            reverse("members:membership_application_status", args=[app.application_id]),
+            {"action": "withdraw"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        app.refresh_from_db()
+        self.assertEqual(app.status, "pending")
+
+    def test_signed_withdrawal_token_can_withdraw_application(self):
+        app = MembershipApplication.objects.create(
+            first_name="John",
+            last_name="Doe",
+            email="john@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn gliding",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        response = self.client.post(
+            reverse("members:membership_application_status", args=[app.application_id]),
+            {
+                "action": "withdraw",
+                "withdrawal_token": _application_withdrawal_token(app),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        app.refresh_from_db()
+        self.assertEqual(app.status, "withdrawn")
 
     def test_waitlist_view(self):
         """Test the waitlist view."""

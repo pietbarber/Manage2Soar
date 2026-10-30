@@ -13,7 +13,12 @@ from instructors.models import (
     MemberQualification,
     QualificationPermissionGrant,
 )
-from members.authorization import AuthorizationDecision, resolve_authorization
+from members.authorization import (
+    AuthorizationDecision,
+    has_membership_application_modify_access,
+    has_membership_application_view_access,
+    resolve_authorization,
+)
 from members.models import RoleMetadata
 from siteconfig.models import MembershipStatus
 
@@ -50,6 +55,22 @@ def test_inactive_account_denied_even_with_context_and_kiosk(member):
         require_active_member=True,
         allow_kiosk_membership_bypass=True,
     ) == AuthorizationDecision(False, "inactive_account")
+
+
+@pytest.mark.django_db
+def test_membership_application_helpers_require_active_account_and_membership(member):
+    member.member_manager = True
+    assert has_membership_application_view_access(member)
+    assert has_membership_application_modify_access(member)
+
+    member.is_active = False
+    assert not has_membership_application_view_access(member)
+    assert not has_membership_application_modify_access(member)
+
+    member.is_active = True
+    member.membership_status = "Inactive Member"
+    assert not has_membership_application_view_access(member)
+    assert not has_membership_application_modify_access(member)
 
 
 @pytest.mark.django_db
