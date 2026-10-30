@@ -63,6 +63,9 @@ def club_accounting_enabled():
     )
 
 
+BOOKS_NOT_STARTED = "Finish Finances Setup before recording entries in the club books."
+
+
 def _require_club_accounting():
     if not club_accounting_enabled():
         raise ClubAccountingDisabledError("Club accounting is disabled for this site.")
@@ -218,6 +221,9 @@ def post_journal_entry(
                     "Source key already identifies a different journal entry."
                 )
             return existing
+    # Anything posted before the opening entry would lock Finances Setup out.
+    if source != JournalEntry.Source.OPENING and not active_opening_entry():
+        raise ValidationError(BOOKS_NOT_STARTED)
     _validate_date(date, source=source, reverses=reverses)
     if source == JournalEntry.Source.OPENING and active_opening_entry():
         raise ValidationError("The books already have an opening entry.")

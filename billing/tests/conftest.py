@@ -47,3 +47,34 @@ def enable_club_accounting(enable_billing_app, seeded_chart):
         update_fields=["club_accounting_enabled", "club_accounting_start_date"]
     )
     return enable_billing_app
+
+
+@pytest.fixture
+def books_started(enable_club_accounting):
+    """Run Finances Setup so the club books accept entries.
+
+    The opening balance goes to the seeded 110 Checking account, and the books
+    start on January 1 of last year so tests can post earlier-dated entries.
+    """
+    from datetime import date
+
+    from billing.ledger_services import BankBalance, go_live
+    from billing.models import Account
+    from members.models import Member
+    from siteconfig.timezone_utils import get_club_today
+
+    actor = Member.objects.create_user(
+        username="books-setup",
+        treasurer=True,
+        is_active=True,
+        membership_status="Full Member",
+    )
+    return go_live(
+        actor=actor,
+        start_date=date(get_club_today().year - 1, 1, 1),
+        rows=[
+            BankBalance(
+                account=Account.objects.get(code="110"), name="Checking", amount="1000"
+            )
+        ],
+    )

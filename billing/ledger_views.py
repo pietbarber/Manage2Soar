@@ -2,6 +2,7 @@
 
 import csv
 from datetime import date
+from functools import wraps
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -30,6 +31,7 @@ from billing.ledger_forms import (
     TransferForm,
 )
 from billing.ledger_services import (
+    BOOKS_NOT_STARTED,
     BankBalance,
     Line,
     account_balances,
@@ -58,6 +60,19 @@ ENTRIES_PER_PAGE = 50
 def club_books_view(view_func):
     """Apply the billing, treasurer, and club-accounting gates in order."""
     return billing_app_required(treasurer_required(club_accounting_required(view_func)))
+
+
+def books_started_required(view_func):
+    """Send the treasurer to Finances Setup until the books have an opening entry."""
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if active_opening_entry() is None:
+            messages.info(request, BOOKS_NOT_STARTED)
+            return redirect("billing:go_live")
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
 
 
 def _year_start():
@@ -349,26 +364,31 @@ def _record_entry(request, kind):
 
 
 @club_books_view
+@books_started_required
 def record_expense(request):
     return _record_entry(request, "expense")
 
 
 @club_books_view
+@books_started_required
 def record_member_expense(request):
     return _record_entry(request, "member_expense")
 
 
 @club_books_view
+@books_started_required
 def record_income(request):
     return _record_entry(request, "income")
 
 
 @club_books_view
+@books_started_required
 def cash_transfer(request):
     return _record_entry(request, "transfer")
 
 
 @club_books_view
+@books_started_required
 def general_journal(request):
     header = JournalHeaderForm(request.POST or None)
     formset = JournalLineFormSet(request.POST or None, prefix="lines")

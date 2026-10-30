@@ -89,7 +89,7 @@ def test_seeded_chart_has_every_system_role():
     ) == [("110", "Checking")]
 
 
-def test_expense_debits_expense_and_credits_cash(treasurer, checking):
+def test_expense_debits_expense_and_credits_cash(treasurer, checking, books_started):
     entry = post_expense(
         actor=treasurer,
         date=today(),
@@ -109,7 +109,7 @@ def test_expense_debits_expense_and_credits_cash(treasurer, checking):
     assert entry.reference == "1042"
 
 
-def test_income_and_transfer_move_cash(treasurer, checking, savings):
+def test_income_and_transfer_move_cash(treasurer, checking, savings, books_started):
     post_income(
         actor=treasurer,
         date=today(),
@@ -225,7 +225,7 @@ def test_posting_requires_club_accounting(treasurer, checking, enable_club_accou
         )
 
 
-def test_future_dates_are_refused(treasurer, checking):
+def test_future_dates_are_refused(treasurer, checking, books_started):
     with pytest.raises(ValidationError, match="Future dates"):
         post_expense(
             actor=treasurer,
@@ -238,7 +238,7 @@ def test_future_dates_are_refused(treasurer, checking):
 
 
 def test_entries_must_be_on_or_after_the_start_date(
-    treasurer, checking, enable_club_accounting
+    treasurer, checking, enable_club_accounting, books_started
 ):
     enable_club_accounting.club_accounting_start_date = today()
     enable_club_accounting.save(update_fields=["club_accounting_start_date"])
@@ -262,7 +262,7 @@ def test_entries_must_be_on_or_after_the_start_date(
     assert entry.date == today()
 
 
-def test_closed_billing_period_refuses_entries(treasurer, checking):
+def test_closed_billing_period_refuses_entries(treasurer, checking, books_started):
     BillingPeriod.objects.create(year=today().year, month=today().month, is_closed=True)
     with pytest.raises(ValidationError, match="billing period is closed"):
         post_expense(
@@ -275,7 +275,7 @@ def test_closed_billing_period_refuses_entries(treasurer, checking):
         )
 
 
-def test_source_key_is_idempotent(treasurer, checking):
+def test_source_key_is_idempotent(treasurer, checking, books_started):
     kwargs = dict(
         actor=treasurer,
         date=today(),
@@ -288,7 +288,7 @@ def test_source_key_is_idempotent(treasurer, checking):
     )
     first = post_journal_entry(**kwargs)
     assert post_journal_entry(**kwargs) == first
-    assert JournalEntry.objects.count() == 1
+    assert JournalEntry.objects.filter(source_key="test:keyed").count() == 1
 
     kwargs["lines"] = [
         Line(account=account("500"), debit=Decimal("21")),
@@ -298,7 +298,7 @@ def test_source_key_is_idempotent(treasurer, checking):
         post_journal_entry(**kwargs)
 
 
-def test_reversal_mirrors_lines_and_cannot_repeat(treasurer, checking):
+def test_reversal_mirrors_lines_and_cannot_repeat(treasurer, checking, books_started):
     original = post_expense(
         actor=treasurer,
         date=today(),
@@ -320,7 +320,7 @@ def test_reversal_mirrors_lines_and_cannot_repeat(treasurer, checking):
         reverse_journal_entry(entry=reversal, actor=treasurer, date=today(), reason="x")
 
 
-def test_reversal_cannot_predate_original(treasurer, checking):
+def test_reversal_cannot_predate_original(treasurer, checking, books_started):
     original = post_expense(
         actor=treasurer,
         date=today(),
@@ -338,7 +338,9 @@ def test_reversal_cannot_predate_original(treasurer, checking):
         )
 
 
-def test_journal_records_are_immutable_through_the_orm(treasurer, checking):
+def test_journal_records_are_immutable_through_the_orm(
+    treasurer, checking, books_started
+):
     entry = post_expense(
         actor=treasurer,
         date=today(),
@@ -371,7 +373,7 @@ def test_journal_entries_cannot_be_created_outside_the_service(treasurer):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_database_triggers_block_journal_updates_and_deletes():
+def test_database_triggers_block_journal_updates_and_deletes(books_started):
     treasurer = Member.objects.create_user(
         username="gl-trigger-treasurer",
         treasurer=True,
@@ -439,7 +441,7 @@ def test_account_admin_delete_requires_delete_permission(client, checking):
     assert not Account.objects.filter(pk=checking.pk).exists()
 
 
-def test_journal_entry_admin_is_view_only(client, treasurer, checking):
+def test_journal_entry_admin_is_view_only(client, treasurer, checking, books_started):
     entry = post_expense(
         actor=treasurer,
         date=today(),
@@ -457,7 +459,7 @@ def test_journal_entry_admin_is_view_only(client, treasurer, checking):
     assert client.post(url, {"_save": "Save"}).status_code == 403
 
 
-def test_account_type_is_locked_once_posted(treasurer, checking):
+def test_account_type_is_locked_once_posted(treasurer, checking, books_started):
     post_expense(
         actor=treasurer,
         date=today(),
@@ -482,7 +484,7 @@ def test_cash_accounts_must_be_assets():
         )
 
 
-def test_trial_balance_and_register(treasurer, checking, savings):
+def test_trial_balance_and_register(treasurer, checking, savings, books_started):
     post_income(
         actor=treasurer,
         date=today() - timedelta(days=2),
@@ -525,7 +527,7 @@ def test_trial_balance_and_register(treasurer, checking, savings):
     assert verify_books() == []
 
 
-def test_verify_books_command(treasurer, checking):
+def test_verify_books_command(treasurer, checking, books_started):
     post_expense(
         actor=treasurer,
         date=today(),
@@ -687,6 +689,23 @@ def test_go_live_refuses_bad_input(treasurer):
     with pytest.raises(ValidationError, match="Undeposited Funds"):
         go_live(actor=treasurer, start_date=today(), rows=[bank("100", amount="10")])
     assert not JournalEntry.objects.exists()
+
+
+def test_entries_wait_for_finances_setup(treasurer, checking):
+    with pytest.raises(ValidationError, match="Finish Finances Setup"):
+        post_expense(
+            actor=treasurer,
+            date=today(),
+            paid_from=checking,
+            expense_account=account("520"),
+            amount="5",
+            memo="Fuel",
+        )
+    assert not JournalEntry.objects.exists()
+
+    # The refused entry didn't lock Finances Setup out.
+    go_live(actor=treasurer, start_date=today(), rows=[bank(amount="10")])
+    assert active_opening_entry() is not None
 
 
 def test_go_live_requires_treasurer(member):

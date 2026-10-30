@@ -65,7 +65,9 @@ def expense(treasurer, checking, memo="Field rent", amount="400.00"):
 
 
 @pytest.mark.parametrize("name", GET_PAGES)
-def test_club_books_pages_require_treasurer(client, member, treasurer, name):
+def test_club_books_pages_require_treasurer(
+    client, member, treasurer, name, books_started
+):
     url = reverse(name)
     assert client.get(url).status_code == 302
 
@@ -76,7 +78,9 @@ def test_club_books_pages_require_treasurer(client, member, treasurer, name):
     assert client.get(url).status_code == 200
 
 
-def test_entry_pages_require_treasurer(client, member, treasurer, checking):
+def test_entry_pages_require_treasurer(
+    client, member, treasurer, checking, books_started
+):
     entry = expense(treasurer, checking)
     urls = (
         reverse("billing:journal_detail", args=[entry.pk]),
@@ -108,7 +112,7 @@ def test_club_books_redirect_when_disabled(client, treasurer, club_books):
     assert response.url == reverse("billing:ledger_list")
 
 
-def test_record_expense_posts_and_redirects(client, treasurer, checking):
+def test_record_expense_posts_and_redirects(client, treasurer, checking, books_started):
     client.force_login(treasurer)
     response = client.post(
         reverse("billing:record_expense"),
@@ -122,14 +126,16 @@ def test_record_expense_posts_and_redirects(client, treasurer, checking):
             "reference": "1043",
         },
     )
-    entry = JournalEntry.objects.get()
+    entry = JournalEntry.objects.get(source=JournalEntry.Source.MANUAL)
     assert response.status_code == 302
     assert response.url == reverse("billing:journal_detail", args=[entry.pk])
     assert entry.created_by == treasurer
     assert str(account_balance(checking)) == "-425.00"
 
 
-def test_record_expense_shows_service_errors(client, treasurer, checking):
+def test_record_expense_shows_service_errors(
+    client, treasurer, checking, books_started
+):
     client.force_login(treasurer)
     response = client.post(
         reverse("billing:record_expense"),
@@ -143,10 +149,12 @@ def test_record_expense_shows_service_errors(client, treasurer, checking):
     )
     assert response.status_code == 200
     assert "Future dates are not allowed" in response.content.decode()
-    assert not JournalEntry.objects.exists()
+    assert list(JournalEntry.objects.all()) == [books_started]
 
 
-def test_general_journal_posts_balanced_entry(client, treasurer, checking):
+def test_general_journal_posts_balanced_entry(
+    client, treasurer, checking, books_started
+):
     client.force_login(treasurer)
     payable = Account.objects.get(code="200")
     maintenance = Account.objects.get(code="510")
@@ -166,7 +174,9 @@ def test_general_journal_posts_balanced_entry(client, treasurer, checking):
     assert account_balance(maintenance) == 800
 
 
-def test_general_journal_rejects_unbalanced_entry(client, treasurer, checking):
+def test_general_journal_rejects_unbalanced_entry(
+    client, treasurer, checking, books_started
+):
     client.force_login(treasurer)
     data = {
         "date": get_club_today().isoformat(),
@@ -181,10 +191,10 @@ def test_general_journal_rejects_unbalanced_entry(client, treasurer, checking):
     response = client.post(reverse("billing:general_journal"), data)
     assert response.status_code == 200
     assert "must equal credits" in response.content.decode()
-    assert not JournalEntry.objects.exists()
+    assert list(JournalEntry.objects.all()) == [books_started]
 
 
-def test_reverse_entry_view(client, treasurer, checking):
+def test_reverse_entry_view(client, treasurer, checking, books_started):
     entry = expense(treasurer, checking)
     client.force_login(treasurer)
     response = client.post(
@@ -196,7 +206,7 @@ def test_reverse_entry_view(client, treasurer, checking):
     assert account_balance(checking) == 0
 
 
-def test_club_ledger_filters(client, treasurer, checking):
+def test_club_ledger_filters(client, treasurer, checking, books_started):
     expense(treasurer, checking, memo="Fuel delivery")
     expense(treasurer, checking, memo="Insurance premium")
     client.force_login(treasurer)
@@ -205,18 +215,21 @@ def test_club_ledger_filters(client, treasurer, checking):
     assert "Insurance premium" not in content
 
 
-def test_club_ledger_csv_sanitizes_cells(client, treasurer, checking):
+def test_club_ledger_csv_sanitizes_cells(client, treasurer, checking, books_started):
     expense(treasurer, checking, memo='=HYPERLINK("http://x")')
     client.force_login(treasurer)
     response = client.get(reverse("billing:club_ledger_csv"))
     rows = list(csv.reader(StringIO(response.content.decode())))
     assert rows[0][:4] == ["Date", "Entry", "Source", "Description"]
-    assert len(rows) == 3
-    assert all(row[3].startswith("'=") for row in rows[1:])
-    assert {row[9] or row[10] for row in rows[1:]} == {"400.00"}
+    expense_rows = [row for row in rows[1:] if row[1] != str(books_started.pk)]
+    assert len(expense_rows) == 2
+    assert all(row[3].startswith("'=") for row in expense_rows)
+    assert {row[9] or row[10] for row in expense_rows} == {"400.00"}
 
 
-def test_account_register_shows_running_balance(client, treasurer, checking):
+def test_account_register_shows_running_balance(
+    client, treasurer, checking, books_started
+):
     expense(treasurer, checking, amount="100.00")
     expense(treasurer, checking, amount="50.00")
     client.force_login(treasurer)
@@ -302,6 +315,23 @@ def go_live_post(**extra):
     }
     data.update(extra)
     return data
+
+
+@pytest.mark.parametrize(
+    "name",
+    (
+        "billing:record_expense",
+        "billing:record_member_expense",
+        "billing:record_income",
+        "billing:cash_transfer",
+        "billing:general_journal",
+    ),
+)
+def test_entry_pages_send_treasurer_to_setup_first(client, treasurer, name):
+    client.force_login(treasurer)
+    response = client.get(reverse(name), follow=True)
+    assert response.redirect_chain == [(reverse("billing:go_live"), 302)]
+    assert "Finish Finances Setup" in response.content.decode()
 
 
 def test_go_live_page_posts_opening_entry(client, treasurer, club_books):

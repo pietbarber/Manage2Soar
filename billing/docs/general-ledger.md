@@ -87,6 +87,8 @@ and SQLite, reject `UPDATE` and `DELETE`.
 `post_journal_entry` refuses an entry when:
 - club accounting is off;
 - the actor isn't a treasurer or superuser (member postings excepted);
+- Finances Setup hasn't posted an opening entry yet (only the opening entry
+  itself can be posted first). An earlier entry would lock setup out;
 - the date is in the future, before the start date (the opening entry must be
   on it), or in a closed billing period;
 - there are fewer than two lines, a line has both or neither side, or an
@@ -141,6 +143,8 @@ non-zero when it finds problems. It checks for:
 
 It also sets `club_accounting_start_date` and posts one `opening` entry dated on
 it. Member entries dated on or after the start date then post one by one.
+Until it runs, nothing else can be posted, and the Record pages send the
+treasurer to Finances Setup.
 
 It can be rerun until the treasurer posts any other entry (member postings
 don't count): the current opening entry is reversed (on its own date) and
