@@ -103,3 +103,35 @@ def test_role_preview_can_be_stopped(client, preview_admin):
 
     assert response.status_code == 302
     assert client.session.get("role_preview") is None
+
+
+@pytest.mark.django_db
+@override_settings(DEBUG=False)
+def test_debug_session_state_cannot_enable_mutations_when_debug_is_off(
+    client, preview_admin, preview_page
+):
+    client.force_login(preview_admin)
+    session = client.session
+    session["role_preview"] = {"role_key": "directors", "debug": True}
+    session.save()
+
+    response = client.post(
+        reverse("cms:edit_page", args=[preview_page.pk]),
+        {},
+    )
+
+    assert response.status_code == 403
+    assert b"read-only" in response.content
+    assert client.session["role_preview"]["debug"] is True
+
+
+@pytest.mark.django_db
+@override_settings(DEBUG=False)
+def test_debug_preview_cannot_be_started_outside_debug(client, preview_admin):
+    client.force_login(preview_admin)
+    response = client.post(
+        reverse("members:role_preview_start"),
+        {"role_key": "directors", "debug": "on"},
+    )
+
+    assert response.status_code == 403

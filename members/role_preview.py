@@ -13,6 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from members.authorization import has_role_admin_access
 from members.models import RoleMetadata
+from members.role_definitions import ROLE_BY_KEY
 from members.utils.membership import is_active_member
 
 SESSION_KEY = "role_preview"
@@ -32,18 +33,6 @@ ROLE_FLAG_KEYS = (
     "treasurer",
     "webmaster",
 )
-ROLE_FLAG_BY_KEY = {
-    "directors": "director",
-    "instructor_admins": "instructor",
-    "instructors": "instructor",
-    "member_managers": "member_manager",
-    "rostermeisters": "rostermeister",
-    "safety_officers": "safety_officer",
-    "secretary": "secretary",
-    "stats_mongers": "stats_monger",
-    "treasurers": "treasurer",
-    "webmasters": "webmaster",
-}
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +83,9 @@ def _load_state(request):
         display_name=metadata.display_name,
         group_name=metadata.group.name,
         permissions=permissions,
-        debug=bool(raw.get("debug", False)),
+        # A session value must never enable debug behavior after DEBUG is
+        # turned off or after a session is copied between environments.
+        debug=bool(raw.get("debug", False) and settings.DEBUG),
     )
 
 
@@ -215,6 +206,9 @@ class RolePreviewMiddleware:
             original[name] = getattr(user, name)
         for name in (*ROLE_FLAG_KEYS, "is_superuser", "is_staff"):
             original[name] = getattr(user, name)
+        original["_role_preview_group_name"] = getattr(
+            user, "_role_preview_group_name", None
+        )
         original["_role_preview_active_member"] = getattr(
             user, "_role_preview_active_member", None
         )
@@ -236,7 +230,8 @@ class RolePreviewMiddleware:
         user.has_module_perms = MethodType(has_module_perms, user)
         user.get_all_permissions = MethodType(get_all_permissions, user)
         for name in ROLE_FLAG_KEYS:
-            setattr(user, name, ROLE_FLAG_BY_KEY.get(state.role_key) == name)
+            role = ROLE_BY_KEY.get(state.role_key)
+            setattr(user, name, bool(role and role.legacy_flag == name))
         user.is_superuser = False
         user.is_staff = False
         user._role_preview_group_name = state.group_name
@@ -248,4 +243,7 @@ class RolePreviewMiddleware:
                     delattr(user, name)
                 else:
                     setattr(user, name, value)
-            delattr(user, "_role_preview_group_name")
+            if original["_role_preview_group_name"] is None:
+                delattr(user, "_role_preview_group_name")
+            else:
+                user._role_preview_group_name = original["_role_preview_group_name"]
