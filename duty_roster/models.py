@@ -808,6 +808,9 @@ class DutySwapRequest(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        permissions = [
+            ("view_all_swap_requests", "Can view all duty swap requests"),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=(

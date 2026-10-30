@@ -39,6 +39,7 @@ from .models import (
     MemberBlackout,
     OpsIntent,
 )
+from .permissions import has_all_swap_requests_access
 from .utils.ics import generate_swap_ics
 from .utils.role_resolution import RoleResolutionService
 from .utils.roles import commercial_duty_enabled, member_is_commercial_pilot
@@ -644,7 +645,7 @@ def swap_request_detail(request, request_id):
         and not is_offerer
         and not is_eligible
         and not is_target
-        and not member.is_staff
+        and not has_all_swap_requests_access(member)
     ):
         messages.error(request, "You don't have permission to view this request.")
         return redirect("duty_roster:duty_calendar")
