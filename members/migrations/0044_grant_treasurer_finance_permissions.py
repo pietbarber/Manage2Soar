@@ -22,9 +22,7 @@ def grant_treasurer_permissions(apps, schema_editor):
     Group = apps.get_model("auth", "Group")
     Permission = apps.get_model("auth", "Permission")
     ContentType = apps.get_model("contenttypes", "ContentType")
-    group = Group.objects.using(db_alias).filter(name="Treasurer").first()
-    if group is None:
-        return
+    group, _ = Group.objects.using(db_alias).get_or_create(name="Treasurer")
     for app_label, model, codename, name in PERMISSIONS:
         content_type, _ = ContentType.objects.using(db_alias).get_or_create(
             app_label=app_label, model=model

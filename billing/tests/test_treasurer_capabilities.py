@@ -1,4 +1,5 @@
 import pytest
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 
 from billing.permissions import has_billing_access, require_manual_transaction_access
@@ -8,11 +9,13 @@ from members.models import Member
 
 @pytest.fixture
 def treasurer(db):
-    return Member.objects.create_user(
+    member = Member.objects.create_user(
         username="capability-treasurer",
         treasurer=True,
         membership_status="Full Member",
     )
+    member.groups.add(Group.objects.get(name="Treasurer"))
+    return member
 
 
 @pytest.mark.django_db
