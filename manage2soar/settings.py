@@ -103,6 +103,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "members.role_preview.RolePreviewMiddleware",
     # Issue #709: KioskAutoLoginMiddleware MUST run before CsrfViewMiddleware.
     # login() calls rotate_token(), which replaces request.META["CSRF_COOKIE"].
     # CsrfViewMiddleware.process_request (running after) overwrites that with
@@ -142,6 +143,8 @@ TEMPLATES = [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
+                "members.role_preview.role_preview_context",
+                "members.context_processors.authorization",
                 "django.contrib.messages.context_processors.messages",
                 "social_django.context_processors.backends",
                 "social_django.context_processors.login_redirect",

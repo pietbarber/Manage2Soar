@@ -6,6 +6,7 @@ from django.utils.html import format_html
 
 from duty_roster.models import DutyRoleDefinition
 from members.authorization import has_admin_model_permission
+from members.role_preview import has_preview_group
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -631,21 +632,15 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to edit membership statuses
-        return (
-            has_admin_model_permission(
-                request.user, "siteconfig", "membershipstatus", "change"
-            )
-            or request.user.groups.filter(name="Member Managers").exists()
-        )
+        return has_admin_model_permission(
+            request.user, "siteconfig", "membershipstatus", "change"
+        ) or has_preview_group(request.user, "Member Managers")
 
     def has_add_permission(self, request):
         # Only allow Webmaster or superuser to add membership statuses
-        return (
-            has_admin_model_permission(
-                request.user, "siteconfig", "membershipstatus", "add"
-            )
-            or request.user.groups.filter(name="Member Managers").exists()
-        )
+        return has_admin_model_permission(
+            request.user, "siteconfig", "membershipstatus", "add"
+        ) or has_preview_group(request.user, "Member Managers")
 
     def has_delete_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to delete membership statuses
@@ -770,9 +765,8 @@ class MembershipBillingRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     def _has_webmaster_permission(self, request):
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return request.user.is_superuser or has_preview_group(
+            request.user, "Webmasters"
         )
 
     def has_change_permission(self, request, obj=None):
@@ -832,9 +826,8 @@ class MembershipGliderRentalRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     def _has_webmaster_permission(self, request):
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return request.user.is_superuser or has_preview_group(
+            request.user, "Webmasters"
         )
 
     def has_change_permission(self, request, obj=None):
@@ -1024,9 +1017,8 @@ class ChargeableItemAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def _has_webmaster_permission(self, request):
         """Check if user has webmaster-level permission."""
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return request.user.is_superuser or has_preview_group(
+            request.user, "Webmasters"
         )
 
     def has_change_permission(self, request, obj=None):

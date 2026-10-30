@@ -132,6 +132,12 @@ def is_active_member(
     if not user or getattr(user, "is_authenticated", False) is False:
         return False
 
+    # Role preview projects authorization capabilities while preserving the
+    # normal active-member baseline needed to exercise member workflows.
+    preview_active = getattr(user, "_role_preview_active_member", None)
+    if preview_active is not None:
+        return bool(preview_active)
+
     if allow_superuser and getattr(user, "is_superuser", False):
         return True
 

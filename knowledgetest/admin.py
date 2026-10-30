@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.html import format_html
 from tinymce.widgets import TinyMCE
 
+from members.role_preview import has_preview_group
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -210,9 +211,9 @@ class TestPresetAdmin(AdminHelperMixin, admin.ModelAdmin):
         Chief Flight Instructor allowed only if allow_cfi is True.
         """
         user = request.user
-        if user.is_superuser or user.groups.filter(name="Webmasters").exists():
+        if user.is_superuser or has_preview_group(user, "Webmasters"):
             return True
-        if allow_cfi and user.groups.filter(name="Chief Flight Instructor").exists():
+        if allow_cfi and has_preview_group(user, "Chief Flight Instructor"):
             return True
         return False
 

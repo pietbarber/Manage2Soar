@@ -47,6 +47,8 @@ def is_privileged_viewer(user):
         return False
     if user.is_superuser:
         return True
+    if getattr(user, "_role_preview_group_name", None) is not None:
+        return user.has_perm(PRIVILEGED_CONTACT_PERMISSION)
     try:
         if user.has_perm(PRIVILEGED_CONTACT_PERMISSION):
             return True

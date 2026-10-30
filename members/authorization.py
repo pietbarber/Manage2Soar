@@ -20,10 +20,12 @@ def has_webmaster_compatibility_access(user):
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
+    from members.role_preview import has_preview_group
+
     return bool(
         getattr(user, "is_superuser", False)
         or getattr(user, "webmaster", False)
-        or user.groups.filter(name="Webmasters").exists()
+        or has_preview_group(user, "Webmasters")
     )
 
 
@@ -49,6 +51,9 @@ def has_role_admin_access(user):
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if not getattr(user, "is_active", False):
+        return False
+    preview_group = getattr(user, "_role_preview_group_name", None)
+    if preview_group is not None:
         return False
     if getattr(user, "is_superuser", False):
         return True
