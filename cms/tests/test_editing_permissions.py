@@ -71,6 +71,19 @@ class EditingPermissionFunctionTests(TestCase):
         self.assertTrue(can_edit_page(self.webmaster, self.member_page))
         self.assertTrue(can_edit_page(self.webmaster, self.board_page))
 
+    def test_registered_page_capabilities_grant_officer_access_without_flags(self):
+        """Explicit CMS capabilities replace role booleans for new grants."""
+        content_type = ContentType.objects.get_for_model(Page)
+        self.member.user_permissions.add(
+            *Permission.objects.filter(
+                content_type=content_type,
+                codename__in=["view_page", "change_page"],
+            )
+        )
+
+        self.assertTrue(self.board_page.can_user_access(self.member))
+        self.assertTrue(can_edit_page(self.member, self.board_page))
+
     def test_can_edit_page_public_pages_officer_access(self):
         """
         Officers (e.g., directors) and webmasters can edit public pages (Issue #549).

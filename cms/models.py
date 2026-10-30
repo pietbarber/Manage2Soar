@@ -543,7 +543,16 @@ class Page(models.Model):
         if "active_member" in required_roles:
             return True  # User already passed is_active_member check above
 
-        return any(getattr(user, role, False) for role in required_roles)
+        from .permissions import has_cms_view_access, has_legacy_cms_officer_access
+
+        return any(
+            (
+                (has_cms_view_access(user) or has_legacy_cms_officer_access(user))
+                if role in {"director", "secretary", "webmaster"}
+                else getattr(user, role, False)
+            )
+            for role in required_roles
+        )
 
     def can_user_edit(self, user):
         """
@@ -584,11 +593,9 @@ class Page(models.Model):
         if self.has_member_permission(user):
             return True
 
-        # Check if user has officer roles (director, secretary, webmaster)
-        if any(
-            getattr(user, role, False)
-            for role in ["director", "secretary", "webmaster"]
-        ):
+        from .permissions import has_cms_edit_access, has_legacy_cms_officer_access
+
+        if has_cms_edit_access(user) or has_legacy_cms_officer_access(user):
             return True
 
         return False

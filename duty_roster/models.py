@@ -455,6 +455,9 @@ class DutyAssignment(models.Model):
 
     class Meta:
         ordering = ["date"]
+        permissions = [
+            ("view_duty_delinquents", "Can view duty delinquents"),
+        ]
 
     def __str__(self):
         return f"{self.date} @ {self.location.identifier if self.location else 'Unknown Field'}"

@@ -16,6 +16,7 @@ from .models import (
     SiteFeedback,
     VisitorContact,
 )
+from .permissions import has_cms_edit_access, has_legacy_cms_officer_access
 
 # --- CMS Arbitrary Page and Document Admin ---
 
@@ -233,8 +234,8 @@ class PageAdmin(admin.ModelAdmin):
 
         return request.user.is_authenticated and (
             has_admin_model_permission(request.user, "cms", "page", "change")
-            or getattr(request.user, "director", False)
-            or getattr(request.user, "secretary", False)
+            or has_cms_edit_access(request.user)
+            or has_legacy_cms_officer_access(request.user)
         )
 
     def has_delete_permission(self, request, obj=None):

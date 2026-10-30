@@ -26,6 +26,7 @@ from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from duty_roster.permissions import has_duty_delinquents_access
 from duty_roster.utils.delinquents import apply_duty_delinquent_exemptions
 from duty_roster.utils.email import (
     get_email_config,
@@ -3646,10 +3647,7 @@ def propose_roster(request):
     )
 
 
-@user_passes_test(
-    lambda u: u.is_authenticated
-    and (u.rostermeister or u.member_manager or u.director or u.is_superuser)
-)
+@user_passes_test(has_duty_delinquents_access)
 def duty_delinquents_detail(request):
     """
     Detailed view of members who haven't been performing duty.
