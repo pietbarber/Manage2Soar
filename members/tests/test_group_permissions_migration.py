@@ -46,6 +46,7 @@ def test_all_canonical_groups_exist():
         "Rostermeisters",
         "Secretary",
         "Treasurer",
+        "Directors",
     ]
     for name in expected:
         assert Group.objects.filter(
@@ -177,6 +178,22 @@ def test_secretary_group_exists_with_no_permissions():
 def test_treasurer_group_exists_with_no_permissions():
     group = Group.objects.get(name="Treasurer")
     assert group.permissions.count() == 0
+
+
+@pytest.mark.django_db
+def test_directors_have_only_membership_application_view_capability():
+    assert _has_perm(
+        "Directors",
+        "members",
+        "membershipapplication",
+        "view_membership_applications",
+    )
+    for codename in (
+        "add_membershipapplication",
+        "change_membershipapplication",
+        "delete_membershipapplication",
+    ):
+        assert not _has_perm("Directors", "members", "membershipapplication", codename)
 
 
 # ---------------------------------------------------------------------------

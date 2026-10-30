@@ -12,6 +12,49 @@ from dataclasses import dataclass
 from members.utils.membership import is_active_member
 
 
+def has_webmaster_compatibility_access(user):
+    """Return the legacy webmaster-level grant used during the transition.
+
+    The flag and group are intentionally retained as compatibility fallbacks;
+    neither ordinary staff status nor membership status grants this access.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return bool(
+        getattr(user, "is_superuser", False)
+        or getattr(user, "webmaster", False)
+        or user.groups.filter(name="Webmasters").exists()
+    )
+
+
+def has_admin_model_permission(user, app_label, model_name, action):
+    """Check one admin model permission with legacy webmaster fallbacks."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return bool(
+        user.has_perm(f"{app_label}.{action}_{model_name}")
+        or has_webmaster_compatibility_access(user)
+    )
+
+
+def has_role_admin_access(user):
+    """Return whether an active account has a role-level admin entry grant.
+
+    This is an additive transition boundary.  Django's default admin site
+    still uses ``is_staff`` until its entry gate is migrated, but application
+    authorization must not use ``is_staff`` as a business permission.  The
+    role flag only controls entry visibility; model/action permissions remain
+    separate.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if not getattr(user, "is_active", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.groups.filter(role_metadata__admin_access=True).exists()
+
+
 @dataclass(frozen=True)
 class AuthorizationDecision:
     """An allow/deny result with a stable, machine-readable reason."""

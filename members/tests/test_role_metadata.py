@@ -8,7 +8,8 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-from members.models import RoleMetadata
+from members.authorization import has_role_admin_access
+from members.models import Member, RoleMetadata
 from siteconfig.models import MailingListCriterion
 
 role_metadata_migration = import_module("members.migrations.0034_role_metadata")
@@ -86,6 +87,9 @@ def _ensure_current_canonical_role_metadata():
     role_metadata_migration.seed_canonical_role_metadata(
         django_apps, SimpleNamespace(connection=connection)
     )
+    RoleMetadata.objects.filter(key__in=CANONICAL_ROLES.values()).update(
+        admin_access=True
+    )
 
 
 def test_metadata_seed_fails_for_missing_canonical_group():
@@ -123,7 +127,11 @@ def test_canonical_groups_have_stable_role_metadata():
     # without changing the recorded schema state.  Re-establish the same
     # migration output so this test does not depend on file order.
     _ensure_current_canonical_role_metadata()
-    metadata = RoleMetadata.objects.select_related("group").order_by("sort_order")
+    metadata = (
+        RoleMetadata.objects.select_related("group")
+        .filter(key__in=CANONICAL_ROLES.values())
+        .order_by("sort_order")
+    )
 
     assert metadata.count() == len(CANONICAL_ROLES)
     assert [(item.group.name, item.key) for item in metadata] == list(
@@ -135,6 +143,7 @@ def test_canonical_groups_have_stable_role_metadata():
     assert all(item.is_system_managed for item in metadata)
     assert all(item.is_assignable for item in metadata)
     assert all(item.mailing_list_eligible for item in metadata)
+    assert all(item.admin_access for item in metadata)
     assert set(CANONICAL_MAILING_LIST_CRITERIA.values()) == {
         criterion.value for criterion in MailingListCriterion
     } - {
@@ -172,6 +181,40 @@ def test_role_metadata_is_one_to_one_and_key_is_unique():
         )
     group.delete()
     assert not RoleMetadata.objects.filter(pk=metadata.pk).exists()
+
+
+@pytest.mark.django_db
+def test_admin_access_is_explicit_and_separate_from_role_permissions():
+    member = Member.objects.create_user(username="role-admin-access")
+    group = Group.objects.create(name="Admin-capable role")
+    metadata = RoleMetadata.objects.create(
+        group=group,
+        key="admin_capable_role",
+        display_name="Admin-capable role",
+        admin_access=True,
+    )
+
+    member.groups.add(group)
+    Member.objects.filter(pk=member.pk).update(is_active=True)
+    member.refresh_from_db()
+
+    assert metadata.admin_access is True
+    assert has_role_admin_access(member) is True
+
+
+@pytest.mark.django_db
+def test_custom_roles_do_not_get_admin_access_by_default():
+    member = Member.objects.create_user(username="non-admin-role")
+    group = Group.objects.create(name="Non-admin role")
+    RoleMetadata.objects.create(
+        group=group,
+        key="non_admin_role",
+        display_name="Non-admin role",
+    )
+
+    member.groups.add(group)
+
+    assert has_role_admin_access(member) is False
 
 
 @pytest.mark.django_db(transaction=True)

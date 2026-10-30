@@ -76,6 +76,13 @@ class RoleMetadata(models.Model):
     is_system_managed = models.BooleanField(default=False)
     is_assignable = models.BooleanField(default=True)
     mailing_list_eligible = models.BooleanField(default=False)
+    admin_access = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow members with this role to enter and see the administrative "
+            "site. This does not grant model or application permissions."
+        ),
+    )
     qualification_permission_bundle = models.BooleanField(
         default=False,
         help_text=(
@@ -123,6 +130,39 @@ class RoleMetadata(models.Model):
         return super().save(*args, **kwargs)
 
 
+class MemberRoleAssignmentQuerySet(models.QuerySet):
+    """Require the provenance service for bulk mutations."""
+
+    _ALLOWED_FK_CLEARS = {"actor"}
+
+    def bulk_create(self, objs, *args, **kwargs):
+        raise ValidationError(
+            "Use set_manual_role() or the role-assignment service to create "
+            "provenance rows."
+        )
+
+    def bulk_update(self, objs, fields, *args, **kwargs):
+        raise ValidationError(
+            "Role assignment provenance rows are immutable; use the "
+            "role-assignment service."
+        )
+
+    def update(self, **kwargs):
+        # Django's deletion collector clears ``SET_NULL`` foreign keys through
+        # a queryset update.  Permit only that exact operation so deleting a
+        # granting Member does not abort; provenance and timestamps stay fixed.
+        if (
+            kwargs
+            and set(kwargs) <= self._ALLOWED_FK_CLEARS
+            and all(value is None for value in kwargs.values())
+        ):
+            return super().update(**kwargs)
+        raise ValidationError(
+            "Role assignment provenance rows are immutable; use the "
+            "role-assignment service."
+        )
+
+
 class MemberRoleAssignment(models.Model):
     """An auditable reason a member belongs to an auth Group."""
 
@@ -150,8 +190,13 @@ class MemberRoleAssignment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = MemberRoleAssignmentQuerySet.as_manager()
+
     class Meta:
         default_permissions = ()
+        # Keep the immutability guard on related-object and generic ORM access
+        # too; ``_base_manager`` would otherwise bypass it.
+        base_manager_name = "objects"
         constraints = [
             models.UniqueConstraint(
                 fields=("member", "group", "source", "source_key"),
@@ -162,11 +207,30 @@ class MemberRoleAssignment(models.Model):
     def __str__(self):
         return f"{self.member} - {self.group} ({self.source}:{self.source_key})"
 
+    def save(self, *args, **kwargs):
+        if self.pk is not None and not self._state.adding:
+            raise ValidationError(
+                "Role assignment provenance rows are immutable; use the "
+                "role-assignment service."
+            )
+        return super().save(*args, **kwargs)
+
 
 class MemberRoleAssignmentEventQuerySet(models.QuerySet):
     """Keep ordinary bulk ORM APIs from bypassing event immutability."""
 
+    _ALLOWED_FK_CLEARS = {"member", "group", "actor"}
+
     def update(self, **kwargs):
+        # Django's deletion collector clears SET_NULL foreign keys through a
+        # queryset update.  Permit only that exact operation; the snapshot
+        # fields remain untouched and the event keeps its audit identity.
+        if (
+            kwargs
+            and set(kwargs) <= self._ALLOWED_FK_CLEARS
+            and all(value is None for value in kwargs.values())
+        ):
+            return super().update(**kwargs)
         raise ValidationError("Role assignment audit events are immutable.")
 
     def delete(self):
@@ -181,6 +245,9 @@ class MemberRoleAssignmentEvent(models.Model):
     Group or assignment must not make the event lose the role's identity.
     Database administrators can still bypass model methods, so immutability
     here is an application-level guarantee rather than a database-admin one.
+    The only bulk update allowed through the default/base manager is clearing
+    the nullable convenience foreign keys, which Django's deletion collector
+    needs for ``SET_NULL``; the snapshot fields remain immutable.
     """
 
     ACTION_CHOICES = (("grant", "Grant"), ("revoke", "Revoke"))
@@ -219,6 +286,9 @@ class MemberRoleAssignmentEvent(models.Model):
     class Meta:
         default_permissions = ()
         ordering = ("timestamp", "pk")
+        # Make the guard apply through related-object and generic ORM access
+        # too; ``_base_manager`` would otherwise be a plain Django manager.
+        base_manager_name = "objects"
 
     objects = models.Manager.from_queryset(MemberRoleAssignmentEventQuerySet)()
 
@@ -566,6 +636,8 @@ class Member(AbstractUser):
             names.append("Secretary")
         if self.treasurer:
             names.append("Treasurer")
+        if self.director:
+            names.append("Directors")
         return names
 
     def _sync_groups(self, using=None):
@@ -592,6 +664,7 @@ class Member(AbstractUser):
                     ("Webmasters", "webmaster"),
                     ("Secretary", "secretary"),
                     ("Treasurer", "treasurer"),
+                    ("Directors", "director"),
                 )
                 if getattr(locked_member, key)
             }
@@ -1135,6 +1208,9 @@ class SafetyReport(models.Model):
         verbose_name = "Safety Report"
         verbose_name_plural = "Safety Reports"
         ordering = ["-created_at"]
+        permissions = [
+            ("access_safety_reports", "Can access safety reports"),
+        ]
 
     def __str__(self):
         if self.is_anonymous:

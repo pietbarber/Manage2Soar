@@ -91,6 +91,7 @@ class RoleMetadataInline(admin.StackedInline):
         (
             "is_assignable",
             "mailing_list_eligible",
+            "admin_access",
             "qualification_permission_bundle",
             "sort_order",
         ),
