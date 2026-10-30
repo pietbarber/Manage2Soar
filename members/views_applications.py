@@ -20,6 +20,7 @@ from .forms_applications import (
 from .models_applications import MembershipApplication
 
 logger = logging.getLogger(__name__)
+VIEW_MEMBERSHIP_APPLICATIONS_PERMISSION = "members.view_membership_applications"
 
 
 def _send_account_setup_email_safely(member, application_id):
@@ -36,7 +37,11 @@ def _send_account_setup_email_safely(member, application_id):
 def _can_view_membership_applications(user):
     """Return True when the user may view membership applications/waitlist."""
     return bool(
-        user.director or user.member_manager or user.webmaster or user.is_superuser
+        user.has_perm(VIEW_MEMBERSHIP_APPLICATIONS_PERMISSION)
+        or user.director
+        or user.member_manager
+        or user.webmaster
+        or user.is_superuser
     )
 
 

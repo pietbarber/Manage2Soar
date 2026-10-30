@@ -6,6 +6,7 @@ Tests for Issue #585 - Safety Officer Interface for viewing safety reports.
 from unittest.mock import patch
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.urls import reverse
 
 from members.models import Member, SafetyReport
@@ -14,7 +15,7 @@ from members.models import Member, SafetyReport
 @pytest.fixture
 def safety_officer(db):
     """Create a safety officer member."""
-    return Member.objects.create_user(
+    member = Member.objects.create_user(
         username="safety_officer",
         email="safety@example.com",
         password="testpass123",
@@ -23,6 +24,12 @@ def safety_officer(db):
         safety_officer=True,
         membership_status="Full Member",
     )
+    member.user_permissions.add(
+        Permission.objects.get(
+            content_type__app_label="members", codename="access_safety_reports"
+        )
+    )
+    return member
 
 
 @pytest.fixture
@@ -91,6 +98,17 @@ class TestSafetyOfficerRequired:
         client.login(username="regular_member", password="testpass123")
         url = reverse("members:safety_report_list")
         response = client.get(url)
+        assert response.status_code == 403
+
+    def test_legacy_flag_alone_gets_403(self, client, db):
+        member = Member.objects.create_user(
+            username="legacy_safety",
+            password="testpass123",
+            membership_status="Full Member",
+            safety_officer=True,
+        )
+        client.force_login(member)
+        response = client.get(reverse("members:safety_report_list"))
         assert response.status_code == 403
 
     def test_safety_officer_has_access(self, client, safety_officer):

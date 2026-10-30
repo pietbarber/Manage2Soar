@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from members.models import Member
 from members.utils import is_active_member
+from members.utils.permissions import SAFETY_REPORT_PERMISSION
 
 ####################################################
 # instructor_required
@@ -89,7 +90,7 @@ def member_or_instructor_required(view_func):
 # Decorator to restrict view access to instructors or safety officers.
 # Allows superusers, then checks:
 # - membership_status in ALLOWED_MEMBERSHIP_STATUSES
-# - user.instructor flag True OR user.safety_officer flag True
+# - user.instructor flag True OR the safety-report capability
 # Redirects unauthenticated users to login;
 # renders 403.html for forbidden access.
 #
@@ -116,9 +117,11 @@ def instructor_or_safety_officer_required(view_func):
         if not is_active_member(user):
             return render(request, "403.html", status=403)
 
-        # Check if user has instructor or safety_officer flag
+        # Instructors retain their existing role behavior; safety access is an
+        # explicit capability rather than a legacy boolean authorization read.
         if not (
-            getattr(user, "instructor", False) or getattr(user, "safety_officer", False)
+            getattr(user, "instructor", False)
+            or user.has_perm(SAFETY_REPORT_PERMISSION)
         ):
             return render(request, "403.html", status=403)
 

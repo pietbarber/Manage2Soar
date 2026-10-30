@@ -2,6 +2,7 @@ import json
 from typing import cast
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -307,7 +308,7 @@ class QuizFlowTests(TestCase):
             WrittenTestAttempt.objects.filter(student=other_member).exists()
         )
 
-    def test_staff_can_submit_without_assignment(self):
+    def test_unrelated_staff_cannot_submit_without_assignment(self):
         staff_user = User.objects.create_user(
             username="staff-submit", password="pass", is_staff=True
         )
@@ -321,8 +322,30 @@ class QuizFlowTests(TestCase):
         payload = {"answers": json.dumps({"1": "A", "2": "C"})}
         response = self.client.post(submit_url, payload)
 
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(WrittenTestAttempt.objects.filter(student=staff_user).exists())
+
+    def test_instructor_admin_can_submit_without_assignment(self):
+        admin = User.objects.create_user(
+            username="instructor-admin-submit", password="pass", is_staff=True
+        )
+        admin.membership_status = "Full Member"
+        admin.save()
+        permission = Permission.objects.get(
+            content_type__app_label="knowledgetest",
+            codename="start_unassigned_written_test",
+        )
+        admin.user_permissions.add(permission)
+
+        self.client.logout()
+        self.client.login(username="instructor-admin-submit", password="pass")
+        response = self.client.post(
+            reverse("knowledgetest:quiz-submit", args=[self.tmpl.pk]),
+            {"answers": json.dumps({"1": "A", "2": "C"})},
+        )
+
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(WrittenTestAttempt.objects.filter(student=staff_user).exists())
+        self.assertTrue(WrittenTestAttempt.objects.filter(student=admin).exists())
 
     def test_self_practice_submission_creates_no_instruction_report(self):
         self.tmpl.created_by = self.student
@@ -445,8 +468,7 @@ class WrittenTestDeleteTests(TestCase):
             attempt=self.attempt, question=self.q1, selected_answer="A", is_correct=True
         )
 
-    def test_staff_can_delete_attempt(self):
-        """Staff users should be able to delete any attempt."""
+    def test_unrelated_staff_cannot_delete_attempt(self):
         self.client.login(username="staff", password="pass")
 
         delete_url = reverse(
@@ -454,14 +476,8 @@ class WrittenTestDeleteTests(TestCase):
         )
         resp = self.client.post(delete_url)
 
-        # Should redirect to the student's instruction record
-        expected_redirect = reverse(
-            "instructors:member_instruction_record", args=[self.student.pk]
-        )
-        self.assertRedirects(resp, expected_redirect)
-
-        # Attempt should be deleted
-        self.assertFalse(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
 
     def test_instructor_can_delete_own_attempt(self):
         """The grading instructor should be able to delete attempts they graded."""

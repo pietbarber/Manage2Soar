@@ -76,6 +76,7 @@ from .models import (
     TowplaneCloseout,
     TowplaneRentalCharge,
 )
+from .permissions import has_logsheet_finance_access, has_stats_dump_export_access
 from .services import finalize_logsheet_financials
 from .utils.finalization_email import enqueue_finalization_summary_email_job
 from .utils.flight_charges import effective_rental_cost as _effective_rental_cost
@@ -677,7 +678,7 @@ def tow_pilot_logbook_csv(request):
 @active_member_required
 def stats_dump_export_queue(request):
     """Render queue page on GET and enqueue asynchronous export on POST."""
-    if not (request.user.is_superuser or getattr(request.user, "stats_monger", False)):
+    if not has_stats_dump_export_access(request.user):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     if request.method == "GET":
@@ -700,7 +701,7 @@ def stats_dump_export_queue(request):
 @active_member_required
 def stats_dump_export_status(request, pk):
     """Display status for an asynchronous stats dump export job."""
-    if not (request.user.is_superuser or getattr(request.user, "stats_monger", False)):
+    if not has_stats_dump_export_access(request.user):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     export_job = get_object_or_404(StatsDumpOutbox, pk=pk)
@@ -724,7 +725,7 @@ def stats_dump_export_status(request, pk):
 @active_member_required
 def stats_dump_export_download(request, pk):
     """Download a completed asynchronous stats dump export file."""
-    if not (request.user.is_superuser or getattr(request.user, "stats_monger", False)):
+    if not has_stats_dump_export_access(request.user):
         return HttpResponseForbidden("You do not have permission to export stats dump.")
 
     export_job = get_object_or_404(StatsDumpOutbox, pk=pk)
@@ -888,6 +889,8 @@ def personal_charges_summary_csv(request):
 @active_member_required
 def export_logsheet_finances_csv(request, pk):
     """Export finalized per-flight financial charges for treasurer workflows."""
+    if not has_logsheet_finance_access(request.user, export=True):
+        return HttpResponseForbidden("Treasurer access is required.")
     logsheet = get_object_or_404(Logsheet, pk=pk)
 
     if not logsheet.finalized:
@@ -1079,7 +1082,7 @@ def update_flight_split(request, flight_id):
     if logsheet.finalized:
         if not (
             request.user.is_superuser
-            or request.user.treasurer
+            or has_logsheet_finance_access(request.user)
             or request.user == flight.pilot
         ):
             return JsonResponse(
@@ -1249,7 +1252,7 @@ def _send_split_request_resolution_email(split_request):
 
 @active_member_required
 def flight_split_request_list(request):
-    if not (request.user.is_superuser or request.user.treasurer):
+    if not has_logsheet_finance_access(request.user):
         return HttpResponseForbidden("Treasurer access is required.")
     now = timezone.now()
     FlightSplitRequest.objects.filter(
@@ -1276,11 +1279,11 @@ def flight_split_request_detail(request, token):
     if request.user not in {
         split_request.requester,
         split_request.requested_member,
-    } and not (request.user.is_superuser or request.user.treasurer):
+    } and not has_logsheet_finance_access(request.user):
         return HttpResponseForbidden("You cannot view this split request.")
 
     period_closed = is_period_closed(split_request.flight.logsheet.log_date)
-    is_treasurer = request.user.is_superuser or request.user.treasurer
+    is_treasurer = has_logsheet_finance_access(request.user)
     treasurer_can_act = (
         period_closed
         and is_treasurer

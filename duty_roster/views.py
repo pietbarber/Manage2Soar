@@ -1092,7 +1092,7 @@ def duty_calendar_view(request, year=None, month=None):
         original_date__in=visible_dates,
     )
     if request.user.is_authenticated:
-        if not (request.user.is_staff or getattr(request.user, "rostermeister", False)):
+        if not request.user.has_perm("duty_roster.view_dutyswaprequest"):
             open_swap_queryset = open_swap_queryset.filter(
                 models.Q(request_type="general")
                 | (
@@ -1556,7 +1556,7 @@ def calendar_day_detail(request, year, month, day):
         original_date=day_date,
     )
     if request.user.is_authenticated:
-        if not (request.user.is_staff or getattr(request.user, "rostermeister", False)):
+        if not request.user.has_perm("duty_roster.view_dutyswaprequest"):
             open_swap_requests_queryset = open_swap_requests_queryset.filter(
                 models.Q(request_type="general")
                 | (
@@ -5494,7 +5494,9 @@ def _notify_student_instructor_assigned(slot):
 
 
 @active_member_required
-@user_passes_test(lambda u: is_rostermeister(u) or u.is_staff or u.is_superuser)
+@user_passes_test(
+    lambda u: u.is_superuser or u.has_perm("duty_roster.edit_dutyroster_message")
+)
 @never_cache
 def edit_roster_message(request):
     """

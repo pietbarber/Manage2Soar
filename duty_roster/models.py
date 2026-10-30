@@ -89,6 +89,12 @@ class DutyRosterMessage(models.Model):
     class Meta:
         verbose_name = "Duty Roster Message"
         verbose_name_plural = "Duty Roster Message"  # Singular since it's a singleton
+        permissions = [
+            (
+                "edit_dutyroster_message",
+                "Can edit the duty roster message",
+            ),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(id__lte=1),

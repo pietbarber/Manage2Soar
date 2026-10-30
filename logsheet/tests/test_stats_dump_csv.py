@@ -1,4 +1,6 @@
 import pytest
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
@@ -7,13 +9,28 @@ from logsheet.models import StatsDumpOutbox
 from members.models import Member
 
 
+def _create_stats_user(**kwargs):
+    grant_permission = kwargs.pop("grant_permission", True)
+    user = Member.objects.create_user(**kwargs)
+    if grant_permission:
+        permission = Permission.objects.get(
+            content_type=ContentType.objects.get(
+                app_label="logsheet", model="logsheet"
+            ),
+            codename="can_export_stats_dump",
+        )
+        user.user_permissions.add(permission)
+    return user
+
+
 @pytest.mark.django_db
 def test_stats_dump_csv_requires_stats_monger_permission(client):
-    user = Member.objects.create_user(
+    user = _create_stats_user(
         username="no_stats_access",
         password="pass",
         membership_status="Full Member",
         stats_monger=False,
+        grant_permission=False,
     )
     client.force_login(user)
 
@@ -23,8 +40,22 @@ def test_stats_dump_csv_requires_stats_monger_permission(client):
 
 
 @pytest.mark.django_db
+def test_stats_monger_flag_alone_does_not_grant_stats_export(client):
+    user = _create_stats_user(
+        username="legacy_stats_flag_only",
+        password="pass",
+        membership_status="Full Member",
+        stats_monger=True,
+        grant_permission=False,
+    )
+    client.force_login(user)
+
+    assert client.get(reverse("logsheet:stats_dump_export_queue")).status_code == 403
+
+
+@pytest.mark.django_db
 def test_stats_dump_csv_get_renders_queue_page(client):
-    requester = Member.objects.create_user(
+    requester = _create_stats_user(
         username="stats_owner_get",
         password="pass",
         membership_status="Full Member",
@@ -40,7 +71,7 @@ def test_stats_dump_csv_get_renders_queue_page(client):
 
 @pytest.mark.django_db
 def test_stats_dump_csv_queues_job_and_redirects_to_status(client):
-    requester = Member.objects.create_user(
+    requester = _create_stats_user(
         username="stats_owner",
         password="pass",
         membership_status="Full Member",
@@ -59,13 +90,13 @@ def test_stats_dump_csv_queues_job_and_redirects_to_status(client):
 
 @pytest.mark.django_db
 def test_stats_dump_status_rejects_other_non_superusers(client):
-    requester = Member.objects.create_user(
+    requester = _create_stats_user(
         username="stats_owner_access",
         password="pass",
         membership_status="Full Member",
         stats_monger=True,
     )
-    other = Member.objects.create_user(
+    other = _create_stats_user(
         username="stats_other_access",
         password="pass",
         membership_status="Full Member",
@@ -81,7 +112,7 @@ def test_stats_dump_status_rejects_other_non_superusers(client):
 
 @pytest.mark.django_db
 def test_stats_dump_status_rejects_non_superuser_when_requested_by_missing(client):
-    requester = Member.objects.create_user(
+    requester = _create_stats_user(
         username="stats_owner_missing_requester",
         password="pass",
         membership_status="Full Member",
@@ -98,7 +129,7 @@ def test_stats_dump_status_rejects_non_superuser_when_requested_by_missing(clien
 @pytest.mark.django_db
 def test_stats_dump_download_returns_file_for_ready_export(client, tmp_path, settings):
     settings.MEDIA_ROOT = str(tmp_path)
-    requester = Member.objects.create_user(
+    requester = _create_stats_user(
         username="stats_owner_download",
         password="pass",
         membership_status="Full Member",
@@ -126,7 +157,7 @@ def test_stats_dump_download_returns_file_for_ready_export(client, tmp_path, set
 
 @pytest.mark.django_db
 def test_stats_dump_download_redirects_when_not_ready(client):
-    requester = Member.objects.create_user(
+    requester = _create_stats_user(
         username="stats_owner_waiting",
         password="pass",
         membership_status="Full Member",
@@ -151,7 +182,7 @@ def test_stats_dump_download_redirects_when_not_ready(client):
 def test_stats_dump_download_rejects_non_superuser_when_requested_by_missing(
     client,
 ):
-    requester = Member.objects.create_user(
+    requester = _create_stats_user(
         username="stats_owner_download_missing_requester",
         password="pass",
         membership_status="Full Member",
@@ -170,7 +201,7 @@ def test_stats_dump_download_rejects_non_superuser_when_requested_by_missing(
 
 @pytest.mark.django_db
 def test_stats_dump_status_hides_last_error_for_non_superuser(client):
-    requester = Member.objects.create_user(
+    requester = _create_stats_user(
         username="stats_owner_failed_hidden",
         password="pass",
         membership_status="Full Member",
@@ -193,12 +224,13 @@ def test_stats_dump_status_hides_last_error_for_non_superuser(client):
 
 @pytest.mark.django_db
 def test_stats_dump_status_shows_last_error_for_superuser(client):
-    superuser = Member.objects.create_user(
+    superuser = _create_stats_user(
         username="stats_superuser_failed_visible",
         password="pass",
         membership_status="Full Member",
         stats_monger=False,
         is_superuser=True,
+        grant_permission=False,
     )
     outbox = StatsDumpOutbox.objects.create(
         requested_by=None,

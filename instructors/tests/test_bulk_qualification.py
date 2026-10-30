@@ -7,6 +7,7 @@ MemberQualification records.
 """
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 
@@ -250,6 +251,11 @@ class TestBulkAssignQualificationView(TestCase):
             password="testpass123",
             membership_status="Full Member",
             safety_officer=True,
+        )
+        cls.safety_officer.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="members", codename="access_safety_reports"
+            )
         )
         cls.regular_member = Member.objects.create_user(
             username="regular",

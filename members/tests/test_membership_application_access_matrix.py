@@ -63,6 +63,9 @@ def actor(db):
         if role == "group_only":
             group, _ = Group.objects.get_or_create(name="Member Managers")
             member.groups.add(group)
+        if role == "director_group":
+            group = Group.objects.get(name="Directors")
+            member.groups.add(group)
         if role in {"kiosk", "kiosk_manager"}:
             # A kiosk role account is login-enabled despite inactive membership.
             Member.objects.filter(pk=member.pk).update(is_active=True)
@@ -102,6 +105,7 @@ def _url(endpoint, application):
     [
         ("ordinary", 403),
         ("director", 200),
+        ("director_group", 200),
         ("member_manager", 200),
         ("webmaster", 200),
         ("superuser", 200),
@@ -122,7 +126,9 @@ def test_management_get_access(client, actor, application, role, expected, endpo
     if expected == 302:
         assert "login" in response.url
     elif expected == 200:
-        assert response.context["can_modify"] is (role != "director")
+        assert response.context["can_modify"] is (
+            role not in {"director", "director_group"}
+        )
 
 
 @pytest.mark.django_db

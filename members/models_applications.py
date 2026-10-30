@@ -299,6 +299,12 @@ class MembershipApplication(models.Model):
         verbose_name = "Membership Application"
         verbose_name_plural = "Membership Applications"
         ordering = ["-submitted_at"]
+        permissions = [
+            (
+                "view_membership_applications",
+                "Can view membership applications",
+            ),
+        ]
         indexes = [
             models.Index(fields=["status"]),
             models.Index(fields=["submitted_at"]),

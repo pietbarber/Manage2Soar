@@ -1405,6 +1405,11 @@ class Logsheet(models.Model):
     )
 
     class Meta:
+        permissions = (
+            ("can_manage_logsheet_finances", "Can manage logsheet finances"),
+            ("can_export_logsheet_finances", "Can export logsheet finances"),
+            ("can_export_stats_dump", "Can export raw flight statistics"),
+        )
         unique_together = ("log_date", "airfield")
 
     def __str__(self):
