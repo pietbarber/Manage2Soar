@@ -321,6 +321,9 @@ exercise that path.
 - Whether test databases must be migrated in place or may be recreated.
 - The policy for manually assigned privileged roles when a member becomes
   inactive.
+- Whether inactive superusers should retain application-level capability
+  bypasses. The current transition preserves existing superuser compatibility
+  paths, while Django's `has_perm()` itself denies inactive users.
 - Whether role preview includes the Active Member baseline.
 - Which permissions, if any, are protected from removal.
 - Whether CMS page-level roles migrate in this patch or retain a compatibility
