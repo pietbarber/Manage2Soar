@@ -14,19 +14,28 @@ def grant_director_application_view(apps, schema_editor):
     ContentType = apps.get_model("contenttypes", "ContentType")
 
     group, _ = Group.objects.using(db_alias).get_or_create(name=DIRECTOR_GROUP)
-    RoleMetadata.objects.using(db_alias).get_or_create(
-        group_id=group.pk,
-        defaults={
-            "key": DIRECTOR_ROLE_KEY,
-            "display_name": DIRECTOR_GROUP,
-            "description": "Read-only access to membership applications and waitlist.",
-            "is_builtin": True,
-            "is_protected": True,
-            "is_system_managed": True,
-            "is_assignable": True,
-            "sort_order": 25,
-        },
-    )
+    metadata = RoleMetadata.objects.using(db_alias).filter(group_id=group.pk).first()
+    if metadata is not None and metadata.key != DIRECTOR_ROLE_KEY:
+        raise RuntimeError(
+            f"{DIRECTOR_GROUP} metadata has unexpected stable key {metadata.key!r}; "
+            f"expected {DIRECTOR_ROLE_KEY!r}."
+        )
+    if metadata is None:
+        if RoleMetadata.objects.using(db_alias).filter(key=DIRECTOR_ROLE_KEY).exists():
+            raise RuntimeError(
+                f"Stable key {DIRECTOR_ROLE_KEY!r} is already assigned to another Group."
+            )
+        RoleMetadata.objects.using(db_alias).create(
+            group_id=group.pk,
+            key=DIRECTOR_ROLE_KEY,
+            display_name=DIRECTOR_GROUP,
+            description="Read-only access to membership applications and waitlist.",
+            is_builtin=True,
+            is_protected=True,
+            is_system_managed=True,
+            is_assignable=True,
+            sort_order=25,
+        )
 
     content_type, _ = ContentType.objects.using(db_alias).get_or_create(
         app_label="members", model="membershipapplication"

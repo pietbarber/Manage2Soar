@@ -1,7 +1,6 @@
 from django import forms
 from django.contrib import admin
 from django.contrib.auth.models import Group, Permission
-from django.db.models import Q
 from reversion.admin import VersionAdmin
 from tinymce.models import HTMLField
 from tinymce.widgets import TinyMCE
@@ -9,8 +8,7 @@ from tinymce.widgets import TinyMCE
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
-    QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
-    QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES,
+    QUALIFICATION_ALLOWED_PERMISSIONS,
     ClubQualificationType,
     GroundInstruction,
     GroundLessonScore,
@@ -25,22 +23,20 @@ from .models import (
 
 
 def safe_qualification_permissions():
-    """Match the denylist enforced by QualificationPermissionGrant.clean()."""
-    return Permission.objects.exclude(
-        Q(content_type__app_label__in=("admin", "auth", "contenttypes", "sessions"))
-        | Q(
-            content_type__app_label="members",
-            content_type__model__in=("member", "rolemetadata", "memberroleassignment"),
+    """Return only explicitly approved qualification capabilities."""
+    allowed = [
+        (app_label, codename)
+        for app_label, codename in (
+            capability.split(".", 1) for capability in QUALIFICATION_ALLOWED_PERMISSIONS
         )
-        | Q(
-            content_type__app_label="instructors",
-            codename__in=QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
+    ]
+    query = Permission.objects.none()
+    for app_label, codename in allowed:
+        query = query | Permission.objects.filter(
+            content_type__app_label=app_label,
+            codename=codename,
         )
-        | Q(codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[0])
-        | Q(codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[1])
-        | Q(codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[2])
-        | Q(codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[3])
-    )
+    return query
 
 
 def eligible_qualification_groups():
@@ -298,6 +294,7 @@ class ClubQualificationTypeAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "permission_group":
+            allowed_permission_ids = safe_qualification_permissions().values("pk")
             kwargs["queryset"] = (
                 Group.objects.filter(
                     qualificationpermissiongrant__isnull=False,
@@ -306,48 +303,7 @@ class ClubQualificationTypeAdmin(AdminHelperMixin, admin.ModelAdmin):
                     role_metadata__is_protected=False,
                     role_metadata__is_system_managed=False,
                 )
-                .exclude(
-                    Q(
-                        permissions__content_type__app_label__in=(
-                            "admin",
-                            "auth",
-                            "contenttypes",
-                            "sessions",
-                        )
-                    )
-                    | Q(
-                        permissions__content_type__app_label="members",
-                        permissions__content_type__model__in=(
-                            "member",
-                            "rolemetadata",
-                            "memberroleassignment",
-                        ),
-                    )
-                    | Q(
-                        permissions__content_type__app_label="instructors",
-                        permissions__codename__in=QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
-                    )
-                    | Q(
-                        permissions__codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                            0
-                        ]
-                    )
-                    | Q(
-                        permissions__codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                            1
-                        ]
-                    )
-                    | Q(
-                        permissions__codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                            2
-                        ]
-                    )
-                    | Q(
-                        permissions__codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                            3
-                        ]
-                    )
-                )
+                .filter(permissions__in=allowed_permission_ids)
                 .distinct()
                 .order_by("name")
             )

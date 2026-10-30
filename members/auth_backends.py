@@ -21,8 +21,7 @@ class QualificationPermissionBackend(BaseBackend):
 
         today = timezone.localdate()
         from instructors.models import (
-            QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
-            QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES,
+            QUALIFICATION_ALLOWED_PERMISSIONS,
             MemberQualification,
             QualificationPermissionGrant,
         )
@@ -41,6 +40,13 @@ class QualificationPermissionBackend(BaseBackend):
         approved_permissions = QualificationPermissionGrant.objects.filter(
             group_id__in=permission_groups
         ).values_list("permission_id", flat=True)
+        allowed_filters = Q()
+        for capability in QUALIFICATION_ALLOWED_PERMISSIONS:
+            app_label, codename = capability.split(".", 1)
+            allowed_filters |= Q(
+                content_type__app_label=app_label,
+                codename=codename,
+            )
         permissions = (
             Permission.objects.filter(
                 id__in=approved_permissions,
@@ -50,48 +56,7 @@ class QualificationPermissionBackend(BaseBackend):
                 group__role_metadata__is_protected=False,
                 group__role_metadata__is_system_managed=False,
             )
-            .exclude(
-                Q(
-                    content_type__app_label__in=(
-                        "admin",
-                        "auth",
-                        "contenttypes",
-                        "sessions",
-                    )
-                )
-                | Q(
-                    content_type__app_label="members",
-                    content_type__model__in=(
-                        "member",
-                        "rolemetadata",
-                        "memberroleassignment",
-                    ),
-                )
-                | Q(
-                    content_type__app_label="instructors",
-                    codename__in=QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
-                )
-                | Q(
-                    codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                        0
-                    ]
-                )
-                | Q(
-                    codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                        1
-                    ]
-                )
-                | Q(
-                    codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                        2
-                    ]
-                )
-                | Q(
-                    codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                        3
-                    ]
-                )
-            )
+            .filter(allowed_filters)
             .values_list("content_type__app_label", "codename")
         )
         return {f"{app_label}.{codename}" for app_label, codename in permissions}

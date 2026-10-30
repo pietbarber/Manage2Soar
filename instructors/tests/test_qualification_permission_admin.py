@@ -156,8 +156,8 @@ class ClubQualificationTypeAdminTests(TestCase):
         )
         permission, _ = Permission.objects.get_or_create(
             content_type=ContentType.objects.get_for_model(GroundInstruction),
-            codename="can_manage_qualification_admin_test",
-            defaults={"name": "Can manage qualification admin test"},
+            codename="can_manage_ground_instruction",
+            defaults={"name": "Can manage ground instruction"},
         )
         group.permissions.add(permission)
         QualificationPermissionGrant.objects.create(

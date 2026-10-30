@@ -23,19 +23,28 @@ def grant_safety_report_access(apps, schema_editor):
         defaults={"name": "Can access safety reports"},
     )
     group, _ = Group.objects.using(db_alias).get_or_create(name="Safety Officers")
-    RoleMetadata.objects.using(db_alias).get_or_create(
-        group_id=group.pk,
-        defaults={
-            "key": "safety_officers",
-            "display_name": "Safety Officers",
-            "description": "Access to safety reports and safety workflows.",
-            "is_builtin": True,
-            "is_protected": True,
-            "is_system_managed": True,
-            "is_assignable": True,
-            "sort_order": 30,
-        },
-    )
+    metadata = RoleMetadata.objects.using(db_alias).filter(group_id=group.pk).first()
+    if metadata is not None and metadata.key != "safety_officers":
+        raise RuntimeError(
+            "Safety Officers metadata has unexpected stable key "
+            f"{metadata.key!r}; expected 'safety_officers'."
+        )
+    if metadata is None:
+        if RoleMetadata.objects.using(db_alias).filter(key="safety_officers").exists():
+            raise RuntimeError(
+                "Stable key 'safety_officers' is already assigned to another Group."
+            )
+        RoleMetadata.objects.using(db_alias).create(
+            group_id=group.pk,
+            key="safety_officers",
+            display_name="Safety Officers",
+            description="Access to safety reports and safety workflows.",
+            is_builtin=True,
+            is_protected=True,
+            is_system_managed=True,
+            is_assignable=True,
+            sort_order=30,
+        )
     group.permissions.db_manager(db_alias).add(permission)
     for member in Member.objects.using(db_alias).filter(safety_officer=True):
         MemberRoleAssignment.objects.using(db_alias).get_or_create(

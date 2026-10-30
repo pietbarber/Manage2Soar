@@ -43,6 +43,26 @@ MIGRATED_CAPABILITY_GRANTS = {
     "instructor_admins": ("duty_roster.view_all_swap_requests",),
 }
 
+CAPABILITY_CONTENT_TYPES = {
+    "billing.can_manage_billing": ("billing", "billingperiod"),
+    "logsheet.can_manage_logsheet_finances": ("logsheet", "logsheet"),
+    "logsheet.can_export_logsheet_finances": ("logsheet", "logsheet"),
+    "members.view_privileged_contact": ("members", "member"),
+    "members.access_safety_reports": ("members", "safetyreport"),
+    "members.view_membership_applications": (
+        "members",
+        "membershipapplication",
+    ),
+    "cms.view_page": ("cms", "page"),
+    "cms.change_page": ("cms", "page"),
+    "duty_roster.edit_dutyroster_message": (
+        "duty_roster",
+        "dutyrostermessage",
+    ),
+    "duty_roster.view_duty_delinquents": ("duty_roster", "dutyassignment"),
+    "duty_roster.view_all_swap_requests": ("duty_roster", "dutyswaprequest"),
+}
+
 
 def sync_registered_capabilities(apps, schema_editor):
     db_alias = schema_editor.connection.alias
@@ -64,10 +84,12 @@ def sync_registered_capabilities(apps, schema_editor):
         permissions = []
         for capability in capabilities:
             app_label, codename = capability.split(".", 1)
+            model = CAPABILITY_CONTENT_TYPES[capability][1]
             permission = (
                 Permission.objects.using(db_alias)
                 .filter(
                     content_type__app_label=app_label,
+                    content_type__model=model,
                     codename=codename,
                 )
                 .first()

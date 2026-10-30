@@ -2,25 +2,15 @@ import re
 
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
 from tinymce.models import HTMLField
 
 from members.models import Member, RoleMetadata
 from utils.upload_entropy import upload_quals_icon
 
-QUALIFICATION_ADMIN_PERMISSION_CODENAMES = (
-    "add_clubqualificationtype",
-    "change_clubqualificationtype",
-    "delete_clubqualificationtype",
-    "add_memberqualification",
-    "change_memberqualification",
-    "delete_memberqualification",
-)
-QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES = (
-    "add_",
-    "change_",
-    "delete_",
-    "view_",
+# Qualification-derived permissions are an explicit security boundary. Add a
+# capability here only after reviewing its business impact and endpoint policy.
+QUALIFICATION_ALLOWED_PERMISSIONS = frozenset(
+    {"instructors.can_manage_ground_instruction"}
 )
 
 SCORE_CHOICES = [
@@ -402,41 +392,13 @@ class ClubQualificationType(models.Model):
                     )
                 }
             )
-        if self.permission_group.permissions.filter(
-            Q(content_type__app_label__in=("admin", "auth", "contenttypes", "sessions"))
-            | Q(
-                content_type__app_label="members",
-                content_type__model__in=(
-                    "member",
-                    "rolemetadata",
-                    "memberroleassignment",
-                ),
+        if any(
+            f"{permission.content_type.app_label}.{permission.codename}"
+            not in QUALIFICATION_ALLOWED_PERMISSIONS
+            for permission in self.permission_group.permissions.select_related(
+                "content_type"
             )
-            | Q(
-                content_type__app_label="instructors",
-                codename__in=QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
-            )
-            | Q(
-                codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                    0
-                ]
-            )
-            | Q(
-                codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                    1
-                ]
-            )
-            | Q(
-                codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                    2
-                ]
-            )
-            | Q(
-                codename__startswith=QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES[
-                    3
-                ]
-            )
-        ).exists():
+        ):
             raise ValidationError(
                 {
                     "permission_group": (
@@ -467,22 +429,15 @@ class QualificationPermissionGrant(models.Model):
 
     def clean(self):
         super().clean()
-        codename = self.permission.codename if self.permission_id else ""
+        permission_name = (
+            f"{self.permission.content_type.app_label}.{self.permission.codename}"
+            if self.permission_id
+            else ""
+        )
         if (
             not self.group_id
             or not self.permission_id
-            or codename.startswith(QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES)
-            or self.permission.content_type.app_label
-            in ("admin", "auth", "contenttypes", "sessions")
-            or (
-                self.permission.content_type.app_label == "members"
-                and self.permission.content_type.model
-                in ("member", "rolemetadata", "memberroleassignment")
-            )
-            or (
-                self.permission.content_type.app_label == "instructors"
-                and codename in QUALIFICATION_ADMIN_PERMISSION_CODENAMES
-            )
+            or permission_name not in QUALIFICATION_ALLOWED_PERMISSIONS
         ):
             raise ValidationError(
                 "Only explicitly approved, non-CRUD custom action permissions may be qualification-derived."

@@ -187,8 +187,8 @@ def test_qualification_expiry_is_rechecked_on_same_user(member):
     )
     permission, _ = Permission.objects.get_or_create(
         content_type=ContentType.objects.get_for_model(ClubQualificationType),
-        codename="can_authorize_test_action",
-        defaults={"name": "Can authorize test action"},
+        codename="can_manage_ground_instruction",
+        defaults={"name": "Can manage ground instruction"},
     )
     group.permissions.add(permission)
     QualificationPermissionGrant.objects.create(group=group, permission=permission)
@@ -198,7 +198,7 @@ def test_qualification_expiry_is_rechecked_on_same_user(member):
     record = MemberQualification.objects.create(
         member=member, qualification=qualification
     )
-    action = "instructors.can_authorize_test_action"
+    action = "instructors.can_manage_ground_instruction"
 
     assert resolve_authorization(member, action).allow
     record.expiration_date = timezone.localdate() - timedelta(days=1)

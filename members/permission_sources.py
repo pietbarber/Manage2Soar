@@ -16,8 +16,7 @@ from collections import defaultdict
 from django.utils import timezone
 
 from instructors.models import (
-    QUALIFICATION_ADMIN_PERMISSION_CODENAMES,
-    QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES,
+    QUALIFICATION_ALLOWED_PERMISSIONS,
     MemberQualification,
     QualificationPermissionGrant,
 )
@@ -30,24 +29,8 @@ def _permission_name(permission):
 
 
 def _is_unsafe_permission(permission):
-    """Keep this denylist in step with QualificationPermissionBackend."""
-    content_type = permission.content_type
-    if content_type.app_label in ("admin", "auth", "contenttypes", "sessions"):
-        return True
-    if content_type.app_label == "members" and content_type.model in (
-        "member",
-        "rolemetadata",
-        "memberroleassignment",
-    ):
-        return True
-    if (
-        content_type.app_label == "instructors"
-        and permission.codename in QUALIFICATION_ADMIN_PERMISSION_CODENAMES
-    ):
-        return True
-    return permission.codename.startswith(
-        QUALIFICATION_STANDARD_PERMISSION_CODENAME_PREFIXES
-    )
+    """Return whether a permission is outside the qualification allowlist."""
+    return _permission_name(permission) not in QUALIFICATION_ALLOWED_PERMISSIONS
 
 
 def get_permission_sources(member, permission=None):
