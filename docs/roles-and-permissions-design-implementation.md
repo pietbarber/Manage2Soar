@@ -334,12 +334,22 @@ source, timestamp, and relevant before/after state. Qualification award,
 expiry/revocation, and resulting permission changes should be attributable to
 the underlying qualification record and actor where available.
 
-The current implementation now appends immutable, snapshot-backed grant/revoke
-events for source-specific manual changes made through `set_manual_role()` and
-exposes them read-only to active superusers. Automatic legacy/status changes,
-role permission edits, and qualification lifecycle events still need equivalent
-event coverage; direct M2M writes remain outside this audit boundary until the
-enforcement plan in `direct-group-write-enforcement.md` is implemented.
+The current implementation appends immutable, snapshot-backed grant/revoke
+events and exposes them read-only to active superusers. Grant events are emitted
+by a creation signal for every provenance row, so a direct ORM creation is still
+audited (attributed to the named actor or as a system grant). Revocations are
+emitted when assignment rows are deleted directly or by a Member/Group cascade;
+those cascade events retain snapshot identity, including the stable `role_key`
+captured before `RoleMetadata` is removed, but intentionally null their
+convenience foreign keys so the new audit row cannot block the parent deletion.
+Callers that know the acting user should use `set_manual_role()` or the
+`delete_role_assignments()` service; direct assignment deletion is reserved for
+system cleanup and cascades. Bulk creation/update of provenance rows is
+rejected by the model manager. Automatic legacy/status permission
+reconciliation, role permission edits, and qualification lifecycle events still
+need equivalent event coverage; direct M2M writes remain outside this audit
+boundary until the enforcement plan in `direct-group-write-enforcement.md` is
+implemented.
 
 ## 6. Admin experience requirements
 
@@ -436,6 +446,38 @@ unchanged. See the endpoint-level matrix and regression tests in
 `roles-and-permissions-authorization-inventory.md` and
 `members/tests/test_membership_application_access_matrix.py`. Call out the
 intentional narrowing in the merge/deployment notes.
+
+### Merge/deployment notes for this branch
+
+- **Kiosk narrowing is intentional.** Shared kiosk sessions can no longer list,
+  view, or update membership applications, even when the kiosk Role Account
+  carries `member_manager=True`. Public applicant routes are unchanged.
+- **No representative data is seeded.** The shared local database is not a
+  fixture source. Exercises that need sample roles, members, or applications
+  must create isolated test data; do not commit representative seed rows or
+  run them against the shared database.
+- **Migration `0039_alter_memberroleassignmentevent_options` is metadata-only.**
+  It changes `MemberRoleAssignmentEvent` model options (`base_manager_name`)
+  and does not alter data or schema columns. Follow-up migration `0040` adds
+  the assignment manager guard and backfills grant events for provenance rows
+  that predate the audit ledger.
+- **Settings template is deliberately synchronized.** The GKE/default path
+  still uses `manage2soar.settings`. Single-host still renders
+  `settings_single_host.py.j2` over the checked-in
+  `manage2soar/settings_single_host.py`. Edit both plus the template together;
+  `test_settings_single_host_template.py` fails on executable-body drift. The
+  contract test is structural, not proof of runtime equivalence.
+- **Single-host gaps are recorded, not fixed here.** Scheduled jobs, artifact
+  pinning, Python runtime alignment, and CI smoke coverage are follow-ups in
+  [`infrastructure/docs/single-host-architecture.md`](../infrastructure/docs/single-host-architecture.md#known-single-host-gaps-follow-up).
+- **Audit coverage is explicit about its boundary.** Grant events are emitted
+  for every provenance-row creation. Revocations are emitted for direct and
+  cascade assignment deletion; service callers use `set_manual_role()` or
+  `delete_role_assignments()` so the actor is attributed. Direct
+  `Member.groups` writes remain outside the audit boundary until the staged
+  enforcement plan in
+  [`direct-group-write-enforcement.md`](direct-group-write-enforcement.md) is
+  implemented.
 
 ## 9. Phases and parallel work
 

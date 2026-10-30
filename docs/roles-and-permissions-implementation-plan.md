@@ -96,7 +96,10 @@ or explicitly map them; it must not silently discard manually added groups.
 
 Provide admin-managed mappings from membership statuses to automatic baseline
 roles. Preserve existing active-member access rules and make status changes
-reconcile only status-sourced assignments.
+reconcile only status-sourced assignments. The assignment service is
+authoritative for new supported Group writes; existing unexplained/manual
+memberships remain valid until explicitly reviewed and must not be silently
+removed.
 
 Qualifications may provide configured permissions/eligibility and profile tags
 while valid. Derive those effects from the qualification record and its
@@ -105,13 +108,23 @@ unless that is separately and explicitly intended. Expiration or revocation
 removes qualification-derived effects immediately, while any independently
 granted administrative role remains unaffected.
 
+Qualification-derived permissions use a positive allowlist. Permission
+codenames cannot establish intent by themselves. Administrative,
+authentication, member-management, qualification-management, broad
+management, impersonation, and export permissions are excluded unless a
+separate review explicitly approves them.
+
 Keep operational assignments scoped to their context. Define object-level
 policies for actions that depend on the specific duty, aircraft, roster, or
 event; do not treat a contextual assignment as a global role permission.
 
-Privileged administrative roles remain manually assigned. Define and test the
-policy for manually assigned privileged roles when a member becomes inactive;
-automatic cleanup must not silently remove them.
+Privileged administrative roles remain manually assigned. When a member becomes
+inactive, retain the Group memberships and manual assignment records, but
+remove their effective ability to use those permissions. Inactive members
+cannot log in under the existing account-status policy; the authorization
+resolver must also deny effective role/qualification permissions if an inactive
+identity is evaluated directly. No automatic cleanup may silently remove the
+underlying Groups or assignments.
 
 ## Admin experience
 
@@ -132,6 +145,53 @@ Only Platform Administrators can create roles or edit protected built-in role
 permissions. Changes to role permissions affect all members with that role
 immediately and should display that consequence before saving.
 
+Roles are composable bundles of focused capabilities, not monolithic access
+profiles. The migration target is parity with the current intended deployment
+behavior while reducing each role to only the capabilities required for its
+job. A Member Manager retains legitimate membership-management capabilities,
+but generic or unrelated access obtained only through `is_staff` or an overly
+broad legacy Group is not folded into the new role. Additional capabilities
+are assigned through separate roles or permissions.
+
+Permission administration should have a small number of authoritative sources:
+
+1. registered Django model/workflow permissions assigned to roles;
+2. explicitly approved qualification-derived permissions; and
+3. code-owned contextual policies for ownership, workflow state, kiosk,
+   active-member, and operational-assignment rules.
+
+Admin screens should assign existing registered permissions and show their
+view/add/change/delete effect. They must not create arbitrary executable
+permission names. Django admin visibility and mutation checks, application
+views, APIs, and services should consume the same permission/resolver contract
+instead of maintaining independent staff, boolean, or hard-coded Group-name
+exceptions. The initial migration prioritizes parity: preserve current
+role-to-permission assignments as closely as possible while representing them
+in one understandable role/capability structure.
+
+Administrative-site access is separate from business permissions. The new
+explicit admin-access capability/flag is the source of truth for whether a role
+should have administrative-site access, while Django's existing `is_staff`
+field remains the technical gate for entering the admin during this migration.
+The role configuration must control the admin-access decision and the
+model/action permissions separately. This lets administrators add or remove
+individual permissions without granting unrelated application access merely
+because a role can see the admin menu. Superuser behavior remains a separate
+compatibility path pending maintainer review. Replacing the Django admin gate
+itself is deferred; first migrate the permission sources and application
+authorization paths.
+
+While Django's `is_staff` remains as a temporary technical admin-site gate,
+every staff-derived behavior must be rebound explicitly to the appropriate
+role capability or contextual policy. `is_staff` must not itself authorize an
+application action. Legacy boolean fields remain temporarily as compatibility
+and operational data sources, but authorization consumers must migrate to the
+new role/resolver system. New supported writes should update role assignments
+or contextual records rather than using boolean flags as the authorization
+source. Operational booleans such as instructor, tow-pilot, duty-officer, and
+safety-officer must be mapped explicitly to qualification or contextual
+policies rather than mechanically converted into global administrative roles.
+
 ## Central authorization and migration of checks
 
 Create shared helpers for role and permission checks, then migrate existing
@@ -146,8 +206,14 @@ authorization code to them. Inventory and update:
 - templates, navigation, and action visibility;
 - APIs, background tasks, and notification recipient queries.
 
-Keep `is_superuser` as the platform-level override unless maintainers decide
-otherwise. Separate Django admin access from operational/business permissions.
+Keep `is_superuser` behavior as close as possible to the current deployment
+until maintainer review. Do not redesign superuser semantics or turn
+superuser or staff status into a new universal bypass while migrating
+authorization. Existing `is_staff` checks must be superseded by explicit new
+permissions/resolver checks on the affected endpoints, while preserving their
+endpoint-specific semantics. `is_staff` must not become a universal
+application permission. Separate Django admin access from
+operational/business permissions.
 Template visibility is not an authorization boundary: each protected request
 and service operation must enforce permissions server-side.
 

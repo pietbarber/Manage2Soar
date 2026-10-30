@@ -227,6 +227,41 @@ Start with these existing focused suites when a surface is migrated:
 
 ## Next work
 
+### Approved policy decisions
+
+- `is_staff` is not a universal application bypass. Existing staff-enabled
+  endpoints will be migrated to explicit new permissions/resolver checks while
+  preserving their endpoint-specific behavior.
+- Existing `is_superuser` behavior remains as close as possible to the current
+  deployment during this work. It is not expanded into a universal bypass,
+  and superuser-specific details are deferred for maintainer review. The role
+  inventory should document current superuser behavior rather than redesign it.
+- Inactive members retain their Groups and assignment records, but lose the
+  effective ability to use those permissions. They cannot log in under the
+  existing inactive-account policy, and direct authorization evaluation must
+  deny their effective role/qualification permissions as well. Existing
+  superuser behavior matches current behavior for now; the direct-evaluation
+  edge case is explicitly deferred for later review.
+- The assignment service is authoritative for new supported Group writes.
+  Existing unexplained/manual memberships remain valid until explicitly
+  reviewed; they are not silently removed during enforcement.
+- Qualification-derived permissions use a positive allowlist. Permissions are
+  not granted merely because a codename appears safe. Admin/authentication,
+  member-management, qualification-management, broad management,
+  impersonation, and export permissions remain excluded unless separately
+  approved.
+- The target is current intended-behavior parity with narrower, composable
+  roles. Existing Groups should be decomposed into focused capabilities that
+  can be combined or added independently. Preserve legitimate current access,
+  but do not preserve accidental access caused only by broad legacy Groups or
+  generic `is_staff` checks. Member Manager permissions should represent the
+  current membership-management job, while unrelated staff-derived access is
+  represented separately.
+
+The remaining major policy gate is the global-versus-contextual resolver
+contract. The inactive-superuser direct-evaluation edge case is also recorded
+for later review.
+
 1. Review and approve a completed baseline against product intent, especially staff, superuser,
    dynamic operational roles, and staff-only admin behavior.
 2. Expand the matrix into endpoint-level allow/deny tests where behavior is
