@@ -26,7 +26,10 @@ from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
-from duty_roster.permissions import has_duty_delinquents_access
+from duty_roster.permissions import (
+    has_duty_delinquents_access,
+    has_rostermeister_access,
+)
 from duty_roster.utils.delinquents import apply_duty_delinquent_exemptions
 from duty_roster.utils.email import (
     get_email_config,
@@ -1991,7 +1994,7 @@ def maybe_notify_surge_towpilot(day_date):
 
 
 def assignment_edit_form(request, year, month, day):
-    if not request.user.is_authenticated or not request.user.rostermeister:
+    if not has_rostermeister_access(request.user):
         return HttpResponse("Forbidden", status=403)
 
     day_date = date(year, month, day)
@@ -2011,7 +2014,7 @@ def assignment_edit_form(request, year, month, day):
 
 @require_POST
 def assignment_save_form(request, year, month, day):
-    if not request.user.is_authenticated or not request.user.rostermeister:
+    if not has_rostermeister_access(request.user):
         return HttpResponse("Forbidden", status=403)
 
     day_date = date(year, month, day)
@@ -2451,7 +2454,7 @@ def calendar_cancel_ops_modal(request, year, month, day):
 
 
 def is_rostermeister(user):
-    return user.is_authenticated and user.rostermeister
+    return has_rostermeister_access(user)
 
 
 @active_member_required

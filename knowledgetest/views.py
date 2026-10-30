@@ -27,9 +27,8 @@ from knowledgetest.models import (
     WrittenTestTemplate,
     WrittenTestTemplateQuestion,
 )
-from members.authorization import has_webmaster_compatibility_access
+from knowledgetest.permissions import has_written_test_admin_access
 from members.decorators import active_member_required
-from members.role_preview import has_preview_group
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -57,14 +56,10 @@ DELETE_ANY_ASSIGNMENT = "knowledgetest.delete_any_pending_written_test_assignmen
 def _legacy_written_test_admin_access(user):
     """Compatibility for ambiguous Webmaster/Chief Flight Instructor roles.
 
-    Existing deployments used ``is_staff`` as the effective grant for these
-    roles.  Keep their named-role behavior during the transition, but never
-    treat generic staff status as written-test authorization.
+    Existing deployments used named Webmaster/Chief Flight Instructor roles
+    as the effective grant for these actions.
     """
-    return bool(
-        has_webmaster_compatibility_access(user)
-        or has_preview_group(user, "Chief Flight Instructor")
-    )
+    return has_written_test_admin_access(user)
 
 
 def _has_written_test_capability(user, permission):

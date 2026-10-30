@@ -4,6 +4,15 @@ VIEW_DUTY_DELINQUENTS_PERMISSION = "duty_roster.view_duty_delinquents"
 VIEW_ALL_SWAP_REQUESTS_PERMISSION = "duty_roster.view_all_swap_requests"
 
 
+def has_rostermeister_access(user):
+    """Return whether *user* has the legacy rostermeister role."""
+    return bool(
+        user
+        and getattr(user, "is_authenticated", False)
+        and getattr(user, "rostermeister", False)
+    )
+
+
 def has_duty_delinquents_access(user):
     """Return whether *user* may view the duty-delinquents report."""
     if not user or not getattr(user, "is_authenticated", False):

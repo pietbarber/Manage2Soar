@@ -3,7 +3,7 @@ from django.db import models
 from django.utils.html import format_html
 from tinymce.widgets import TinyMCE
 
-from members.role_preview import has_preview_group
+from knowledgetest.permissions import has_written_test_admin_access
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -210,12 +210,7 @@ class TestPresetAdmin(AdminHelperMixin, admin.ModelAdmin):
         Webmaster and superuser always allowed.
         Chief Flight Instructor allowed only if allow_cfi is True.
         """
-        user = request.user
-        if user.is_superuser or has_preview_group(user, "Webmasters"):
-            return True
-        if allow_cfi and has_preview_group(user, "Chief Flight Instructor"):
-            return True
-        return False
+        return has_written_test_admin_access(request.user, allow_cfi=allow_cfi)
 
     def has_change_permission(self, request, obj=None):
         # Only allow Webmaster, superuser, or Chief Flight Instructor to edit test presets
