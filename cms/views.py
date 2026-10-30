@@ -242,6 +242,10 @@ def cms_page(request, **kwargs):
         "page_has_role_restrictions": page.has_role_restrictions(),
         "page_required_roles": page_required_roles,
         "can_edit_page": can_edit,
+        "role_preview_edit_diagnostic": (
+            getattr(request, "role_preview", None) is not None,
+            can_edit,
+        ),
         "can_create_subpage": can_create_subpage,
     }
 

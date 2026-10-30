@@ -54,7 +54,7 @@
             </p>
           </div>
         </div>
-        {% if request.user.is_superuser or request.user.member_manager %}
+        {% if role_access.member_admin %}
         <div class="profile-action-buttons">
           <a href="{% url 'admin:members_member_change' member.id %}" class="btn btn-light btn-modern">
             <i class="bi bi-pencil-square me-2"></i>Edit Member
@@ -452,7 +452,7 @@
       </div>
 
       <!-- Instructor Tools Section -->
-      {% if request.user == member or request.user.instructor %}
+      {% if request.user == member or role_access.instructor %}
       <div class="card contact-info mb-4">
         <div class="card-header bg-primary text-white">
           <h5 class="mb-0">
@@ -481,7 +481,7 @@
 
           <div class="row g-2">
             <div class="col-sm-6">
-              <a href="{% if request.user.instructor %}{% url 'instructors:member_training_grid' member.id %}{% else %}{% url 'members:training_progress' %}{% endif %}" class="btn btn-outline-primary btn-modern w-100">
+              <a href="{% if role_access.instructor %}{% url 'instructors:member_training_grid' member.id %}{% else %}{% url 'members:training_progress' %}{% endif %}" class="btn btn-outline-primary btn-modern w-100">
                 <i class="bi bi-grid-3x3 me-2"></i>View Training Grid
               </a>
             </div>
@@ -492,7 +492,7 @@
             </div>
           </div>
 
-          {% if request.user.instructor and request.user != member %}
+          {% if role_access.instructor and request.user != member %}
           <hr>
           <h6 class="text-primary mb-3">
             <i class="bi bi-person-workspace me-2"></i>Instructor Actions

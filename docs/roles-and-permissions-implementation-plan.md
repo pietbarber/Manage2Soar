@@ -287,6 +287,17 @@ alone do not prevent every mutation or external action.
    boolean fields as authorization sources. Keep fields temporarily if needed
    for operational data compatibility, with a documented later removal step.
 
+### Deferred cleanup
+
+- Consolidate the default Group definitions, role metadata, and capability
+  assignments currently spread across the initial group-permission migration
+  and later incremental migrations into one canonical role-definition source.
+- Audit template and navigation visibility checks that still read legacy role
+  booleans or staff flags, replacing them with the same capability/context
+  helpers used by the server-side authorization where appropriate. Templates
+  remain presentation-only; every corresponding endpoint must continue to
+  enforce authorization independently.
+
 Since the patch targets test deployments, maintainers should decide whether
 existing test databases must be migrated in place or can be recreated. In-place
 migration is needed to validate data conversion; a clean rebuild alone does not
