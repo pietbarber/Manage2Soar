@@ -30,6 +30,7 @@ from cms.pdf_proxy import (
     sign_external_pdf_url,
     verify_external_pdf_url,
 )
+from members.authorization import has_webmaster_compatibility_access
 from members.decorators import active_member_required
 from members.utils import is_active_member
 from utils.email_helpers import get_absolute_club_logo_url
@@ -378,7 +379,7 @@ def external_pdf_proxy(request):
 @require_http_methods(["GET"])
 def sign_external_pdf(request):
     """Sign an allowed external PDF target for an authenticated CMS editor."""
-    if not (request.user.is_superuser or getattr(request.user, "webmaster", False)):
+    if not has_webmaster_compatibility_access(request.user):
         return HttpResponseForbidden("CMS webmaster permission is required.")
     url = request.GET.get("url", "").strip()
     if not is_proxyable_external_url(url):
@@ -421,7 +422,7 @@ def homepage(request):
     if page:
         # Homepage editing is webmaster-only
         can_edit_homepage = user.is_authenticated and (
-            user.is_superuser or getattr(user, "webmaster", False)
+            has_webmaster_compatibility_access(user)
         )
         return render(
             request,
@@ -846,7 +847,7 @@ def can_edit_page(user, page):
         return False
 
     # Webmaster override - can edit everything
-    if user.is_superuser or getattr(user, "webmaster", False):
+    if has_webmaster_compatibility_access(user):
         return True
 
     # Check EDIT permissions (includes member permissions for both public and private pages)
@@ -864,7 +865,7 @@ def can_create_in_directory(user, parent_page=None):
         return False
 
     # Webmaster can create anywhere
-    if user.is_superuser or getattr(user, "webmaster", False):
+    if has_webmaster_compatibility_access(user):
         return True
 
     # If no parent (top-level), only webmaster can create
@@ -933,7 +934,7 @@ def edit_homepage_content(request, content_id):
     # Homepage editing is webmaster-only (no role restrictions)
     if not (
         request.user.is_authenticated
-        and (request.user.is_superuser or getattr(request.user, "webmaster", False))
+        and has_webmaster_compatibility_access(request.user)
     ):
         return HttpResponseForbidden("Only webmasters can edit homepage content.")
 

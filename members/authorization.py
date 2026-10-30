@@ -60,6 +60,28 @@ def has_role_admin_access(user):
     return user.groups.filter(role_metadata__admin_access=True).exists()
 
 
+def has_membership_application_view_access(user):
+    """Return whether *user* may view application-management screens."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return bool(
+        user.has_perm("members.view_membership_applications")
+        or getattr(user, "director", False)
+        or getattr(user, "member_manager", False)
+        or has_webmaster_compatibility_access(user)
+    )
+
+
+def has_membership_application_modify_access(user):
+    """Return whether *user* may modify application-management screens."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return bool(
+        getattr(user, "member_manager", False)
+        or has_webmaster_compatibility_access(user)
+    )
+
+
 @dataclass(frozen=True)
 class AuthorizationDecision:
     """An allow/deny result with a stable, machine-readable reason."""

@@ -7,6 +7,8 @@ particularly for determining who can unfinalize a logsheet.
 
 from typing import TYPE_CHECKING, Optional, Union
 
+from members.authorization import has_webmaster_compatibility_access
+
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
 
@@ -41,11 +43,13 @@ def can_unfinalize_logsheet(
         return True
 
     # Treasurers can unfinalize any logsheet to correct errors
-    if getattr(user, "treasurer", False):
+    if user.has_perm("logsheet.can_manage_logsheet_finances") or getattr(
+        user, "treasurer", False
+    ):
         return True
 
     # Webmasters can unfinalize any logsheet for administrative purposes
-    if getattr(user, "webmaster", False):
+    if has_webmaster_compatibility_access(user):
         return True
 
     # The duty officer who finalized the logsheet can unfinalize it

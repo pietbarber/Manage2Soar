@@ -1,6 +1,8 @@
 """Authorization decisions used only for template visibility."""
 
+from duty_roster.permissions import has_duty_delinquents_access
 from members.authorization import (
+    has_membership_application_view_access,
     has_role_admin_access,
     has_webmaster_compatibility_access,
 )
@@ -16,19 +18,8 @@ def authorization(request):
         "role_access": {
             # Keep compatibility fallbacks here until the corresponding view
             # policies are fully migrated. Templates never enforce access.
-            "membership_applications": bool(
-                has_perm("members.view_membership_applications")
-                or getattr(user, "director", False)
-                or getattr(user, "member_manager", False)
-                or has_webmaster_compatibility_access(user)
-            ),
-            "duty_delinquents": bool(
-                has_perm("duty_roster.view_duty_delinquents")
-                or getattr(user, "rostermeister", False)
-                or getattr(user, "member_manager", False)
-                or getattr(user, "director", False)
-                or getattr(user, "is_superuser", False)
-            ),
+            "membership_applications": has_membership_application_view_access(user),
+            "duty_delinquents": has_duty_delinquents_access(user),
             "billing": bool(
                 has_perm("billing.can_manage_billing")
                 or getattr(user, "treasurer", False)

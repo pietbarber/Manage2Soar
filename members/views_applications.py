@@ -9,6 +9,10 @@ from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 
+from members.authorization import (
+    has_membership_application_modify_access,
+    has_membership_application_view_access,
+)
 from siteconfig.models import SiteConfiguration
 
 from .account_emails import send_account_setup_email
@@ -20,7 +24,6 @@ from .forms_applications import (
 from .models_applications import MembershipApplication
 
 logger = logging.getLogger(__name__)
-VIEW_MEMBERSHIP_APPLICATIONS_PERMISSION = "members.view_membership_applications"
 
 
 def _send_account_setup_email_safely(member, application_id):
@@ -36,18 +39,12 @@ def _send_account_setup_email_safely(member, application_id):
 
 def _can_view_membership_applications(user):
     """Return True when the user may view membership applications/waitlist."""
-    return bool(
-        user.has_perm(VIEW_MEMBERSHIP_APPLICATIONS_PERMISSION)
-        or user.director
-        or user.member_manager
-        or user.webmaster
-        or user.is_superuser
-    )
+    return has_membership_application_view_access(user)
 
 
 def _can_modify_membership_applications(user):
     """Return True when the user may modify membership applications/waitlist."""
-    return bool(user.member_manager or user.webmaster or user.is_superuser)
+    return has_membership_application_modify_access(user)
 
 
 @ensure_csrf_cookie

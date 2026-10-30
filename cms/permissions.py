@@ -32,6 +32,6 @@ def has_legacy_cms_officer_access(user):
     """Temporary compatibility for officer flags during role backfill."""
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if getattr(user, "webmaster", False):
+    if has_webmaster_compatibility_access(user):
         return True
     return bool(getattr(user, "director", False) or getattr(user, "secretary", False))
