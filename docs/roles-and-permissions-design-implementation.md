@@ -540,6 +540,13 @@ After resolver/API contracts stabilize, work can proceed in parallel on:
 All workstreams use the shared resolver and preserve their existing contextual
 policies.
 
+**Deferred Phase 3 cleanup:** consolidate the default Group definitions, stable
+role metadata, and capability assignments currently spread across the initial
+group-permission migration and later incremental migrations into one canonical
+role-definition source. Preserve historical migrations for replayability; use
+the canonical source for future grants and verify it against the existing
+groups with parity tests.
+
 ### Phase 4 — Role preview
 
 Implement after the authorization context and read-only protections are tested.

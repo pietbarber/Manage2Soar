@@ -655,17 +655,12 @@ class Member(AbstractUser):
             locked_member = (
                 type(self).objects.using(using).select_for_update().get(pk=self.pk)
             )
+            from members.role_definitions import legacy_sync_group_names
+
+            legacy_groups = legacy_sync_group_names()
             desired = {
                 name: key
-                for name, key in (
-                    ("Rostermeisters", "rostermeister"),
-                    ("Instructor Admins", "instructor"),
-                    ("Member Managers", "member_manager"),
-                    ("Webmasters", "webmaster"),
-                    ("Secretary", "secretary"),
-                    ("Treasurer", "treasurer"),
-                    ("Directors", "director"),
-                )
+                for name, key in legacy_groups.items()
                 if getattr(locked_member, key)
             }
             for name, source_key in desired.items():
