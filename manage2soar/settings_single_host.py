@@ -209,7 +209,11 @@ STORAGES = {
         "OPTIONS": {"location": IMPORT_EXPORT_TMP_DIR},
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if TESTING
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
     },
 }
 IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.MediaStorage"
