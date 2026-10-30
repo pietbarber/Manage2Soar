@@ -440,7 +440,15 @@ class Account(models.Model):
         if self.system_role == self.Role.MEMBER_RECEIVABLES and self.is_cash:
             raise ValidationError("Member receivables cannot be a cash account.")
         if self.pk:
-            previous = Account.objects.filter(pk=self.pk).values("type").first()
+            previous = (
+                Account.objects.filter(pk=self.pk).values("type", "system_role").first()
+            )
+            if (
+                previous
+                and previous["system_role"]
+                and previous["system_role"] != self.system_role
+            ):
+                raise ValidationError("System accounts keep their role.")
             if previous and previous["type"] != self.type and self.lines.exists():
                 raise ValidationError(
                     "An account with posted entries cannot change type."

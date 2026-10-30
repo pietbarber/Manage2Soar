@@ -474,6 +474,32 @@ def test_account_type_is_locked_once_posted(treasurer, checking, books_started):
         fuel.save()
 
 
+def test_system_accounts_keep_their_role(client):
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    receivables.system_role = None
+    with pytest.raises(ValidationError, match="keep their role"):
+        receivables.save()
+
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    client.force_login(
+        Member.objects.create_superuser(username="gl-role-admin", password="x")
+    )
+    response = client.post(
+        reverse("admin:billing_account_change", args=[receivables.pk]),
+        {
+            "code": receivables.code,
+            "name": receivables.name,
+            "type": receivables.type,
+            "is_active": "on",
+            "description": "",
+            "system_role": "",
+        },
+    )
+    assert response.status_code == 302
+    receivables.refresh_from_db()
+    assert receivables.system_role == Account.Role.MEMBER_RECEIVABLES
+
+
 def test_cash_accounts_must_be_assets():
     with pytest.raises(ValidationError):
         Account.objects.create(

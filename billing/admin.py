@@ -73,6 +73,7 @@ class AccountAdmin(admin.ModelAdmin):
     list_display = ("code", "name", "type", "is_cash", "system_role", "is_active")
     list_filter = ("type", "is_cash", "is_active")
     search_fields = ("code", "name")
+    readonly_fields = ("system_role",)
     actions = None
 
     def has_delete_permission(self, request, obj=None):
