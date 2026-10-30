@@ -10,7 +10,6 @@ Usage:
 
 import os
 import re
-import sys
 import tempfile
 
 # Basic Django settings
@@ -19,20 +18,15 @@ from pathlib import Path
 from django.contrib.messages import constants as messages
 from dotenv import load_dotenv
 
+from manage2soar.settings_env import is_testing
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-# Keep test settings independent of the deployment bootstrap.  In
-# particular, migration tests may import this module through a temporary
-# settings module rather than through pytest-django's normal settings path.
-_settings_module = os.getenv("DJANGO_SETTINGS_MODULE", "").lower()
-TESTING = (
-    os.getenv("DJANGO_TESTING", "").lower() in ("true", "1", "yes")
-    or "test" in _settings_module
-    or "pytest" in sys.modules
-    or any(Path(arg).name in {"pytest", "py.test", "test"} for arg in sys.argv)
-)
+# Test detection is limited to explicit configuration and test runner names.
+# It must never enable DEBUG or weaken production security defaults.
+TESTING = is_testing()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
@@ -40,7 +34,7 @@ if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY not set in environment!")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "True" if TESTING else "False").lower() in (
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in (
     "true",
     "1",
     "yes",
@@ -50,16 +44,29 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # Deployment/bootstrap fallback for links when SiteConfiguration is unavailable.
 # Once the database is available, SiteConfiguration.canonical_url is authoritative.
-if DEBUG:
-    SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8001")
-else:
-    SITE_URL = os.getenv("SITE_URL", "")
-    # Validate that SITE_URL is set in production
-    if not SITE_URL:
+SITE_URL = os.getenv("SITE_URL", "")
+if not SITE_URL:
+    if DEBUG or TESTING:
+        SITE_URL = "http://127.0.0.1:8001"
+    else:
+        # Validate that SITE_URL is set in production
         raise ValueError(
             "SITE_URL environment variable must be set in production (DEBUG=False). "
             "Example: SITE_URL=https://manage2soar.yourclub.org"
         )
+
+# Keep trusted origins aligned with the base/GKE settings.  The deployment
+# template always supplies CSRF_TRUSTED_ORIGINS; fall back to SITE_URL so a
+# manually configured single-host install still works without a second source
+# of truth for its public origin.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        SITE_URL or "http://127.0.0.1:8001",
+    ).split(",")
+    if origin.strip()
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -163,6 +170,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = os.getenv("STATIC_ROOT", "/var/www/m2s/static")
 STATICFILES_DIRS = [BASE_DIR / "static"]
+TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
 
 # Media files - LOCAL FILESYSTEM
 MEDIA_URL = "/media/"
@@ -277,6 +285,16 @@ if not DEBUG:
         SECURE_SSL_REDIRECT = True
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
+        # Match the base/GKE production policy.  HSTS is only safe once the
+        # deployment is actually serving HTTPS end to end.
+        SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+        if SECURE_HSTS_SECONDS > 0:
+            SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+            SECURE_HSTS_PRELOAD = True
+    # SameSite cookie settings to prevent CSRF attacks.  Lax keeps ordinary
+    # same-site requests and top-level navigation working.
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"

@@ -16,7 +16,6 @@
 import logging
 import os
 import re
-import sys
 import tempfile
 from pathlib import Path
 
@@ -25,22 +24,12 @@ from django.shortcuts import redirect
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 
+from manage2soar.settings_env import is_testing
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # Define the base directory of the Django project.
 # This calculates the path to the directory containing 'manage.py'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Detect test runners as well as ``manage.py test``.  The first argument to
-# pytest is normally the pytest executable, so checking only argv[1] makes
-# settings depend on how the suite was started (and is especially fragile
-# when a migration runner imports a test settings module).
-_settings_module = os.getenv("DJANGO_SETTINGS_MODULE", "").lower()
-TESTING = (
-    os.getenv("DJANGO_TESTING", "").lower() in ("true", "1", "yes")
-    or "test" in _settings_module
-    or "pytest" in sys.modules
-    or any(Path(arg).name in {"pytest", "py.test", "test"} for arg in sys.argv)
-)
 
 # Load environment variables from the .env file located in the BASE_DIR.
 # This ensures that sensitive information and configuration can be managed
@@ -48,7 +37,14 @@ TESTING = (
 dotenv_path = BASE_DIR / ".env"
 if dotenv_path.exists():
     load_dotenv(dotenv_path)
-elif not TESTING:  # Only log if not in test environment
+
+# Detecting tests must never change DEBUG or other security defaults.  Keep
+# the classification in one place so base and single-host settings agree.
+# Classify after ``load_dotenv`` so an explicit ``DJANGO_TESTING`` in ``.env``
+# takes effect consistently with the single-host module.
+TESTING = is_testing()
+
+if not dotenv_path.exists() and not TESTING:  # Only log outside tests
     logger = logging.getLogger(__name__)
     logger.warning(
         f".env file not found at {dotenv_path}. Relying on system environment variables."
