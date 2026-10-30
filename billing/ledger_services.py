@@ -206,7 +206,9 @@ def post_journal_entry(
 ):
     """Post one balanced, immutable journal entry and return it."""
     _require_club_accounting()
-    if source != JournalEntry.Source.MEMBER_POSTING:
+    # Member postings, and reversals that mirror a member ledger reversal, are
+    # authorized by the member ledger service that created them.
+    if source != JournalEntry.Source.MEMBER_POSTING and member_entry is None:
         require_manual_transaction_access(actor)
     elif actor is None:
         raise ValidationError("A posting actor is required.")

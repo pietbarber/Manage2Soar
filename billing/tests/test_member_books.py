@@ -16,6 +16,7 @@ from billing.ledger_services import (
 )
 from billing.models import Account, BillingPeriod, JournalEntry, LedgerEntry
 from billing.services import (
+    correct_flight_charges,
     get_balance,
     post_flight_charges,
     post_guest_payment_pending,
@@ -230,6 +231,52 @@ def test_flight_charge_splits_revenue(treasurer, member, live):
     assert account_balance(account("420")) == D("15.00")
     assert account_balance(account("430")) == D("0.00")
     assert account_balance(receivables()) == D("35.00")
+    assert verify_books() == []
+
+
+def flight_allocation(flight, member, version, total):
+    return {
+        "member": member,
+        "tow": D(total),
+        "rental": D("0.00"),
+        "instruction": D("0.00"),
+        "total": D(total),
+        "allocation_version": version,
+        "source_key": f"flight:{flight.pk}:member:{member.pk}:v{version}",
+    }
+
+
+def test_member_can_accept_a_split_once_books_are_live(
+    treasurer, member, other_member, live
+):
+    logsheet = Logsheet.objects.create(
+        log_date=TODAY(),
+        airfield=Airfield.objects.create(identifier="KMB2", name="Split Field"),
+        created_by=treasurer,
+    )
+    flight = Flight.objects.create(logsheet=logsheet, pilot=member, flight_type="solo")
+    post_flight_charges(
+        flight=flight,
+        actor=treasurer,
+        allocations=[flight_allocation(flight, member, 1, "40.00")],
+    )
+
+    # The split partner approves the request; they aren't a treasurer.
+    correct_flight_charges(
+        flight=flight,
+        actor=other_member,
+        allocations=[
+            flight_allocation(flight, member, 2, "20.00"),
+            flight_allocation(flight, other_member, 2, "20.00"),
+        ],
+        effective_date=TODAY(),
+        reason="Approved split request #1: shared flight",
+    )
+
+    reversal = JournalEntry.objects.get(source=JournalEntry.Source.REVERSAL)
+    assert reversal.created_by == other_member
+    assert reversal.member_entry.kind == LedgerEntry.Kind.REVERSAL
+    assert account_balance(receivables()) == D("40.00")
     assert verify_books() == []
 
 
