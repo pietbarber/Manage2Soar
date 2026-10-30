@@ -1,6 +1,5 @@
 from django.db import migrations
 
-
 PERMISSIONS = (
     ("billing", "billingperiod", "can_manage_billing", "Can manage member billing"),
     (
@@ -19,22 +18,23 @@ PERMISSIONS = (
 
 
 def grant_treasurer_permissions(apps, schema_editor):
+    db_alias = schema_editor.connection.alias
     Group = apps.get_model("auth", "Group")
     Permission = apps.get_model("auth", "Permission")
     ContentType = apps.get_model("contenttypes", "ContentType")
-    group = Group.objects.filter(name="Treasurer").first()
+    group = Group.objects.using(db_alias).filter(name="Treasurer").first()
     if group is None:
         return
     for app_label, model, codename, name in PERMISSIONS:
-        content_type, _ = ContentType.objects.get_or_create(
+        content_type, _ = ContentType.objects.using(db_alias).get_or_create(
             app_label=app_label, model=model
         )
-        permission, _ = Permission.objects.get_or_create(
+        permission, _ = Permission.objects.using(db_alias).get_or_create(
             content_type=content_type,
             codename=codename,
             defaults={"name": name},
         )
-        group.permissions.add(permission)
+        group.permissions.db_manager(db_alias).add(permission)
 
 
 class Migration(migrations.Migration):

@@ -2,7 +2,6 @@
 
 from django.db import migrations
 
-
 PERMISSION_CODENAME = "view_privileged_contact"
 PRIVILEGED_GROUPS = (
     "Webmasters",
@@ -42,13 +41,15 @@ def revoke_privileged_contact_permission(apps, schema_editor):
     content_type = ContentType.objects.using(db_alias).get(
         app_label="members", model=Member._meta.model_name
     )
-    permission = Permission.objects.using(db_alias).filter(
-        content_type=content_type, codename=PERMISSION_CODENAME
-    ).first()
+    permission = (
+        Permission.objects.using(db_alias)
+        .filter(content_type=content_type, codename=PERMISSION_CODENAME)
+        .first()
+    )
     if permission is None:
         return
     for group in Group.objects.using(db_alias).filter(name__in=PRIVILEGED_GROUPS):
-        group.permissions.remove(permission)
+        group.permissions.db_manager(db_alias).remove(permission)
     permission.delete(using=db_alias)
 
 

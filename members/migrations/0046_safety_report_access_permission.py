@@ -6,6 +6,8 @@ def grant_safety_report_access(apps, schema_editor):
     Member = apps.get_model("members", "Member")
     Group = apps.get_model("auth", "Group")
     Permission = apps.get_model("auth", "Permission")
+    RoleMetadata = apps.get_model("members", "RoleMetadata")
+    MemberRoleAssignment = apps.get_model("members", "MemberRoleAssignment")
 
     content_type, _ = (
         apps.get_model("contenttypes", "ContentType")
@@ -21,8 +23,27 @@ def grant_safety_report_access(apps, schema_editor):
         defaults={"name": "Can access safety reports"},
     )
     group, _ = Group.objects.using(db_alias).get_or_create(name="Safety Officers")
+    RoleMetadata.objects.using(db_alias).get_or_create(
+        group_id=group.pk,
+        defaults={
+            "key": "safety_officers",
+            "display_name": "Safety Officers",
+            "description": "Access to safety reports and safety workflows.",
+            "is_builtin": True,
+            "is_protected": True,
+            "is_system_managed": True,
+            "is_assignable": True,
+            "sort_order": 30,
+        },
+    )
     group.permissions.db_manager(db_alias).add(permission)
     for member in Member.objects.using(db_alias).filter(safety_officer=True):
+        MemberRoleAssignment.objects.using(db_alias).get_or_create(
+            member_id=member.pk,
+            group_id=group.pk,
+            source="legacy",
+            source_key="safety_officer",
+        )
         member.groups.db_manager(db_alias).add(group)
 
 

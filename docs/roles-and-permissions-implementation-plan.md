@@ -181,6 +181,11 @@ compatibility path pending maintainer review. Replacing the Django admin gate
 itself is deferred; first migrate the permission sources and application
 authorization paths.
 
+**Foundation status:** `admin_access` is modeled and seeded for role metadata,
+but the default Django admin entry gate still uses `is_staff`; no production
+path should describe `admin_access` as the active entry authorization until
+that gate is explicitly migrated.
+
 While Django's `is_staff` remains as a temporary technical admin-site gate,
 every staff-derived behavior must be rebound explicitly to the appropriate
 role capability or contextual policy. `is_staff` must not itself authorize an

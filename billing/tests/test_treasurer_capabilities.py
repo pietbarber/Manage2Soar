@@ -54,6 +54,19 @@ def test_inactive_treasurer_is_denied(db):
 
 
 @pytest.mark.django_db
+def test_enabled_treasurer_with_inactive_membership_is_denied(db):
+    departed = Member.objects.create_user(
+        username="departed-capability-treasurer",
+        treasurer=True,
+        is_active=True,
+        membership_status="Non-Member",
+    )
+    assert not has_billing_access(departed)
+    with pytest.raises(ValidationError):
+        require_manual_transaction_access(departed)
+
+
+@pytest.mark.django_db
 def test_superuser_keeps_finance_access(db):
     superuser = Member.objects.create_superuser(
         username="finance-superuser", password="test-password"
