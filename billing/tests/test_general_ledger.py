@@ -1,0 +1,845 @@
+from datetime import date, timedelta
+from decimal import Decimal
+
+import pytest
+from django.core.exceptions import ValidationError
+from django.core.management import CommandError, call_command
+from django.db import DatabaseError, connection, transaction
+from django.urls import reverse
+
+from billing.exceptions import ClubAccountingDisabledError
+from billing.ledger_services import (
+    BankBalance,
+    Line,
+    account_balance,
+    account_balances,
+    account_register,
+    active_opening_entry,
+    go_live,
+    post_cash_transfer,
+    post_expense,
+    post_income,
+    post_journal_entry,
+    post_member_paid_expense,
+    reverse_journal_entry,
+    verify_books,
+)
+from billing.models import Account, BillingPeriod, JournalEntry, JournalLine
+from members.models import Member
+from siteconfig.timezone_utils import get_club_today
+
+
+def today():
+    return get_club_today()
+
+
+@pytest.fixture(autouse=True)
+def club_books(enable_club_accounting):
+    return enable_club_accounting
+
+
+@pytest.fixture
+def treasurer(db):
+    return Member.objects.create_user(
+        username="gl-treasurer",
+        treasurer=True,
+        is_active=True,
+        membership_status="Full Member",
+    )
+
+
+@pytest.fixture
+def member(db):
+    return Member.objects.create_user(
+        username="gl-member", is_active=True, membership_status="Full Member"
+    )
+
+
+@pytest.fixture
+def checking(db):
+    return Account.objects.create(
+        code="101", name="Test Checking", type=Account.Type.ASSET, is_cash=True
+    )
+
+
+@pytest.fixture
+def savings(db):
+    return Account.objects.create(
+        code="102", name="Test Savings", type=Account.Type.ASSET, is_cash=True
+    )
+
+
+def account(code):
+    return Account.objects.get(code=code)
+
+
+def role(name):
+    return Account.objects.get(system_role=name)
+
+
+def test_seeded_chart_has_every_system_role():
+    roles = set(
+        Account.objects.exclude(system_role=None).values_list("system_role", flat=True)
+    )
+    assert roles == set(Account.Role.values)
+    assert list(
+        Account.objects.filter(is_cash=True)
+        .exclude(system_role=Account.Role.UNDEPOSITED_FUNDS)
+        .values_list("code", "name")
+    ) == [("110", "Checking")]
+
+
+def test_expense_debits_expense_and_credits_cash(treasurer, checking, books_started):
+    entry = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("500"),
+        amount="450.00",
+        memo="October field rent",
+        payee="Airport authority",
+        reference="1042",
+    )
+    lines = {line.account.code: line for line in entry.lines.all()}
+    assert lines["500"].debit == Decimal("450.00")
+    assert lines["101"].credit == Decimal("450.00")
+    assert account_balance(checking) == Decimal("-450.00")
+    assert account_balance(account("500")) == Decimal("450.00")
+    assert entry.payee == "Airport authority"
+    assert entry.reference == "1042"
+
+
+def test_income_and_transfer_move_cash(treasurer, checking, savings, books_started):
+    post_income(
+        actor=treasurer,
+        date=today(),
+        deposit_to=checking,
+        income_account=account("460"),
+        amount="1000",
+        memo="Donation",
+    )
+    post_cash_transfer(
+        actor=treasurer,
+        date=today(),
+        from_account=checking,
+        to_account=savings,
+        amount="250",
+        memo="Move to savings",
+    )
+    assert account_balance(checking) == Decimal("750.00")
+    assert account_balance(savings) == Decimal("250.00")
+    assert account_balance(account("460")) == Decimal("1000.00")
+
+
+def test_unbalanced_entry_is_refused(treasurer, checking):
+    with pytest.raises(ValidationError, match="must equal credits"):
+        post_journal_entry(
+            actor=treasurer,
+            date=today(),
+            memo="Bad entry",
+            lines=[
+                Line(account=account("500"), debit=Decimal("10")),
+                Line(account=checking, credit=Decimal("9.99")),
+            ],
+        )
+    assert not JournalEntry.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "lines_factory, message",
+    [
+        (lambda c: [Line(account=c, debit=Decimal("5"))], "at least two lines"),
+        (
+            lambda c: [
+                Line(account=c, debit=Decimal("5"), credit=Decimal("5")),
+                Line(account=account("500"), credit=Decimal("5")),
+            ],
+            "either a debit or a credit",
+        ),
+        (
+            lambda c: [
+                Line(account=c, debit=Decimal("-5")),
+                Line(account=account("500"), credit=Decimal("-5")),
+            ],
+            "cannot be negative",
+        ),
+    ],
+)
+def test_malformed_lines_are_refused(treasurer, checking, lines_factory, message):
+    with pytest.raises(ValidationError, match=message):
+        post_journal_entry(
+            actor=treasurer, date=today(), memo="Bad", lines=lines_factory(checking)
+        )
+
+
+def test_manual_entries_cannot_touch_member_receivables(treasurer, member, checking):
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    with pytest.raises(ValidationError, match="only through member ledgers"):
+        post_journal_entry(
+            actor=treasurer,
+            date=today(),
+            memo="Sneaky",
+            lines=[
+                Line(account=checking, debit=Decimal("5")),
+                Line(account=receivables, credit=Decimal("5"), member=member),
+            ],
+        )
+
+
+def test_only_receivables_lines_name_a_member(treasurer, member, checking):
+    with pytest.raises(ValidationError, match="Only Member Receivables"):
+        post_journal_entry(
+            actor=treasurer,
+            date=today(),
+            memo="Member on cash line",
+            lines=[
+                Line(account=checking, debit=Decimal("5"), member=member),
+                Line(account=account("490"), credit=Decimal("5")),
+            ],
+        )
+
+
+def test_non_treasurer_cannot_post(member, checking):
+    with pytest.raises(ValidationError, match="treasurers and superusers"):
+        post_expense(
+            actor=member,
+            date=today(),
+            paid_from=checking,
+            expense_account=account("500"),
+            amount="1",
+            memo="Nope",
+        )
+
+
+def test_posting_requires_club_accounting(treasurer, checking, enable_club_accounting):
+    enable_club_accounting.club_accounting_enabled = False
+    enable_club_accounting.save(update_fields=["club_accounting_enabled"])
+    with pytest.raises(ClubAccountingDisabledError):
+        post_expense(
+            actor=treasurer,
+            date=today(),
+            paid_from=checking,
+            expense_account=account("500"),
+            amount="1",
+            memo="Off",
+        )
+
+
+def test_future_dates_are_refused(treasurer, checking, books_started):
+    with pytest.raises(ValidationError, match="Future dates"):
+        post_expense(
+            actor=treasurer,
+            date=today() + timedelta(days=1),
+            paid_from=checking,
+            expense_account=account("500"),
+            amount="1",
+            memo="Tomorrow",
+        )
+
+
+def test_entries_must_be_on_or_after_the_start_date(
+    treasurer, checking, enable_club_accounting, books_started
+):
+    enable_club_accounting.club_accounting_start_date = today()
+    enable_club_accounting.save(update_fields=["club_accounting_start_date"])
+    with pytest.raises(ValidationError, match="on or after the books' start date"):
+        post_expense(
+            actor=treasurer,
+            date=today() - timedelta(days=1),
+            paid_from=checking,
+            expense_account=account("500"),
+            amount="1",
+            memo="Before start date",
+        )
+    entry = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("500"),
+        amount="1",
+        memo="On start date",
+    )
+    assert entry.date == today()
+
+
+def test_closed_billing_period_refuses_entries(treasurer, checking, books_started):
+    BillingPeriod.objects.create(year=today().year, month=today().month, is_closed=True)
+    with pytest.raises(ValidationError, match="billing period is closed"):
+        post_expense(
+            actor=treasurer,
+            date=today(),
+            paid_from=checking,
+            expense_account=account("500"),
+            amount="1",
+            memo="Closed",
+        )
+
+
+def test_source_key_is_idempotent(treasurer, checking, books_started):
+    kwargs = dict(
+        actor=treasurer,
+        date=today(),
+        memo="Keyed",
+        source_key="test:keyed",
+        lines=[
+            Line(account=account("500"), debit=Decimal("20")),
+            Line(account=checking, credit=Decimal("20")),
+        ],
+    )
+    first = post_journal_entry(**kwargs)
+    assert post_journal_entry(**kwargs) == first
+    assert JournalEntry.objects.filter(source_key="test:keyed").count() == 1
+
+    kwargs["lines"] = [
+        Line(account=account("500"), debit=Decimal("21")),
+        Line(account=checking, credit=Decimal("21")),
+    ]
+    with pytest.raises(ValidationError, match="different journal entry"):
+        post_journal_entry(**kwargs)
+
+
+def test_reversal_mirrors_lines_and_cannot_repeat(treasurer, checking, books_started):
+    original = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("510"),
+        amount="300",
+        memo="Wrong amount",
+    )
+    reversal = reverse_journal_entry(
+        entry=original, actor=treasurer, date=today(), reason="Typo"
+    )
+    assert reversal.source == JournalEntry.Source.REVERSAL
+    assert reversal.reverses == original
+    assert account_balance(checking) == Decimal("0.00")
+    assert account_balance(account("510")) == Decimal("0.00")
+    with pytest.raises(ValidationError, match="already been reversed"):
+        reverse_journal_entry(entry=original, actor=treasurer, date=today(), reason="x")
+    with pytest.raises(ValidationError, match="cannot itself be reversed"):
+        reverse_journal_entry(entry=reversal, actor=treasurer, date=today(), reason="x")
+
+
+def test_reversal_cannot_predate_original(treasurer, checking, books_started):
+    original = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("510"),
+        amount="1",
+        memo="Today",
+    )
+    with pytest.raises(ValidationError, match="before the original"):
+        reverse_journal_entry(
+            entry=original,
+            actor=treasurer,
+            date=today() - timedelta(days=1),
+            reason="Backdated",
+        )
+
+
+def test_journal_records_are_immutable_through_the_orm(
+    treasurer, checking, books_started
+):
+    entry = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("500"),
+        amount="5",
+        memo="Immutable",
+    )
+    line = entry.lines.first()
+    with pytest.raises(ValidationError):
+        entry.save()
+    with pytest.raises(ValidationError):
+        entry.delete()
+    with pytest.raises(ValidationError):
+        line.save()
+    with pytest.raises(ValidationError):
+        line.delete()
+    with pytest.raises(ValidationError):
+        JournalLine.objects.bulk_create([JournalLine(entry=entry, account=checking)])
+
+
+def test_journal_entries_cannot_be_created_outside_the_service(treasurer):
+    with pytest.raises(ValidationError, match="ledger service"):
+        JournalEntry(
+            date=today(),
+            memo="Direct",
+            source=JournalEntry.Source.MANUAL,
+            created_by=treasurer,
+        ).save()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_database_triggers_block_journal_updates_and_deletes(books_started):
+    treasurer = Member.objects.create_user(
+        username="gl-trigger-treasurer",
+        treasurer=True,
+        is_active=True,
+        membership_status="Full Member",
+    )
+    checking = Account.objects.create(
+        code="105", name="Trigger Checking", type=Account.Type.ASSET, is_cash=True
+    )
+    entry = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=Account.objects.get(code="500"),
+        amount="5",
+        memo="Trigger",
+    )
+    for sql, params in (
+        ("UPDATE billing_journalentry SET memo = %s WHERE id = %s", ["x", entry.pk]),
+        ("DELETE FROM billing_journalentry WHERE id = %s", [entry.pk]),
+        (
+            "UPDATE billing_journalline SET debit = %s WHERE entry_id = %s",
+            [1, entry.pk],
+        ),
+        ("DELETE FROM billing_journalline WHERE entry_id = %s", [entry.pk]),
+    ):
+        with pytest.raises(DatabaseError):
+            with transaction.atomic(), connection.cursor() as cursor:
+                cursor.execute(sql, params)
+
+
+def test_system_accounts_are_protected():
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    with pytest.raises(ValidationError):
+        receivables.delete()
+    receivables.type = Account.Type.LIABILITY
+    with pytest.raises(ValidationError, match="role needs"):
+        receivables.save()
+    general_fund = role(Account.Role.GENERAL_FUND)
+    general_fund.is_active = False
+    with pytest.raises(ValidationError, match="cannot be deactivated"):
+        general_fund.save()
+
+
+def test_account_admin_delete_requires_delete_permission(client, checking):
+    instructor = Member.objects.create_user(
+        username="gl-instructor",
+        instructor=True,
+        is_active=True,
+        membership_status="Full Member",
+    )
+    assert instructor.is_staff
+    delete_url = reverse("admin:billing_account_delete", args=[checking.pk])
+
+    client.force_login(instructor)
+    assert client.post(delete_url, {"post": "yes"}).status_code == 403
+    assert Account.objects.filter(pk=checking.pk).exists()
+
+    superuser = Member.objects.create_superuser(username="gl-admin", password="x")
+    client.force_login(superuser)
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    receivables_url = reverse("admin:billing_account_delete", args=[receivables.pk])
+    assert client.post(receivables_url, {"post": "yes"}).status_code == 403
+    assert client.post(delete_url, {"post": "yes"}).status_code == 302
+    assert not Account.objects.filter(pk=checking.pk).exists()
+
+
+def test_journal_entry_admin_is_view_only(client, treasurer, checking, books_started):
+    entry = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("520"),
+        amount="5",
+        memo="Fuel",
+    )
+    client.force_login(
+        Member.objects.create_superuser(username="gl-viewer", password="x")
+    )
+    url = reverse("admin:billing_journalentry_change", args=[entry.pk])
+
+    assert client.get(url).status_code == 200
+    assert client.post(url, {"_save": "Save"}).status_code == 403
+
+
+def test_account_type_is_locked_once_posted(treasurer, checking, books_started):
+    post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("520"),
+        amount="5",
+        memo="Fuel",
+    )
+    fuel = account("520")
+    fuel.type = Account.Type.INCOME
+    with pytest.raises(ValidationError, match="cannot change type"):
+        fuel.save()
+
+
+def test_system_accounts_keep_their_role(client):
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    receivables.system_role = None
+    with pytest.raises(ValidationError, match="keep their role"):
+        receivables.save()
+
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    client.force_login(
+        Member.objects.create_superuser(username="gl-role-admin", password="x")
+    )
+    response = client.post(
+        reverse("admin:billing_account_change", args=[receivables.pk]),
+        {
+            "code": receivables.code,
+            "name": receivables.name,
+            "type": receivables.type,
+            "is_active": "on",
+            "description": "",
+            "system_role": "",
+        },
+    )
+    assert response.status_code == 302
+    receivables.refresh_from_db()
+    assert receivables.system_role == Account.Role.MEMBER_RECEIVABLES
+
+
+def test_cash_accounts_must_be_assets():
+    with pytest.raises(ValidationError):
+        Account.objects.create(
+            code="299",
+            name="Cash liability",
+            type=Account.Type.LIABILITY,
+            is_cash=True,
+        )
+
+
+def test_trial_balance_and_register(treasurer, checking, savings, books_started):
+    post_income(
+        actor=treasurer,
+        date=today() - timedelta(days=2),
+        deposit_to=checking,
+        income_account=account("400"),
+        amount="500",
+        memo="Dues",
+    )
+    post_expense(
+        actor=treasurer,
+        date=today() - timedelta(days=1),
+        paid_from=checking,
+        expense_account=account("530"),
+        amount="120",
+        memo="Insurance",
+    )
+    post_cash_transfer(
+        actor=treasurer,
+        date=today(),
+        from_account=checking,
+        to_account=savings,
+        amount="80",
+        memo="Sweep",
+    )
+    rows = account_balances()
+    assert sum(row["debit"] for row in rows) == sum(row["credit"] for row in rows)
+    debit_normal = sum(row["balance"] for row in rows if row["account"].is_debit_normal)
+    credit_normal = sum(
+        row["balance"] for row in rows if not row["account"].is_debit_normal
+    )
+    assert debit_normal == credit_normal
+
+    register = account_register(checking, start=today() - timedelta(days=1))
+    assert register["opening_balance"] == Decimal("500.00")
+    assert [row["balance"] for row in register["rows"]] == [
+        Decimal("380.00"),
+        Decimal("300.00"),
+    ]
+    assert register["rows"][1]["other_accounts"] == ["Test Savings"]
+    assert verify_books() == []
+
+
+def test_verify_books_command(treasurer, checking, books_started):
+    post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("550"),
+        amount="3",
+        memo="Fee",
+    )
+    call_command("verify_books")
+
+
+def test_verify_books_command_fails_on_problems(monkeypatch):
+    monkeypatch.setattr(
+        "billing.management.commands.verify_books.verify_books",
+        lambda: ["Journal entry #1 does not balance."],
+    )
+    with pytest.raises(CommandError, match="1 problem"):
+        call_command("verify_books")
+
+
+def test_siteconfig_requires_billing_for_club_accounting(enable_club_accounting):
+    enable_club_accounting.billing_app_enabled = False
+    with pytest.raises(ValidationError) as excinfo:
+        enable_club_accounting.full_clean()
+    assert "club_accounting_enabled" in excinfo.value.message_dict
+
+
+def test_opening_source_must_use_start_date(
+    treasurer, checking, enable_club_accounting
+):
+    start = (
+        date(today().year, 1, 1) if today().month > 1 else today() - timedelta(days=1)
+    )
+    enable_club_accounting.club_accounting_start_date = start
+    enable_club_accounting.save(update_fields=["club_accounting_start_date"])
+    lines = [
+        Line(account=checking, debit=Decimal("100")),
+        Line(account=role(Account.Role.OPENING_BALANCE_EQUITY), credit=Decimal("100")),
+    ]
+    with pytest.raises(ValidationError, match="dated on the books' start date"):
+        post_journal_entry(
+            actor=treasurer,
+            date=today(),
+            memo="Opening",
+            lines=lines,
+            source=JournalEntry.Source.OPENING,
+        )
+    entry = post_journal_entry(
+        actor=treasurer,
+        date=start,
+        memo="Opening",
+        lines=lines,
+        source=JournalEntry.Source.OPENING,
+    )
+    with pytest.raises(ValidationError, match="Finances Setup wizard"):
+        reverse_journal_entry(entry=entry, actor=treasurer, date=today(), reason="x")
+
+
+def bank(code="110", amount="0", name=None):
+    account = Account.objects.get(code=code)
+    return BankBalance(account=account, name=name or account.name, amount=amount)
+
+
+def test_go_live_posts_opening_bank_balances(treasurer, enable_club_accounting):
+    start = today() - timedelta(days=1)
+    entry = go_live(
+        actor=treasurer,
+        start_date=start,
+        rows=[
+            bank(amount="5000.00", name="Wells Fargo Checking"),
+            BankBalance(account=None, name="Wells Fargo Savings", amount="2500"),
+        ],
+    )
+
+    enable_club_accounting.refresh_from_db()
+    assert enable_club_accounting.club_accounting_start_date == start
+    assert entry.source == JournalEntry.Source.OPENING
+    assert entry.date == start
+    checking = account("110")
+    savings = account("111")
+    assert checking.name == "Wells Fargo Checking"
+    assert savings.name == "Wells Fargo Savings"
+    assert savings.is_cash and savings.type == Account.Type.ASSET
+    assert account_balance(checking) == Decimal("5000.00")
+    assert account_balance(savings) == Decimal("2500.00")
+    assert account_balance(role(Account.Role.GENERAL_FUND)) == Decimal("7500.00")
+    assert account_balance(role(Account.Role.OPENING_BALANCE_EQUITY)) == Decimal("0.00")
+    assert verify_books() == []
+
+
+def test_go_live_rerun_replaces_the_opening_entry(treasurer, enable_club_accounting):
+    first = go_live(
+        actor=treasurer,
+        start_date=today() - timedelta(days=1),
+        rows=[bank(amount="5000")],
+    )
+    second_start = today() - timedelta(days=2)
+    second = go_live(
+        actor=treasurer, start_date=second_start, rows=[bank(amount="4800")]
+    )
+
+    first.refresh_from_db()
+    assert first.reversal.source == JournalEntry.Source.REVERSAL
+    assert first.reversal.date == first.date
+    assert active_opening_entry() == second
+    enable_club_accounting.refresh_from_db()
+    assert enable_club_accounting.club_accounting_start_date == second_start
+    assert account_balance(account("110")) == Decimal("4800.00")
+    assert account_balance(role(Account.Role.GENERAL_FUND)) == Decimal("4800.00")
+    assert verify_books() == []
+
+
+def test_go_live_with_unchanged_balances_posts_nothing(treasurer):
+    start = today() - timedelta(days=1)
+    first = go_live(actor=treasurer, start_date=start, rows=[bank(amount="5000")])
+    again = go_live(actor=treasurer, start_date=start, rows=[bank(amount="5000.00")])
+    assert again == first
+    assert JournalEntry.objects.count() == 1
+
+
+def test_go_live_locks_once_other_entries_exist(treasurer):
+    go_live(
+        actor=treasurer,
+        start_date=today() - timedelta(days=1),
+        rows=[bank(amount="5000")],
+    )
+    post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=account("110"),
+        expense_account=account("500"),
+        amount="100",
+        memo="Field rent",
+    )
+    with pytest.raises(ValidationError, match="general journal entry"):
+        go_live(actor=treasurer, start_date=today(), rows=[bank(amount="4900")])
+
+
+def test_go_live_overdrawn_account_debits_general_fund(treasurer):
+    go_live(
+        actor=treasurer,
+        start_date=today() - timedelta(days=1),
+        rows=[bank(amount="-25.50")],
+    )
+    assert account_balance(account("110")) == Decimal("-25.50")
+    assert account_balance(role(Account.Role.GENERAL_FUND)) == Decimal("-25.50")
+    assert verify_books() == []
+
+
+def test_go_live_refuses_bad_input(treasurer):
+    with pytest.raises(ValidationError, match="at least one bank balance"):
+        go_live(actor=treasurer, start_date=today(), rows=[bank(amount="0")])
+    with pytest.raises(ValidationError, match="Future dates"):
+        go_live(
+            actor=treasurer,
+            start_date=today() + timedelta(days=1),
+            rows=[bank(amount="10")],
+        )
+    with pytest.raises(ValidationError, match="Undeposited Funds"):
+        go_live(actor=treasurer, start_date=today(), rows=[bank("100", amount="10")])
+    assert not JournalEntry.objects.exists()
+
+
+def test_entries_wait_for_finances_setup(treasurer, checking):
+    with pytest.raises(ValidationError, match="Finish Finances Setup"):
+        post_expense(
+            actor=treasurer,
+            date=today(),
+            paid_from=checking,
+            expense_account=account("520"),
+            amount="5",
+            memo="Fuel",
+        )
+    assert not JournalEntry.objects.exists()
+
+    # The refused entry didn't lock Finances Setup out.
+    go_live(actor=treasurer, start_date=today(), rows=[bank(amount="10")])
+    assert active_opening_entry() is not None
+
+
+def test_go_live_requires_treasurer(member):
+    with pytest.raises(ValidationError, match="Only treasurers"):
+        go_live(actor=member, start_date=today(), rows=[bank(amount="10")])
+
+
+def test_only_one_opening_entry_at_a_time(treasurer):
+    start = today() - timedelta(days=1)
+    go_live(actor=treasurer, start_date=start, rows=[bank(amount="10")])
+    with pytest.raises(ValidationError, match="already have an opening entry"):
+        post_journal_entry(
+            actor=treasurer,
+            date=start,
+            memo="Second opening",
+            lines=[
+                Line(account=account("110"), debit=Decimal("5")),
+                Line(account=role(Account.Role.GENERAL_FUND), credit=Decimal("5")),
+            ],
+            source=JournalEntry.Source.OPENING,
+        )
+
+
+@pytest.fixture
+def live_books(treasurer):
+    """Member-paid expenses post only once Finances Setup has started the books."""
+    return go_live(actor=treasurer, start_date=today(), rows=[bank(amount="1000")])
+
+
+def member_paid_rent(treasurer, member, amount="700.00"):
+    return post_member_paid_expense(
+        actor=treasurer,
+        date=today(),
+        member=member,
+        expense_account=account("500"),
+        amount=amount,
+        memo="Field rent paid in cash to landowner",
+    )
+
+
+def test_member_paid_expense_credits_member_and_books(treasurer, member, live_books):
+    from billing.services import get_balance
+
+    entry = member_paid_rent(treasurer, member)
+
+    assert entry.source == JournalEntry.Source.MEMBER_POSTING
+    assert entry.member_entry.kind == "credit"
+    assert entry.member_entry.ledger.member == member
+    assert get_balance(entry.member_entry.ledger) == Decimal("-700.00")
+    receivables = role(Account.Role.MEMBER_RECEIVABLES)
+    assert account_balance(account("500")) == Decimal("700.00")
+    assert account_balance(receivables) == Decimal("-700.00")
+    line = entry.lines.get(account=receivables)
+    assert line.member == member and line.credit == Decimal("700.00")
+    assert verify_books() == []
+
+
+def test_member_ledger_reversal_also_reverses_the_books(treasurer, member, live_books):
+    from billing.services import get_balance, reverse_manual_entry
+
+    entry = member_paid_rent(treasurer, member)
+    member_reversal = reverse_manual_entry(
+        entry=entry.member_entry,
+        actor=treasurer,
+        effective_date=today(),
+        reason="Entered twice",
+    )
+
+    entry.refresh_from_db()
+    assert entry.reversal.member_entry == member_reversal
+    assert get_balance(entry.member_entry.ledger) == Decimal("0.00")
+    assert account_balance(account("500")) == Decimal("0.00")
+    assert account_balance(role(Account.Role.MEMBER_RECEIVABLES)) == Decimal("0.00")
+    with pytest.raises(ValidationError, match="member's ledger"):
+        reverse_journal_entry(entry=entry, actor=treasurer, date=today(), reason="x")
+
+
+def test_member_paid_expense_is_all_or_nothing(treasurer, member, live_books):
+    from billing.models import LedgerEntry
+
+    BillingPeriod.objects.update_or_create(
+        year=today().year, month=today().month, defaults={"is_closed": True}
+    )
+    with pytest.raises(ValidationError, match="billing period is closed"):
+        member_paid_rent(treasurer, member)
+    assert not LedgerEntry.objects.exists()
+    assert not JournalEntry.objects.filter(member_entry__isnull=False).exists()
+
+
+def test_member_paid_expense_waits_for_go_live(treasurer, member):
+    from billing.models import LedgerEntry
+
+    with pytest.raises(ValidationError, match="Finances Setup"):
+        member_paid_rent(treasurer, member)
+    assert not LedgerEntry.objects.exists()
+
+
+def test_member_paid_expense_requires_expense_and_treasurer(
+    treasurer, member, live_books
+):
+    with pytest.raises(ValidationError, match="expense account"):
+        post_member_paid_expense(
+            actor=treasurer,
+            date=today(),
+            member=member,
+            expense_account=account("400"),
+            amount="10",
+            memo="Wrong category",
+        )
+    with pytest.raises(ValidationError, match="Only treasurers"):
+        member_paid_rent(member, member)

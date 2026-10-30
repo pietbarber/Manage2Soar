@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, close_old_connections, connection, transaction
+from django.urls import reverse
 
 from billing.models import FlightChargeSnapshot, LedgerEntry
 from billing.services import (
@@ -437,6 +438,43 @@ def test_flight_charge_posts_immutable_snapshot_once(member, actor, db):
     with pytest.raises(DatabaseError):
         with transaction.atomic():
             FlightChargeSnapshot.objects.filter(pk=snapshot.pk).delete()
+
+
+def test_posted_records_are_view_only_in_admin(client, member, actor):
+    flight = Flight.objects.create(
+        logsheet=Logsheet.objects.create(
+            log_date=date.today(),
+            airfield=Airfield.objects.create(identifier="KADM", name="Admin Field"),
+            created_by=actor,
+        ),
+        pilot=member,
+        flight_type="solo",
+    )
+    (entry,) = post_flight_charges(
+        flight=flight,
+        actor=actor,
+        allocations=[
+            {
+                "member": member,
+                "tow": Decimal("20.00"),
+                "rental": Decimal("15.00"),
+                "instruction": Decimal("0.00"),
+                "total": Decimal("35.00"),
+                "source_key": f"flight:{flight.pk}:member:{member.pk}:v1",
+            }
+        ],
+    )
+    snapshot = FlightChargeSnapshot.objects.get(flight=flight)
+    client.force_login(Member.objects.create_superuser(username="admin", password="x"))
+
+    for model, record in (("ledgerentry", entry), ("flightchargesnapshot", snapshot)):
+        change_url = reverse(f"admin:billing_{model}_change", args=[record.pk])
+        assert client.get(change_url).status_code == 200
+        assert client.post(change_url, {"_save": "Save"}).status_code == 403
+        assert client.get(reverse(f"admin:billing_{model}_add")).status_code == 403
+        delete_url = reverse(f"admin:billing_{model}_delete", args=[record.pk])
+        assert client.post(delete_url, {"post": "yes"}).status_code == 403
+        assert type(record).objects.filter(pk=record.pk).exists()
 
 
 @pytest.mark.django_db(transaction=True)
