@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from duty_roster.models import DutyRoleDefinition
+from members.authorization import has_admin_model_permission
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -238,19 +239,31 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
     inlines = [DutyRoleDefinitionInline]
     search_fields = ("club_name", "domain_name", "club_abbreviation")
 
+    def has_module_permission(self, request):
+        return has_admin_model_permission(
+            request.user, "siteconfig", "siteconfiguration", "view"
+        )
+
+    def has_view_permission(self, request, obj=None):
+        return has_admin_model_permission(
+            request.user, "siteconfig", "siteconfiguration", "view"
+        )
+
     def has_add_permission(self, request):
         # Only allow adding if no config exists
-        return not SiteConfiguration.objects.exists()
+        return not SiteConfiguration.objects.exists() and has_admin_model_permission(
+            request.user, "siteconfig", "siteconfiguration", "add"
+        )
 
     def has_delete_permission(self, request, obj=None):
         # Prevent deletion
         return False
 
     def has_change_permission(self, request, obj=None):
-        # Only allow Webmaster (superuser or group) to edit
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        # Model permission is authoritative, with the legacy webmaster grant
+        # retained during the transition.
+        return has_admin_model_permission(
+            request.user, "siteconfig", "siteconfiguration", "change"
         )
 
     readonly_fields = ("visiting_pilot_token", "visiting_pilot_token_created")
@@ -619,24 +632,25 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to edit membership statuses
         return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+            has_admin_model_permission(
+                request.user, "siteconfig", "membershipstatus", "change"
+            )
             or request.user.groups.filter(name="Member Managers").exists()
         )
 
     def has_add_permission(self, request):
         # Only allow Webmaster or superuser to add membership statuses
         return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+            has_admin_model_permission(
+                request.user, "siteconfig", "membershipstatus", "add"
+            )
             or request.user.groups.filter(name="Member Managers").exists()
         )
 
     def has_delete_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to delete membership statuses
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return has_admin_model_permission(
+            request.user, "siteconfig", "membershipstatus", "delete"
         )
 
     def delete_model(self, request, obj):
@@ -922,21 +936,20 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
             '<span title="Click list name to see subscribers">{}</span>', count
         )
 
-    def _has_webmaster_permission(self, request):
+    def _has_webmaster_permission(self, request, action="change"):
         """Check if user has webmaster-level permission."""
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return has_admin_model_permission(
+            request.user, "siteconfig", "mailinglist", action
         )
 
     def has_change_permission(self, request, obj=None):
-        return self._has_webmaster_permission(request)
+        return self._has_webmaster_permission(request, "change")
 
     def has_add_permission(self, request):
-        return self._has_webmaster_permission(request)
+        return self._has_webmaster_permission(request, "add")
 
     def has_delete_permission(self, request, obj=None):
-        return self._has_webmaster_permission(request)
+        return self._has_webmaster_permission(request, "delete")
 
     admin_helper_message = (
         "Mailing Lists: Configure email lists for your club's mail server. "

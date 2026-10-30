@@ -4,7 +4,10 @@ from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 
@@ -21,6 +24,45 @@ from siteconfig.models import (
 from utils.favicon import PWA_CLUB_ICON_NAME
 
 User = get_user_model()
+
+
+@pytest.mark.django_db
+def test_siteconfig_admin_accepts_webmaster_compatibility_and_model_grants():
+    from siteconfig.admin import SiteConfigurationAdmin
+
+    admin_obj = SiteConfigurationAdmin(SiteConfiguration, AdminSite())
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+
+    flag_user = User.objects.create_user(
+        username="siteconfig-flag", is_staff=True, webmaster=True
+    )
+    group_user = User.objects.create_user(username="siteconfig-group", is_staff=True)
+    group_user.groups.add(Group.objects.get(name="Webmasters"))
+    model_user = User.objects.create_user(username="siteconfig-model", is_staff=True)
+    User.objects.filter(pk=model_user.pk).update(is_active=True)
+    model_user.refresh_from_db()
+    content_type = ContentType.objects.get_for_model(SiteConfiguration)
+    model_user.user_permissions.add(
+        *Permission.objects.filter(
+            content_type=content_type,
+            codename__in=["view_siteconfiguration", "change_siteconfiguration"],
+        )
+    )
+    ordinary_staff = User.objects.create_user(
+        username="siteconfig-staff", is_staff=True
+    )
+    superuser = User.objects.create_superuser(
+        username="siteconfig-superuser", password="password"
+    )
+
+    for user in (flag_user, group_user, model_user, superuser):
+        request = type("Request", (), {"user": user})()
+        assert admin_obj.has_module_permission(request)
+        assert admin_obj.has_change_permission(request, config)
+    request = type("Request", (), {"user": ordinary_staff})()
+    assert not admin_obj.has_change_permission(request, config)
 
 
 @pytest.mark.parametrize(
