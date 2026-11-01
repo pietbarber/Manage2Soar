@@ -117,7 +117,7 @@ def _validate_date(entry_date, *, source, reverses=None):
         )
 
 
-def _normalize_lines(lines, *, allow_receivables):
+def _normalize_lines(lines, *, allow_receivables, allow_inactive=False):
     normalized = []
     for line in lines:
         debit = Decimal(str(line.debit or 0))
@@ -129,7 +129,7 @@ def _normalize_lines(lines, *, allow_receivables):
         debit = _money(debit) if debit else ZERO
         credit = _money(credit) if credit else ZERO
         account = line.account
-        if not account.is_active:
+        if not account.is_active and not allow_inactive:
             raise ValidationError(f"{account} is inactive.")
         is_receivables = account.system_role == Account.Role.MEMBER_RECEIVABLES
         if is_receivables:
@@ -173,6 +173,20 @@ def _fingerprint(lines):
     )
 
 
+def _mirrors(lines, original):
+    """True when lines are the original entry's lines with debit and credit swapped."""
+    flipped = [
+        Line(
+            account=line.account,
+            debit=line.credit,
+            credit=line.debit,
+            member=line.member,
+        )
+        for line in original.lines.select_related("account", "member")
+    ]
+    return _fingerprint(lines) == _fingerprint(flipped)
+
+
 def _existing_matches(existing, *, entry_date, lines):
     existing_lines = [
         Line(
@@ -213,7 +227,13 @@ def post_journal_entry(
     elif actor is None:
         raise ValidationError("A posting actor is required.")
     memo = require_audit_text(memo, "memo")
-    lines = _normalize_lines(lines, allow_receivables=allow_receivables)
+    # A reversal mirrors its original's lines, even if an account has since
+    # been deactivated.
+    lines = _normalize_lines(
+        lines, allow_receivables=allow_receivables, allow_inactive=reverses is not None
+    )
+    if reverses is not None and not _mirrors(lines, reverses):
+        raise ValidationError("A reversal must mirror the original entry's lines.")
     source_key = (source_key or "").strip() or None
     if source_key:
         existing = JournalEntry.objects.filter(source_key=source_key).first()

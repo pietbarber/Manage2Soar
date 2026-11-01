@@ -320,6 +320,29 @@ def test_reversal_mirrors_lines_and_cannot_repeat(treasurer, checking, books_sta
         reverse_journal_entry(entry=reversal, actor=treasurer, date=today(), reason="x")
 
 
+def test_reversal_must_mirror_the_original(treasurer, checking, books_started):
+    original = post_expense(
+        actor=treasurer,
+        date=today(),
+        paid_from=checking,
+        expense_account=account("510"),
+        amount="300",
+        memo="Original",
+    )
+    with pytest.raises(ValidationError, match="must mirror"):
+        post_journal_entry(
+            actor=treasurer,
+            date=today(),
+            memo="Not a mirror",
+            source=JournalEntry.Source.REVERSAL,
+            reverses=original,
+            lines=[
+                Line(account=checking, debit=Decimal("200")),
+                Line(account=account("510"), credit=Decimal("200")),
+            ],
+        )
+
+
 def test_reversal_cannot_predate_original(treasurer, checking, books_started):
     original = post_expense(
         actor=treasurer,

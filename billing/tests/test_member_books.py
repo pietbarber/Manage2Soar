@@ -12,6 +12,8 @@ from billing.ledger_services import (
     BankBalance,
     account_balance,
     go_live,
+    post_expense,
+    reverse_journal_entry,
     verify_books,
 )
 from billing.models import Account, BillingPeriod, JournalEntry, LedgerEntry
@@ -353,6 +355,43 @@ def test_retrying_a_charge_counted_in_the_opening_posts_nothing(treasurer, membe
     assert not JournalEntry.objects.filter(member_entry__isnull=False).exists()
     assert account_balance(receivables()) == D("60.00")
     assert verify_books() == []
+
+
+def test_reversals_work_after_their_bank_account_is_deactivated(
+    treasurer, member, live
+):
+    bank = Account.objects.create(
+        code="115", name="Old Bank", type=Account.Type.ASSET, is_cash=True
+    )
+    expense = post_expense(
+        actor=treasurer,
+        date=TODAY(),
+        paid_from=bank,
+        expense_account=account("520"),
+        amount="5",
+        memo="Fuel",
+    )
+    deposit = payment(member, treasurer, "100", book_account=bank)
+    bank.is_active = False
+    bank.save()
+
+    reverse_journal_entry(entry=expense, actor=treasurer, date=TODAY(), reason="Wrong")
+    reverse_manual_entry(
+        entry=deposit, actor=treasurer, effective_date=TODAY(), reason="Bounced"
+    )
+
+    assert account_balance(bank) == D("0.00")
+    assert verify_books() == []
+    # New entries still can't use the inactive account.
+    with pytest.raises(ValidationError, match="is inactive"):
+        post_expense(
+            actor=treasurer,
+            date=TODAY(),
+            paid_from=bank,
+            expense_account=account("520"),
+            amount="5",
+            memo="Fuel",
+        )
 
 
 def test_closed_month_refuses_member_entry_once_books_are_live(treasurer, member, live):
