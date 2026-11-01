@@ -282,6 +282,8 @@ class AccountForm(forms.ModelForm):
             )
         if instance.system_role:
             self.fields["is_active"].disabled = True
+        if instance.system_role == Account.Role.UNDEPOSITED_FUNDS:
+            self.fields["is_cash"].disabled = True
 
 
 class GoLiveForm(forms.Form):

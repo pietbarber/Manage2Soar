@@ -439,6 +439,8 @@ class Account(models.Model):
             raise ValidationError("System accounts cannot be deactivated.")
         if self.system_role == self.Role.MEMBER_RECEIVABLES and self.is_cash:
             raise ValidationError("Member receivables cannot be a cash account.")
+        if self.system_role == self.Role.UNDEPOSITED_FUNDS and not self.is_cash:
+            raise ValidationError("Undeposited Funds must stay a cash account.")
         if self.pk:
             previous = (
                 Account.objects.filter(pk=self.pk).values("type", "system_role").first()

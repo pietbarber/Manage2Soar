@@ -3,6 +3,7 @@ from datetime import timedelta
 from io import StringIO
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 
 from billing.ledger_services import account_balance, post_expense
@@ -306,6 +307,24 @@ def test_system_account_type_is_locked_in_form(client, treasurer):
     assert receivables.type == Account.Type.ASSET
     assert receivables.is_active
     assert receivables.name == "Receivables"
+
+
+def test_undeposited_funds_stays_a_cash_account(client, treasurer):
+    funds = Account.objects.get(system_role=Account.Role.UNDEPOSITED_FUNDS)
+    client.force_login(treasurer)
+    response = client.post(
+        reverse("billing:account_edit", args=[funds.pk]),
+        {"code": funds.code, "name": "Deposits to make", "description": ""},
+    )
+    assert response.status_code == 302
+    funds.refresh_from_db()
+    assert funds.is_cash
+    assert funds.name == "Deposits to make"
+
+    # Other edit paths, such as Django admin, hit the model rule.
+    funds.is_cash = False
+    with pytest.raises(ValidationError, match="must stay a cash account"):
+        funds.save()
 
 
 def test_club_finances_nav_for_treasurer_only(client, member, treasurer, club_books):
