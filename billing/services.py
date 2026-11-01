@@ -51,6 +51,17 @@ def _post_to_books(entry, *, actor, account=None, reference=""):
     return post_member_entry(entry, actor=actor, account=account, reference=reference)
 
 
+def _lock_books():
+    """Queue behind Finances Setup and other club-books writes.
+
+    Taken before any other lock or new entry, so a member entry is either
+    counted in the opening entry or posted after it.
+    """
+    from billing.ledger_services import lock_books
+
+    lock_books()
+
+
 def get_or_create_ledger(member):
     _require_billing_enabled()
     try:
@@ -151,6 +162,7 @@ def post_entry(
     transaction; ``book_account`` overrides the default other side.
     """
     _require_billing_enabled()
+    _lock_books()
     if actor is None:
         raise ValidationError("A posting actor is required.")
     if effective_date > _club_today():
@@ -293,6 +305,7 @@ def post_flight_charges(*, flight, actor, allocations, correction_group=None):
 def correct_flight_charges(*, flight, actor, allocations, effective_date, reason):
     """Replace every active charge for one flight with a complete allocation."""
     _require_billing_enabled()
+    _lock_books()
     if not allocations:
         raise ValidationError("A correction requires replacement allocations.")
     versions = {allocation.get("allocation_version") for allocation in allocations}
@@ -461,6 +474,7 @@ def remit_guest_payment(
 ):
     """Clear a guest payment in full after treasurer confirmation."""
     require_manual_transaction_access(actor)
+    _lock_books()
     original = LedgerEntry.objects.select_for_update().get(pk=entry.pk)
     if original.kind != LedgerEntry.Kind.GUEST_PAYMENT_PENDING:
         raise ValidationError("Only pending guest payments can be remitted.")
@@ -552,6 +566,7 @@ def post_opening_balance(
     *, member, actor, amount, effect, effective_date, description, reason
 ):
     require_manual_transaction_access(actor)
+    _lock_books()
     description = require_audit_text(description, "member description")
     reason = require_audit_text(reason, "reason")
     if effect not in LedgerEntry.Effect.values:
@@ -601,6 +616,7 @@ def override_opening_balance(
 ):
     """Adjust an account's opening balance without changing posted history."""
     require_manual_transaction_access(actor)
+    _lock_books()
     description = require_audit_text(description, "member description")
     reason = require_audit_text(reason, "reason")
     if len(description) > OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION:
@@ -676,6 +692,7 @@ def reverse_manual_entry(*, entry, actor, effective_date, reason):
 @transaction.atomic
 def reverse_entry(*, entry, actor, effective_date, reason, correction_group=None):
     _require_billing_enabled()
+    _lock_books()
     if actor is None:
         raise ValidationError("A reversal actor is required.")
     if effective_date > _club_today():

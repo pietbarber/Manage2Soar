@@ -102,6 +102,16 @@ and SQLite, reject `UPDATE` and `DELETE`.
 A repeated `source_key` with the same date and lines returns the existing
 entry; a different payload raises.
 
+Concurrent writes take turns on the **books lock** (`lock_books()`, a row
+lock on Site Configuration). `post_journal_entry`, `post_member_entry`,
+`reverse_journal_entry`, Finances Setup, and the member ledger services that
+save entries all take it before any other billing lock, so locks are always
+taken in the same order: books lock, member ledger rows, journal entries,
+billing period. Each write holds it for a few milliseconds. It does nothing
+while Club Finances is off. This keeps an expense from slipping past a Finances
+Setup rerun, makes identical submissions return one entry, and means a member
+entry is either counted in the opening entry or posted after it.
+
 Reversals:
 - Only manual entries can be reversed here.
 - Member postings are reversed from the member's ledger. Reversing a member

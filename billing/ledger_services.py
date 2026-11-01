@@ -71,6 +71,19 @@ def _require_club_accounting():
         raise ClubAccountingDisabledError("Club accounting is disabled for this site.")
 
 
+def lock_books():
+    """Take the books lock, so club-books writes and Finances Setup take turns.
+
+    Every write that can reach the club books takes it before any other
+    billing lock, so concurrent writes queue in one order and can't deadlock.
+    It does nothing while Club Finances is off.
+    """
+    from siteconfig.models import SiteConfiguration
+
+    if club_accounting_enabled():
+        SiteConfiguration.objects.select_for_update().first()
+
+
 def books_start_date():
     config = _config()
     if config and config.club_accounting_start_date:
@@ -220,6 +233,7 @@ def post_journal_entry(
 ):
     """Post one balanced, immutable journal entry and return it."""
     _require_club_accounting()
+    lock_books()
     # Member postings, and reversals that mirror a member ledger reversal, are
     # authorized by the member ledger service that created them.
     if source != JournalEntry.Source.MEMBER_POSTING and member_entry is None:
@@ -266,10 +280,12 @@ def post_journal_entry(
     try:
         with transaction.atomic():
             entry.save()
-    except IntegrityError:
+    except (IntegrityError, ValidationError):
         if not source_key:
             raise
-        existing = JournalEntry.objects.get(source_key=source_key)
+        existing = JournalEntry.objects.filter(source_key=source_key).first()
+        if existing is None:
+            raise
         if not _existing_matches(existing, entry_date=date, lines=lines):
             raise ValidationError(
                 "Source key already identifies a different journal entry."
@@ -456,6 +472,7 @@ def post_member_entry(entry, *, actor, account=None, reference=""):
     """
     if not member_books_live():
         return None
+    lock_books()
     existing = JournalEntry.objects.filter(member_entry=entry).first()
     if existing:
         return existing
@@ -602,6 +619,7 @@ def reverse_journal_entry(*, entry, actor, date, reason):
     _require_club_accounting()
     require_manual_transaction_access(actor)
     reason = require_audit_text(reason, "reversal reason")
+    lock_books()
     original = JournalEntry.objects.select_for_update().get(pk=entry.pk)
     if original.source == JournalEntry.Source.REVERSAL:
         raise ValidationError("A reversal cannot itself be reversed.")
@@ -773,6 +791,7 @@ def go_live(*, actor, start_date, rows):
 
     _require_club_accounting()
     require_manual_transaction_access(actor)
+    # The books lock (see lock_books()), held until the opening entry is saved.
     config = SiteConfiguration.objects.select_for_update().first()
     if go_live_locked():
         raise ValidationError(
