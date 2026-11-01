@@ -449,6 +449,27 @@ def test_verify_flags_entries_missing_from_books_and_sync_posts_them(
     assert verify_books() == []
 
 
+# The sync command runs outside any transaction, so this test does too.
+@pytest.mark.django_db(transaction=True)
+def test_sync_posts_a_missing_reversal_of_a_posted_entry(
+    treasurer, member, live, club_books
+):
+    entry = charge(member, treasurer, "60")
+    club_books.club_accounting_enabled = False
+    club_books.save(update_fields=["club_accounting_enabled"])
+    reverse_manual_entry(
+        entry=entry, actor=treasurer, effective_date=TODAY(), reason="Oops"
+    )
+    club_books.club_accounting_enabled = True
+    club_books.save(update_fields=["club_accounting_enabled"])
+
+    call_command("sync_member_books", "--post", "--actor", treasurer.username)
+
+    assert JournalEntry.objects.filter(source=JournalEntry.Source.REVERSAL).exists()
+    assert account_balance(receivables()) == D("0.00")
+    assert verify_books() == []
+
+
 def test_ledger_page_posts_to_chosen_account(client, treasurer, member, live):
     client.force_login(treasurer)
     url = reverse("billing:ledger_detail", args=[member.pk])

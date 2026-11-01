@@ -445,6 +445,7 @@ def member_entry_lines(entry, account=None):
     ]
 
 
+@transaction.atomic
 def post_member_entry(entry, *, actor, account=None, reference=""):
     """Post the club-books side of a member-ledger entry.
 
