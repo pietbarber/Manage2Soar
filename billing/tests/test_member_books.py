@@ -394,6 +394,18 @@ def test_reversals_work_after_their_bank_account_is_deactivated(
         )
 
 
+def test_long_member_name_is_trimmed_to_fit_the_payee(treasurer, live):
+    member = Member.objects.create_user(
+        username="mb-long-name", is_active=True, first_name="A" * 80, last_name="B" * 80
+    )
+    entry = charge(member, treasurer, "60")
+
+    journal = JournalEntry.objects.get(member_entry=entry)
+    assert journal.payee == member.full_display_name[:150]
+    assert len(journal.payee) == 150
+    assert verify_books() == []
+
+
 def test_closed_month_refuses_member_entry_once_books_are_live(treasurer, member, live):
     BillingPeriod.objects.update_or_create(
         year=TODAY().year, month=TODAY().month, defaults={"is_closed": True}

@@ -497,7 +497,9 @@ def post_member_entry(entry, *, actor, account=None, reference=""):
         date=date,
         lines=lines,
         memo=entry.member_description[:255],
-        payee=member_label(entry.ledger.member),
+        payee=member_label(entry.ledger.member)[
+            : JournalEntry._meta.get_field("payee").max_length
+        ],
         reference=reference,
         internal_note=note,
         source=JournalEntry.Source.MEMBER_POSTING,
