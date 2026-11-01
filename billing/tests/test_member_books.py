@@ -334,6 +334,27 @@ def test_cleared_start_date_falls_back_to_the_opening_entry(
         )
 
 
+def test_retrying_a_charge_counted_in_the_opening_posts_nothing(treasurer, member):
+    flight = Flight.objects.create(
+        logsheet=Logsheet.objects.create(
+            log_date=TODAY() - timedelta(days=1),
+            airfield=Airfield.objects.create(identifier="KMB3", name="Retry Field"),
+            created_by=treasurer,
+        ),
+        pilot=member,
+        flight_type="solo",
+    )
+    allocations = [flight_allocation(flight, member, 1, "60.00")]
+    post_flight_charges(flight=flight, actor=treasurer, allocations=allocations)
+    start_books(treasurer)
+
+    post_flight_charges(flight=flight, actor=treasurer, allocations=allocations)
+
+    assert not JournalEntry.objects.filter(member_entry__isnull=False).exists()
+    assert account_balance(receivables()) == D("60.00")
+    assert verify_books() == []
+
+
 def test_closed_month_refuses_member_entry_once_books_are_live(treasurer, member, live):
     BillingPeriod.objects.update_or_create(
         year=TODAY().year, month=TODAY().month, defaults={"is_closed": True}

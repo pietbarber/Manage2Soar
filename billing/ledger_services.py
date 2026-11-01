@@ -438,6 +438,9 @@ def post_member_entry(entry, *, actor, account=None, reference=""):
     existing = JournalEntry.objects.filter(member_entry=entry).first()
     if existing:
         return existing
+    if not member_entries_missing_from_books().filter(pk=entry.pk).exists():
+        # Setup already counted it in the opening entry's Member Receivables.
+        return None
     start = books_start_date()
     date = max(entry.effective_date, start)
     note = entry.internal_note
