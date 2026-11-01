@@ -31,20 +31,20 @@
           <tr>
             <td class="text-start">
               {{ line.account|add_class:"form-select form-select-sm"|add_error_class:"is-invalid"|attr:"aria-label:Account" }}
-              {% for error in line.account.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% include "billing/books/_field_errors.html" with field=line.account %}
               {% for error in line.non_field_errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
             </td>
             <td class="text-start">
               {{ line.debit|add_class:"form-control form-control-sm"|add_error_class:"is-invalid"|attr:"aria-label:Debit" }}
-              {% for error in line.debit.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% include "billing/books/_field_errors.html" with field=line.debit %}
             </td>
             <td class="text-start">
               {{ line.credit|add_class:"form-control form-control-sm"|add_error_class:"is-invalid"|attr:"aria-label:Credit" }}
-              {% for error in line.credit.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% include "billing/books/_field_errors.html" with field=line.credit %}
             </td>
             <td class="text-start">
               {{ line.memo|add_class:"form-control form-control-sm"|add_error_class:"is-invalid"|attr:"aria-label:Line memo" }}
-              {% for error in line.memo.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% include "billing/books/_field_errors.html" with field=line.memo %}
             </td>
           </tr>
           {% endfor %}

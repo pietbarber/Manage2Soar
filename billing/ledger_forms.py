@@ -9,7 +9,18 @@ from members.models import Member
 from members.utils.membership import get_active_membership_statuses
 from siteconfig.timezone_utils import get_club_today
 
-AMOUNT_FIELD = dict(min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
+# Plain-English versions of Django's digit-count messages, for any amount field.
+AMOUNT_ERRORS = {
+    "max_digits": "Amounts can be at most $9,999,999,999.99.",
+    "max_whole_digits": "Amounts can be at most $9,999,999,999.99.",
+    "max_decimal_places": "Use dollars and cents, with at most 2 decimal places.",
+}
+AMOUNT_FIELD = dict(
+    min_value=Decimal("0.01"),
+    max_digits=12,
+    decimal_places=2,
+    error_messages={**AMOUNT_ERRORS, "min_value": "Enter an amount of at least $0.01."},
+)
 
 
 def _date_field(**kwargs):
@@ -289,7 +300,11 @@ class BankBalanceForm(forms.Form):
     )
     name = forms.CharField(max_length=100, required=False, label="Bank account")
     amount = forms.DecimalField(
-        required=False, max_digits=12, decimal_places=2, label="Balance"
+        required=False,
+        max_digits=12,
+        decimal_places=2,
+        label="Balance",
+        error_messages=AMOUNT_ERRORS,
     )
 
     def __init__(self, *args, **kwargs):

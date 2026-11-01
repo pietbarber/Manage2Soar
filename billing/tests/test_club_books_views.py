@@ -215,7 +215,7 @@ def test_general_journal_shows_each_line_error(
     html = response.content.decode()
     assert response.status_code == 200
     assert "That account is no longer available" in html
-    assert "no more than 12 digits" in html
+    assert "Amounts can be at most $9,999,999,999.99." in html
     assert "Choose an account for this line" not in html
     assert "not both" not in html
     assert list(JournalEntry.objects.all()) == [books_started]

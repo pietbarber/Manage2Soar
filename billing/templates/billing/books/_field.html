@@ -3,8 +3,8 @@
 <div class="form-check mb-3">
   {{ field|add_class:"form-check-input" }}
   <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-  {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+  {% if field.help_text %}<div class="form-text" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
+  {% include "billing/books/_field_errors.html" %}
 </div>
 {% else %}
 <div class="mb-3">
@@ -14,7 +14,7 @@
   {% else %}
     {% if field.errors %}{{ field|add_class:"form-control is-invalid" }}{% else %}{{ field|add_class:"form-control" }}{% endif %}
   {% endif %}
-  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-  {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+  {% if field.help_text %}<div class="form-text" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
+  {% include "billing/books/_field_errors.html" %}
 </div>
 {% endif %}

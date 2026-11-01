@@ -51,14 +51,14 @@
               {{ row.name|add_class:"form-control form-control-sm"|attr:"aria-label:New bank account name"|attr:"placeholder:New account (optional)" }}
               {% endif %}
               {% for error in row.non_field_errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-              {% for error in row.name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% include "billing/books/_field_errors.html" with field=row.name %}
             </td>
             <td class="text-start">
               <div class="input-group input-group-sm">
                 <span class="input-group-text">$</span>
                 {{ row.amount|add_class:"form-control"|attr:"aria-label:Balance"|attr:"inputmode:decimal" }}
               </div>
-              {% for error in row.amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% include "billing/books/_field_errors.html" with field=row.amount %}
             </td>
           </tr>
           {% endfor %}
