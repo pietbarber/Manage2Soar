@@ -194,6 +194,33 @@ def test_general_journal_rejects_unbalanced_entry(
     assert list(JournalEntry.objects.all()) == [books_started]
 
 
+def test_general_journal_shows_each_line_error(
+    client, treasurer, checking, books_started
+):
+    retired = Account.objects.create(
+        code="598", name="Retired expense", type=Account.Type.EXPENSE, is_active=False
+    )
+    client.force_login(treasurer)
+    data = {
+        "date": get_club_today().isoformat(),
+        "memo": "Bad lines",
+        "lines-TOTAL_FORMS": "2",
+        "lines-INITIAL_FORMS": "0",
+        "lines-0-account": retired.pk,
+        "lines-0-debit": "10.00",
+        "lines-1-account": checking.pk,
+        "lines-1-credit": "12345678901.00",
+    }
+    response = client.post(reverse("billing:general_journal"), data)
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert "That account is no longer available" in html
+    assert "no more than 12 digits" in html
+    assert "Choose an account for this line" not in html
+    assert "not both" not in html
+    assert list(JournalEntry.objects.all()) == [books_started]
+
+
 def test_reverse_entry_view(client, treasurer, checking, books_started):
     entry = expense(treasurer, checking)
     client.force_login(treasurer)

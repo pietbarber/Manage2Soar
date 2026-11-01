@@ -192,7 +192,13 @@ class JournalHeaderForm(_EntryDetailsForm):
 
 
 class JournalLineForm(forms.Form):
-    account = forms.ModelChoiceField(queryset=Account.objects.none(), required=False)
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.none(),
+        required=False,
+        error_messages={
+            "invalid_choice": "That account is no longer available. Choose another."
+        },
+    )
     debit = forms.DecimalField(required=False, **AMOUNT_FIELD)
     credit = forms.DecimalField(required=False, **AMOUNT_FIELD)
     memo = forms.CharField(max_length=255, required=False)
@@ -206,6 +212,10 @@ class JournalLineForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
+        if self.errors:
+            # A field already explains the problem; the checks below would
+            # misread the rejected value as blank.
+            return cleaned
         account = cleaned.get("account")
         debit, credit = cleaned.get("debit"), cleaned.get("credit")
         if not account and not debit and not credit:
