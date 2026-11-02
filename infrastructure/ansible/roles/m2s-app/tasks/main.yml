@@ -255,11 +255,12 @@
     group: root
     mode: "0644"
 
-- name: Deploy django-axes cleanup oneshot service (issue #1110)
+- name: Deploy django-axes cleanup oneshot service
   # Mirrors the ``cleanup-login-attempts`` CronJob in k8s-cronjobs.yaml so
   # single-host deployments enforce the same 24-hour retention window on
   # axes_accessattempt / axes_accessfailurelog rows. Runs the cleanup command
-  # as the unprivileged app user through the manage.sh wrapper.
+  # as the unprivileged app user (via the virtualenv Python + EnvironmentFile,
+  # see the service template).
   ansible.builtin.template:
     src: m2s-cleanup-login-attempts.service.j2
     dest: /etc/systemd/system/m2s-cleanup-login-attempts.service
@@ -268,7 +269,7 @@
     mode: "0644"
   when: m2s_cleanup_login_attempts_enabled | bool
 
-- name: Deploy django-axes cleanup hourly timer (issue #1110)
+- name: Deploy django-axes cleanup hourly timer
   ansible.builtin.template:
     src: m2s-cleanup-login-attempts.timer.j2
     dest: /etc/systemd/system/m2s-cleanup-login-attempts.timer
@@ -282,10 +283,32 @@
     daemon_reload: true
   when: m2s_cleanup_login_attempts_enabled | bool
 
-- name: Enable and start django-axes cleanup timer (issue #1110)
+- name: Enable and start django-axes cleanup timer
   ansible.builtin.systemd:
     name: m2s-cleanup-login-attempts.timer
     state: started
     enabled: true
     daemon_reload: true
   when: m2s_cleanup_login_attempts_enabled | bool
+
+# --- Opt-out path -------------------------------------------------------------
+# If the flag is set to false after an initial deployment, the enabled-path
+# tasks above are skipped.  Without the tasks below, the previously installed
+# timer would keep running (and stay enabled across reboots) even though the
+# operator opted out.  Reconcile to stopped+disabled, but only when the timer
+# unit actually exists (tolerating hosts where it was never installed, so the
+# role stays idempotent and doesn't fail with "unit not found").
+- name: Check if django-axes cleanup timer is installed
+  ansible.builtin.stat:
+    path: /etc/systemd/system/m2s-cleanup-login-attempts.timer
+  register: m2s_cleanup_timer_present
+  when: not (m2s_cleanup_login_attempts_enabled | bool)
+
+- name: Stop and disable django-axes cleanup timer when disabled
+  ansible.builtin.systemd:
+    name: m2s-cleanup-login-attempts.timer
+    state: stopped
+    enabled: false
+  when:
+    - not (m2s_cleanup_login_attempts_enabled | bool)
+    - m2s_cleanup_timer_present.stat.exists
