@@ -19,10 +19,20 @@ This command deletes rows older than 24 hours.  The 24 h horizon is well
 past the 15-minute ``AXES_COOLOFF_TIME`` window, so deleting old rows
 cannot break an in-flight throttle.
 
-Scheduled via the ``cleanup-login-attempts`` CronJob in ``k8s-cronjobs.yaml``
-(Ansible template: ``infrastructure/ansible/roles/gke-deploy/templates/k8s-cronjobs.yml.j2``)
-to run hourly.  The ``BaseCronJobCommand`` base class provides distributed
-locking so multiple pods don't race on the same cleanup.
+Scheduled to run hourly in both deployment topologies:
+
+- **GKE (Kubernetes):** the ``cleanup-login-attempts`` CronJob in
+  ``k8s-cronjobs.yaml`` (Ansible template:
+  ``infrastructure/ansible/roles/gke-deploy/templates/k8s-cronjobs.yml.j2``).
+  The ``BaseCronJobCommand`` base class provides distributed locking so
+  multiple pods don't race on the same cleanup.
+- **Single-host (Ansible):** the ``m2s-app`` role deploys an hourly systemd
+  timer (``m2s-cleanup-login-attempts.timer`` →
+  ``m2s-cleanup-login-attempts.service``) that runs this command as the
+  application user through the ``manage.sh`` wrapper
+  (``infrastructure/ansible/roles/m2s-app/templates/``).  This mirrors the
+  CronJob schedule so single-host deployments enforce the same 24-hour
+  retention instead of letting stale rows accumulate indefinitely.
 """
 
 from datetime import timedelta

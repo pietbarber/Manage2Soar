@@ -21,6 +21,7 @@ Semantics note (django-axes 8.x):
 """
 
 from datetime import timedelta
+from unittest import mock
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -679,3 +680,129 @@ class TestKioskUnaffected:
         resp = kiosk_client.get("/members/", follow=True)
         # If kiosk auth works, the user is authenticated (not redirected to login)
         assert resp.wsgi_request.user.is_authenticated
+
+
+@pytest.mark.django_db
+class TestProviderAuthExemptFromThrottle:
+    """Provider-based authentication (Google OAuth / social_core) must not be
+    blocked by the password-login throttle (Issue #1110 review).
+
+    During a Google OAuth callback, ``social_django`` reaches
+    ``django.contrib.auth.authenticate()`` with a real ``request`` and a
+    ``social_core`` backend instance in ``kwargs['backend']``.  The
+    ``AxesCompatBackend`` must let that call pass through to
+    ``GoogleOAuth2`` (return ``None``) rather than running the axes IP bucket,
+    otherwise a valid Google sign-in from a shared-IP client that has burned
+    through the password-login budget would be refused by Axes first.
+
+    Password-form logins (no ``social_core`` backend kwarg) must still be
+    throttled — the two paths must be distinguishable.
+    """
+
+    @staticmethod
+    def _provider_backend():
+        """A minimal ``social_core.backends.base.BaseAuth`` instance that
+        mimics what ``DjangoStrategy.authenticate`` passes as ``backend``.
+
+        ``BaseAuth.__init__`` only calls ``strategy.request_data()`` and
+        ``strategy.absolute_uri()``, so a tiny stub strategy is sufficient and
+        avoids pulling in a live Google OAuth token round-trip.
+        """
+        from social_core.backends.base import BaseAuth
+
+        class _StubStrategy:
+            def request_data(self):
+                return {}
+
+            def absolute_uri(self, uri):
+                return uri
+
+        class _Provider(BaseAuth):
+            pass
+
+        return _Provider(_StubStrategy(), redirect_uri="http://test.local/cb/")
+
+    def test_provider_call_is_exempt_when_ip_is_locked(self):
+        """A Google OAuth callback from a password-throttled IP must NOT be
+        rejected by the axes backend (it must pass through, not raise)."""
+        from django.test import RequestFactory
+
+        from utils.auth_backends import AxesCompatBackend
+
+        _make_member("oauth_user")
+        _reset_axes()
+        # Exhaust the IP's password-login budget so axes WOULD lock out a
+        # password login from this IP.
+        client = Client()
+        for _ in range(LIMIT):
+            _failed_login(client, "oauth_user", ip="203.0.114.5")
+
+        request = RequestFactory().get("/oauth/google-oauth2/callback/")
+        request.META["REMOTE_ADDR"] = "203.0.114.5"
+
+        backend = AxesCompatBackend()
+        # Provider call (has a social_core backend) must pass through -> None,
+        # never raising AxesBackendPermissionDenied.
+        result = backend.authenticate(
+            request,
+            username=None,
+            password=None,
+            backend=self._provider_backend(),
+            response={},
+        )
+        assert result is None, (
+            "Provider-based auth must pass through to the social backend "
+            "(return None); it must not be blocked by the password throttle."
+        )
+
+    def test_password_login_still_throttled_when_ip_locked(self):
+        """A password-form login from a locked IP must still be rejected by axes
+        (the exemption above must not weaken the password throttle)."""
+        from axes.exceptions import AxesBackendPermissionDenied
+        from django.test import RequestFactory
+
+        from utils.auth_backends import AxesCompatBackend
+
+        _make_member("pw_user")
+        _reset_axes()
+        client = Client()
+        for _ in range(LIMIT):
+            _failed_login(client, "pw_user", ip="203.0.114.6")
+
+        request = RequestFactory().get("/login/")
+        request.META["REMOTE_ADDR"] = "203.0.114.6"
+
+        backend = AxesCompatBackend()
+        with pytest.raises(AxesBackendPermissionDenied):
+            # No 'backend' kwarg -> password-form path -> axes lockout check
+            # runs and the locked IP is denied.
+            backend.authenticate(request, username="pw_user", password="wrong")
+
+    def test_password_login_allowed_when_not_locked(self):
+        """A password-form login from a non-locked IP must still delegate to the
+        axes backend (i.e. be *allowed* by it), proving the exemption only
+        applies to the provider path."""
+        from django.test import RequestFactory
+
+        import utils.auth_backends as ab
+
+        _make_member("ok_user")
+        _reset_axes()
+        request = RequestFactory().get("/login/")
+        request.META["REMOTE_ADDR"] = "203.0.114.7"
+
+        backend = ab.AxesCompatBackend()
+        # Patch the parent's authenticate to prove the password path DELEGATES
+        # to axes (rather than short-circuiting) — the parent would then do the
+        # real is_allowed() check.
+        with mock.patch.object(
+            ab.AxesStandaloneBackend, "authenticate", return_value="DELEGATED"
+        ) as spied:
+            result = backend.authenticate(
+                request, username="ok_user", password="testpass123!"
+            )
+        assert result == "DELEGATED"
+        assert spied.called, (
+            "Password-form logins must delegate to the axes backend so the "
+            "throttle still applies."
+        )
