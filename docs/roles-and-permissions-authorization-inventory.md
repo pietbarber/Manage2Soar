@@ -4,6 +4,49 @@ Status: **unapproved, incomplete first-pass static inventory**, 2026-10-29.
 This records observed behavior for review before migrating authorization checks;
 it is not a completed baseline, approved policy, or migration specification.
 
+## Review scope for this branch
+
+The PR should describe the following separately; a test of one surface does not
+approve every other role-to-permission mapping. Compare both allowed and denied
+requests to `upstream/main` before calling a mapping equivalent.
+
+| Change in this branch | Current contract / review decision | Evidence |
+| --- | --- | --- |
+| Application management | Directors, the Directors Group's view capability, and explicit view-permission holders can read; member managers and webmasters can modify. Staff alone and Member Managers Group membership alone do not grant access; a view capability does not grant write access. **Intentional restriction:** kiosk-authenticated role accounts can no longer use the management list, detail, or waitlist, even with a manager flag. List POST still renders a non-mutating response rather than returning 405. | `members/authorization.py`, `members/views_applications.py`; `members/tests/test_membership_application_access_matrix.py` |
+| Role and capability backfill | Built-in role keys and their registered capability grants are explicit. Migration `0052` adds missing grants; it must not erase tenant-created Groups, memberships, or unrelated permissions. Approval is still needed for the exact business-action mapping. | `members/role_definitions.py`, `members/migrations/0052_sync_registered_role_capabilities.py`; `members/tests/test_role_definitions.py`, `test_capability_registry_migration.py` |
+| CMS, billing, duty, logsheet, and membership actions | Bounded permission helpers and compatibility paths replace some direct role/staff checks. Preserve active membership, ownership, page grants, and workflow context where applicable. **Do not claim global authorization parity:** the inventory below still lists unreviewed endpoints. | `cms/permissions.py`, `billing/permissions.py`, `duty_roster/permissions.py`, `logsheet/permissions.py`, `members/authorization.py`; focused app tests |
+| Role preview | A selected role projects its permissions for a request; write methods are denied outside DEBUG preview. GET-side effects and preview audit retention remain explicit release decisions. | `members/role_preview.py`; `members/tests/test_role_preview.py` |
+| Qualification permissions | Only approved custom actions from an opted-in bundle can be derived from a current qualification. No existing instructor/tow-pilot/duty qualification is mapped automatically. | `members/auth_backends.py`, `instructors/models.py`; `members/tests/test_qualification_permission_bundle.py` |
+| Mailing-list audiences | Role and tag selectors are additive to existing criteria; recipient parity against real tenant data is **not yet verified**. | `siteconfig/models.py`; `siteconfig/tests/test_mailing_list.py` |
+
+Before a PR is treated as deployment-ready, record clean-install and
+representative in-place migration results on disposable PostgreSQL databases,
+recipient and sensitive-action parity, and the maintainer's decisions on the
+unapproved rows. Local migration tests are evidence, not a substitute for
+tenant-data validation.
+
+### Local validation record (2026-11-02)
+
+- Disposable PostgreSQL clean-install test databases: 81 focused application
+  access/backfill tests, 83 authorization/CMS/logsheet tests, and 64 Group-
+  permission/mailing-list tests passed. The latter assert exact Treasurer and
+  Secretary capabilities rather than the pre-branch assumption of no grants.
+- Disposable PostgreSQL upgrade: applied all `upstream/main` migrations, added
+  three synthetic members (legacy instructor and treasurer flags, plus manual
+  custom-Group membership), a custom Group permission, and a legacy mailing
+  list. Applied the branch migrations through `members.0052`. The legacy and
+  manual assignment sources were classified as expected; memberships, custom
+  permission, and the two sampled mailing-list recipients were unchanged.
+  Registered built-in role capability grants were present after upgrade.
+- Both GKE and single-host settings passed `manage.py check` and
+  `makemigrations --check --dry-run` against the disposable upgraded database.
+- The historical `members.0021` migration still emits missing-permission
+  warnings while the graph is first applied; later backfills and focused
+  canonical-grant assertions passed. Preserve these warnings in the PR log.
+- **Not yet validated:** a representative *tenant-data* upgrade, real mailing-
+  list recipient parity, and the full endpoint-by-endpoint authorization
+  baseline. The synthetic sample must not be called production parity.
+
 ## Scope and method
 
 The inventory covers runtime Python authorization checks using member role
@@ -38,7 +81,7 @@ boundaries; the server-side endpoint is the authorization source of truth.
 | --- | --- | --- | --- |
 | Shared member gates | Active members pass `active_member_required`; superusers are handled by `is_active_member`; kiosk sessions can bypass the membership-status check on this decorator. | Anonymous users are redirected to login; non-active members are forbidden unless an explicit exception applies. `non_kiosk_member_required` rejects shared kiosk sessions. | `members/tests/` contains membership and kiosk policy coverage; add endpoint-specific tests when migrating. |
 | Contact/profile privacy | Own profile fields are accessible to the subject. Privileged viewers include superusers, staff, selected legacy roles (`webmaster`, `treasurer`, `member_manager`, `rostermeister`), and configured `MEMBERS_REDACT_EXEMPT_GROUPS`. Other viewers follow subject preferences and club defaults. | A hidden field or legacy full-redaction setting denies ordinary viewers; profile field-policy and kiosk rules constrain self-service. | `members/utils/permissions.py`; `members/tests/test_contact_visibility.py`, `test_member_profile_policy_controls.py`, `test_kiosk_auth.py`. Staff and exempt Groups are a separate policy dimension, not a role mapping assumption. |
-| Membership applications / waitlist | See endpoint matrix below: authenticated non-kiosk active-member gate (with a superuser nuance), then legacy flag checks for view/modify. | GET and POST are not interchangeable; public applicant routes use different rules. | `members/views_applications.py`; `members/tests/test_membership_applications.py`, `test_membership_application_access_matrix.py`. These views do not use the resolver yet. |
+| Membership applications / waitlist | See endpoint matrix below: authenticated non-kiosk active-member gate (with a superuser nuance), then explicit view permission or legacy-role fallback for read; modification still requires member-manager or webmaster compatibility access. | GET and POST are not interchangeable; public applicant routes use different rules. | `members/views_applications.py`; `members/tests/test_membership_applications.py`, `test_membership_application_access_matrix.py`. These views do not use the general resolver yet. |
 | Member profile administration and personal account actions | Self-service is governed by configured per-field profile policies. Superusers have several cross-member edit paths. | Non-self users are denied absent the relevant elevated access; account recovery is blocked in kiosk sessions. | `members/views.py`; `members/tests/test_member_profile_policy_controls.py`, `test_views.py`. Distinguish self-service from admin authorization. |
 | Instructor records and training | Instructor-specific decorators require active membership plus the instructor boolean; instructor-or-safety paths require either role, with explicit superuser handling in one decorator. Several record views permit the subject member or an instructor. | Other users are denied; object ownership and member status remain contextual. | `instructors/decorators.py`, `instructors/views.py`; `instructors/tests/` includes instructor/safety/superuser cases. Multiple direct checks need a focused route-to-test map before migration. |
 | Safety workflows | Safety-officer decorator permits superusers or active members with `safety_officer=True`. | Anonymous, inactive ordinary members, and members without the flag are denied. | `members/decorators.py`; `members/tests/test_safety_officer_interface.py`, `test_safety_dashboard.py`. |
@@ -58,31 +101,35 @@ All three routes are in `members/urls.py` and now use
 before the wrapped active-member gate. Other unauthenticated requests redirect
 to login; authenticated non-kiosk users must pass
 `members.utils.membership.is_active_member` (configured active status, with its
-default superuser override) or receive 403. The view then checks the user's
-actual legacy flags or `is_superuser`. `is_staff`, Group membership, and `has_perm()` alone are **not**
-tested by the view. No ownership/assignment grant applies to these management
+default superuser override) or receive 403. The view checks the explicit
+`members.view_membership_applications` permission or legacy director/manager/
+webmaster compatibility for read; modify still requires manager/webmaster
+compatibility. `is_staff` alone is not a grant. Group membership grants read
+only when its Group actually carries the view capability (e.g. Directors).
+No ownership/assignment grant applies to these management
 routes. There is no per-HTTP-method decorator on them; describe the observed
 GET/POST branches below, not an exhaustive method contract.
 
 In the matrix, **gate** means authenticated → login redirect if anonymous;
 configured active status → 403 if inactive, except superuser passes
 `is_active_member`; kiosk → 403 even with an allowed role flag. **Privilege** means
-superuser passes the view-role check; `is_staff` alone and Group membership
-alone do not. Kiosk is not a role override. These facts apply independently
+superuser passes the view-role check; `is_staff` alone does not. An explicit
+view capability, direct or through a Group, grants read but not write. Kiosk
+is not a role override. These facts apply independently
 to *each* row and are repeated as compact column references for readability.
 
 | Route / source | Method | Auth / active / kiosk | Superuser / staff | Legacy role | Object/context | Expected result | Existing tests | Planned policy and gaps |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `members:membership_applications_list` (`applications/`); `membership_applications_list`, `_can_view_membership_applications` | GET | Gate | Privilege | `director OR member_manager OR webmaster` for read | `status`/`q` filters; `can_modify` computed separately | Reader 200; role-denied 403; anonymous 302; inactive account redirects at login gate | `test_director_can_view_applications_list`, `test_webmaster_and_superuser_can_view_and_modify_waitlist`, `test_regular_member_cannot_view_membership_applications`, `test_staff_and_group_membership_alone_do_not_grant_application_access`, `test_inactive_manager_cannot_access_application_management`, `test_anonymous_user_is_redirected_from_application_management`, access matrix | Preserve gate/flag OR; the access matrix covers the listed principal classes, including kiosk. |
-| `members:membership_applications_list`; same source | POST | Gate | Privilege | Same read check; **no write check** | No POST mutation branch: renders filtered list | Reader 200; role-denied 403, not automatically 405 | No route-specific POST baseline | Preserve actual non-mutating behavior pending review; test explicit POST cases before changing it. |
-| `members:membership_application_detail` (`applications/<uuid:application_id>/`); `membership_application_detail`, `_can_view_membership_applications` | GET | Gate | Privilege | `director OR member_manager OR webmaster` for read | Existing application UUID required (`get_object_or_404`); no ownership grant | Reader 200; role-denied 403; missing UUID 404 after role check | `test_director_can_view_application_detail` | Preserve read/object checks; test anonymous, inactive, kiosk, staff-only, Group-only, ordinary, manager, webmaster and superuser. |
+| `members:membership_applications_list` (`applications/`); `membership_applications_list`, `_can_view_membership_applications` | GET | Gate | Privilege | View capability OR `director OR member_manager OR webmaster` | `status`/`q` filters; `can_modify` computed separately | Reader 200; role-denied 403; anonymous 302; inactive account redirects at login gate | `test_management_get_access` covers staff, kiosk, view-only, Group-only and legacy roles | Review permission-derived read path alongside legacy checks. |
+| `members:membership_applications_list`; same source | POST | Gate | Privilege | Same read check; **no write check** | No POST mutation branch: renders filtered list | Reader 200; role-denied 403, not automatically 405 | `test_list_post_uses_same_read_gate_as_get` covers staff, kiosk, view-only, and legacy roles | Preserve actual non-mutating behavior pending review. |
+| `members:membership_application_detail` (`applications/<uuid:application_id>/`); `membership_application_detail`, `_can_view_membership_applications` | GET | Gate | Privilege | View capability OR director/manager/webmaster compatibility | Existing application UUID required (`get_object_or_404`); no ownership grant | Reader 200; role-denied 403; missing UUID 404 after role check | `test_management_get_access` covers anonymous, inactive, kiosk, staff-only, Group-only, view-only, ordinary, manager, webmaster and superuser | Review permission-derived read path and preserve object checks. |
 | `members:membership_application_detail`; `membership_application_detail`, `_can_modify_membership_applications` | POST | Gate | Privilege | Read check, then `member_manager OR webmaster` for write; director alone read-only | Existing UUID; form/action and state govern `approve`, `waitlist`, `reject`, `need_info`, `save_notes` | Director 403/no mutation; permitted validated action redirects; missing UUID 404 after role check | `test_director_cannot_modify_application_review`, `test_approval_sends_account_setup_email_after_commit`, `test_save_notes_without_status_change`, `test_add_to_waitlist_already_waitlisted_keeps_position` | Preserve write gate, validations and side effects; test denied principal classes and positive webmaster/superuser POST for detail. |
-| `members:membership_waitlist` (`applications/waitlist/`); `membership_waitlist`, `_can_view_membership_applications` | GET | Gate | Privilege | `director OR member_manager OR webmaster` for read | Only `status="waitlisted"`, ordered by `waitlist_position`; `can_modify` separate | Reader 200; role-denied 403 | `test_waitlist_view`, `test_director_can_view_waitlist` | Preserve status-scoped read; test direct route principal/active/kiosk/staff/Group cases. |
+| `members:membership_waitlist` (`applications/waitlist/`); `membership_waitlist`, `_can_view_membership_applications` | GET | Gate | Privilege | View capability OR director/manager/webmaster compatibility | Only `status="waitlisted"`, ordered by `waitlist_position`; `can_modify` separate | Reader 200; role-denied 403 | `test_management_get_access` covers principal/active/kiosk/staff/Group/view-only cases | Review permission-derived read path and preserve status-scoped read. |
 | `members:membership_waitlist`; `membership_waitlist`, `_can_modify_membership_applications` | POST | Gate | Privilege | Read check, then `member_manager OR webmaster` for write; director alone read-only | Requires `action` and `application_id`; target must be waitlisted, positions/action determine mutation | Director 403/no reorder; permitted move redirects; absent/no-op action redirects without reorder | `test_director_cannot_reorder_waitlist`, `test_waitlist_move_to_top`, `test_waitlist_move_to_bottom`, `test_webmaster_and_superuser_can_view_and_modify_waitlist` | Preserve waitlisted-target check/non-mutating no-ops; test other denied classes and non-mutation. |
 
 `members/tests/test_membership_application_access_matrix.py` now exercises the
 listed routes and both method branches across ordinary, director, manager,
-webmaster, superuser, staff-only, Group-only, anonymous, inactive-manager, and
+webmaster, superuser, staff-only, Group-only, view-only, anonymous, inactive-manager, and
 kiosk principals. **Maintainer migration note (approved policy change):** before
 the `non_kiosk_member_required` change, a kiosk-authenticated Role Account with
 `member_manager=True` could view application details and POST changes to review

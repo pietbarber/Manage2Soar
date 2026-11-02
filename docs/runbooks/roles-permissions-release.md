@@ -27,7 +27,28 @@ Run the focused authorization suites and record the results:
 ./.venv/bin/pytest -q members/tests/test_role_preview.py
 ./.venv/bin/pytest -q cms/tests/test_editing_permissions.py
 ./.venv/bin/pytest -q logsheet/tests/test_permissions.py
+./.venv/bin/pytest -q members/tests/test_membership_application_access_matrix.py
+./.venv/bin/pytest -q members/tests/test_capability_registry_migration.py
+./.venv/bin/pytest -q members/tests/test_role_assignments.py
+./.venv/bin/pytest -q members/tests/test_group_permissions_migration.py
+./.venv/bin/pytest -q siteconfig/tests/test_mailing_list.py
 ```
+
+These tests create and migrate **disposable test databases**; never run the
+in-place test against a live tenant database. A clean pytest database exercises
+the complete migration graph; the migration tests additionally exercise
+forward upgrades with existing Groups, permissions, and memberships. Record the
+PostgreSQL version and the test results in the PR. A local `makemigrations
+--check` may report "No changes detected" even if it could not connect to
+PostgreSQL to verify migration history; report that warning rather than
+claiming database validation succeeded.
+
+For the PR review, identify the access changes in
+[`docs/roles-and-permissions-authorization-inventory.md`](../roles-and-permissions-authorization-inventory.md#review-scope-for-this-branch),
+especially the intentional kiosk restriction on application-management routes.
+Clean-install tests do **not** establish existing-tenant recipient parity: use
+an authorized copy of representative tenant data for that comparison before
+deployment. Do not copy or migrate a live database as a substitute for a backup.
 
 ## Database rollout
 
