@@ -1,7 +1,23 @@
+from unittest.mock import Mock
+
 import pytest
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.test import RequestFactory
 from django.urls import reverse
 
+from logsheet import views
 from logsheet.models import MaintenanceIssue
+
+
+def _direct_request(method, path, user, data=None):
+    """Build a request suitable for calling a decorated view directly."""
+    factory = RequestFactory()
+    request = getattr(factory, method.lower())(path, data or {})
+    SessionMiddleware(lambda request: None).process_request(request)
+    request.session.save()
+    request.user = user
+    request._messages = Mock()
+    return request
 
 
 @pytest.mark.django_db
@@ -385,6 +401,56 @@ def test_maintenance_mark_resolved_forbidden_for_unassigned_member(
     maintenance_issue.refresh_from_db()
     assert maintenance_issue.resolved is False
     assert maintenance_issue.resolved_by is None
+
+
+@pytest.mark.django_db
+def test_mark_issue_resolved_directly_rejects_unassigned_member(
+    active_member, maintenance_issue
+):
+    request = _direct_request(
+        "POST",
+        reverse("logsheet:maintenance_mark_resolved", args=[maintenance_issue.pk]),
+        active_member,
+    )
+
+    response = views.mark_issue_resolved(request, maintenance_issue.pk)
+
+    assert response.status_code == 302
+    maintenance_issue.refresh_from_db()
+    assert maintenance_issue.resolved is False
+
+
+@pytest.mark.django_db
+def test_resolve_maintenance_issue_directly_rejects_unassigned_member(
+    active_member, maintenance_issue
+):
+    request = _direct_request(
+        "POST",
+        reverse("logsheet:maintenance_mark_resolved", args=[maintenance_issue.pk]),
+        active_member,
+        {"notes": "Attempted unauthorized resolution."},
+    )
+
+    response = views.resolve_maintenance_issue(request, maintenance_issue.pk)
+
+    assert response.status_code == 403
+    maintenance_issue.refresh_from_db()
+    assert maintenance_issue.resolved is False
+
+
+@pytest.mark.django_db
+def test_mark_issue_resolved_rejects_get(active_member, maintenance_issue):
+    request = _direct_request(
+        "GET",
+        reverse("logsheet:maintenance_mark_resolved", args=[maintenance_issue.pk]),
+        active_member,
+    )
+
+    response = views.mark_issue_resolved(request, maintenance_issue.pk)
+
+    assert response.status_code == 405
+    maintenance_issue.refresh_from_db()
+    assert maintenance_issue.resolved is False
 
 
 @pytest.mark.django_db
