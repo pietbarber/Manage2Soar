@@ -84,6 +84,30 @@ def _load_forwarding_aliases_from_virtual(virtual_file='/etc/postfix/virtual'):
     return aliases
 
 
+def _load_routing_snapshot(virtual_file='/etc/postfix/virtual'):
+    """Read list and forwarding routes from one consistent virtual-file snapshot."""
+    lists = set()
+    forwards = set()
+    try:
+        with open(virtual_file, 'r') as f:
+            in_forwards = False
+            for raw_line in f:
+                line = raw_line.strip()
+                if line == ADMIN_FORWARD_MARKER:
+                    in_forwards = True
+                    continue
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split(None, 1)
+                if len(parts) != 2 or '@' not in parts[0]:
+                    continue
+                address = parts[0].lower()
+                (forwards if in_forwards else lists).add(address)
+    except OSError as e:
+        sys.stderr.write(f"maillist-rewriter: warning: could not read routes: {e}\n")
+    return lists, forwards
+
+
 def _is_bounces_alias(addr):
     """Return True if ``addr`` is a list ``-bounces`` delivery alias.
 
@@ -110,13 +134,13 @@ def _is_bounces_alias(addr):
 # /etc/postfix/virtual; we must include them here so they are not bounced.
 # ``*-bounces@`` delivery aliases are excluded so they are never treated as a
 # detectable mailing list (see _is_bounces_alias and issue #1038).
+_VIRTUAL_LISTS, _VIRTUAL_FORWARDS = _load_routing_snapshot()
 FORWARDING_ALIASES = {
-    addr for addr in _load_forwarding_aliases_from_virtual()
-    if not _is_bounces_alias(addr)
+    addr for addr in _VIRTUAL_FORWARDS if not _is_bounces_alias(addr)
 }
 ALL_KNOWN_LISTS = {
     addr
-    for addr in (MAILING_LISTS | _load_lists_from_virtual())
+    for addr in (MAILING_LISTS | _VIRTUAL_LISTS)
     if not _is_bounces_alias(addr) and addr not in FORWARDING_ALIASES
 }
 
@@ -281,7 +305,7 @@ def find_list_from_recipients(recipients, preferred_domain=None):
         sys.stderr.write(f"maillist-rewriter: error reading /etc/postfix/virtual in find_list_from_recipients: {e}\n")
 
 
-def detect_original_recipient(msg, recipients):
+def detect_original_recipient(msg, recipients, trusted_original_recipient=None):
     """
     Identify the original recipient in priority order.
 
@@ -290,6 +314,18 @@ def detect_original_recipient(msg, recipients):
     content filter may receive recipients after virtual-alias expansion.
     """
     original_to = None
+
+    # This value is supplied by Postfix's ${original_recipient} expansion,
+    # before virtual alias expansion. Never use a client-provided header for
+    # routing when trusted delivery metadata is available.
+    if trusted_original_recipient is not None:
+        trusted = trusted_original_recipient.strip().lower()
+        resolved = resolve_alias_recipient(trusted)
+        if resolved:
+            return resolved
+        # Postfix supplied metadata is authoritative. Do not fall back to
+        # message headers when it is present but not a configured route.
+        return None
 
     # Postfix preserves the pre-expansion recipient here when available.
     # Check this before message headers and recipient expansion because a
@@ -355,6 +391,22 @@ def detect_original_recipient(msg, recipients):
     return original_to
 
 
+def resolve_alias_recipient(address):
+    """Resolve Postfix's recipient-delimiter extension to a known address."""
+    address = address.strip().lower()
+    if address in ALL_KNOWN_LISTS or address in FORWARDING_ALIASES:
+        return address
+    if '@' not in address:
+        return None
+    local, domain = address.rsplit('@', 1)
+    if '+' not in local:
+        return None
+    base = f"{local.split('+', 1)[0]}@{domain}"
+    if base in ALL_KNOWN_LISTS or base in FORWARDING_ALIASES:
+        return base
+    return None
+
+
 # Kept as a compatibility name for local integrations and older tests.
 detect_original_list = detect_original_recipient
 
@@ -376,19 +428,22 @@ def main():
     Content filter: Read email from stdin, rewrite headers, reinject to port 10025
     Args: nexthop sender recipient1 recipient2 ...
     """
-    if len(sys.argv) < 4:
-        sys.stderr.write("Usage: maillist-rewriter.py nexthop sender recipient...\n")
+    if len(sys.argv) < 5:
+        sys.stderr.write("Usage: maillist-rewriter.py nexthop sender original_recipient recipient...\n")
         sys.exit(1)
 
     nexthop = sys.argv[1]
     sender = sys.argv[2]
-    recipients = sys.argv[3:]
+    trusted_original_recipient = sys.argv[3]
+    recipients = sys.argv[4:]
 
     # Read message from stdin
     original_msg = sys.stdin.buffer.read()
     msg = email.message_from_bytes(original_msg)
 
-    original_to = detect_original_recipient(msg, recipients)
+    original_to = detect_original_recipient(
+        msg, recipients, trusted_original_recipient=trusted_original_recipient
+    )
 
     # If list detection failed entirely, this is a transactional email (e.g. password
     # reset, notification) — not a mailing list message.  Pass it through to the
@@ -429,12 +484,23 @@ def main():
         # Mailing-list and direct-forward reinjection use verified club
         # addresses. Unknown recipients retain the original envelope sender.
         envelope_sender = sender
-        if is_mailing_list or is_forwarding_alias:
+        if (is_mailing_list or is_forwarding_alias) and sender:
             from_header = msg.get("From", "")
             _, envelope_sender = parseaddr(from_header)
+            if is_forwarding_alias:
+                # Do not return delivery failures to the forward itself.
+                alias_local, alias_domain = original_to.split('@', 1)
+                envelope_sender = f"{alias_local}-bounces@{alias_domain}"
         # Ensure we never use an empty envelope sender; prefer verified mailing list addresses
         if not envelope_sender:
             sys.stderr.write("maillist-rewriter: Warning: Rewritten From header is empty or unparsable; this indicates a potential bug in rewrite_headers. Falling back to a verified mailing list envelope sender.\n")
+            # Preserve the null reverse path for DSNs; it must never be
+            # replaced with an alias, or delivery failures can loop forever.
+            if not sender:
+                envelope_sender = ''
+                smtp.sendmail(envelope_sender, recipients, msg.as_bytes())
+                smtp.quit()
+                sys.exit(0)
             fallback_sender = None
             # Prefer the detected original mailing list recipient if it is known
             if original_to and original_to.lower() in MAILING_LISTS:

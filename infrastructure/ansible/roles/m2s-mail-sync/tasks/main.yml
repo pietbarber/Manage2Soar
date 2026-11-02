@@ -67,6 +67,6 @@
 
 - name: Run initial sync
   ansible.builtin.command:
-    cmd: "{{ m2s_sync_dir }}/sync-aliases.py"
+    cmd: "/usr/bin/flock --wait 300 /run/lock/m2s-mail-sync.lock {{ m2s_sync_dir }}/sync-aliases.py"
   changed_when: true
   ignore_errors: true  # May fail if M2S API not yet configured

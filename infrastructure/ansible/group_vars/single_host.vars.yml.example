@@ -208,6 +208,13 @@ mail_server_receive_enabled: false
 club_domains:
   - prefix: "{{ club_prefix }}"
     name: "{{ club_name }}"
+    api_url: "{{ canonical_url | default('https://' ~ m2s_domain) }}/api/email-lists/"
+    domains:
+      - "{{ club_prefix }}.{{ mail_domain }}"
+
+# Settings used by the inbound mail synchronization role.
+m2s_api_key: "{{ vault_m2s_api_key }}"
+m2s_sync_dir: "/opt/m2s-mail-sync"
 
 # Email dev mode - prevents actual email sending during initial deployment
 # HIGHLY RECOMMENDED: Keep this true until you've verified your mail server

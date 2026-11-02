@@ -80,7 +80,7 @@ def fetch_club_lists(club, default_auth_token):
         return None
 
 
-def generate_virtual_aliases(clubs_data, dev_mode=None):
+def generate_virtual_aliases(clubs_data, dev_mode=None, local_domains=None):
     """Generate Postfix virtual alias file content.
 
     If dev_mode is enabled, ALL recipients are redirected to the configured
@@ -90,6 +90,7 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
     # Check if dev mode is enabled
     dev_enabled = dev_mode and dev_mode.get('enabled', False)
     dev_redirect = dev_mode.get('redirect_to', '') if dev_mode else ''
+    local_domains = {d.lower().rstrip('.') for d in (local_domains or [])}
 
     lines = [
         "# ============================================================",
@@ -162,7 +163,10 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
                 print(f"[{datetime.now()}] WARNING: Invalid forwarding alias for {domain}, skipping")
                 continue
             recipient = dev_redirect if dev_enabled else destination
-            if not is_valid_email(recipient) or recipient.lower() == alias_address.lower():
+            destination_domain = recipient.rsplit('@', 1)[-1].lower().rstrip('.')
+            if (not is_valid_email(recipient)
+                    or recipient.lower() == alias_address.lower()
+                    or destination_domain in local_domains):
                 print(f"[{datetime.now()}] WARNING: Invalid forwarding destination for {alias_address}, skipping")
                 continue
             lines.append(f"{alias_address}  {recipient}")
@@ -361,13 +365,20 @@ def file_changed(filepath, new_content):
 
 
 def write_and_postmap(filepath, content):
-    """Write file and run postmap if content changed."""
+    """Atomically publish a complete map and rebuild its Postfix database."""
     if not file_changed(filepath, content):
         return False
 
-    # Write new content
-    with open(filepath, 'w') as f:
-        f.write(content)
+    directory = os.path.dirname(filepath) or '.'
+    fd, temp_path = tempfile.mkstemp(dir=directory)
+    try:
+        with os.fdopen(fd, 'w') as f:
+            f.write(content)
+        os.replace(temp_path, filepath)
+    except Exception:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        raise
 
     # Run postmap to rebuild hash database (use full path for cron compatibility)
     subprocess.run(['/usr/sbin/postmap', filepath], check=True)
@@ -509,7 +520,14 @@ def main():
         print(f"[{datetime.now()}] All mailing list recipients will be redirected to: {redirect_to}")
 
     # Generate and update virtual aliases
-    virtual_content = generate_virtual_aliases(clubs_data, dev_mode=dev_mode)
+    local_domains = set()
+    for club in config.get('clubs', []):
+        local_domains.update(club.get('domains', []))
+        if club.get('domain'):
+            local_domains.add(club['domain'])
+    virtual_content = generate_virtual_aliases(
+        clubs_data, dev_mode=dev_mode, local_domains=local_domains
+    )
     if write_and_postmap(config['postfix_virtual_file'], virtual_content):
         print(f"[{datetime.now()}] Updated virtual aliases")
     else:

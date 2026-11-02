@@ -307,7 +307,7 @@ class EmailAlias(models.Model):
         return self.name
 
     def clean(self):
-        if not re.fullmatch(r"[a-z0-9][a-z0-9._+-]*", self.name or "") or (
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9._+-]*[a-z0-9])?", self.name or "") or (
             ".." in self.name or self.name.endswith(".")
         ):
             raise ValidationError(

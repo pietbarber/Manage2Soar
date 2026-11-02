@@ -53,13 +53,11 @@
           Mail Server: {{ mail_server_enabled | default(false) }}
           ========================================
 
-    - name: Require mail API and SMTP2GO credentials for inbound lists
+    - name: Require mail API credentials for inbound lists
       ansible.builtin.assert:
         that:
           - vault_m2s_api_key is defined and vault_m2s_api_key | length > 0
-          - vault_email_host_user is defined and vault_email_host_user | length > 0
-          - vault_email_host_password is defined and vault_email_host_password | length > 0
-        fail_msg: "Set vault_m2s_api_key and SMTP2GO vault_email_host_user/password in the single-host vault before enabling inbound lists."
+        fail_msg: "Set vault_m2s_api_key in the single-host vault before enabling inbound lists."
       when: (mail_server_enabled | default(false) | bool) and (mail_server_receive_enabled | default(false) | bool)
       no_log: true
 
@@ -91,6 +89,9 @@
 
     - role: m2s-mail-sync
       tags: [mail, sync]
+      vars:
+        dev_mode_enabled: "{{ email_dev_mode | default(false) }}"
+        dev_mode_redirect_to: "{{ email_dev_mode_redirect_to | default('') }}"
       when: (mail_server_enabled | default(false) | bool) and (mail_server_receive_enabled | default(false) | bool)
 
   post_tasks:
