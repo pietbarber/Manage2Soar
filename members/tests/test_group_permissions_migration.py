@@ -163,21 +163,40 @@ def test_webmasters_has_cms_permissions():
 
 
 # ---------------------------------------------------------------------------
-# Secretary / Treasurer – no model permissions
+# Secretary / Treasurer – deliberately scoped capabilities
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-def test_secretary_group_exists_with_no_permissions():
-    """Secretary group is created for _sync_groups assignment; it has no model perms."""
+def test_secretary_group_has_only_registered_capabilities():
     group = Group.objects.get(name="Secretary")
-    assert group.permissions.count() == 0
+    assert {
+        f"{app}.{codename}"
+        for app, codename in group.permissions.values_list(
+            "content_type__app_label", "codename"
+        )
+    } == {
+        "cms.view_page",
+        "cms.change_page",
+        "duty_roster.view_all_swap_requests",
+    }
 
 
 @pytest.mark.django_db
-def test_treasurer_group_exists_with_no_permissions():
+def test_treasurer_group_has_only_registered_capabilities():
     group = Group.objects.get(name="Treasurer")
-    assert group.permissions.count() == 0
+    assert {
+        f"{app}.{codename}"
+        for app, codename in group.permissions.values_list(
+            "content_type__app_label", "codename"
+        )
+    } == {
+        "billing.can_manage_billing",
+        "logsheet.can_manage_logsheet_finances",
+        "logsheet.can_export_logsheet_finances",
+        "members.view_privileged_contact",
+        "duty_roster.view_all_swap_requests",
+    }
 
 
 @pytest.mark.django_db
