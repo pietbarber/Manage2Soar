@@ -1,0 +1,49 @@
+# Systemd oneshot service that runs the django-axes cleanup management
+# command (Issue #1110).  Mirrors the ``cleanup-login-attempts`` CronJob in
+# ``k8s-cronjobs.yaml`` so single-host deployments enforce the same 24-hour
+# retention window on ``axes_accessattempt``/``axes_accessfailurelog`` rows
+# (previously only the K8s deployment scheduled the cleanup, so stale rows
+# from one-off usernames/IPs accumulated indefinitely on single-host).
+#
+# The runtime environment is loaded via systemd's ``EnvironmentFile=`` (the
+# same ``app/.env`` the Gunicorn service consumes).  Unlike the ``manage.sh``
+# wrapper — which bash-``source``s the file — ``EnvironmentFile`` reads it as
+# literal ``KEY=VALUE`` pairs with NO shell expansion.  This matters because
+# ``env.j2`` writes ``DB_PASSWORD`` (and other secrets) unquoted: a value
+# containing ``$$`` or ``$NAME`` would be expanded (and mangled) if it were
+# ``source``d by a shell, breaking Postgres auth for this job.
+#
+# The command is the app's virtualenv Python run directly against
+# ``manage.py`` — the same shape as the ``Run Django migrations`` /
+# ``Collect static files`` tasks in ``tasks/main.yml``.
+#
+# Executed as the unprivileged application user (``{{ m2s_app_user }}``).
+# BaseCronJobCommand's Postgres-backed distributed lock means concurrent runs
+# (e.g. manual + timer) are serialized safely.
+#
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+[Unit]
+Description=Manage2Soar django-axes cleanup (issue #1110)
+Documentation=man:cleanup_login_attempts
+Wants=postgresql.service
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+User={{ m2s_app_user }}
+Group={{ m2s_app_group }}
+WorkingDirectory={{ m2s_app_home }}/app
+# ``EnvironmentFile`` loads the file as literal KEY=VALUE pairs (no shell
+# expansion), matching gunicorn.service, so unquoted secret values in env.j2
+# (e.g. DB_PASSWORD) are preserved exactly as written.
+EnvironmentFile={{ m2s_app_home }}/app/.env
+# Invoke the virtualenv Python directly (NOT the manage.sh wrapper): the
+# wrapper bash-sources .env, which would shell-expand unquoted secrets such as
+# DB_PASSWORD. EnvironmentFile passes them through verbatim.
+ExecStart={{ m2s_venv_path }}/bin/python {{ m2s_app_home }}/app/manage.py cleanup_login_attempts --verbosity=1
+# Same 5-minute budget as the K8s CronJob's activeDeadlineSeconds.
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

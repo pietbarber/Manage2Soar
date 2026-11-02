@@ -33,6 +33,7 @@ from cms.pdf_proxy import (
 from members.decorators import active_member_required
 from members.utils import is_active_member
 from utils.email_helpers import get_absolute_club_logo_url
+from utils.ip_utils import get_client_ip as _get_client_ip  # Issue #1110: shared helper
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .models import Document, Page, PageMemberPermission, PageRolePermission
@@ -630,16 +631,6 @@ def contact_success(request):
             "site_config": site_config,
         },
     )
-
-
-def _get_client_ip(request):
-    """Get the visitor's IP address for logging purposes."""
-    x_forwarded_for = request.headers.get("x-forwarded-for")
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(",")[0]
-    else:
-        ip = request.META.get("REMOTE_ADDR")
-    return ip
 
 
 def _is_spam_contact_submission(contact_submission, site_config):

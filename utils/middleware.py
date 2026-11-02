@@ -127,8 +127,9 @@ class KioskAutoLoginMiddleware:
         return kiosk_token.user
 
     def _get_client_ip(self, request):
-        """Extract client IP address from request, handling proxies."""
-        x_forwarded_for = request.headers.get("x-forwarded-for")
-        if x_forwarded_for:
-            return x_forwarded_for.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR")
+        # Issue #1110: delegate to the shared helper so all per-IP logic in
+        # the codebase (kiosk, login throttle, contact form) agrees on which
+        # IP is "the client" behind the GKE load balancer.
+        from utils.ip_utils import get_client_ip
+
+        return get_client_ip(request)
