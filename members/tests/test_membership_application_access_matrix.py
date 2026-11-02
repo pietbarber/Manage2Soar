@@ -1,7 +1,7 @@
 """Endpoint-level baseline for legacy membership application access rules."""
 
 import pytest
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.urls import reverse
 
 from members.models import Member
@@ -66,6 +66,13 @@ def actor(db):
         if role == "director_group":
             group = Group.objects.get(name="Directors")
             member.groups.add(group)
+        if role == "capability_only":
+            permission = Permission.objects.get(
+                content_type__app_label="members",
+                content_type__model="membershipapplication",
+                codename="view_membership_applications",
+            )
+            member.user_permissions.add(permission)
         if role in {"kiosk", "kiosk_manager"}:
             # A kiosk role account is login-enabled despite inactive membership.
             Member.objects.filter(pk=member.pk).update(is_active=True)
@@ -106,6 +113,7 @@ def _url(endpoint, application):
         ("ordinary", 403),
         ("director", 200),
         ("director_group", 200),
+        ("capability_only", 200),
         ("member_manager", 200),
         ("webmaster", 200),
         ("superuser", 200),
@@ -127,7 +135,7 @@ def test_management_get_access(client, actor, application, role, expected, endpo
         assert "login" in response.url
     elif expected == 200:
         assert response.context["can_modify"] is (
-            role not in {"director", "director_group"}
+            role not in {"director", "director_group", "capability_only"}
         )
 
 
@@ -138,6 +146,8 @@ def test_management_get_access(client, actor, application, role, expected, endpo
     [
         ("ordinary", 403),
         ("director", 403),
+        ("director_group", 403),
+        ("capability_only", 403),
         ("staff_only", 403),
         ("group_only", 403),
         ("anonymous", 302),
@@ -230,20 +240,42 @@ def test_authorized_reviewer_can_reorder_waitlist(client, actor, application, ro
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("role", "expected"),
-    [("ordinary", 403), ("director", 200), ("member_manager", 200), ("anonymous", 302)],
+    [
+        ("ordinary", 403),
+        ("director", 200),
+        ("director_group", 200),
+        ("capability_only", 200),
+        ("member_manager", 200),
+        ("webmaster", 200),
+        ("superuser", 200),
+        ("staff_only", 403),
+        ("group_only", 403),
+        ("anonymous", 302),
+        ("inactive_manager", 302),
+        ("kiosk", 403),
+        ("kiosk_manager", 403),
+    ],
 )
 def test_list_post_uses_same_read_gate_as_get(
     client, actor, application, role, expected
 ):
     _login(client, actor, role)
 
-    response = client.post(_url("list", application), {"review_action": "reject"})
+    response = client.post(
+        _url("list", application),
+        {"review_action": "reject", "admin_notes": "Unauthorized edit"},
+    )
 
     assert response.status_code == expected
     if expected == 200:
-        assert response.context["can_modify"] is (role != "director")
+        assert response.context["can_modify"] is (
+            role not in {"director", "director_group", "capability_only"}
+        )
+    elif expected == 302:
+        assert "login" in response.url
     application.refresh_from_db()
     assert application.status == "pending"
+    assert application.admin_notes != "Unauthorized edit"
 
 
 @pytest.mark.django_db
