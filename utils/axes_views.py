@@ -27,6 +27,7 @@ from django.forms.forms import NON_FIELD_ERRORS
 from django.forms.utils import ErrorDict, ErrorList
 from django.http import HttpRequest, HttpResponse, HttpResponseBase, JsonResponse
 from django.template import loader
+from django.views.decorators.cache import add_never_cache_headers
 
 # The generic invalid-credential error, identical to the one Django's
 # AuthenticationForm emits for a wrong password, so the throttled response is
@@ -48,6 +49,15 @@ def lockout_response(
     indistinguishable from a normal failed login.  Uses a single, consistent
     status code (429) for both HTML and XHR clients, and never reveals whether
     the throttle is IP-based or username-based.
+
+    ``AxesMiddleware`` replaces the view's response *after* the security
+    middlewares (``XFrameOptionsMiddleware`` in particular) have already run
+    on the original response, so the fresh response produced here would not
+    inherit the ``X-Frame-Options`` and never-cache headers that an ordinary
+    failed login carries.  ``add_never_cache_headers`` and the explicit
+    ``X-Frame-Options`` assignment below close that gap for both the HTML and
+    JSON paths, so a throttled login form is at least as protected as a
+    normal one.
     """
     # Use a display-only (unbound) form so nothing re-authenticates the rejected
     # credentials: binding the POST data would run ``clean()``/``authenticate()``
@@ -74,7 +84,19 @@ def lockout_response(
 
     status = 429
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
-        return JsonResponse({"error": body}, status=status)
-    response = HttpResponse(body, status=status)
-    response["Content-Type"] = "text/html; charset=utf-8"
+        response = JsonResponse({"error": body}, status=status)
+    else:
+        response = HttpResponse(body, status=status)
+        response["Content-Type"] = "text/html; charset=utf-8"
+
+    # AxesMiddleware replaces the view's response after XFrameOptionsMiddleware
+    # has already run on the original response, so this fresh response would
+    # not inherit the frame / cache protections an ordinary failed login
+    # carries.  Apply them explicitly to BOTH the HTML and JSON responses so a
+    # throttled login form is at least as protected as a normal one (Issue
+    # #1110 review).
+    add_never_cache_headers(response)
+    xfo = getattr(settings, "X_FRAME_OPTIONS", "DENY")
+    if xfo:
+        response["X-Frame-Options"] = str(xfo).upper()
     return response

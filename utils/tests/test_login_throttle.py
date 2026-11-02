@@ -62,10 +62,11 @@ def _failed_login(client, username, password="wrongpass", ip="1.2.3.4"):
 
 def _delete_all_attempts():
     """Reset all axes state between tests."""
-    from axes.models import AccessAttempt, AccessFailureLog
+    from axes.models import AccessAttempt, AccessFailureLog, AccessLog
 
     AccessAttempt.objects.all().delete()
     AccessFailureLog.objects.all().delete()
+    AccessLog.objects.all().delete()
 
 
 def _reset_axes():
@@ -499,6 +500,39 @@ class TestLockoutResponseRendering:
         # Consistent status for XHR (same 429 as the HTML path).
         assert resp.status_code == 429
 
+    def test_html_lockout_has_frame_and_cache_protection(self):
+        """The throttled HTML response must carry the X-Frame-Options and
+        never-cache protections that an ordinary failed login carries.
+
+        AxesMiddleware replaces the view's response *after* XFrameOptionsMiddleware
+        has run on the original response, so the callable must apply these
+        headers itself (Issue #1110 review).
+        """
+        resp = self._lock("10.16.0.1")
+        assert resp.status_code == 429
+        # X-Frame-Options present and matches the project default (DENY).
+        assert resp["X-Frame-Options"] == "DENY"
+        # Never-cache directive (from add_never_cache_headers).
+        assert "no-store" in resp["Cache-Control"].lower()
+
+    def test_xhr_lockout_has_frame_and_cache_protection(self):
+        """The throttled XHR/JSON response must carry the same protections."""
+        _make_member("hdr_user")
+        _reset_axes()
+        client = Client()
+        for _ in range(LIMIT - 1):
+            _failed_login(client, "hdr_user", ip="10.17.0.1")
+        _failed_login(client, "hdr_user", ip="10.17.0.1")
+        resp = client.post(
+            reverse("login"),
+            {"username": "hdr_user", "password": "wrong"},
+            HTTP_X_FORWARDED_FOR="10.17.0.1",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert resp.status_code == 429
+        assert resp["X-Frame-Options"] == "DENY"
+        assert "no-store" in resp["Cache-Control"].lower()
+
 
 @pytest.mark.django_db
 class TestSharedStorage:
@@ -644,6 +678,63 @@ class TestCleanupCommand:
         # Dry run should NOT delete
         assert AccessAttempt.objects.filter(ip_address="10.9.9.9").count() >= 1
 
+    def test_deletes_old_access_logs(self):
+        """django-axes 8.x inserts an AccessLog row per successful login
+        (AXES_DISABLE_ACCESS_LOG defaults to False).  The cleanup must apply
+        the same 24-hour retention to AccessLog, not just to the attempt and
+        failure tables (Issue #1110 review)."""
+        from axes.models import AccessLog
+
+        _make_member("waldo")
+        _reset_axes()
+
+        # Simulate a successful-login audit row created by axes.
+        log = AccessLog.objects.create(
+            username="waldo",
+            ip_address="10.18.0.1",
+            user_agent="test-agent",
+            http_accept="text/html",
+            path_info="/login/",
+            session_hash="abc123",
+        )
+
+        # Backdate past the 24h retention horizon.
+        old_time = timezone.now() - timedelta(hours=25)
+        AccessLog.objects.filter(pk=log.pk).update(attempt_time=old_time)
+
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command("cleanup_login_attempts", "--force", stdout=out)
+
+        assert AccessLog.objects.filter(ip_address="10.18.0.1").count() == 0
+
+    def test_preserves_recent_access_logs(self):
+        """A fresh AccessLog (within the retention window) must be kept."""
+        from axes.models import AccessLog
+
+        _make_member("xena")
+        _reset_axes()
+        AccessLog.objects.create(
+            username="xena",
+            ip_address="10.19.0.1",
+            user_agent="test-agent",
+            http_accept="text/html",
+            path_info="/login/",
+            session_hash="def456",
+        )
+
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command("cleanup_login_attempts", "--force", stdout=out)
+
+        assert AccessLog.objects.filter(ip_address="10.19.0.1").count() == 1
+
 
 @pytest.mark.django_db
 class TestKioskUnaffected:
@@ -720,7 +811,10 @@ class TestProviderAuthExemptFromThrottle:
         class _Provider(BaseAuth):
             pass
 
-        return _Provider(_StubStrategy(), redirect_uri="http://test.local/cb/")
+        return _Provider(
+            _StubStrategy(),  # type: ignore[arg-type]
+            redirect_uri="http://test.local/cb/",
+        )
 
     def test_provider_call_is_exempt_when_ip_is_locked(self):
         """A Google OAuth callback from a password-throttled IP must NOT be
@@ -747,7 +841,11 @@ class TestProviderAuthExemptFromThrottle:
             request,
             username=None,
             password=None,
-            backend=self._provider_backend(),
+            # The 'backend' kwarg is intentionally a social_core BaseAuth
+            # instance (that is how DjangoStrategy.authenticate signals a
+            # provider call); AxesCompatBackend.authenticate accepts **kwargs
+            # typed as dict, so Pylance flags the non-dict value.
+            backend=self._provider_backend(),  # type: ignore[arg-type]
             response={},
         )
         assert result is None, (

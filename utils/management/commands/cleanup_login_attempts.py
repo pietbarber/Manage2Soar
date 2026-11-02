@@ -1,7 +1,7 @@
 """
 CronJob command that cleans up stale django-axes rows (Issue #1110).
 
-django-axes (v8) stores two kinds of per-attempt rows in PostgreSQL:
+django-axes (v8) stores three kinds of per-attempt rows in PostgreSQL:
 
 - ``axes.models.AccessAttempt`` — one row per (username, IP, user-agent)
   combination, with a ``failures_since_start`` counter and an
@@ -9,8 +9,12 @@ django-axes (v8) stores two kinds of per-attempt rows in PostgreSQL:
   This is what the throttle budget is computed from.
 - ``axes.models.AccessFailureLog`` — one row per failed login, kept for
   auditing.
+- ``axes.models.AccessLog`` — one row per *successful* login.  django-axes
+  8.x defaults ``AXES_DISABLE_ACCESS_LOG`` to ``False``, so every successful
+  password, Google, or kiosk login inserts a row here.  Without retention
+  this audit table grows unboundedly, so it is included in the same cleanup.
 
-Without cleanup both tables grow unboundedly — in a production deployment
+Without cleanup these tables grow unboundedly — in a production deployment
 behind a load balancer, every attempt from every user on the internet
 lands on the same row set (the IP column is the *real* client IP thanks
 to ``AXES_CLIENT_IP_CALLABLE`` in ``manage2soar/settings.py``).
@@ -47,14 +51,14 @@ RETENTION_HOURS = 24
 
 
 class Command(BaseCronJobCommand):
-    help = "Delete stale django-axes AccessAttempt/AccessFailureLog rows (Issue #1110 cleanup)."
+    help = "Delete stale django-axes AccessAttempt/AccessFailureLog/AccessLog rows (Issue #1110 cleanup)."
     job_name = "cleanup_login_attempts"
     max_execution_time = timedelta(minutes=5)
 
     def execute_job(self, *args, **options):
         # Local import keeps the module importable even if axes is absent
         # (e.g. in a test harness that doesn't install it).
-        from axes.models import AccessAttempt, AccessFailureLog
+        from axes.models import AccessAttempt, AccessFailureLog, AccessLog
 
         cutoff = timezone.now() - timedelta(hours=RETENTION_HOURS)
 
@@ -65,16 +69,21 @@ class Command(BaseCronJobCommand):
             failure_count = AccessFailureLog.objects.filter(
                 attempt_time__lt=cutoff
             ).count()
+            access_log_count = AccessLog.objects.filter(attempt_time__lt=cutoff).count()
             self.log_info(
-                f"Would delete {attempt_count} AccessAttempt row(s) and "
-                f"{failure_count} AccessFailureLog row(s) older than {RETENTION_HOURS} h"
+                f"Would delete {attempt_count} AccessAttempt, "
+                f"{failure_count} AccessFailureLog, and "
+                f"{access_log_count} AccessLog row(s) older than {RETENTION_HOURS} h"
             )
             return
 
         # AccessAttempt is a OneToOne source of AccessAttemptExpiration, so
         # deleting the attempt cascades to its expiration row automatically.
+        # AccessLog has no sidecar and is retained on the same 24-hour
+        # horizon as the other two tables (django-axes 8.x creates one row
+        # per successful login by default — AXES_DISABLE_ACCESS_LOG is False).
         deleted_details = {}
-        for model in (AccessAttempt, AccessFailureLog):
+        for model in (AccessAttempt, AccessFailureLog, AccessLog):
             deleted, _details = model.objects.filter(attempt_time__lt=cutoff).delete()
             deleted_details[model.__name__] = deleted
 
