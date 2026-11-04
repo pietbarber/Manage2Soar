@@ -130,6 +130,17 @@ def test_go_live_folds_member_balances_into_the_opening_entry(
     assert verify_books() == []
 
 
+def test_go_live_with_no_bank_balance_opens_with_member_balances(treasurer, member):
+    charge(member, treasurer, "60", when=TODAY() - timedelta(days=1))
+
+    start_books(treasurer, amount="0")
+
+    assert account_balance(receivables()) == D("60.00")
+    general_fund = Account.objects.get(system_role=Account.Role.GENERAL_FUND)
+    assert account_balance(general_fund) == D("60.00")
+    assert verify_books() == []
+
+
 def test_member_entries_wait_for_go_live(treasurer, member):
     entry = charge(member, treasurer)
     assert not JournalEntry.objects.exists()

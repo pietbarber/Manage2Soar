@@ -821,11 +821,12 @@ def go_live(*, actor, start_date, rows):
         else:
             lines.append(Line(account=account, credit=_money(-amount)))
             total -= _money(-amount)
-    if not lines:
-        raise ValidationError("Enter at least one bank balance.")
     for line in _opening_receivables_lines(start_date):
         lines.append(line)
         total += line.debit - line.credit
+    # Member balances alone can open the books, e.g. $0 in Checking.
+    if not lines:
+        raise ValidationError("Enter at least one bank balance.")
     if total > 0:
         lines.append(Line(account=general_fund, credit=total))
     elif total < 0:
