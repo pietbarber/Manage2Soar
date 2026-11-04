@@ -151,7 +151,7 @@ isort==9.0.1
     # via -r requirements.in
 jinja2==3.1.6
     # via -r requirements.in
-joserfc==1.7.5
+joserfc==1.7.6
     # via authlib
 license-expression==30.4.4
     # via cyclonedx-python-lib
@@ -231,7 +231,7 @@ psycopg2-binary==2.9.13
     # via -r requirements.in
 py-serializable==2.1.0
     # via cyclonedx-python-lib
-pyasn1==0.6.4
+pyasn1==0.6.5
     # via pyasn1-modules
 pyasn1-modules==0.4.2
     # via google-auth
@@ -307,9 +307,9 @@ ruff==0.16.9
     # via -r requirements.in
 six==1.17.0
     # via python-dateutil
-social-auth-app-django==6.0.1
+social-auth-app-django==7.2.0
     # via -r requirements.in
-social-auth-core==5.1.1
+social-auth-core==6.2.0
     # via
     #   -r requirements.in
     #   social-auth-app-django
