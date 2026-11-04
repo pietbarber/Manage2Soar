@@ -4282,28 +4282,14 @@ def maintenance_log(request):
 #################################################
 
 
+@require_POST
 @active_member_required
 def mark_issue_resolved(request, issue_id):
     issue = get_object_or_404(MaintenanceIssue, pk=issue_id)
 
-    # Check if this user is the AircraftMeister for the aircraft
-    member = request.user
-    if issue.glider:
-        if not AircraftMeister.objects.filter(
-            glider=issue.glider, meister=member
-        ).exists():
-            messages.error(
-                request, "You are not authorized to resolve issues for this glider."
-            )
-            return redirect("logsheet:maintenance_issues")
-    elif issue.towplane:
-        if not AircraftMeister.objects.filter(
-            towplane=issue.towplane, meister=member
-        ).exists():
-            messages.error(
-                request, "You are not authorized to resolve issues for this towplane."
-            )
-            return redirect("logsheet:maintenance_issues")
+    if not issue.can_be_resolved_by(request.user):
+        messages.error(request, "You are not authorized to resolve this issue.")
+        return redirect("logsheet:maintenance_issues")
 
     issue.resolved = True
     issue.grounded = False  # in case it was grounded
@@ -4349,7 +4335,7 @@ def resolve_maintenance_modal(request, issue_id):
 #
 # Behavior:
 # - Fetches the MaintenanceIssue by ID.
-# - (Permission checks assumed same as modal trigger; only active members allowed.)
+# - Verifies the user is authorized for the issue's specific aircraft.
 # - Records the resolving member and the resolution date.
 # - Saves resolution notes if provided, or applies a default note if none exist.
 # - Marks the issue as resolved and saves the update.
@@ -4369,7 +4355,8 @@ def resolve_maintenance_modal(request, issue_id):
 def resolve_maintenance_issue(request, issue_id):
     issue = get_object_or_404(MaintenanceIssue, id=issue_id)
 
-    # (same permission checks as before)
+    if not issue.can_be_resolved_by(request.user):
+        return HttpResponseForbidden("You're not allowed to resolve this issue.")
 
     notes = request.POST.get("notes", "").strip()
 
