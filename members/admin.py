@@ -1,5 +1,6 @@
 import csv
 import logging
+from urllib.parse import unquote
 
 from django import forms
 from django.contrib import admin
@@ -8,7 +9,7 @@ from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.contrib.auth.models import Group
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, router, transaction
 from django.http import HttpResponse
 from django.utils.html import format_html
@@ -601,6 +602,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         "Webmasters": "webmaster",
         "Secretary": "secretary",
         "Treasurer": "treasurer",
+        "Stats Mongers": "stats_monger",
     }
     privilege_fields = {
         "is_superuser",
@@ -809,6 +811,23 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             )
             for title, options in fieldsets
         )
+
+    def user_change_password(self, request, id, form_url=""):
+        """Keep limited member editors from changing another account's password.
+
+        ``UserAdmin`` exposes password changes through a separate URL, so
+        removing the password field from the regular member form is not
+        sufficient.  Limited editors may still use this endpoint for their
+        own account; superusers retain the normal UserAdmin behavior.
+        """
+        user = self.get_object(request, unquote(id))
+        if (
+            user is not None
+            and self._limited_member_editor(request)
+            and user.pk != request.user.pk
+        ):
+            raise PermissionDenied
+        return super().user_change_password(request, id, form_url)
 
     @admin.display(description="Current Photo")
     def profile_photo_preview(self, obj):

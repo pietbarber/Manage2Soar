@@ -98,7 +98,13 @@ CAPABILITY_GRANTS = {
         "cms.change_page",
         "duty_roster.view_all_swap_requests",
     ),
-    "instructor_admins": ("duty_roster.view_all_swap_requests",),
+    "instructor_admins": (
+        "duty_roster.view_all_swap_requests",
+        "knowledgetest.start_unassigned_written_test",
+        "knowledgetest.delete_any_written_test_attempt",
+        "knowledgetest.view_recent_written_tests",
+        "knowledgetest.delete_any_pending_written_test_assignment",
+    ),
 }
 
 

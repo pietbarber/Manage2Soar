@@ -118,6 +118,24 @@ class TestSafetyOfficerRequired:
         response = client.get(url)
         assert response.status_code == 200
 
+    def test_capability_grant_allows_access_without_legacy_flag(self, client, db):
+        member = Member.objects.create_user(
+            username="capability_only",
+            password="testpass123",
+            membership_status="Full Member",
+            safety_officer=False,
+        )
+        member.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="members", codename="access_safety_reports"
+            )
+        )
+
+        client.force_login(member)
+        response = client.get(reverse("members:safety_report_list"))
+
+        assert response.status_code == 200
+
     def test_superuser_has_access(self, client, superuser):
         """Superusers should have access."""
         client.login(username="admin", password="testpass123")
@@ -140,7 +158,7 @@ class TestSafetyOfficerRequired:
         client.force_login(inactive_officer)
 
         # Mock is_active_member to return False (simulating inactive membership)
-        with patch("members.decorators.is_active_member", return_value=False):
+        with patch("members.authorization.is_active_member", return_value=False):
             url = reverse("members:safety_report_list")
             response = client.get(url)
             assert response.status_code == 403
@@ -233,6 +251,29 @@ class TestSafetyReportDetailView:
         safety_report.refresh_from_db()
         assert safety_report.status == "reviewed"
         assert safety_report.reviewed_by == safety_officer
+
+    def test_denied_post_does_not_mutate_report(
+        self, client, regular_member, safety_report
+    ):
+        """Denied users cannot update a safety report."""
+        client.login(username="regular_member", password="testpass123")
+        url = reverse("members:safety_report_detail", args=[safety_report.pk])
+
+        response = client.post(
+            url,
+            {
+                "status": "reviewed",
+                "officer_notes": "Unauthorized update",
+                "actions_taken": "Unauthorized action",
+            },
+        )
+
+        assert response.status_code == 403
+        safety_report.refresh_from_db()
+        assert safety_report.status == "new"
+        assert safety_report.officer_notes is None
+        assert safety_report.actions_taken is None
+        assert safety_report.reviewed_by is None
 
     def test_can_add_officer_notes(self, client, safety_officer, safety_report):
         """Safety officer can add internal notes."""

@@ -8,7 +8,7 @@ import logging
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import models
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete
 from django.dispatch import receiver
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -25,9 +25,59 @@ from .models import (
     MemberRoleAssignmentEvent,
     RoleMetadata,
 )
-from .role_audit import get_actor
+from .role_audit import get_actor, is_internal_group_write
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(m2m_changed, sender=Member.groups.through)
+def warn_external_member_group_write(
+    sender, instance, action, reverse, model, pk_set, using, **kwargs
+):
+    """Warn about direct Group membership writes without changing them."""
+    if is_internal_group_write():
+        return
+    if action not in {"post_add", "post_remove", "pre_clear"}:
+        return
+
+    if reverse:
+        group_ids = [instance.pk]
+        member_ids = sorted(pk_set or ())
+        if action == "pre_clear":
+            member_ids = sorted(
+                sender.objects.using(using)
+                .filter(group_id=instance.pk)
+                .values_list("member_id", flat=True)
+            )
+    else:
+        member_ids = [instance.pk]
+        group_ids = sorted(pk_set or ())
+        if action == "pre_clear":
+            group_ids = sorted(
+                sender.objects.using(using)
+                .filter(member_id=instance.pk)
+                .values_list("group_id", flat=True)
+            )
+
+    actor = get_actor()
+
+    logger.warning(
+        "External Member.groups write detected",
+        extra={
+            "event": "external_member_group_write",
+            "action": action,
+            "operation": (
+                "clear" if action == "pre_clear" else action.removeprefix("post_")
+            ),
+            "member_id": instance.pk if not reverse else None,
+            "member_ids": member_ids,
+            "group_id": instance.pk if reverse else None,
+            "group_ids": group_ids,
+            "actor_id": getattr(actor, "pk", None),
+            "actor": getattr(actor, "username", None),
+            "using": using,
+        },
+    )
 
 
 def _deleting_model(origin):

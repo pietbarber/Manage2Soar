@@ -7,11 +7,16 @@ VIEW_ALL_SWAP_REQUESTS_PERMISSION = "duty_roster.view_all_swap_requests"
 
 
 def has_rostermeister_access(user):
-    """Return whether *user* has the legacy rostermeister role."""
+    """Return whether an active account may use rostermeister workflows."""
+    if (
+        not user
+        or not getattr(user, "is_authenticated", False)
+        or not getattr(user, "is_active", False)
+        or not is_active_member(user)
+    ):
+        return False
     return bool(
-        user
-        and getattr(user, "is_authenticated", False)
-        and getattr(user, "rostermeister", False)
+        getattr(user, "is_superuser", False) or getattr(user, "rostermeister", False)
     )
 
 

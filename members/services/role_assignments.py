@@ -14,7 +14,7 @@ from members.models import (
     MemberRoleAssignment,
     RoleMetadata,
 )
-from members.role_audit import actor_scope
+from members.role_audit import actor_scope, internal_group_write_scope
 
 
 def delete_role_assignments(assignments, *, actor):
@@ -80,7 +80,8 @@ def set_manual_role(member, group, *, enabled: bool, actor=None, source_key="adm
                     source_key=source_key,
                     defaults={"actor_id": locked_actor.pk if locked_actor else None},
                 )
-            locked_member.groups.db_manager(using).add(locked_group.pk)
+            with internal_group_write_scope():
+                locked_member.groups.db_manager(using).add(locked_group.pk)
         else:
             # The deletion signal appends the revoke event so that direct and
             # cascade assignment deletion is audited consistently.
@@ -91,6 +92,8 @@ def set_manual_role(member, group, *, enabled: bool, actor=None, source_key="adm
                 .exists()
             )
             if remaining:
-                locked_member.groups.db_manager(using).add(locked_group.pk)
+                with internal_group_write_scope():
+                    locked_member.groups.db_manager(using).add(locked_group.pk)
             elif deleted:
-                locked_member.groups.db_manager(using).remove(locked_group.pk)
+                with internal_group_write_scope():
+                    locked_member.groups.db_manager(using).remove(locked_group.pk)

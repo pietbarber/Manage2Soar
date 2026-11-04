@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -166,3 +168,17 @@ def test_legacy_flag_sync_survives_manual_revocation(member):
     assert MemberRoleAssignment.objects.filter(
         member=member, group=group, source="legacy", source_key="instructor"
     ).exists()
+
+
+@pytest.mark.django_db
+def test_legacy_sync_group_write_does_not_warn(member, caplog):
+    member.instructor = True
+    member.save()
+    caplog.set_level(logging.WARNING, logger="members.signals")
+
+    member._sync_groups()
+
+    assert not any(
+        getattr(record, "event", None) == "external_member_group_write"
+        for record in caplog.records
+    )

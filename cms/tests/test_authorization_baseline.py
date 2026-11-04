@@ -2,14 +2,14 @@
 
 import pytest
 from django.contrib.admin.sites import AdminSite
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Group, Permission
 from django.test import RequestFactory
 from django.urls import reverse
 
 from cms.admin import PageAdmin
 from cms.models import Page, PageMemberPermission, PageRolePermission
 from cms.views import can_create_in_directory, can_edit_page
-from members.models import Member
+from members.models import Member, RoleMetadata
 
 
 @pytest.fixture
@@ -79,6 +79,43 @@ def test_private_page_role_rows_use_or_semantics(pages, principals):
     principals["member"].save(update_fields=["treasurer"])
 
     assert page.can_user_access(principals["member"]) is True
+
+
+@pytest.mark.django_db
+def test_global_cms_view_capability_does_not_bypass_page_role_restriction(
+    pages, principals
+):
+    view_only_group = Group.objects.create(name="CMS Viewers")
+    RoleMetadata.objects.create(
+        group=view_only_group,
+        key="cms_viewers",
+        display_name="CMS Viewers",
+    )
+    view_only_group.permissions.add(
+        Permission.objects.get(
+            content_type__app_label="cms",
+            content_type__model="page",
+            codename="view_page",
+        )
+    )
+    principals["member"].groups.add(view_only_group)
+
+    assert principals["member"].has_perm("cms.view_page") is True
+    assert pages["restricted"].can_user_access(principals["member"]) is False
+
+    principals["member"].director = True
+    principals["member"].save(update_fields=["director"])
+    assert pages["restricted"].can_user_access(principals["member"]) is True
+
+
+@pytest.mark.django_db
+def test_required_role_and_editor_context_still_grant_view(pages, principals):
+    assert pages["restricted"].can_user_access(principals["director"]) is True
+
+    PageMemberPermission.objects.create(
+        page=pages["restricted"], member=principals["editor"]
+    )
+    assert pages["restricted"].can_user_access(principals["editor"]) is True
 
 
 @pytest.mark.django_db

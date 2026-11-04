@@ -27,6 +27,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from duty_roster.permissions import (
+    has_all_swap_requests_access,
     has_duty_delinquents_access,
     has_rostermeister_access,
 )
@@ -1096,7 +1097,7 @@ def duty_calendar_view(request, year=None, month=None):
         original_date__in=visible_dates,
     )
     if request.user.is_authenticated:
-        if not request.user.has_perm("duty_roster.view_dutyswaprequest"):
+        if not has_all_swap_requests_access(request.user):
             open_swap_queryset = open_swap_queryset.filter(
                 models.Q(request_type="general")
                 | (
@@ -1560,7 +1561,7 @@ def calendar_day_detail(request, year, month, day):
         original_date=day_date,
     )
     if request.user.is_authenticated:
-        if not request.user.has_perm("duty_roster.view_dutyswaprequest"):
+        if not has_all_swap_requests_access(request.user):
             open_swap_requests_queryset = open_swap_requests_queryset.filter(
                 models.Q(request_type="general")
                 | (

@@ -71,8 +71,8 @@ class EditingPermissionFunctionTests(TestCase):
         self.assertTrue(can_edit_page(self.webmaster, self.member_page))
         self.assertTrue(can_edit_page(self.webmaster, self.board_page))
 
-    def test_registered_page_capabilities_grant_officer_access_without_flags(self):
-        """Explicit CMS capabilities replace role booleans for new grants."""
+    def test_registered_page_capabilities_keep_edit_access_without_role_flags(self):
+        """The edit capability grants view through the editor context."""
         content_type = ContentType.objects.get_for_model(Page)
         self.member.user_permissions.add(
             *Permission.objects.filter(

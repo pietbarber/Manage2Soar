@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
@@ -275,6 +277,78 @@ def test_direct_assignment_creation_uses_actor_scope(audit_member, audit_group):
     event = MemberRoleAssignmentEvent.objects.get()
     assert event.actor_id == actor.pk
     assert event.actor_username == "scoped-actor"
+
+
+@pytest.mark.django_db
+def test_external_group_write_logs_structured_warning_without_provenance(
+    audit_member, audit_group, caplog
+):
+    caplog.set_level(logging.WARNING, logger="members.signals")
+
+    audit_member.groups.add(audit_group)
+
+    warning = next(
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "external_member_group_write"
+    )
+    assert warning.action == "post_add"
+    assert warning.operation == "add"
+    assert warning.member_id == audit_member.pk
+    assert warning.group_ids == [audit_group.pk]
+    assert audit_member.groups.filter(pk=audit_group.pk).exists()
+    assert not MemberRoleAssignment.objects.filter(
+        member=audit_member, group=audit_group
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_reverse_group_write_logs_member_ids(audit_member, audit_group, caplog):
+    caplog.set_level(logging.WARNING, logger="members.signals")
+
+    audit_group.user_set.add(audit_member)
+
+    warning = next(
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "external_member_group_write"
+    )
+    assert warning.member_ids == [audit_member.pk]
+    assert warning.group_id == audit_group.pk
+
+
+@pytest.mark.django_db
+def test_group_clear_logs_affected_ids(audit_member, audit_group, caplog):
+    second_group = Group.objects.create(name="Audit role two")
+    audit_member.groups.add(audit_group, second_group)
+    caplog.clear()
+    caplog.set_level(logging.WARNING, logger="members.signals")
+
+    audit_member.groups.clear()
+
+    warning = next(
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "external_member_group_write"
+        and getattr(record, "operation", None) == "clear"
+    )
+    assert warning.member_id == audit_member.pk
+    assert warning.group_ids == sorted([audit_group.pk, second_group.pk])
+
+
+@pytest.mark.django_db
+def test_supported_role_assignment_group_write_does_not_warn(
+    audit_member, audit_group, caplog
+):
+    caplog.set_level(logging.WARNING, logger="members.signals")
+
+    set_manual_role(audit_member, audit_group, enabled=True)
+
+    assert not any(
+        getattr(record, "event", None) == "external_member_group_write"
+        for record in caplog.records
+    )
+    assert MemberRoleAssignmentEvent.objects.filter(action="grant").exists()
 
 
 @pytest.mark.django_db

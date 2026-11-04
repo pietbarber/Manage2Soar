@@ -19,6 +19,8 @@ from utils.upload_entropy import (
     upload_profile_photo_small,
 )
 
+from .role_audit import internal_group_write_scope
+
 # Membership application models are in models_applications.py to avoid circular imports
 from .utils.avatar_generator import generate_identicon
 
@@ -643,6 +645,8 @@ class Member(AbstractUser):
             names.append("Treasurer")
         if self.director:
             names.append("Directors")
+        if self.stats_monger:
+            names.append("Stats Mongers")
         return names
 
     def _sync_groups(self, using=None):
@@ -663,6 +667,7 @@ class Member(AbstractUser):
             from members.role_definitions import legacy_sync_group_names
 
             legacy_groups = legacy_sync_group_names()
+            legacy_groups["Stats Mongers"] = "stats_monger"
             desired = {
                 name: key
                 for name, key in legacy_groups.items()
@@ -689,15 +694,17 @@ class Member(AbstractUser):
                     .filter(member_id=locked_member.pk, group_id=assignment.group_id)
                     .exists()
                 ):
-                    locked_member.groups.db_manager(using).remove(assignment.group)
+                    with internal_group_write_scope():
+                        locked_member.groups.db_manager(using).remove(assignment.group)
 
             # Existing and newly-created provenance rows must be reflected in
             # the M2M table, but this deliberately never replaces the member's groups.
-            locked_member.groups.db_manager(using).add(
-                *Group.objects.using(using)
-                .filter(member_role_assignments__member_id=locked_member.pk)
-                .distinct()
-            )
+            with internal_group_write_scope():
+                locked_member.groups.db_manager(using).add(
+                    *Group.objects.using(using)
+                    .filter(member_role_assignments__member_id=locked_member.pk)
+                    .distinct()
+                )
 
     @classmethod
     def get_membership_status_choices(cls):

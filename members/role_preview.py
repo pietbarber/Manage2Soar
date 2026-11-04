@@ -11,7 +11,6 @@ from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
-from members.authorization import has_role_admin_access
 from members.models import RoleMetadata
 from members.role_definitions import ROLE_BY_KEY
 from members.utils.membership import is_active_member
@@ -19,6 +18,7 @@ from members.utils.membership import is_active_member
 SESSION_KEY = "role_preview"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 CONTROL_PATHS = {
+    "/members/role-preview/",
     "/members/role-preview/start/",
     "/members/role-preview/stop/",
 }
@@ -34,6 +34,37 @@ ROLE_FLAG_KEYS = (
     "webmaster",
 )
 logger = logging.getLogger(__name__)
+
+
+def _log_preview_event(request, outcome, *, role=None, debug=None, reason=None):
+    """Log a preview decision with fields usable by structured log handlers."""
+    user = getattr(request, "user", None)
+    actor = user.get_username() if user is not None else None
+    event = {
+        "outcome": outcome,
+        "actor": actor,
+        "role": role,
+        "debug": debug,
+        "reason": reason,
+        "method": request.method,
+        "path": request.path,
+    }
+    logger.info(
+        "Role preview event: outcome=%s actor=%s role=%s debug=%s reason=%s "
+        "method=%s path=%s",
+        outcome,
+        actor,
+        role,
+        debug,
+        reason,
+        request.method,
+        request.path,
+        extra={
+            **event,
+            "role_preview_event": event,
+            "role_preview_outcome": outcome,
+        },
+    )
 
 
 @dataclass(frozen=True)
@@ -55,24 +86,27 @@ class PreviewState:
 
 
 def can_manage_preview(user):
-    """Allow platform admins, plus staff developers in local DEBUG mode."""
+    """Allow only active superusers to manage role previews.
+
+    ``RoleMetadata.admin_access`` is an administrative-site entry grant, not a
+    role-preview capability.  Until a separate, deliberately scoped platform
+    administrator policy exists, ordinary role holders must not be able to
+    select an arbitrary role and project its permissions onto their account.
+    """
     if not user or not getattr(user, "is_authenticated", False):
         return False
     return bool(
-        getattr(user, "is_superuser", False)
-        or has_role_admin_access(user)
-        or (settings.DEBUG and getattr(user, "is_staff", False))
+        getattr(user, "is_active", False) and getattr(user, "is_superuser", False)
     )
 
 
 def _load_state(request):
     raw = request.session.get(SESSION_KEY)
-    if not raw:
+    if not raw or not isinstance(raw, dict):
         return None
     role_key = raw.get("role_key")
     metadata = RoleMetadata.objects.select_related("group").filter(key=role_key).first()
     if metadata is None:
-        request.session.pop(SESSION_KEY, None)
         return None
     permissions = frozenset(
         f"{permission.content_type.app_label}.{permission.codename}"
@@ -90,7 +124,16 @@ def _load_state(request):
 
 
 def get_preview_state(request):
-    return getattr(request, "role_preview", None) or _load_state(request)
+    # Middleware attaches the already-authorized state before projecting the
+    # user.  Do not re-check the projected user here: it intentionally no
+    # longer has superuser status.  Conversely, do not load a session state for
+    # an ordinary user who may have inherited or tampered with a stale session.
+    state = getattr(request, "role_preview", None)
+    if state is not None:
+        return state
+    if not can_manage_preview(getattr(request, "user", None)):
+        return None
+    return _load_state(request)
 
 
 def has_preview_group(user, group_name):
@@ -111,8 +154,10 @@ def _preview_manager_required(view):
     @wraps(view)
     def wrapped(request, *args, **kwargs):
         if not request.user.is_authenticated:
+            _log_preview_event(request, "rejected", reason="unauthenticated")
             return redirect_to_login(request.get_full_path())
         if not can_manage_preview(request.user):
+            _log_preview_event(request, "rejected", reason="not_authorized")
             return HttpResponseForbidden(
                 "Role preview is restricted to administrators."
             )
@@ -141,18 +186,23 @@ def start_role_preview(request):
     role_key = request.POST.get("role_key", "")
     metadata = _role_metadata().filter(key=role_key).first()
     if metadata is None:
+        _log_preview_event(
+            request, "rejected", role=role_key or None, reason="unknown_role"
+        )
         return HttpResponseForbidden("Unknown preview role.")
     debug = request.POST.get("debug") == "on"
     if debug and not settings.DEBUG:
+        _log_preview_event(
+            request,
+            "rejected",
+            role=metadata.key,
+            debug=debug,
+            reason="debug_disabled",
+        )
         return HttpResponseForbidden("Debug role preview is disabled.")
     request.session[SESSION_KEY] = {"role_key": metadata.key, "debug": debug}
     request.session.modified = True
-    logger.info(
-        "Role preview started: actor=%s role=%s debug=%s",
-        request.user.get_username(),
-        metadata.key,
-        debug,
-    )
+    _log_preview_event(request, "start", role=metadata.key, debug=debug)
     return redirect("members:role_preview")
 
 
@@ -162,10 +212,10 @@ def stop_role_preview(request):
     previous = request.session.get(SESSION_KEY)
     request.session.pop(SESSION_KEY, None)
     request.session.modified = True
-    logger.info(
-        "Role preview stopped: actor=%s role=%s",
-        request.user.get_username(),
-        previous.get("role_key") if previous else None,
+    _log_preview_event(
+        request,
+        "stop",
+        role=previous.get("role_key") if isinstance(previous, dict) else None,
     )
     return redirect("members:role_preview")
 
@@ -196,6 +246,13 @@ class RolePreviewMiddleware:
             and not state.debug
             and request.path not in CONTROL_PATHS
         ):
+            _log_preview_event(
+                request,
+                "blocked",
+                role=state.role_key,
+                debug=state.debug,
+                reason="read_only",
+            )
             return HttpResponseForbidden(
                 "Role preview is read-only. Enable DEBUG preview to test edits."
             )

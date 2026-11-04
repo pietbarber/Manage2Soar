@@ -2791,6 +2791,120 @@ class TestSwapVisibilityInCalendar:
         summary = response.context["open_swap_summary_by_date"][duty_date]
         assert summary["count"] == 1
 
+    def test_calendar_keeps_requesters_own_direct_swap_visible(
+        self, client, site_config, alice, bob
+    ):
+        duty_date = date.today() + timedelta(days=13)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        client.force_login(alice)
+        month_response = client.get(
+            reverse(
+                "duty_roster:duty_calendar_month",
+                kwargs={"year": duty_date.year, "month": duty_date.month},
+            )
+        )
+        day_response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                kwargs={
+                    "year": duty_date.year,
+                    "month": duty_date.month,
+                    "day": duty_date.day,
+                },
+            )
+        )
+
+        assert (
+            month_response.context["open_swap_summary_by_date"][duty_date]["count"] == 1
+        )
+        assert len(day_response.context["open_swap_requests"]) == 1
+
+    @pytest.mark.parametrize(
+        ("viewer_kind", "expected_count"),
+        [
+            ("Directors", 1),
+            ("Secretary", 2),
+            ("Treasurer", 2),
+            ("Member Managers", 2),
+            ("Instructor Admins", 2),
+            ("Rostermeisters", 2),
+            ("staff", 1),
+            ("ordinary", 1),
+            ("superuser", 2),
+        ],
+    )
+    def test_calendar_swap_visibility_uses_all_swap_requests_capability(
+        self,
+        client,
+        site_config,
+        alice,
+        bob,
+        viewer_kind,
+        expected_count,
+    ):
+        duty_date = date.today() + timedelta(days=13)
+        DutyAssignment.objects.create(date=duty_date, is_scheduled=True)
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="general",
+            status="open",
+        )
+        DutySwapRequest.objects.create(
+            requester=alice,
+            original_date=duty_date,
+            role="TOW",
+            request_type="direct",
+            direct_request_to=bob,
+            status="open",
+        )
+
+        viewer = Member.objects.create(
+            username=f"calendar-{viewer_kind.lower().replace(' ', '-')}",
+            first_name="Calendar",
+            last_name="Viewer",
+            email=f"calendar-{viewer_kind.lower().replace(' ', '-')}@example.com",
+            membership_status="Full Member",
+            is_staff=viewer_kind == "staff",
+            is_superuser=viewer_kind == "superuser",
+        )
+        if viewer_kind not in {"staff", "ordinary", "superuser"}:
+            viewer.groups.add(Group.objects.get(name=viewer_kind))
+
+        client.force_login(viewer)
+        month_response = client.get(
+            reverse(
+                "duty_roster:duty_calendar_month",
+                kwargs={"year": duty_date.year, "month": duty_date.month},
+            )
+        )
+        day_response = client.get(
+            reverse(
+                "duty_roster:calendar_day_detail",
+                kwargs={
+                    "year": duty_date.year,
+                    "month": duty_date.month,
+                    "day": duty_date.day,
+                },
+            )
+        )
+
+        assert (
+            month_response.context["open_swap_summary_by_date"][duty_date]["count"]
+            == expected_count
+        )
+        assert len(day_response.context["open_swap_requests"]) == expected_count
+
     def test_calendar_month_shows_direct_request_to_rostermeister(
         self, client, site_config, alice, bob
     ):

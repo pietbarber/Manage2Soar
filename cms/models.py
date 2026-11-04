@@ -549,11 +549,15 @@ class Page(models.Model):
         if "active_member" in required_roles:
             return True  # User already passed is_active_member check above
 
-        from .permissions import has_cms_view_access, has_legacy_cms_officer_access
+        # A global CMS view capability is intentionally not enough here: a
+        # page's stored role restrictions must remain an independent boundary.
+        # Officer compatibility is retained through the legacy helper, while
+        # explicit page editors are handled above via can_user_edit().
+        from .permissions import has_legacy_cms_officer_access
 
         return any(
             (
-                (has_cms_view_access(user) or has_legacy_cms_officer_access(user))
+                has_legacy_cms_officer_access(user)
                 if role in {"director", "secretary", "webmaster"}
                 else getattr(user, role, False)
             )

@@ -1,8 +1,9 @@
 from functools import wraps
 
 from django.contrib.auth.views import redirect_to_login
-from django.shortcuts import redirect, render
+from django.shortcuts import render
 
+from .authorization import resolve_authorization
 from .utils import is_active_member
 from .utils.kiosk import is_kiosk_session
 from .utils.permissions import SAFETY_REPORT_PERMISSION
@@ -66,17 +67,12 @@ def safety_officer_required(view_func):
         if not user.is_authenticated:
             return redirect_to_login(request.get_full_path())
 
-        # Superusers always have access
-        if user.is_superuser:
-            return view_func(request, *args, **kwargs)
-
-        # Check for active membership status
-        if not is_active_member(user):
-            return render(request, "403.html", status=403)
-
-        # Check the explicit capability; the legacy role flag is not an auth
-        # source (it remains for reporting and mailing-list behavior).
-        if user.has_perm(SAFETY_REPORT_PERMISSION):
+        decision = resolve_authorization(
+            user,
+            SAFETY_REPORT_PERMISSION,
+            require_active_member=True,
+        )
+        if decision.allow:
             return view_func(request, *args, **kwargs)
 
         return render(request, "403.html", status=403)
