@@ -101,7 +101,7 @@ def _filtered_entries(request):
                 | Q(payee__icontains=query)
                 | Q(reference__icontains=query)
             )
-    entries = entries.distinct().select_related("created_by", "reverses")
+    entries = entries.distinct().select_related("created_by", "reverses", "reversal")
     entries = entries.prefetch_related(
         Prefetch(
             "lines",
