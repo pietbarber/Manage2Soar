@@ -1,6 +1,7 @@
 import re
 import smtplib
 from datetime import timedelta
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -9,12 +10,15 @@ from django.contrib.auth.tokens import default_token_generator
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core import signing
+from django.http import HttpResponse
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from social_core.pipeline.user import user_details
+from social_core.storage import UserProtocol
+from social_core.strategy import BaseStrategy
 
 from members.admin import CustomMemberChangeForm
 from members.forms import PasswordResetConfirmForm
@@ -165,7 +169,7 @@ def test_email_change_request_uses_locked_member_state(
         reverse("members:request_email_change"), {"email": "new@example.com"}
     )
     request.user = stale_member
-    SessionMiddleware(lambda req: None).process_request(request)
+    SessionMiddleware(lambda req: HttpResponse()).process_request(request)
     request.session.save()
     request._messages = FallbackStorage(request)
 
@@ -175,9 +179,9 @@ def test_email_change_request_uses_locked_member_state(
     assert response.status_code == 302
     member.refresh_from_db()
     assert member.pending_email == "new@example.com"
-    confirmation_token = re.search(
-        r"/members/email/confirm/([A-Za-z0-9_.:-]+)", mailoutbox[0].body
-    ).group(1)
+    match = re.search(r"/members/email/confirm/([A-Za-z0-9_.:-]+)", mailoutbox[0].body)
+    assert match is not None
+    confirmation_token = match.group(1)
     token_data = signing.loads(confirmation_token, salt="members.email-change")
     assert token_data["current_email"] == "confirmed@example.com"
     assert token_data["password_fingerprint"] == _email_change_password_fingerprint(
@@ -495,12 +499,15 @@ def test_email_confirmation_post_changes_email(
         def setting(name, default=None, **kwargs):
             return getattr(settings, f"SOCIAL_AUTH_{name}", default)
 
+        def get_storage(self, *, stage=None):
+            return self.storage
+
     assert "email" in settings.SOCIAL_AUTH_PROTECTED_USER_FIELDS
     user_details(
-        GoogleLoginStrategy(),
+        cast(BaseStrategy, GoogleLoginStrategy()),
         {"email": "old@example.com"},
-        backend="google-oauth2",
-        user=member,
+        backend=None,
+        user=cast(UserProtocol, member),
     )
     member.refresh_from_db()
     assert member.email == "new@example.com"
