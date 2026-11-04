@@ -255,6 +255,25 @@ def test_club_ledger_csv_sanitizes_cells(client, treasurer, checking, books_star
     assert {row[9] or row[10] for row in expense_rows} == {"400.00"}
 
 
+def test_inverted_date_range_shows_error_and_blocks_csv(
+    client, treasurer, checking, books_started
+):
+    today = get_club_today()
+    query = {"start": today.isoformat(), "end": (today - timedelta(days=1)).isoformat()}
+    client.force_login(treasurer)
+    for page, export, args in (
+        ("billing:club_ledger", "billing:club_ledger_csv", []),
+        ("billing:account_register", "billing:account_register_csv", [checking.pk]),
+    ):
+        response = client.get(reverse(page, args=args), query)
+        assert "The From date must be on or before the To date." in (
+            response.content.decode()
+        )
+        response = client.get(reverse(export, args=args), query)
+        assert response.status_code == 302
+        assert response["Location"].startswith(reverse(page, args=args) + "?")
+
+
 def test_account_register_shows_running_balance(
     client, treasurer, checking, books_started
 ):

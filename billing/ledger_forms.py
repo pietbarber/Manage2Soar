@@ -349,3 +349,10 @@ class ClubLedgerFilterForm(forms.Form):
         required=False,
     )
     q = forms.CharField(required=False, label="Search")
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get("start"), cleaned.get("end")
+        if start and end and start > end:
+            raise ValidationError("The From date must be on or before the To date.")
+        return cleaned

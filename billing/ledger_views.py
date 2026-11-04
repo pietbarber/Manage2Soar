@@ -10,6 +10,7 @@ from django.core.paginator import Paginator
 from django.db.models import Prefetch, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from billing.decorators import (
@@ -136,7 +137,9 @@ def club_ledger(request):
 
 @club_books_view
 def club_ledger_csv(request):
-    _, entries = _filtered_entries(request)
+    form, entries = _filtered_entries(request)
+    if form.errors:
+        return _back_to_filter(request, reverse("billing:club_ledger"))
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="club_ledger.csv"'
     writer = csv.writer(response)
@@ -182,6 +185,11 @@ def club_ledger_csv(request):
     return response
 
 
+def _back_to_filter(request, url):
+    """Send an export with bad filters back to the page that shows the errors."""
+    return redirect(f"{url}?{request.GET.urlencode()}")
+
+
 def _register_range(request):
     if not request.GET:
         start = _year_start()
@@ -214,7 +222,11 @@ def account_register_view(request, account_id):
 @club_books_view
 def account_register_csv(request, account_id):
     account = get_object_or_404(Account, pk=account_id)
-    _, start, end = _register_range(request)
+    form, start, end = _register_range(request)
+    if form.errors:
+        return _back_to_filter(
+            request, reverse("billing:account_register", args=[account.pk])
+        )
     register = account_register(account, start=start, end=end)
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = (

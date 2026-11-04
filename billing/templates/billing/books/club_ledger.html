@@ -33,6 +33,7 @@
     {% endfor %}
   </div>
 
+  {% include "billing/books/_form_errors.html" %}
   <form method="get" class="row g-2 align-items-end mb-3">
     <div class="col-6 col-md-2">
       <label class="form-label small mb-1" for="{{ form.start.id_for_label }}">From</label>
