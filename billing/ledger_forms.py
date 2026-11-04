@@ -298,7 +298,13 @@ class GoLiveForm(forms.Form):
 
 class BankBalanceForm(forms.Form):
     account = forms.ModelChoiceField(
-        queryset=Account.objects.none(), required=False, widget=forms.HiddenInput
+        queryset=Account.objects.none(),
+        required=False,
+        widget=forms.HiddenInput,
+        error_messages={
+            "invalid_choice": "This bank account was changed since the page "
+            "loaded. Reload the page to see the current accounts."
+        },
     )
     name = forms.CharField(max_length=100, required=False, label="Bank account")
     amount = forms.DecimalField(

@@ -51,6 +51,7 @@
               {{ row.name|add_class:"form-control form-control-sm"|attr:"aria-label:New bank account name"|attr:"placeholder:New account (optional)" }}
               {% endif %}
               {% for error in row.non_field_errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% include "billing/books/_field_errors.html" with field=row.account %}
               {% include "billing/books/_field_errors.html" with field=row.name %}
             </td>
             <td class="text-start">
