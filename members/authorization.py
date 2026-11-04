@@ -11,6 +11,8 @@ from dataclasses import dataclass
 
 from members.utils.membership import is_active_member
 
+GROUND_INSTRUCTION_PERMISSION = "instructors.can_manage_ground_instruction"
+
 
 def has_webmaster_compatibility_access(user):
     """Return the legacy webmaster-level grant used during the transition.
@@ -92,6 +94,23 @@ class AuthorizationDecision:
 
     allow: bool
     reason: str
+
+
+def can_manage_ground_instruction(user):
+    """Return whether *user* may record ground instruction.
+
+    Ground instruction keeps the legacy active-instructor grant while also
+    accepting the narrowly scoped qualification-derived capability. Both
+    grants require an active account and active membership.
+    """
+    decision = resolve_authorization(
+        user,
+        GROUND_INSTRUCTION_PERMISSION,
+        require_active_member=True,
+    )
+    if decision.allow:
+        return True
+    return decision.reason == "no_grant" and bool(getattr(user, "instructor", False))
 
 
 def resolve_authorization(

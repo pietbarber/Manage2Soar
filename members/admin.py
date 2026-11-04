@@ -20,6 +20,10 @@ from tinymce.widgets import TinyMCE
 from utils.admin_helpers import AdminHelperMixin
 
 from .account_emails import send_account_setup_email
+from .authorization import (
+    has_membership_application_modify_access,
+    has_membership_application_view_access,
+)
 from .models import (
     Badge,
     Biography,
@@ -39,7 +43,9 @@ from .models_applications import MembershipApplication
 from .permission_sources import get_permission_sources
 from .resources import (
     MEMBER_CSV_FIELDS,
+    MEMBER_CSV_PRIVILEGE_FIELDS,
     MemberResource,
+    SafeMemberImportResource,
     serialize_contact_visibility,
     serialize_emergency_contacts,
 )
@@ -604,24 +610,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         "Treasurer": "treasurer",
         "Stats Mongers": "stats_monger",
     }
-    privilege_fields = {
-        "is_superuser",
-        "is_staff",
-        "groups",
-        "user_permissions",
-        "instructor",
-        "towpilot",
-        "duty_officer",
-        "assistant_duty_officer",
-        "director",
-        "member_manager",
-        "rostermeister",
-        "webmaster",
-        "secretary",
-        "treasurer",
-        "stats_monger",
-        "safety_officer",
-    }
+    privilege_fields = set(MEMBER_CSV_PRIVILEGE_FIELDS)
     resource_classes = [MemberResource]
     actions = ["export_members_csv", "mark_inactive"]
 
@@ -791,6 +780,29 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             and not user.is_superuser
             and user.has_perm("members.change_member")
         )
+
+    def has_import_permission(self, request):
+        """Require an explicit member-import capability.
+
+        django-import-export permits imports by default when no setting-level
+        permission is configured. That default is unsafe for this admin,
+        because the member CSV schema contains role fields. Member Managers
+        receive the dedicated capability for profile imports, while only a
+        superuser receives the complete role-capable resource.
+        """
+        user = getattr(request, "user", None)
+        return bool(
+            user
+            and user.is_active
+            and user.has_perm("members.change_member")
+            and (user.is_superuser or user.has_perm("members.import_member"))
+        )
+
+    def get_import_resource_classes(self, request):
+        """Prevent non-superuser imports from changing roles or privileges."""
+        if getattr(request.user, "is_superuser", False):
+            return super().get_import_resource_classes(request)
+        return [SafeMemberImportResource]
 
     def get_fieldsets(self, request, obj=None):
         fieldsets = super().get_fieldsets(request, obj)
@@ -1272,6 +1284,22 @@ class MembershipApplicationAdmin(AdminHelperMixin, VersionAdmin, admin.ModelAdmi
 
         days = (timezone.now() - obj.submitted_at).days
         return f"{days} days ago"
+
+    def has_view_permission(self, request, obj=None):
+        """Match admin read access to the application-management policy."""
+        return has_membership_application_view_access(request.user)
+
+    def has_module_permission(self, request):
+        """Show the admin module to the same principals who may read it."""
+        return self.has_view_permission(request)
+
+    def has_add_permission(self, request):
+        """Applications are submitted through the public application form."""
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """Only member managers and webmasters may edit applications."""
+        return has_membership_application_modify_access(request.user)
 
     def has_delete_permission(self, request, obj=None):
         """Restrict deletion - applications should be retained for records."""

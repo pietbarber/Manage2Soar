@@ -283,6 +283,9 @@ class GroundInstruction(models.Model):
 
     class Meta:
         ordering = ["-date"]
+        permissions = [
+            ("can_manage_ground_instruction", "Can manage ground instruction"),
+        ]
         indexes = [
             models.Index(fields=["student"]),
             models.Index(fields=["instructor"]),

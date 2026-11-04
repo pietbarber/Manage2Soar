@@ -29,6 +29,7 @@ from django.views.generic import FormView
 
 from instructors import foreflight_export as ff
 from instructors.decorators import (
+    ground_instruction_required,
     instructor_or_safety_officer_required,
     instructor_required,
 )
@@ -907,7 +908,7 @@ def member_training_grid(request, member_id):
 ####################################################
 
 
-@instructor_required
+@ground_instruction_required
 def log_ground_instruction(request):
     # Accept either 'student' or 'student_id' as the query parameter for
     # compatibility with multiple templates/links in the codebase.

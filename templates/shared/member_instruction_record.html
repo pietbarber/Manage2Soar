@@ -16,8 +16,8 @@
     <h2 class="mb-0">Instruction Record for {{ member.full_display_name }}</h2>
   </div>
   <div class="d-flex align-items-center">
-  {% comment %}Issue #258: Only show ground instruction button for instructors viewing OTHER members' records{% endcomment %}
-  {% if role_access.instructor and request.user != member %}
+  {% comment %}Issue #258: Only show ground instruction button for authorized users viewing OTHER members' records{% endcomment %}
+  {% if role_access.ground_instruction and request.user != member %}
     <a href="{% url 'instructors:log_ground_instruction' %}?student_id={{ member.id }}" class="btn btn-outline-primary btn-sm me-2">✍️ Log Ground Instruction</a>
   {% endif %}
     <a href="{% url 'members:member_view' member_id=member.id %}"

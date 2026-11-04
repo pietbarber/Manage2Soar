@@ -10,11 +10,13 @@ from django.utils import timezone
 
 from instructors.models import (
     ClubQualificationType,
+    GroundInstruction,
     MemberQualification,
     QualificationPermissionGrant,
 )
 from members.authorization import (
     AuthorizationDecision,
+    can_manage_ground_instruction,
     has_membership_application_modify_access,
     has_membership_application_view_access,
     resolve_authorization,
@@ -120,6 +122,46 @@ def test_context_is_explicit_or_not_inferred_from_identity_or_flags(member):
     assert resolve_authorization(
         member, "auth.delete_group", context_allow=False
     ) == AuthorizationDecision(False, "no_grant")
+
+
+@pytest.mark.django_db
+def test_ground_instruction_helper_keeps_legacy_instructor_grant(member):
+    member.instructor = True
+    assert can_manage_ground_instruction(member)
+
+
+@pytest.mark.django_db
+def test_ground_instruction_helper_allows_scoped_permission(member):
+    permission = Permission.objects.get(
+        content_type=ContentType.objects.get_for_model(GroundInstruction),
+        codename="can_manage_ground_instruction",
+    )
+    member.user_permissions.add(permission)
+    member = get_user_model().objects.get(pk=member.pk)
+
+    assert can_manage_ground_instruction(member)
+
+
+@pytest.mark.django_db
+def test_ground_instruction_helper_denies_ordinary_and_inactive_users(member):
+    assert not can_manage_ground_instruction(member)
+
+    permission = Permission.objects.get(
+        content_type=ContentType.objects.get_for_model(GroundInstruction),
+        codename="can_manage_ground_instruction",
+    )
+    member.user_permissions.add(permission)
+    member = get_user_model().objects.get(pk=member.pk)
+    member.is_active = False
+    assert not can_manage_ground_instruction(member)
+
+
+@pytest.mark.django_db
+def test_ground_instruction_helper_preserves_active_superuser_compatibility(member):
+    member.is_superuser = True
+    member.membership_status = "Inactive Member"
+
+    assert can_manage_ground_instruction(member)
 
 
 @pytest.mark.django_db

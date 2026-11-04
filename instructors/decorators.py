@@ -4,6 +4,7 @@ from functools import wraps
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import get_object_or_404, redirect, render
 
+from members.authorization import can_manage_ground_instruction
 from members.models import Member
 from members.utils import is_active_member
 from members.utils.permissions import SAFETY_REPORT_PERMISSION
@@ -38,6 +39,24 @@ def instructor_required(view_func):
             return render(request, "403.html", status=403)
 
         if not getattr(user, "instructor", False):
+            return render(request, "403.html", status=403)
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+def ground_instruction_required(view_func):
+    """Require the scoped ground-instruction capability or legacy instructor role."""
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+
+        if not user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+
+        if not can_manage_ground_instruction(user):
             return render(request, "403.html", status=403)
 
         return view_func(request, *args, **kwargs)

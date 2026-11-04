@@ -11,6 +11,7 @@ import members.admin as members_admin_module
 from members.admin import (
     MemberAdmin,
     MemberRoleAssignmentEventAdmin,
+    MembershipApplicationAdmin,
     RoleMetadataInline,
     SuperuserOnlyGroupAdmin,
 )
@@ -20,6 +21,8 @@ from members.models import (
     MemberRoleAssignmentEvent,
     RoleMetadata,
 )
+from members.models_applications import MembershipApplication
+from members.utils.membership import clear_active_membership_statuses_cache
 from siteconfig.models import MailingList, MembershipStatus
 
 
@@ -60,6 +63,80 @@ def test_role_assignment_event_admin_is_superuser_read_only(superuser, staff_use
     request.user = staff_user
     assert not model_admin.has_module_permission(request)
     assert not model_admin.has_view_permission(request)
+
+
+@pytest.fixture
+def membership_application_admin(db):
+    MembershipStatus.objects.get_or_create(
+        name="Full Member", defaults={"is_active": True}
+    )
+    clear_active_membership_statuses_cache()
+    return MembershipApplicationAdmin(MembershipApplication, admin.site)
+
+
+def _membership_application_request(user):
+    request = RequestFactory().get("/admin/members/membershipapplication/")
+    request.user = user
+    return request
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("role", "view", "change"),
+    [
+        ("ordinary_staff", False, False),
+        ("director", True, False),
+        ("view_only", True, False),
+        ("member_manager", True, True),
+        ("webmaster", True, True),
+        ("superuser", True, True),
+    ],
+)
+def test_membership_application_admin_permissions(
+    db, membership_application_admin, role, view, change
+):
+    options = {
+        "username": f"application-admin-{role}",
+        "password": "password",
+        "is_staff": True,
+        "membership_status": "Full Member",
+    }
+    if role in {"director", "member_manager", "webmaster"}:
+        options[role] = True
+    elif role == "superuser":
+        options["is_superuser"] = True
+
+    user = get_user_model().objects.create_user(**options)
+
+    # The default ModelAdmin permissions must not widen application access.
+    # MembershipApplicationAdmin supplies the separate policy boundary below.
+    user.user_permissions.add(
+        *Permission.objects.filter(
+            content_type__app_label="members",
+            content_type__model="membershipapplication",
+            codename__in={
+                "add_membershipapplication",
+                "change_membershipapplication",
+                "delete_membershipapplication",
+                "view_membershipapplication",
+            },
+        )
+    )
+    if role == "view_only":
+        user.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="members",
+                content_type__model="membershipapplication",
+                codename="view_membership_applications",
+            )
+        )
+    request = _membership_application_request(user)
+
+    assert membership_application_admin.has_module_permission(request) is view
+    assert membership_application_admin.has_view_permission(request) is view
+    assert membership_application_admin.has_add_permission(request) is False
+    assert membership_application_admin.has_change_permission(request) is change
+    assert membership_application_admin.has_delete_permission(request) is False
 
 
 @pytest.mark.django_db
