@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count, DecimalField, F, Q, Sum, Value
+from django.db.models import Case, Count, DecimalField, F, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
 
 from billing.exceptions import ClubAccountingDisabledError
@@ -708,17 +708,28 @@ def go_live_locked():
     )
 
 
+def _member_ledger_totals(entries):
+    """Each member's ledger balance over entries, as {member pk: total}."""
+    signed = Case(
+        When(effect=LedgerEntry.Effect.CREDIT, then=-F("amount")),
+        default=F("amount"),
+        output_field=MONEY_FIELD,
+    )
+    return dict(
+        entries.order_by().values_list("ledger__member").annotate(total=Sum(signed))
+    )
+
+
 def _opening_receivables_lines(start_date):
     """One Member Receivables line per member, for entries dated before setup."""
-    balances = defaultdict(lambda: ZERO)
-    members = {}
-    entries = LedgerEntry.objects.filter(
-        effective_date__lt=start_date, journal_entry__isnull=True
-    ).select_related("ledger__member")
-    for entry in entries:
-        member = entry.ledger.member
-        members[member.pk] = member
-        balances[member.pk] += entry.signed_amount
+    from members.models import Member
+
+    balances = _member_ledger_totals(
+        LedgerEntry.objects.filter(
+            effective_date__lt=start_date, journal_entry__isnull=True
+        )
+    )
+    members = Member.objects.in_bulk(balances)
     receivables = get_role_account(Account.Role.MEMBER_RECEIVABLES)
     lines = []
     for member_pk, balance in sorted(balances.items()):
@@ -1001,20 +1012,26 @@ def _receivables_tie_out():
     """Compare each member's Member Receivables balance with their ledger."""
     if not member_books_live():
         return []
-    books = defaultdict(lambda: ZERO)
-    for member_pk, debit, credit in JournalLine.objects.filter(
-        account__system_role=Account.Role.MEMBER_RECEIVABLES
-    ).values_list("member", "debit", "credit"):
-        books[member_pk] += debit - credit
-    ledgers = defaultdict(lambda: ZERO)
-    for entry in LedgerEntry.objects.select_related("ledger"):
-        ledgers[entry.ledger.member_id] += entry.signed_amount
     from members.models import Member
 
-    mismatched = [pk for pk in set(books) | set(ledgers) if books[pk] != ledgers[pk]]
+    # Per-member totals come from the database, so this costs the same however
+    # long the club's history gets.
+    books = dict(
+        JournalLine.objects.filter(account__system_role=Account.Role.MEMBER_RECEIVABLES)
+        .order_by()
+        .values_list("member")
+        .annotate(total=Sum(F("debit") - F("credit"), output_field=MONEY_FIELD))
+    )
+    ledgers = _member_ledger_totals(LedgerEntry.objects.all())
+    mismatched = [
+        pk
+        for pk in set(books) | set(ledgers)
+        if books.get(pk, ZERO) != ledgers.get(pk, ZERO)
+    ]
     problems = [
-        f"Member Receivables for {member_label(member)} is {books[member.pk]}, "
-        f"but their member ledger balance is {ledgers[member.pk]}."
+        f"Member Receivables for {member_label(member)} is "
+        f"{books.get(member.pk, ZERO)}, but their member ledger balance is "
+        f"{ledgers.get(member.pk, ZERO)}."
         for member in Member.objects.filter(pk__in=mismatched).order_by("pk")
     ]
     missing = member_entries_missing_from_books().count()
