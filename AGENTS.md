@@ -33,3 +33,11 @@ The GKE deployment is the default path and uses `manage2soar/settings.py`. Singl
 
 ## Other notes
 Do not to do tests on everything try to keep it only to large changes and before commits
+
+## Local roles/permissions testing notes
+
+If present, read `.agent-notes/roles-permissions-testing.md` before validating
+the roles/permissions branch. This directory is gitignored and local to this
+checkout; use `docs/runbooks/roles-permissions-release.md` for the shared
+release requirements. Do not assume the local notes exist in other clones or
+that prior synthetic-data results establish tenant-data parity.

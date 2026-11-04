@@ -1,8 +1,11 @@
 # Authorization Inventory and Behavior Baseline
 
-Status: **unapproved, incomplete first-pass static inventory**, 2026-10-29.
-This records observed behavior for review before migrating authorization checks;
-it is not a completed baseline, approved policy, or migration specification.
+Status: **incomplete, unapproved authorization inventory**. This records
+observed behavior and test gaps, not a migration specification or a claim of
+app-wide authorization parity. See the
+[implementation guide](roles-and-permissions-design-implementation.md) for
+the branch's feature scope and the [release runbook](runbooks/roles-permissions-release.md)
+for validation gates.
 
 ## Review scope for this branch
 
@@ -14,8 +17,14 @@ requests to `upstream/main` before calling a mapping equivalent.
 | --- | --- | --- |
 | Application management | Directors, the Directors Group's view capability, and explicit view-permission holders can read; member managers and webmasters can modify. Staff alone and Member Managers Group membership alone do not grant access; a view capability does not grant write access. **Intentional restriction:** kiosk-authenticated role accounts can no longer use the management list, detail, or waitlist, even with a manager flag. List POST still renders a non-mutating response rather than returning 405. | `members/authorization.py`, `members/views_applications.py`; `members/tests/test_membership_application_access_matrix.py` |
 | Role and capability backfill | Built-in role keys and their registered capability grants are explicit. Migration `0052` adds missing grants; it must not erase tenant-created Groups, memberships, or unrelated permissions. Approval is still needed for the exact business-action mapping. | `members/role_definitions.py`, `members/migrations/0052_sync_registered_role_capabilities.py`; `members/tests/test_role_definitions.py`, `test_capability_registry_migration.py` |
-| CMS, billing, duty, logsheet, and membership actions | Bounded permission helpers and compatibility paths replace some direct role/staff checks. Preserve active membership, ownership, page grants, and workflow context where applicable. **Do not claim global authorization parity:** the inventory below still lists unreviewed endpoints. | `cms/permissions.py`, `billing/permissions.py`, `duty_roster/permissions.py`, `logsheet/permissions.py`, `members/authorization.py`; focused app tests |
-| Role preview | A selected role projects its permissions for a request; write methods are denied outside DEBUG preview. GET-side effects and preview audit retention remain explicit release decisions. | `members/role_preview.py`; `members/tests/test_role_preview.py` |
+| CMS, billing, duty, logsheet, and membership actions | Bounded permission helpers and compatibility paths replace some direct role/staff checks. The global `cms.view_page` capability does not bypass stored page-role restrictions; `cms.change_page` still intentionally grants editor-implied view. Preserve active membership, ownership, page grants, and workflow context where applicable. **Do not claim global authorization parity:** the inventory below still lists unreviewed endpoints. | `cms/models.py`, `cms/permissions.py`, `billing/permissions.py`, `duty_roster/permissions.py`, `logsheet/permissions.py`, `members/authorization.py`; focused app tests |
+| Safety reports | Officer interface uses `members.access_safety_reports` through the shared resolver. The `safety_officer` flag alone is not an authorization grant; submission/audience behavior remains separate. | `members/decorators.py`, `members/views_safety_reports.py`; safety interface/dashboard tests |
+| Stats-dump export | The `stats_monger` flag owns its `legacy:stats_monger` assignment. Migration `0053`/`0054` removes unprovenanced direct grants left by the historical `0045` migration; independently assigned Group/role access remains. This security-first cleanup may remove an unrecorded direct exception and requires tenant-data parity review. | `members/models.py`, `members/migrations/0053_source_aware_stats_monger_grants.py`, `members/migrations/0054_reconcile_stats_monger_direct_grants.py`, `logsheet/permissions.py`; stats-monger tests |
+| Limited member admin editing | Non-superuser editors with `members.change_member` cannot use the separate Django password-change endpoint for another account, including privileged accounts. | `members/admin.py`; admin password-change tests |
+| Role preview | Only active superusers can start/control preview. A selected role projects its permissions for a request; write methods are denied outside DEBUG preview. GET-side effects and preview audit retention remain explicit release decisions. | `members/role_preview.py`; `members/tests/test_role_preview.py` |
+| Written-test administration | Four custom capabilities are explicitly created and granted to Instructor Admins in migration `0008`; the grant does not depend on post-migrate permission creation. | `knowledgetest/migrations/0008_create_and_grant_written_test_capabilities.py`, `members/role_definitions.py`; written-test migration tests |
+| Duty-swap visibility | Calendar filtering uses `duty_roster.view_all_swap_requests` for roles granted broad swap visibility, while ordinary users retain requester/target visibility. | `duty_roster/views.py`, `duty_roster/permissions.py`; duty-swap tests |
+| Rostermeister administration | Rostermeister assignment forms require an active account and active membership; inactive flags no longer authorize read or mutation. | `duty_roster/permissions.py`; roster permission tests |
 | Qualification permissions | Only approved custom actions from an opted-in bundle can be derived from a current qualification. No existing instructor/tow-pilot/duty qualification is mapped automatically. | `members/auth_backends.py`, `instructors/models.py`; `members/tests/test_qualification_permission_bundle.py` |
 | Mailing-list audiences | Role and tag selectors are additive to existing criteria; recipient parity against real tenant data is **not yet verified**. | `siteconfig/models.py`; `siteconfig/tests/test_mailing_list.py` |
 
@@ -24,28 +33,6 @@ representative in-place migration results on disposable PostgreSQL databases,
 recipient and sensitive-action parity, and the maintainer's decisions on the
 unapproved rows. Local migration tests are evidence, not a substitute for
 tenant-data validation.
-
-### Local validation record (2026-11-02)
-
-- Disposable PostgreSQL clean-install test databases: 81 focused application
-  access/backfill tests, 83 authorization/CMS/logsheet tests, and 64 Group-
-  permission/mailing-list tests passed. The latter assert exact Treasurer and
-  Secretary capabilities rather than the pre-branch assumption of no grants.
-- Disposable PostgreSQL upgrade: applied all `upstream/main` migrations, added
-  three synthetic members (legacy instructor and treasurer flags, plus manual
-  custom-Group membership), a custom Group permission, and a legacy mailing
-  list. Applied the branch migrations through `members.0052`. The legacy and
-  manual assignment sources were classified as expected; memberships, custom
-  permission, and the two sampled mailing-list recipients were unchanged.
-  Registered built-in role capability grants were present after upgrade.
-- Both GKE and single-host settings passed `manage.py check` and
-  `makemigrations --check --dry-run` against the disposable upgraded database.
-- The historical `members.0021` migration still emits missing-permission
-  warnings while the graph is first applied; later backfills and focused
-  canonical-grant assertions passed. Preserve these warnings in the PR log.
-- **Not yet validated:** a representative *tenant-data* upgrade, real mailing-
-  list recipient parity, and the full endpoint-by-endpoint authorization
-  baseline. The synthetic sample must not be called production parity.
 
 ## Scope and method
 
@@ -166,11 +153,11 @@ mutating those grants, use a fresh instance or invalidate Django's caches.
 
 This API is only a **foundation contract**. No migration may assume it covers
 every operational action: the target permission codenames need an explicit
-positive allowlist; ownership and assignment checks belong to domain policies;
-later preview must supply a separate effective principal rather than inherit
-the administrator's grants. Audit writes belong at grant/mutation services,
-not in this read-only resolver. A corresponding endpoint matrix and parity
-tests are required before replacing a legacy check.
+positive allowlist; ownership and assignment checks belong to domain policies.
+The separate session preview projects a selected role onto supported request
+checks; the resolver itself does not provide preview isolation or audit events.
+Audit writes belong at grant/mutation services, not in this read-only resolver.
+An endpoint matrix and parity tests are required before replacing a legacy check.
 
 ## Baseline allow/deny matrix
 

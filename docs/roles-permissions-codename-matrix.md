@@ -1,14 +1,18 @@
 # Application authorization migration matrix (proposal)
 
-> **Status: unapproved proposal.** This is a read-only inventory and naming
-> proposal; it does not change enforcement, groups, migrations, or behavior.
-> Model CRUD permissions and business-action permissions are intentionally
-> separate. CMS authorization is excluded (it is a separate workstream).
+> **Status: planning snapshot, not a current access contract.** Some rows were
+> drafted before this branch introduced capability checks. Verify every
+> “current checks” cell against the implementation and the
+> [authorization inventory](roles-and-permissions-authorization-inventory.md)
+> before using it for migration. Proposed codenames are not necessarily
+> implemented or approved. CMS is covered separately in the
+> [CMS baseline](cms-authorization-baseline.md).
 
 ## Reading rules
 
-- “Current allow” describes the production code observed in this repository;
-  `superuser` means the explicit `is_superuser` branch, not merely staff.
+- “Current allow” is the legacy baseline at drafting time, not an exhaustive
+  description of the branch; `superuser` means an explicit `is_superuser`
+  branch, not merely staff.
 - A route protected by `active_member_required` permits an authenticated kiosk
   session regardless of membership status (`members/decorators.py`), unless it
   uses `non_kiosk_member_required`.

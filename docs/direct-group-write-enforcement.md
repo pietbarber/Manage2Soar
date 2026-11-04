@@ -132,12 +132,15 @@ not `Member.groups`.
 
 ### Unexplained / unsafe direct production writes
 
-None were found outside the two intentional internal mechanisms above. The
-repository's own service docstring (`members/services/role_assignments.py:3-5`)
-already labels arbitrary direct writes unsupported and explicitly says existing
-memberships without provenance must remain unresolved rather than be removed.
-The remaining direct writes are test setup and should not be used as evidence
-that arbitrary production writes are supported.
+The supported service and legacy synchronization paths now mark their M2M
+writes as internal. An audit-only `m2m_changed` tripwire logs external
+`Member.groups` add/remove/clear/set operations with member, group, actor, and
+database context; it does not reject or repair them yet. Historical migrations
+`0046` and `0047` also contain intentional direct writes and should be treated
+as migration-owned exceptions. The repository's own service docstring
+(`members/services/role_assignments.py:3-5`) labels arbitrary direct writes
+unsupported and requires unexplained memberships to remain effective until an
+operator classifies them.
 
 ## Enforcement policy
 

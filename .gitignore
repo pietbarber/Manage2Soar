@@ -271,3 +271,6 @@ infrastructure/ansible/group_vars/all/vault.yml
 .mcp.json
 .claude.json
 graphify-out
+
+# Local agent handoff notes and validation logs (not part of product docs)
+.agent-notes/
