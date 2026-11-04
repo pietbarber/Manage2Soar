@@ -47,6 +47,11 @@ control boundary.
   permission edits and qualification lifecycle, and automatic status-to-role
   mapping are not complete. The proposed status policy is documented in
   [status-role reconciliation](status-role-reconciliation-policy.md).
+- Member CSV import now requires the explicit `members.import_member`
+  capability in addition to `members.change_member`. Non-superuser imports use
+  a profile-only resource that excludes role and account-privilege fields;
+  superusers retain the complete resource. The separate admin password-change
+  endpoint remains restricted for limited editors.
 
 ### Permission checks and compatibility
 
@@ -73,6 +78,12 @@ The safety-report officer endpoints use the existing
 legacy `safety_officer` flag remains useful for reporting and audiences but is
 not sufficient by itself. Account and active-membership gates, superuser
 compatibility, and denied POST behavior remain enforced.
+
+Ground-instruction recording uses the registered
+`instructors.can_manage_ground_instruction` capability through a shared helper,
+while preserving the active legacy instructor path. Navigation and templates
+use the same active-membership-aware decisions as their views; presentation
+checks do not replace server-side authorization.
 
 Stats-dump export access is source-aware. The `stats_monger` flag owns its
 `legacy:stats_monger` role assignment. Migration `0053` converts flagged

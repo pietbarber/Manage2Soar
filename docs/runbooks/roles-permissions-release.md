@@ -36,6 +36,8 @@ Run the focused authorization suites and record the results:
 ./.venv/bin/pytest -q members/tests/test_admin_password_change_permissions.py
 ./.venv/bin/pytest -q knowledgetest/tests/test_written_test_capability_migration.py
 ./.venv/bin/pytest -q duty_roster/tests/test_permissions.py duty_roster/tests/test_duty_swap.py
+./.venv/bin/pytest -q members/tests/test_admin_member_import_permissions.py
+./.venv/bin/pytest -q members/tests/test_context_processors.py
 ```
 
 These tests create and migrate **disposable test databases**; never run the
@@ -98,7 +100,9 @@ failures.
 3. Confirm `members.0052_sync_registered_role_capabilities`,
    `members.0053_source_aware_stats_monger_grants`,
    `members.0054_reconcile_stats_monger_direct_grants`, and
-   `knowledgetest.0008_create_and_grant_written_test_capabilities` completed.
+   `members.0055_alter_member_options`, `members.0056_member_manager_import_permission`,
+   `knowledgetest.0008_create_and_grant_written_test_capabilities`, and
+   `instructors.0008_groundinstruction_manage_permission` completed.
 4. Run the role registry parity test against the migrated database.
 5. Compare role permissions and sensitive-action allow/deny results with the
    pre-release baseline before enabling traffic.
