@@ -13,8 +13,11 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connection
+from django.test import Client
+from django.urls import reverse
+from django.utils import timezone
 
-from billing import ledger_services
+from billing import ledger_services, periods
 from billing.ledger_services import (
     BankBalance,
     Line,
@@ -24,8 +27,11 @@ from billing.ledger_services import (
     verify_books,
 )
 from billing.models import Account, JournalEntry, LedgerEntry
-from billing.services import post_manual_charge
+from billing.services import post_flight_charges, post_manual_charge
+from logsheet.models import Airfield, Flight, FlightSplitRequest, Logsheet
+from logsheet.utils.flight_charges import get_billing_allocations
 from members.models import Member
+from siteconfig.models import MembershipStatus
 from siteconfig.timezone_utils import get_club_today
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -187,6 +193,90 @@ def test_member_charge_saved_during_setup_reaches_the_books(
         started.result()
 
     # The charge waited for setup, so it posted on its own after the opening.
+    entry = LedgerEntry.objects.get(pk=entry_pk)
+    assert JournalEntry.objects.filter(member_entry=entry).exists()
+    assert verify_books() == []
+
+
+def test_split_approval_and_member_charge_at_once_both_post(
+    treasurer, books_started, monkeypatch
+):
+    MembershipStatus.objects.get_or_create(
+        name="Full Member", defaults={"is_active": True}
+    )
+    pilot = Member.objects.create_user(
+        username="cc-pilot", is_active=True, membership_status="Full Member"
+    )
+    partner = Member.objects.create_user(
+        username="cc-partner", is_active=True, membership_status="Full Member"
+    )
+    logsheet = Logsheet.objects.create(
+        log_date=TODAY(),
+        airfield=Airfield.objects.create(identifier="KCC1", name="Race Field"),
+        created_by=treasurer,
+        finalized=True,
+    )
+    flight = Flight.objects.create(
+        logsheet=logsheet,
+        pilot=pilot,
+        flight_type="solo",
+        tow_cost_actual=Decimal("40.00"),
+    )
+    post_flight_charges(
+        flight=flight, actor=treasurer, allocations=get_billing_allocations(flight)
+    )
+    split_request = FlightSplitRequest.objects.create(
+        flight=flight,
+        requester=pilot,
+        requested_member=partner,
+        split_type="even",
+        reason="Shared flight",
+        allocation_version=1,
+        expires_at=timezone.now() + timedelta(days=7),
+    )
+
+    # Pause the approval right after it locks the billing period. The ledger
+    # services imported their own copy, so the charge doesn't pause.
+    period_locked = threading.Event()
+    original = periods.lock_period_for_date
+
+    def slow(period_date):
+        closed = original(period_date)
+        period_locked.set()
+        time.sleep(0.5)
+        return closed
+
+    monkeypatch.setattr(periods, "lock_period_for_date", slow)
+
+    @threaded
+    def approve():
+        client = Client()
+        client.force_login(Member.objects.get(pk=partner.pk))
+        return client.post(
+            reverse("logsheet:flight_split_request_detail", args=[split_request.token]),
+            {"decision": "accept"},
+        ).status_code
+
+    @threaded
+    def charge():
+        period_locked.wait(5)
+        return post_manual_charge(
+            member=Member.objects.get(pk=pilot.pk),
+            actor=Member.objects.get(pk=treasurer.pk),
+            amount="15",
+            effective_date=TODAY(),
+            description="Charge",
+            reason="Test",
+        ).pk
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        approved = executor.submit(approve)
+        entry_pk = executor.submit(charge).result()
+        assert approved.result() == 302
+
+    # Neither request deadlocked; the charge waited for the approval.
+    split_request.refresh_from_db()
+    assert split_request.status == FlightSplitRequest.Status.ACCEPTED
     entry = LedgerEntry.objects.get(pk=entry_pk)
     assert JournalEntry.objects.filter(member_entry=entry).exists()
     assert verify_books() == []
