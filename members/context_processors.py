@@ -1,11 +1,15 @@
 """Authorization decisions used only for template visibility."""
 
+from billing.permissions import has_billing_access
 from duty_roster.permissions import has_duty_delinquents_access
+from logsheet.permissions import has_stats_dump_export_access
 from members.authorization import (
+    can_manage_ground_instruction,
     has_membership_application_view_access,
     has_role_admin_access,
     has_webmaster_compatibility_access,
 )
+from members.utils.membership import is_active_member
 
 
 def authorization(request):
@@ -20,16 +24,18 @@ def authorization(request):
             # policies are fully migrated. Templates never enforce access.
             "membership_applications": has_membership_application_view_access(user),
             "duty_delinquents": has_duty_delinquents_access(user),
-            "billing": bool(
-                has_perm("billing.can_manage_billing")
-                or getattr(user, "treasurer", False)
-                or getattr(user, "is_superuser", False)
+            "billing": has_billing_access(user),
+            # Keep this in sync with the view's active-member decorator and
+            # stats capability gate, including the canonical superuser path.
+            "stats_dump_export": bool(
+                is_active_member(user) and has_stats_dump_export_access(user)
             ),
             "commercial_ticket": bool(
                 getattr(user, "duty_officer", False)
                 or getattr(user, "treasurer", False)
             ),
             "instructor": bool(getattr(user, "instructor", False)),
+            "ground_instruction": can_manage_ground_instruction(user),
             "safety_reports": bool(
                 has_perm("members.access_safety_reports")
                 or getattr(user, "safety_officer", False)

@@ -70,6 +70,20 @@ def test_stats_dump_csv_get_renders_queue_page(client):
 
 
 @pytest.mark.django_db
+def test_stats_dump_navigation_is_visible_for_superuser(client):
+    superuser = Member.objects.create_superuser(
+        username="stats_superuser",
+        password="pass",
+        membership_status="Non-Member",
+    )
+
+    client.force_login(superuser)
+    response = client.get(reverse("home"))
+
+    assert reverse("logsheet:stats_dump_export_queue") in response.content.decode()
+
+
+@pytest.mark.django_db
 def test_stats_dump_csv_queues_job_and_redirects_to_status(client):
     requester = _create_stats_user(
         username="stats_owner",
