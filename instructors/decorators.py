@@ -4,8 +4,10 @@ from functools import wraps
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import get_object_or_404, redirect, render
 
+from members.authorization import can_manage_ground_instruction
 from members.models import Member
 from members.utils import is_active_member
+from members.utils.permissions import SAFETY_REPORT_PERMISSION
 
 ####################################################
 # instructor_required
@@ -37,6 +39,24 @@ def instructor_required(view_func):
             return render(request, "403.html", status=403)
 
         if not getattr(user, "instructor", False):
+            return render(request, "403.html", status=403)
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+def ground_instruction_required(view_func):
+    """Require the scoped ground-instruction capability or legacy instructor role."""
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+
+        if not user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+
+        if not can_manage_ground_instruction(user):
             return render(request, "403.html", status=403)
 
         return view_func(request, *args, **kwargs)
@@ -89,7 +109,7 @@ def member_or_instructor_required(view_func):
 # Decorator to restrict view access to instructors or safety officers.
 # Allows superusers, then checks:
 # - membership_status in ALLOWED_MEMBERSHIP_STATUSES
-# - user.instructor flag True OR user.safety_officer flag True
+# - user.instructor flag True OR the safety-report capability
 # Redirects unauthenticated users to login;
 # renders 403.html for forbidden access.
 #
@@ -116,9 +136,11 @@ def instructor_or_safety_officer_required(view_func):
         if not is_active_member(user):
             return render(request, "403.html", status=403)
 
-        # Check if user has instructor or safety_officer flag
+        # Instructors retain their existing role behavior; safety access is an
+        # explicit capability rather than a legacy boolean authorization read.
         if not (
-            getattr(user, "instructor", False) or getattr(user, "safety_officer", False)
+            getattr(user, "instructor", False)
+            or user.has_perm(SAFETY_REPORT_PERMISSION)
         ):
             return render(request, "403.html", status=403)
 

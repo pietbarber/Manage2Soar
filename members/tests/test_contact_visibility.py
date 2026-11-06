@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from django.contrib.auth.models import Group
 from django.test import Client
 from django.urls import reverse
 
@@ -259,7 +260,8 @@ def test_directory_omits_hidden_email_from_content_and_data_attribute():
 @pytest.mark.parametrize(
     "viewer_privilege",
     [
-        {"is_staff": True},
+        {"webmaster": True},
+        {"treasurer": True},
         {"member_manager": True},
         {"rostermeister": True},
     ],
@@ -298,6 +300,19 @@ def test_directory_keeps_hidden_contact_fields_redacted_for_privileged_viewers(
     assert b"555-0100" not in response.content
     assert b"fully-redacted@example.com" not in response.content
     assert b"555-0101" not in response.content
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["instructor", "secretary"])
+def test_staff_role_does_not_grant_privileged_contact_visibility(role):
+    viewer = Member.objects.create_user(username=f"{role}_viewer", **{role: True})
+    subject = Member.objects.create_user(
+        username=f"{role}_subject",
+        contact_visibility={"email": "hide"},
+    )
+
+    assert viewer.is_staff
+    assert not can_view_contact_field(viewer, subject, "email")
 
 
 @pytest.mark.django_db
@@ -450,9 +465,10 @@ def test_privileged_profile_hides_regular_member_private_values_until_revealed(c
     viewer = Member.objects.create_user(
         username="private_contact_staff",
         email="staff@example.com",
-        is_staff=True,
         membership_status="Privacy Active",
     )
+    member_manager_group = Group.objects.get(name="Member Managers")
+    viewer.groups.add(member_manager_group)
     subject = Member.objects.create_user(
         username="private_contact_member",
         email="private@example.com",

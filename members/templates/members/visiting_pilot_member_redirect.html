@@ -22,7 +22,7 @@
                             <i class="fas fa-home"></i>
                             Go to Homepage
                         </a>
-                        {% if user.duty_officer or user.is_staff %}
+                        {% if role_access.visiting_pilot %}
                             <a href="{% url 'members:visiting_pilot_qr_display' %}" class="btn btn-outline-secondary">
                                 <i class="fas fa-qrcode"></i>
                                 View QR Code

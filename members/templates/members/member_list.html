@@ -14,7 +14,7 @@
     </h1>
     <p class="text-muted mb-0">Connect with fellow soaring enthusiasts</p>
   </div>
-  {% if user.is_staff %}
+  {% if role_access.can_edit_member_list %}
   <a href="/admin/members/member/add/" class="btn btn-success btn-modern">
     <i class="bi bi-person-plus me-2"></i>Add New Member
   </a>

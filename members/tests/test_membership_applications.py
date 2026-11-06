@@ -5,6 +5,7 @@ Tests for the membership application system.
 from unittest.mock import patch
 
 import pytest
+from django.contrib.auth.models import Group
 from django.core import mail
 from django.core.exceptions import ValidationError
 from django.test import Client, TestCase, override_settings
@@ -13,6 +14,7 @@ from django.urls import reverse
 from members.forms_applications import MembershipApplicationForm
 from members.models import Member
 from members.models_applications import MembershipApplication
+from members.views_applications import _application_withdrawal_token
 
 
 @pytest.mark.django_db
@@ -807,6 +809,65 @@ class MembershipApplicationViewTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_application_uuid_alone_cannot_withdraw_application(self):
+        app = MembershipApplication.objects.create(
+            first_name="John",
+            last_name="Doe",
+            email="john@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn gliding",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        response = self.client.post(
+            reverse("members:membership_application_status", args=[app.application_id]),
+            {"action": "withdraw"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        app.refresh_from_db()
+        self.assertEqual(app.status, "pending")
+
+    def test_signed_withdrawal_token_can_withdraw_application(self):
+        app = MembershipApplication.objects.create(
+            first_name="John",
+            last_name="Doe",
+            email="john@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn gliding",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        response = self.client.post(
+            reverse("members:membership_application_status", args=[app.application_id]),
+            {
+                "action": "withdraw",
+                "withdrawal_token": _application_withdrawal_token(app),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        app.refresh_from_db()
+        self.assertEqual(app.status, "withdrawn")
+
     def test_waitlist_view(self):
         """Test the waitlist view."""
         self._create_manager()
@@ -909,6 +970,95 @@ class MembershipApplicationViewTests(TestCase):
         app2.refresh_from_db()
         self.assertEqual(app1.waitlist_position, 1)
         self.assertEqual(app2.waitlist_position, 2)
+
+    def test_webmaster_and_superuser_can_view_and_modify_waitlist(self):
+        """Webmasters and superusers retain the full application workflow."""
+        for username, is_superuser in (
+            ("webmaster-reviewer", False),
+            ("superuser-reviewer", True),
+        ):
+            with self.subTest(username=username):
+                if is_superuser:
+                    reviewer = Member.objects.create_superuser(
+                        username=username,
+                        email=f"{username}@example.com",
+                        password="testpass",
+                    )
+                else:
+                    reviewer = Member.objects.create_user(
+                        username=username,
+                        email=f"{username}@example.com",
+                        password="testpass",
+                        membership_status="Full Member",
+                        webmaster=True,
+                    )
+                self.client.force_login(reviewer)
+
+                first = self._create_waitlisted_app(
+                    f"{username} First", f"{username}-first@example.com"
+                )
+                second = self._create_waitlisted_app(
+                    f"{username} Second", f"{username}-second@example.com"
+                )
+                first_position = first.waitlist_position
+
+                list_response = self.client.get(
+                    reverse("members:membership_applications_list")
+                )
+                self.assertEqual(list_response.status_code, 200)
+
+                response = self.client.post(
+                    reverse("members:membership_waitlist"),
+                    {"action": "move_to_top", "application_id": second.application_id},
+                )
+
+                self.assertEqual(response.status_code, 302)
+                first.refresh_from_db()
+                second.refresh_from_db()
+                self.assertEqual(second.waitlist_position, 1)
+                self.assertEqual(first.waitlist_position, first_position + 1)
+
+    def test_anonymous_user_is_redirected_from_application_management(self):
+        response = self.client.get(reverse("members:membership_applications_list"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_staff_and_group_membership_alone_do_not_grant_application_access(self):
+        """Current checks use flags, not Django staff or Group membership."""
+        staff = Member.objects.create_user(
+            username="application-staff-only",
+            membership_status="Full Member",
+            is_staff=True,
+        )
+        grouped = Member.objects.create_user(
+            username="application-group-only",
+            membership_status="Full Member",
+        )
+        grouped.groups.add(Group.objects.get(name="Member Managers"))
+
+        for member in (staff, grouped):
+            with self.subTest(member=member.username):
+                self.client.force_login(member)
+                response = self.client.get(
+                    reverse("members:membership_applications_list")
+                )
+                self.assertEqual(response.status_code, 403)
+
+    def test_inactive_manager_cannot_access_application_management(self):
+        manager = Member.objects.create_user(
+            username="inactive-application-manager",
+            membership_status="Inactive Member",
+            member_manager=True,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("members:membership_applications_list"))
+
+        # Member.save() deactivates inactive statuses; Django will not
+        # authenticate the account, so the login gate redirects first.
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
 
     def test_regular_member_cannot_view_membership_applications(self):
         """Active members without elevated roles cannot view membership applications."""

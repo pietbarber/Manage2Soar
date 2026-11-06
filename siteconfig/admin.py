@@ -5,6 +5,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from duty_roster.models import DutyRoleDefinition
+from members.authorization import has_admin_model_permission
+from members.role_preview import has_preview_group
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -23,7 +25,7 @@ class MailingListAdminForm(forms.ModelForm):
     """Custom form with multi-select widget for criteria."""
 
     criteria_select = forms.MultipleChoiceField(
-        choices=MailingListCriterion.choices,
+        choices=(),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label="Membership Criteria",
@@ -41,6 +43,66 @@ class MailingListAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from members.models import MemberTag, RoleMetadata
+
+        selected = list(self.instance.criteria or []) if self.instance else []
+        role_choices = [
+            (f"role:{role.key}", role.display_name)
+            for role in RoleMetadata.objects.filter(mailing_list_eligible=True)
+        ]
+        tag_choices = [
+            (f"tag:{tag.key}", tag.display_label)
+            for tag in MemberTag.objects.filter(is_active=True)
+        ]
+        known_values = {value for value, _label in MailingListCriterion.choices}
+        known_values.update(value for value, _label in role_choices)
+        known_values.update(value for value, _label in tag_choices)
+        # Keep legacy/stale values selectable while editing an existing list;
+        # model validation still prevents newly accepting an ineligible role.
+        selected_roles = {
+            role_key: criterion
+            for criterion in selected
+            if (role_key := MailingList._role_key_from_selector(criterion))
+        }
+        role_metadata = {
+            role.key: role
+            for role in RoleMetadata.objects.filter(key__in=selected_roles)
+        }
+        selected_tag_keys = {
+            tag_key: criterion
+            for criterion in selected
+            if (tag_key := MailingList._tag_key_from_selector(criterion))
+        }
+        tags = {
+            tag.key: tag for tag in MemberTag.objects.filter(key__in=selected_tag_keys)
+        }
+        preserved = []
+        for value in selected:
+            if value in known_values:
+                continue
+            role_key = MailingList._role_key_from_selector(value)
+            role = role_metadata.get(role_key)
+            if role_key:
+                if role is None:
+                    label = f"⚠️ {value} (stale/missing role metadata)"
+                else:
+                    label = MailingList._role_display(role_key, role)
+            elif tag_key := MailingList._tag_key_from_selector(value):
+                tag = tags.get(tag_key)
+                if tag is None:
+                    label = f"⚠️ {value} (stale/missing tag)"
+                else:
+                    label = MailingList._tag_display(tag_key, tag)
+            else:
+                label = f"⚠️ {value} (stale criterion)"
+            preserved.append((value, label))
+
+        self.fields["criteria_select"].choices = [
+            *MailingListCriterion.choices,
+            *role_choices,
+            *tag_choices,
+            *preserved,
+        ]
         # Pre-populate criteria_select from the JSON field
         if self.instance and self.instance.pk:
             self.fields["criteria_select"].initial = self.instance.criteria or []
@@ -178,19 +240,31 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
     inlines = [DutyRoleDefinitionInline]
     search_fields = ("club_name", "domain_name", "club_abbreviation")
 
+    def has_module_permission(self, request):
+        return has_admin_model_permission(
+            request.user, "siteconfig", "siteconfiguration", "view"
+        )
+
+    def has_view_permission(self, request, obj=None):
+        return has_admin_model_permission(
+            request.user, "siteconfig", "siteconfiguration", "view"
+        )
+
     def has_add_permission(self, request):
         # Only allow adding if no config exists
-        return not SiteConfiguration.objects.exists()
+        return not SiteConfiguration.objects.exists() and has_admin_model_permission(
+            request.user, "siteconfig", "siteconfiguration", "add"
+        )
 
     def has_delete_permission(self, request, obj=None):
         # Prevent deletion
         return False
 
     def has_change_permission(self, request, obj=None):
-        # Only allow Webmaster (superuser or group) to edit
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        # Model permission is authoritative, with the legacy webmaster grant
+        # retained during the transition.
+        return has_admin_model_permission(
+            request.user, "siteconfig", "siteconfiguration", "change"
         )
 
     readonly_fields = ("visiting_pilot_token", "visiting_pilot_token_created")
@@ -558,25 +632,20 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to edit membership statuses
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
-            or request.user.groups.filter(name="Member Managers").exists()
-        )
+        return has_admin_model_permission(
+            request.user, "siteconfig", "membershipstatus", "change"
+        ) or has_preview_group(request.user, "Member Managers")
 
     def has_add_permission(self, request):
         # Only allow Webmaster or superuser to add membership statuses
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
-            or request.user.groups.filter(name="Member Managers").exists()
-        )
+        return has_admin_model_permission(
+            request.user, "siteconfig", "membershipstatus", "add"
+        ) or has_preview_group(request.user, "Member Managers")
 
     def has_delete_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to delete membership statuses
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return has_admin_model_permission(
+            request.user, "siteconfig", "membershipstatus", "delete"
         )
 
     def delete_model(self, request, obj):
@@ -696,9 +765,8 @@ class MembershipBillingRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     def _has_webmaster_permission(self, request):
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return request.user.is_superuser or has_preview_group(
+            request.user, "Webmasters"
         )
 
     def has_change_permission(self, request, obj=None):
@@ -758,9 +826,8 @@ class MembershipGliderRentalRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     def _has_webmaster_permission(self, request):
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return request.user.is_superuser or has_preview_group(
+            request.user, "Webmasters"
         )
 
     def has_change_permission(self, request, obj=None):
@@ -862,21 +929,20 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
             '<span title="Click list name to see subscribers">{}</span>', count
         )
 
-    def _has_webmaster_permission(self, request):
+    def _has_webmaster_permission(self, request, action="change"):
         """Check if user has webmaster-level permission."""
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return has_admin_model_permission(
+            request.user, "siteconfig", "mailinglist", action
         )
 
     def has_change_permission(self, request, obj=None):
-        return self._has_webmaster_permission(request)
+        return self._has_webmaster_permission(request, "change")
 
     def has_add_permission(self, request):
-        return self._has_webmaster_permission(request)
+        return self._has_webmaster_permission(request, "add")
 
     def has_delete_permission(self, request, obj=None):
-        return self._has_webmaster_permission(request)
+        return self._has_webmaster_permission(request, "delete")
 
     admin_helper_message = (
         "Mailing Lists: Configure email lists for your club's mail server. "
@@ -951,9 +1017,8 @@ class ChargeableItemAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def _has_webmaster_permission(self, request):
         """Check if user has webmaster-level permission."""
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+        return request.user.is_superuser or has_preview_group(
+            request.user, "Webmasters"
         )
 
     def has_change_permission(self, request, obj=None):

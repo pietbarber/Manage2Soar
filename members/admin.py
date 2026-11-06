@@ -1,13 +1,16 @@
 import csv
 import logging
+from urllib.parse import unquote
 
 from django import forms
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
+from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
-from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.contrib.auth.models import Group
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import models, router, transaction
 from django.http import HttpResponse
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
@@ -17,6 +20,10 @@ from tinymce.widgets import TinyMCE
 from utils.admin_helpers import AdminHelperMixin
 
 from .account_emails import send_account_setup_email
+from .authorization import (
+    has_membership_application_modify_access,
+    has_membership_application_view_access,
+)
 from .models import (
     Badge,
     Biography,
@@ -25,19 +32,262 @@ from .models import (
     KioskToken,
     Member,
     MemberBadge,
+    MemberRoleAssignmentEvent,
+    MemberTag,
+    MemberTagAssignment,
+    RoleMetadata,
     SafetyReport,
     VisitingPilotVisit,
 )
 from .models_applications import MembershipApplication
+from .permission_sources import get_permission_sources
 from .resources import (
     MEMBER_CSV_FIELDS,
+    MEMBER_CSV_PRIVILEGE_FIELDS,
     MemberResource,
+    SafeMemberImportResource,
     serialize_contact_visibility,
     serialize_emergency_contacts,
 )
+from .services.role_assignments import set_manual_role
 from .utils.image_processing import generate_profile_thumbnails
 
 logger = logging.getLogger(__name__)
+
+
+def _instance_db(instance):
+    """Return the database selected for an already-loaded model instance."""
+    return instance._state.db or router.db_for_write(type(instance), instance=instance)
+
+
+def _role_metadata_is_referenced(metadata):
+    """Return whether a mailing list still uses this role's stable key."""
+    if metadata is None:
+        return False
+
+    # Keep siteconfig out of module import time; it imports member-related code.
+    from siteconfig.models import MailingList
+
+    using = _instance_db(metadata)
+    selector = f"role:{metadata.key}"
+    return any(
+        selector in (criteria or [])
+        for criteria in MailingList.objects.using(using).values_list(
+            "criteria", flat=True
+        )
+    )
+
+
+class RoleMetadataInline(admin.StackedInline):
+    """Optional role metadata editor for the Group admin.
+
+    Metadata was added after Groups already existed, so the inline deliberately
+    does not require a row.  This keeps legacy Groups manageable while making a
+    metadata-backed custom role a one-page operation.
+    """
+
+    model = RoleMetadata
+    extra = 1
+    max_num = 1
+    can_delete = True
+    fields = (
+        "key",
+        "display_name",
+        "description",
+        ("is_builtin", "is_protected", "is_system_managed"),
+        (
+            "is_assignable",
+            "mailing_list_eligible",
+            "admin_access",
+            "qualification_permission_bundle",
+            "sort_order",
+        ),
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        # A stable key and the provenance flags are immutable once metadata
+        # exists.  obj is the parent Group supplied by InlineModelAdmin, so
+        # check for the related row before making the fields read-only.
+        return (
+            ("key", "is_builtin", "is_protected", "is_system_managed")
+            if obj
+            and obj.pk
+            and RoleMetadata.objects.using(_instance_db(obj))
+            .filter(group_id=obj.pk)
+            .exists()
+            else ()
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        if not super().has_delete_permission(request, obj):
+            return False
+        if obj is None:
+            return True
+        try:
+            metadata = obj.role_metadata
+        except RoleMetadata.DoesNotExist:
+            return True
+        return not metadata.is_protected and not _role_metadata_is_referenced(metadata)
+
+
+class SuperuserOnlyGroupAdmin(DjangoGroupAdmin):
+    """Emergency/bootstrap Group management until Platform Administrator exists."""
+
+    inlines = (RoleMetadataInline,)
+
+    def _is_authorized(self, request):
+        return bool(
+            request.user and request.user.is_active and request.user.is_superuser
+        )
+
+    def has_module_permission(self, request):
+        return self._is_authorized(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self._is_authorized(request)
+
+    def has_add_permission(self, request):
+        return self._is_authorized(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._is_authorized(request)
+
+    def get_actions(self, request):
+        # The bulk action calls queryset.delete() and cannot apply the
+        # per-group protected/reference checks in has_delete_permission().
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
+
+    def has_delete_permission(self, request, obj=None):
+        if not self._is_authorized(request):
+            return False
+        if obj is None:
+            return True
+        try:
+            metadata = obj.role_metadata
+        except RoleMetadata.DoesNotExist:
+            return True
+        return not metadata.is_protected and not _role_metadata_is_referenced(metadata)
+
+
+# auth.contrib.admin registers Group with its generic GroupAdmin.  Replace it
+# here so the existing Group permissions UI remains intact while adding the
+# deliberately narrower bootstrap access policy and metadata inline.
+if admin.site.is_registered(Group):
+    admin.site.unregister(Group)
+admin.site.register(Group, SuperuserOnlyGroupAdmin)
+
+
+@admin.register(MemberRoleAssignmentEvent)
+class MemberRoleAssignmentEventAdmin(admin.ModelAdmin):
+    """Read-only assignment history for the bootstrap administrator boundary."""
+
+    list_display = (
+        "timestamp",
+        "action",
+        "member_username",
+        "group_name",
+        "source",
+        "source_key",
+        "actor_username",
+    )
+    list_filter = ("action", "source")
+    search_fields = (
+        "member_username",
+        "group_name",
+        "role_key",
+        "actor_username",
+        "source_key",
+    )
+    ordering = ("-timestamp", "-pk")
+
+    @staticmethod
+    def _is_authorized(request):
+        return bool(
+            request.user and request.user.is_active and request.user.is_superuser
+        )
+
+    def has_module_permission(self, request):
+        return self._is_authorized(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self._is_authorized(request)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class SuperuserOnlyTagAdmin(admin.ModelAdmin):
+    """Bootstrap tag administration until the member-manager policy exists."""
+
+    list_display = ("display_label", "key", "is_active", "sort_order")
+    list_filter = ("is_active",)
+    search_fields = ("key", "display_label", "description")
+    ordering = ("sort_order", "display_label", "pk")
+    readonly_fields = ()
+
+    def _is_authorized(self, request):
+        return bool(
+            request.user and request.user.is_active and request.user.is_superuser
+        )
+
+    def has_module_permission(self, request):
+        return self._is_authorized(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self._is_authorized(request)
+
+    def has_add_permission(self, request):
+        return self._is_authorized(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._is_authorized(request)
+
+    def has_delete_permission(self, request, obj=None):
+        if not self._is_authorized(request):
+            return False
+        if obj is None:
+            return True
+        from siteconfig.models import MailingList
+
+        using = _instance_db(obj)
+        return not any(
+            f"tag:{obj.key}" in (criteria or [])
+            for criteria in MailingList.objects.using(using).values_list(
+                "criteria", flat=True
+            )
+        )
+
+    def get_actions(self, request):
+        # queryset.delete() bypasses has_delete_permission; remove Django's
+        # bulk action so every deletion gets the per-object guard.
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
+
+    def get_readonly_fields(self, request, obj=None):
+        # The key is the stable reference used by future audience integrations.
+        return ("key",) if obj else ()
+
+
+class MemberTagAssignmentInline(admin.TabularInline):
+    model = MemberTagAssignment
+    extra = 1
+    autocomplete_fields = ("member",)
+    fields = ("member",)
+
+
+@admin.register(MemberTag)
+class MemberTagAdmin(SuperuserOnlyTagAdmin):
+    inlines = (MemberTagAssignmentInline,)
+
 
 # --- Register or replace social_django admin entries with helpful admin banners ---
 try:
@@ -351,6 +601,16 @@ class CustomMemberCreationForm(UserCreationForm):
 
 @admin.register(Member)
 class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAdmin):
+    legacy_role_groups = {
+        "Rostermeisters": "rostermeister",
+        "Instructor Admins": "instructor",
+        "Member Managers": "member_manager",
+        "Webmasters": "webmaster",
+        "Secretary": "secretary",
+        "Treasurer": "treasurer",
+        "Stats Mongers": "stats_monger",
+    }
+    privilege_fields = set(MEMBER_CSV_PRIVILEGE_FIELDS)
     resource_classes = [MemberResource]
     actions = ["export_members_csv", "mark_inactive"]
 
@@ -377,7 +637,11 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             writer.writerow(row)
         return response
 
-    readonly_fields = ("profile_photo_preview", "redact_contact")
+    readonly_fields = (
+        "profile_photo_preview",
+        "redact_contact",
+        "permission_source_summary",
+    )
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
@@ -482,6 +746,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "is_superuser",
                     "groups",
                     "user_permissions",
+                    "permission_source_summary",
                 )
             },
         ),
@@ -505,6 +770,76 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             },
         ),
     )
+
+    def _limited_member_editor(self, request):
+        """Member managers may edit members, but never account privileges."""
+        user = getattr(request, "user", None)
+        return bool(
+            user
+            and user.is_active
+            and not user.is_superuser
+            and user.has_perm("members.change_member")
+        )
+
+    def has_import_permission(self, request):
+        """Require an explicit member-import capability.
+
+        django-import-export permits imports by default when no setting-level
+        permission is configured. That default is unsafe for this admin,
+        because the member CSV schema contains role fields. Member Managers
+        receive the dedicated capability for profile imports, while only a
+        superuser receives the complete role-capable resource.
+        """
+        user = getattr(request, "user", None)
+        return bool(
+            user
+            and user.is_active
+            and user.has_perm("members.change_member")
+            and (user.is_superuser or user.has_perm("members.import_member"))
+        )
+
+    def get_import_resource_classes(self, request):
+        """Prevent non-superuser imports from changing roles or privileges."""
+        if getattr(request.user, "is_superuser", False):
+            return super().get_import_resource_classes(request)
+        return [SafeMemberImportResource]
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if not self._limited_member_editor(request) or obj is None:
+            return fieldsets
+        return tuple(
+            (
+                title,
+                {
+                    **options,
+                    "fields": tuple(
+                        field
+                        for field in options.get("fields", ())
+                        if (field if isinstance(field, str) else field[0])
+                        not in self.privilege_fields
+                    ),
+                },
+            )
+            for title, options in fieldsets
+        )
+
+    def user_change_password(self, request, id, form_url=""):
+        """Keep limited member editors from changing another account's password.
+
+        ``UserAdmin`` exposes password changes through a separate URL, so
+        removing the password field from the regular member form is not
+        sufficient.  Limited editors may still use this endpoint for their
+        own account; superusers retain the normal UserAdmin behavior.
+        """
+        user = self.get_object(request, unquote(id))
+        if (
+            user is not None
+            and self._limited_member_editor(request)
+            and user.pk != request.user.pk
+        ):
+            raise PermissionDenied
+        return super().user_change_password(request, id, form_url)
 
     @admin.display(description="Current Photo")
     def profile_photo_preview(self, obj):
@@ -542,6 +877,15 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         were not being generated. This ensures the same processing happens
         as when members upload their own photos.
         """
+        # Save the pre-edit membership so save_related can distinguish a
+        # direct admin grant from role synchronization.
+        using = _instance_db(obj)
+        obj._admin_groups_before = (
+            set(obj.groups.db_manager(using).values_list("pk", flat=True))
+            if obj.pk
+            else set()
+        )
+
         if "profile_photo" in form.changed_data and obj.profile_photo:
             try:
                 thumbnails = generate_profile_thumbnails(obj.profile_photo)
@@ -570,8 +914,116 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
 
         super().save_model(request, obj, form, change)
 
+        # Use the database of the saved instance for all subsequent related
+        # reads and writes.  This matters when the admin is used with a
+        # database router (and also records the alias for save_related).
+        using = _instance_db(obj)
+        obj._admin_db = using
+
         if not change and form.cleaned_data.get("send_account_setup_email"):
             transaction.on_commit(lambda: self._send_account_setup_email_safely(obj))
+
+    @admin.display(description="Effective permissions and all sources")
+    def permission_source_summary(self, obj):
+        if obj is None or not obj.pk:
+            return "Save the member before inspecting permission sources."
+
+        breakdown = get_permission_sources(obj)
+        lines = []
+        if breakdown["superuser_override"]:
+            lines.append("SUPERUSER OVERRIDE: all permissions")
+        for permission, detail in breakdown["permissions"].items():
+            state = "effective" if detail["effective"] else "not effective"
+            lines.append(f"{permission} [{state}]")
+            for source in detail["sources"]:
+                source_type = source["type"]
+                if source_type == "direct":
+                    label = "direct member permission"
+                elif source_type == "group":
+                    role = source.get("role_label") or source["group_name"]
+                    provenance = source.get("source")
+                    source_key = source.get("source_key")
+                    reason = (
+                        f"{provenance}:{source_key}"
+                        if source_key is not None
+                        else provenance
+                    )
+                    label = f"Group {role} ({reason})"
+                    if source.get("actor_id"):
+                        label += f", actor member #{source['actor_id']}"
+                elif source_type == "qualification":
+                    label = (
+                        "qualification "
+                        f"{source['qualification_code']} "
+                        f"(record #{source['member_qualification_id']})"
+                    )
+                else:
+                    label = source_type
+                if not source.get("effective", False):
+                    reason = source.get("ineffective_reason")
+                    label += f" [not effective{f': {reason}' if reason else ''}]"
+                lines.append(f"  - {label}")
+        if not lines:
+            lines.append("No configured permission sources.")
+        lines.append("")
+        lines.append(breakdown["cache_warning"])
+        return format_html(
+            "<pre style='white-space: pre-wrap'>{}</pre>", "\n".join(lines)
+        )
+
+    def save_related(self, request, form, formsets, change):
+        member = form.instance
+        using = getattr(member, "_admin_db", None) or _instance_db(member)
+        before = getattr(member, "_admin_groups_before", set())
+        cleaned_data = getattr(form, "cleaned_data", None)
+        # ModelForm.save_m2m would replace Groups before provenance is written.
+        # Save every other M2M/inline normally, but route the Groups selection
+        # exclusively through the source-specific manual role service.
+        selected_groups = None
+        if cleaned_data is not None and "groups" in cleaned_data:
+            selected_groups = cleaned_data.pop("groups")
+        try:
+            super().save_related(request, form, formsets, change)
+        finally:
+            if selected_groups is not None:
+                cleaned_data["groups"] = selected_groups
+
+        after = (
+            {group.pk for group in selected_groups}
+            if selected_groups is not None
+            else set(member.groups.db_manager(using).values_list("pk", flat=True))
+        )
+        for group in Group.objects.using(using).filter(pk__in=after - before):
+            # Legacy flag reconciliation owns this source while the flag is set.
+            source_key = self.legacy_role_groups.get(group.name)
+            if source_key and getattr(member, source_key, False):
+                continue
+            set_manual_role(member, group, enabled=True, actor=request.user)
+        # If an administrator disables a legacy flag but deliberately leaves
+        # its canonical Group selected, convert that selected membership to an
+        # explicit manual source before the deferred legacy sync removes it.
+        changed_fields = set(getattr(form, "changed_data", ()))
+        for group in Group.objects.using(using).filter(pk__in=after):
+            source_key = self.legacy_role_groups.get(group.name)
+            if (
+                source_key
+                and source_key in changed_fields
+                and not getattr(member, source_key, False)
+            ):
+                set_manual_role(member, group, enabled=True, actor=request.user)
+        for group in Group.objects.using(using).filter(pk__in=before - after):
+            set_manual_role(member, group, enabled=False, actor=request.user)
+            # The role-assignment backfill used this source for memberships
+            # that had no recognizable legacy flag.  Removing a group in the
+            # admin must revoke that source too, without touching any other
+            # manual/status/legacy provenance.
+            set_manual_role(
+                member,
+                group,
+                enabled=False,
+                actor=request.user,
+                source_key="migration",
+            )
 
     @staticmethod
     def _send_account_setup_email_safely(member):
@@ -832,6 +1284,22 @@ class MembershipApplicationAdmin(AdminHelperMixin, VersionAdmin, admin.ModelAdmi
 
         days = (timezone.now() - obj.submitted_at).days
         return f"{days} days ago"
+
+    def has_view_permission(self, request, obj=None):
+        """Match admin read access to the application-management policy."""
+        return has_membership_application_view_access(request.user)
+
+    def has_module_permission(self, request):
+        """Show the admin module to the same principals who may read it."""
+        return self.has_view_permission(request)
+
+    def has_add_permission(self, request):
+        """Applications are submitted through the public application form."""
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """Only member managers and webmasters may edit applications."""
+        return has_membership_application_modify_access(request.user)
 
     def has_delete_permission(self, request, obj=None):
         """Restrict deletion - applications should be retained for records."""

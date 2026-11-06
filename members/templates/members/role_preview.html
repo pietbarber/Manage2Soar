@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Role Preview{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1>Role Preview</h1>
+  <p class="text-muted">Preview a role without changing a member account.</p>
+
+  {% if role_preview %}
+    <div class="alert {% if role_preview.debug %}alert-danger{% else %}alert-warning{% endif %}">
+      Previewing <strong>{{ role_preview.display_name }}</strong>.
+      {% if role_preview.debug %}
+        Debug mode is enabled; edits and side effects are allowed.
+      {% else %}
+        Read-only mode is enabled; mutation requests are blocked.
+      {% endif %}
+    </div>
+    <form method="post" action="{% url 'members:role_preview_stop' %}">
+      {% csrf_token %}
+      <button class="btn btn-outline-secondary" type="submit">Exit preview</button>
+    </form>
+  {% endif %}
+
+  <hr>
+  <form method="post" action="{% url 'members:role_preview_start' %}" class="row g-3">
+    {% csrf_token %}
+    <div class="col-md-6">
+      <label class="form-label" for="role_key">Role</label>
+      <select class="form-select" id="role_key" name="role_key" required>
+        {% for role in roles %}
+          <option value="{{ role.key }}"{% if role_preview.role_key == role.key %} selected{% endif %}>
+            {{ role.display_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if debug_available %}
+      <div class="col-12 form-check">
+        <input class="form-check-input" type="checkbox" name="debug" id="debug">
+        <label class="form-check-label" for="debug">
+          Enable DEBUG preview (allow edits and side effects)
+        </label>
+      </div>
+    {% endif %}
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Start preview</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

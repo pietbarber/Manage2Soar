@@ -10,6 +10,7 @@ Usage:
 
 import os
 import re
+import tempfile
 
 # Basic Django settings
 from datetime import timedelta
@@ -18,9 +19,15 @@ from pathlib import Path
 from django.contrib.messages import constants as messages
 from dotenv import load_dotenv
 
+from manage2soar.settings_env import is_testing
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+
+# Test detection is limited to explicit configuration and test runner names.
+# It must never enable DEBUG or weaken production security defaults.
+TESTING = is_testing()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
@@ -28,22 +35,39 @@ if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY not set in environment!")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # Deployment/bootstrap fallback for links when SiteConfiguration is unavailable.
 # Once the database is available, SiteConfiguration.canonical_url is authoritative.
-if DEBUG:
-    SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8001")
-else:
-    SITE_URL = os.getenv("SITE_URL", "")
-    # Validate that SITE_URL is set in production
-    if not SITE_URL:
+SITE_URL = os.getenv("SITE_URL", "")
+if not SITE_URL:
+    if DEBUG or TESTING:
+        SITE_URL = "http://127.0.0.1:8001"
+    else:
+        # Validate that SITE_URL is set in production
         raise ValueError(
             "SITE_URL environment variable must be set in production (DEBUG=False). "
             "Example: SITE_URL=https://manage2soar.yourclub.org"
         )
+
+# Keep trusted origins aligned with the base/GKE settings.  The deployment
+# template always supplies CSRF_TRUSTED_ORIGINS; fall back to SITE_URL so a
+# manually configured single-host install still works without a second source
+# of truth for its public origin.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        SITE_URL or "http://127.0.0.1:8001",
+    ).split(",")
+    if origin.strip()
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -84,6 +108,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "axes.middleware.AxesMiddleware",  # Issue #1110: login rate limiting
+    "members.role_preview.RolePreviewMiddleware",
     "utils.middleware.KioskAutoLoginMiddleware",  # Issue #364: Kiosk auto-reauth
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -103,6 +128,8 @@ TEMPLATES = [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
+                "members.role_preview.role_preview_context",
+                "members.context_processors.authorization",
                 "django.contrib.messages.context_processors.messages",
                 "social_django.context_processors.backends",
                 "social_django.context_processors.login_redirect",
@@ -149,6 +176,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = os.getenv("STATIC_ROOT", "/var/www/m2s/static")
 STATICFILES_DIRS = [BASE_DIR / "static"]
+TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
 
 # Media files - LOCAL FILESYSTEM
 MEDIA_URL = "/media/"
@@ -166,7 +194,14 @@ MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/var/www/m2s/media")
 # which defaults to this same path. Do not point IMPORT_EXPORT_TMP_DIR at an
 # unprovisioned path, or the directory may not exist and abandoned member CSVs
 # will bypass the retention policy (issue #1071).
-IMPORT_EXPORT_TMP_DIR = os.getenv("IMPORT_EXPORT_TMP_DIR", "/opt/m2s/import-export-tmp")
+IMPORT_EXPORT_TMP_DIR = os.getenv(
+    "IMPORT_EXPORT_TMP_DIR",
+    (
+        str(Path(tempfile.gettempdir()) / "m2s-import-export-tmp")
+        if TESTING or DEBUG
+        else "/opt/m2s/import-export-tmp"
+    ),
+)
 
 STORAGES = {
     "default": {
@@ -177,7 +212,11 @@ STORAGES = {
         "OPTIONS": {"location": IMPORT_EXPORT_TMP_DIR},
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if TESTING
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
     },
 }
 IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.MediaStorage"
@@ -196,6 +235,7 @@ AUTHENTICATION_BACKENDS = (
     "utils.auth_backends.AxesCompatBackend",
     "social_core.backends.google.GoogleOAuth2",
     "django.contrib.auth.backends.ModelBackend",
+    "members.auth_backends.QualificationPermissionBackend",
 )
 
 #############################################################
@@ -289,9 +329,27 @@ if not DEBUG:
         SECURE_SSL_REDIRECT = True
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
+        # Match the base/GKE production policy.  HSTS is only safe once the
+        # deployment is actually serving HTTPS end to end.
+        SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+        if SECURE_HSTS_SECONDS > 0:
+            SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+            SECURE_HSTS_PRELOAD = True
+    # SameSite cookie settings to prevent CSRF attacks.  Lax keeps ordinary
+    # same-site requests and top-level navigation working.
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
+
+# Kiosk cookies follow the same rule as session/CSRF cookies: secure by
+# default for a real single-host deployment, but usable over HTTP in local
+# development and tests.  Always define the setting because kiosk views are
+# also exercised while migrations are being applied.
+KIOSK_COOKIE_SECURE = os.getenv(
+    "KIOSK_COOKIE_SECURE", "False" if TESTING or DEBUG else "True"
+).lower() in ("true", "1", "yes")
 
 # TinyMCE configuration
 TINYMCE_PDF_TRUSTED_URL_PREFIXES = [

@@ -37,6 +37,7 @@ MEMBER_CSV_FIELDS = (
     "webmaster",
     "secretary",
     "treasurer",
+    "stats_monger",
     "safety_officer",
     "address",
     "city",
@@ -51,6 +52,33 @@ MEMBER_CSV_FIELDS = (
     "glider_rating",
     "public_notes",
     "private_notes",
+)
+
+# These fields change a member's roles or Django account privileges. They
+# remain in the complete CSV schema for superuser imports and exports, but
+# must not be accepted from the limited member-editor import path.
+MEMBER_CSV_PRIVILEGE_FIELDS = frozenset(
+    {
+        "is_superuser",
+        "is_staff",
+        "groups",
+        "user_permissions",
+        "instructor",
+        "towpilot",
+        "duty_officer",
+        "assistant_duty_officer",
+        "director",
+        "member_manager",
+        "rostermeister",
+        "webmaster",
+        "secretary",
+        "treasurer",
+        "stats_monger",
+        "safety_officer",
+    }
+)
+SAFE_MEMBER_CSV_FIELDS = tuple(
+    field for field in MEMBER_CSV_FIELDS if field not in MEMBER_CSV_PRIVILEGE_FIELDS
 )
 
 EMERGENCY_CONTACT_CSV_FIELDS = (
@@ -429,3 +457,17 @@ class MemberResource(resources.ModelResource):
             instance.legacy_username,
             self._LEGACY_USERNAME_NULL_TOKENS,
         )
+
+
+class SafeMemberImportResource(MemberResource):
+    """Member import resource with account-privilege fields removed.
+
+    This resource is selected only for non-superusers in the admin. Keeping
+    the complete :class:`MemberResource` available preserves the existing
+    superuser import/export format while making a crafted CSV header unable
+    to reach role fields through the limited editor workflow.
+    """
+
+    class Meta:
+        model = Member
+        fields = SAFE_MEMBER_CSV_FIELDS

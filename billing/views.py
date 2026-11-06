@@ -20,6 +20,7 @@ from billing.forms import (
 )
 from billing.models import BillingPeriod, Ledger, LedgerEntry
 from billing.periods import close_period, reopen_period
+from billing.permissions import has_billing_access
 from billing.services import (
     get_balance,
     get_statement_rows,
@@ -40,7 +41,7 @@ def treasurer_required(view_func):
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect_to_login(request.get_full_path())
-        if not (request.user.is_superuser or request.user.treasurer):
+        if not has_billing_access(request.user):
             return HttpResponseForbidden("Treasurer access is required.")
         return view_func(request, *args, **kwargs)
 

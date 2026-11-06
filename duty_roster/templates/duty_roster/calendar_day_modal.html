@@ -431,7 +431,7 @@
         {% endfor %}
       </ul>
       {# Show Review Requests button for instructors assigned to this day #}
-      {% if user.is_authenticated and user.instructor %}
+      {% if user.is_authenticated and role_access.instructor %}
         {% if user == assignment.instructor or user == assignment.surge_instructor %}
         <div class="mt-3">
           <a href="{% url 'duty_roster:instructor_requests' %}" class="btn btn-primary btn-sm w-100">
@@ -715,7 +715,7 @@
 {% endif %}
 
 {# Admin Section: Edit Duty Crew #}
-{% if user.is_authenticated and user.rostermeister %}
+{% if user.is_authenticated and role_access.rostermeister %}
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-body p-3">
     <details>

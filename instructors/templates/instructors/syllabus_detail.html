@@ -40,7 +40,7 @@
     {% endif %}
     {% if not public and user.is_authenticated %}
       <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-outline-primary">Back to Syllabus</a>
-      {% if user.instructor %}
+      {% if role_access.instructor %}
         <a href="{% url 'admin:instructors_traininglesson_change' lesson.id %}" class="btn btn-outline-secondary">Edit This Lesson</a>
       {% endif %}
     {% endif %}

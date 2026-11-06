@@ -5,7 +5,8 @@ from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
-from django.db import models, transaction
+from django.core.exceptions import ValidationError
+from django.db import models, router, transaction
 from django.db.models import Q
 from tinymce.models import HTMLField
 
@@ -17,6 +18,8 @@ from utils.upload_entropy import (
     upload_profile_photo_medium,
     upload_profile_photo_small,
 )
+
+from .role_audit import internal_group_write_scope
 
 # Membership application models are in models_applications.py to avoid circular imports
 from .utils.avatar_generator import generate_identicon
@@ -57,6 +60,286 @@ class Biography(models.Model):
 
     def __str__(self):
         return f"Biography of {self.member.get_full_name()}"
+
+
+class RoleMetadata(models.Model):
+    """Stable, user-facing metadata for a Django authentication Group."""
+
+    group = models.OneToOneField(
+        Group,
+        on_delete=models.CASCADE,
+        related_name="role_metadata",
+    )
+    key = models.CharField(max_length=100, unique=True)
+    display_name = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    is_builtin = models.BooleanField(default=False)
+    is_protected = models.BooleanField(default=False)
+    is_system_managed = models.BooleanField(default=False)
+    is_assignable = models.BooleanField(default=True)
+    mailing_list_eligible = models.BooleanField(default=False)
+    admin_access = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow members with this role to enter and see the administrative "
+            "site. This does not grant model or application permissions."
+        ),
+    )
+    qualification_permission_bundle = models.BooleanField(
+        default=False,
+        help_text=(
+            "Allow this Group to be selected as a permission bundle for a "
+            "current member qualification."
+        ),
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "display_name", "pk")
+
+    def __str__(self):
+        return self.display_name
+
+    def clean(self):
+        super().clean()
+        if self.pk:
+            using = self._state.db or router.db_for_read(type(self), instance=self)
+            persisted_key = (
+                type(self)
+                .objects.using(using)
+                .filter(pk=self.pk)
+                .values_list("key", flat=True)
+                .first()
+            )
+            if persisted_key is not None and persisted_key != self.key:
+                raise ValidationError(
+                    {"key": "Role keys are stable and cannot be changed."}
+                )
+        if self.qualification_permission_bundle and (
+            self.is_protected or self.is_system_managed or self.is_builtin
+        ):
+            raise ValidationError(
+                {
+                    "qualification_permission_bundle": (
+                        "Protected, system-managed, and built-in roles cannot "
+                        "be qualification permission bundles."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class MemberRoleAssignmentQuerySet(models.QuerySet):
+    """Require the provenance service for bulk mutations."""
+
+    _ALLOWED_FK_CLEARS = {"actor"}
+
+    def bulk_create(self, objs, *args, **kwargs):
+        raise ValidationError(
+            "Use set_manual_role() or the role-assignment service to create "
+            "provenance rows."
+        )
+
+    def bulk_update(self, objs, fields, *args, **kwargs):
+        raise ValidationError(
+            "Role assignment provenance rows are immutable; use the "
+            "role-assignment service."
+        )
+
+    def update(self, **kwargs):
+        # Django's deletion collector clears ``SET_NULL`` foreign keys through
+        # a queryset update.  Permit only that exact operation so deleting a
+        # granting Member does not abort; provenance and timestamps stay fixed.
+        if (
+            kwargs
+            and set(kwargs) <= self._ALLOWED_FK_CLEARS
+            and all(value is None for value in kwargs.values())
+        ):
+            return super().update(**kwargs)
+        raise ValidationError(
+            "Role assignment provenance rows are immutable; use the "
+            "role-assignment service."
+        )
+
+
+class MemberRoleAssignment(models.Model):
+    """An auditable reason a member belongs to an auth Group."""
+
+    SOURCE_CHOICES = (
+        ("manual", "Manual"),
+        ("status", "Status"),
+        ("legacy", "Legacy role flag"),
+    )
+
+    member = models.ForeignKey(
+        "Member", on_delete=models.CASCADE, related_name="role_assignments"
+    )
+    group = models.ForeignKey(
+        Group, on_delete=models.CASCADE, related_name="member_role_assignments"
+    )
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
+    source_key = models.CharField(max_length=100)
+    actor = models.ForeignKey(
+        "Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="role_assignments_made",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = MemberRoleAssignmentQuerySet.as_manager()
+
+    class Meta:
+        default_permissions = ()
+        # Keep the immutability guard on related-object and generic ORM access
+        # too; ``_base_manager`` would otherwise bypass it.
+        base_manager_name = "objects"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("member", "group", "source", "source_key"),
+                name="unique_member_role_assignment_provenance",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.member} - {self.group} ({self.source}:{self.source_key})"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None and not self._state.adding:
+            raise ValidationError(
+                "Role assignment provenance rows are immutable; use the "
+                "role-assignment service."
+            )
+        return super().save(*args, **kwargs)
+
+
+class MemberRoleAssignmentEventQuerySet(models.QuerySet):
+    """Keep ordinary bulk ORM APIs from bypassing event immutability."""
+
+    _ALLOWED_FK_CLEARS = {"member", "group", "actor"}
+
+    def update(self, **kwargs):
+        # Django's deletion collector clears SET_NULL foreign keys through a
+        # queryset update.  Permit only that exact operation; the snapshot
+        # fields remain untouched and the event keeps its audit identity.
+        if (
+            kwargs
+            and set(kwargs) <= self._ALLOWED_FK_CLEARS
+            and all(value is None for value in kwargs.values())
+        ):
+            return super().update(**kwargs)
+        raise ValidationError("Role assignment audit events are immutable.")
+
+    def bulk_create(self, *args, **kwargs):
+        raise ValidationError(
+            "Role assignment audit events must be appended individually."
+        )
+
+    def delete(self):
+        raise ValidationError("Role assignment audit events cannot be deleted.")
+
+
+class MemberRoleAssignmentEvent(models.Model):
+    """Append-only audit record for a provenance-aware role change.
+
+    The nullable foreign keys are conveniences for navigating current rows;
+    the snapshot fields are the audit record.  In particular, deleting a
+    Group or assignment must not make the event lose the role's identity.
+    Database administrators can still bypass model methods, so immutability
+    here is an application-level guarantee rather than a database-admin one.
+    The only bulk update allowed through the default/base manager is clearing
+    the nullable convenience foreign keys, which Django's deletion collector
+    needs for ``SET_NULL``; the snapshot fields remain immutable.
+    """
+
+    ACTION_CHOICES = (("grant", "Grant"), ("revoke", "Revoke"))
+
+    member = models.ForeignKey(
+        "Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="role_assignment_events",
+    )
+    member_id_snapshot = models.PositiveBigIntegerField()
+    member_username = models.CharField(max_length=150)
+    group = models.ForeignKey(
+        Group,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="role_assignment_events",
+    )
+    group_id_snapshot = models.PositiveBigIntegerField()
+    group_name = models.CharField(max_length=150)
+    role_key = models.CharField(max_length=100, blank=True)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    actor = models.ForeignKey(
+        "Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="role_assignment_events_made",
+    )
+    actor_id_snapshot = models.PositiveBigIntegerField(null=True, blank=True)
+    actor_username = models.CharField(max_length=150, blank=True)
+    source = models.CharField(max_length=20)
+    source_key = models.CharField(max_length=100)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("timestamp", "pk")
+        # Make the guard apply through related-object and generic ORM access
+        # too; ``_base_manager`` would otherwise be a plain Django manager.
+        base_manager_name = "objects"
+
+    objects = models.Manager.from_queryset(MemberRoleAssignmentEventQuerySet)()
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValidationError("Role assignment audit events are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Role assignment audit events cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.action} {self.member_id_snapshot} -> {self.group_name}"
+
+
+class MemberTag(models.Model):
+    """A permissionless, reusable label that may be assigned to members.
+
+    This first slice intentionally supports only manually managed assignments.
+    Template variables, audience resolution, aircraft-derived instances, and
+    profile visibility are follow-up work and are not represented here.
+    """
+
+    key = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Stable identifier for this tag; changing it is discouraged.",
+    )
+    display_label = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    members = models.ManyToManyField(
+        "Member",
+        through="MemberTagAssignment",
+        related_name="member_tags",
+    )
+
+    class Meta:
+        ordering = ("sort_order", "display_label", "pk")
+        default_permissions = ()
+
+    def __str__(self):
+        return self.display_label
 
 
 #########################
@@ -360,18 +643,68 @@ class Member(AbstractUser):
             names.append("Secretary")
         if self.treasurer:
             names.append("Treasurer")
+        if self.director:
+            names.append("Directors")
+        if self.stats_monger:
+            names.append("Stats Mongers")
         return names
 
-    def _sync_groups(self):
-        # Only safe after PK exists
+    def _sync_groups(self, using=None):
+        """Reconcile role-flag assignments without touching other grants."""
         if not self.pk:
             return
-        desired = []
-        for name in self._desired_group_names():
-            grp, _ = Group.objects.get_or_create(name=name)
-            desired.append(grp)
-        # Atomic replace; avoids add/remove churn
-        self.groups.set(desired)
+        using = (
+            using or self._state.db or router.db_for_write(type(self), instance=self)
+        )
+        with transaction.atomic(using=using):
+            # Save callbacks can run after a newer in-memory instance has
+            # changed (and several callbacks can be queued in one request).
+            # Lock and re-read the row so this reconciliation is serialized
+            # with set_manual_role and always reflects committed values.
+            locked_member = (
+                type(self).objects.using(using).select_for_update().get(pk=self.pk)
+            )
+            from members.role_definitions import legacy_sync_group_names
+
+            legacy_groups = legacy_sync_group_names()
+            legacy_groups["Stats Mongers"] = "stats_monger"
+            desired = {
+                name: key
+                for name, key in legacy_groups.items()
+                if getattr(locked_member, key)
+            }
+            for name, source_key in desired.items():
+                group, _ = Group.objects.using(using).get_or_create(name=name)
+                MemberRoleAssignment.objects.using(using).get_or_create(
+                    member=locked_member,
+                    group=group,
+                    source="legacy",
+                    source_key=source_key,
+                )
+
+            stale = MemberRoleAssignment.objects.using(using).filter(
+                member_id=locked_member.pk, source="legacy"
+            )
+            if desired:
+                stale = stale.exclude(source_key__in=desired.values())
+            for assignment in stale.select_related("group"):
+                assignment.delete(using=using)
+                if (
+                    not MemberRoleAssignment.objects.using(using)
+                    .filter(member_id=locked_member.pk, group_id=assignment.group_id)
+                    .exists()
+                ):
+                    with internal_group_write_scope():
+                        locked_member.groups.db_manager(using).remove(assignment.group)
+
+            # Existing and newly-created provenance rows must be reflected in
+            # the M2M table, but this deliberately never replaces the member's groups.
+            with internal_group_write_scope():
+                locked_member.groups.db_manager(using).add(
+                    *Group.objects.using(using)
+                    .filter(member_role_assignments__member_id=locked_member.pk)
+                    .distinct()
+                )
 
     @classmethod
     def get_membership_status_choices(cls):
@@ -448,11 +781,19 @@ class Member(AbstractUser):
                     )
 
         # 5) now safe to touch M2M
-        transaction.on_commit(self._sync_groups)
+        using = (
+            kwargs.get("using")
+            or self._state.db
+            or router.db_for_write(type(self), instance=self)
+        )
+        transaction.on_commit(lambda: self._sync_groups(using=using), using=using)
 
     class Meta:
         verbose_name = "user"
         verbose_name_plural = "users"
+        permissions = [
+            ("import_member", "Can import member profiles"),
+        ]
 
     ##################################
     #  def __str__
@@ -564,6 +905,34 @@ class MemberBadge(models.Model):
 
     def __str__(self):
         return f"{self.member} - {self.badge.name}"
+
+
+class MemberTagAssignment(models.Model):
+    """Manual membership of a member in a permissionless :class:`MemberTag`."""
+
+    tag = models.ForeignKey(
+        MemberTag,
+        on_delete=models.CASCADE,
+        related_name="assignments",
+    )
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="tag_assignments",
+    )
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tag", "member"),
+                name="unique_member_tag_assignment",
+            )
+        ]
+        ordering = ("member__last_name", "member__first_name", "pk")
+
+    def __str__(self):
+        return f"{self.member} - {self.tag.display_label}"
 
 
 #########################
@@ -849,6 +1218,9 @@ class SafetyReport(models.Model):
         verbose_name = "Safety Report"
         verbose_name_plural = "Safety Reports"
         ordering = ["-created_at"]
+        permissions = [
+            ("access_safety_reports", "Can access safety reports"),
+        ]
 
     def __str__(self):
         if self.is_anonymous:

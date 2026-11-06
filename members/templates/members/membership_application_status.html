@@ -103,6 +103,7 @@
                     <form method="post" style="display: inline;">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="withdraw">
+                        <input type="hidden" name="withdrawal_token" value="{{ withdrawal_token }}">
                         <button type="submit" class="btn btn-sm btn-outline-warning"
                                 onclick="return confirm('Are you sure you want to withdraw your application? This cannot be undone.')">
                             <i class="fas fa-times"></i> Withdraw Application

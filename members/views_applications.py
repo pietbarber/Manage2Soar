@@ -1,18 +1,25 @@
 import logging
+from urllib.parse import urlencode
 
 from django.contrib import messages
+from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 
+from members.authorization import (
+    has_membership_application_modify_access,
+    has_membership_application_view_access,
+)
 from siteconfig.models import SiteConfiguration
 
 from .account_emails import send_account_setup_email
-from .decorators import active_member_required
+from .decorators import non_kiosk_member_required
 from .forms_applications import (
     MembershipApplicationForm,
     MembershipApplicationReviewForm,
@@ -20,6 +27,29 @@ from .forms_applications import (
 from .models_applications import MembershipApplication
 
 logger = logging.getLogger(__name__)
+APPLICATION_WITHDRAWAL_SALT = "members.application-withdrawal"
+APPLICATION_WITHDRAWAL_MAX_AGE = 30 * 24 * 60 * 60
+
+
+def _application_withdrawal_token(application):
+    return signing.dumps(
+        {"application_id": str(application.application_id)},
+        salt=APPLICATION_WITHDRAWAL_SALT,
+    )
+
+
+def _valid_application_withdrawal_token(application, token):
+    if not token:
+        return False
+    try:
+        payload = signing.loads(
+            token,
+            salt=APPLICATION_WITHDRAWAL_SALT,
+            max_age=APPLICATION_WITHDRAWAL_MAX_AGE,
+        )
+    except signing.BadSignature:
+        return False
+    return payload.get("application_id") == str(application.application_id)
 
 
 def _send_account_setup_email_safely(member, application_id):
@@ -35,14 +65,12 @@ def _send_account_setup_email_safely(member, application_id):
 
 def _can_view_membership_applications(user):
     """Return True when the user may view membership applications/waitlist."""
-    return bool(
-        user.director or user.member_manager or user.webmaster or user.is_superuser
-    )
+    return has_membership_application_view_access(user)
 
 
 def _can_modify_membership_applications(user):
     """Return True when the user may modify membership applications/waitlist."""
-    return bool(user.member_manager or user.webmaster or user.is_superuser)
+    return has_membership_application_modify_access(user)
 
 
 @ensure_csrf_cookie
@@ -104,9 +132,13 @@ def membership_application(request):
                     )
 
                     # Redirect to confirmation page with application ID
-                    return redirect(
+                    status_url = reverse(
                         "members:membership_application_status",
-                        application_id=application.application_id,
+                        kwargs={"application_id": application.application_id},
+                    )
+                    token = _application_withdrawal_token(application)
+                    return HttpResponseRedirect(
+                        f"{status_url}?{urlencode({'withdrawal_token': token})}"
                     )
 
             except Exception as e:
@@ -156,7 +188,7 @@ def membership_application(request):
     )
 
 
-@active_member_required
+@non_kiosk_member_required
 def membership_applications_list(request):
     """
     List of membership applications for authorized club roles.
@@ -229,7 +261,7 @@ def membership_applications_list(request):
     )
 
 
-@active_member_required
+@non_kiosk_member_required
 def membership_application_detail(request, application_id):
     """
     Detailed view of a membership application.
@@ -421,7 +453,7 @@ def membership_application_detail(request, application_id):
     )
 
 
-@active_member_required
+@non_kiosk_member_required
 def membership_waitlist(request):
     """
     View/manage the membership waiting list.
@@ -596,10 +628,19 @@ def membership_application_status(request, application_id):
         MembershipApplication, application_id=application_id
     )
 
+    withdrawal_token = request.POST.get("withdrawal_token") or request.GET.get(
+        "withdrawal_token"
+    )
+    can_withdraw = application.status in [
+        "pending",
+        "under_review",
+        "additional_info_needed",
+    ] and _valid_application_withdrawal_token(application, withdrawal_token)
+
     # Handle withdrawal request
     if request.method == "POST" and request.POST.get("action") == "withdraw":
         # Only allow withdrawal if application is still pending or under review
-        if application.status in ["pending", "under_review", "additional_info_needed"]:
+        if can_withdraw:
             application.status = "withdrawn"
             application.reviewed_at = timezone.now()
             application.save()
@@ -621,7 +662,8 @@ def membership_application_status(request, application_id):
             )
         else:
             messages.error(
-                request, "This application cannot be withdrawn at this time."
+                request,
+                "This application cannot be withdrawn with the supplied authorization.",
             )
 
         # Redirect back to status page to prevent re-submission
@@ -636,8 +678,8 @@ def membership_application_status(request, application_id):
         "status_display": application.get_status_display(),
         "submitted_date": application.submitted_at,
         "applicant_name": application.first_name,  # Only show first name for privacy
-        "can_withdraw": application.status
-        in ["pending", "under_review", "additional_info_needed"],
+        "can_withdraw": can_withdraw,
+        "withdrawal_token": withdrawal_token,
     }
 
     return render(request, "members/membership_application_status.html", context)

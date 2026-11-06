@@ -1,11 +1,12 @@
 """Tests for the MailingList model and API integration."""
 
 import pytest
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
 from logsheet.models import Glider
-from members.models import Member
+from members.models import Member, MemberTag, MemberTagAssignment, RoleMetadata
 from siteconfig.models import MailingList, MailingListCriterion, MembershipStatus
 
 
@@ -364,6 +365,264 @@ class TestMailingListSubscribers:
         # Verify count also excludes members without valid emails
         assert ml.get_subscriber_count() == 0
 
+    def test_eligible_role_uses_group_membership(self, membership_status):
+        group = Group.objects.create(name="Safety Coordinators")
+        RoleMetadata.objects.create(
+            group=group,
+            key="safety_coordinators",
+            display_name="Safety Coordinators",
+            mailing_list_eligible=True,
+        )
+        member = Member.objects.create(
+            username="role_member",
+            email="role@example.com",
+            membership_status="Full Member",
+            is_active=True,
+        )
+        member.groups.add(group)
+        unrelated = Member.objects.create(
+            username="role_unrelated",
+            email="unrelated@example.com",
+            membership_status="Full Member",
+            is_active=True,
+        )
+
+        mailing_list = MailingList.objects.create(
+            name="role-list", criteria=["role:safety_coordinators"]
+        )
+        assert list(mailing_list.get_subscribers()) == [member]
+        assert unrelated not in mailing_list.get_subscribers()
+
+    def test_existing_role_selector_still_resolves_when_role_becomes_ineligible(
+        self, membership_status
+    ):
+        group = Group.objects.create(name="Retired Mail Role")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="retired_mail_role",
+            display_name="Retired Mail Role",
+            mailing_list_eligible=True,
+        )
+        member = Member.objects.create(
+            username="retired_role_member",
+            email="retired-role@example.com",
+            membership_status="Full Member",
+            is_active=True,
+        )
+        member.groups.add(group)
+        mailing_list = MailingList.objects.create(
+            name="retired-role-list", criteria=[f"role:{role.key}"]
+        )
+
+        role.mailing_list_eligible = False
+        role.save(update_fields=["mailing_list_eligible"])
+        mailing_list.refresh_from_db()
+
+        assert list(mailing_list.get_subscribers()) == [member]
+        mailing_list.full_clean()
+
+    def test_new_list_cannot_select_ineligible_role(self, db):
+        group = Group.objects.create(name="Not Mail Role")
+        RoleMetadata.objects.create(
+            group=group,
+            key="not_mail_role",
+            display_name="Not Mail Role",
+            mailing_list_eligible=False,
+        )
+        mailing_list = MailingList(
+            name="invalid-new-role-list", criteria=["role:not_mail_role"]
+        )
+        with pytest.raises(ValidationError):
+            mailing_list.full_clean()
+
+    def test_role_criteria_preserves_filters_and_or_deduplication(
+        self, membership_status, inactive_status
+    ):
+        group = Group.objects.create(name="Eligible Role")
+        RoleMetadata.objects.create(
+            group=group,
+            key="eligible_role",
+            display_name="Eligible Role",
+            mailing_list_eligible=True,
+        )
+        role_member = Member.objects.create(
+            username="role_or_member",
+            email="role-or@example.com",
+            membership_status="Full Member",
+            is_active=True,
+        )
+        role_member.groups.add(group)
+        no_email = Member.objects.create(
+            username="role_no_email",
+            email="",
+            membership_status="Full Member",
+            is_active=True,
+        )
+        no_email.groups.add(group)
+        inactive = Member.objects.create(
+            username="role_inactive",
+            email="inactive-role@example.com",
+            membership_status="Inactive Member",
+        )
+        inactive.groups.add(group)
+
+        mailing_list = MailingList.objects.create(
+            name="role-or-list",
+            criteria=["role:eligible_role", MailingListCriterion.ACTIVE_MEMBER],
+        )
+        assert list(mailing_list.get_subscribers()).count(role_member) == 1
+        assert no_email not in mailing_list.get_subscribers()
+        assert inactive not in mailing_list.get_subscribers()
+
+    def test_role_and_tag_criteria_use_or_logic_without_duplicates(
+        self, membership_status, inactive_status
+    ):
+        group = Group.objects.create(name="Tag Role")
+        RoleMetadata.objects.create(
+            group=group,
+            key="tag_role",
+            display_name="Tag Role",
+            mailing_list_eligible=True,
+        )
+        tag = MemberTag.objects.create(key="event", display_label="Event")
+        role_member = Member.objects.create(
+            username="role_and_tag",
+            email="role-and-tag@example.com",
+            membership_status="Full Member",
+            is_active=True,
+        )
+        role_member.groups.add(group)
+        MemberTagAssignment.objects.create(tag=tag, member=role_member)
+        tag_member = Member.objects.create(
+            username="tag_only",
+            email="tag-only@example.com",
+            membership_status="Full Member",
+            is_active=True,
+        )
+        MemberTagAssignment.objects.create(tag=tag, member=tag_member)
+        no_email = Member.objects.create(
+            username="tag_no_email",
+            email="",
+            membership_status="Full Member",
+            is_active=True,
+        )
+        MemberTagAssignment.objects.create(tag=tag, member=no_email)
+        inactive = Member.objects.create(
+            username="tag_inactive",
+            email="tag-inactive@example.com",
+            membership_status="Inactive Member",
+        )
+        MemberTagAssignment.objects.create(tag=tag, member=inactive)
+
+        mailing_list = MailingList.objects.create(
+            name="role-and-tag-list",
+            criteria=["role:tag_role", "tag:event"],
+        )
+        assert list(mailing_list.get_subscribers()) == [role_member, tag_member]
+
+    def test_inactive_tag_selector_remains_effective_and_labeled(self, active_member):
+        from siteconfig.admin import MailingListAdminForm
+
+        tag = MemberTag.objects.create(
+            key="retired", display_label="Retired Event", is_active=True
+        )
+        MemberTagAssignment.objects.create(tag=tag, member=active_member)
+        mailing_list = MailingList.objects.create(
+            name="retired-tag-list", criteria=["tag:retired"]
+        )
+        tag.is_active = False
+        tag.save(update_fields=["is_active"])
+        mailing_list.refresh_from_db()
+        assert list(mailing_list.get_subscribers()) == [active_member]
+        assert "inactive tag" in mailing_list.get_criteria_display()[0]
+        form = MailingListAdminForm(instance=mailing_list)
+        assert any(
+            value == "tag:retired" and "inactive tag" in label
+            for value, label in form.fields["criteria_select"].choices
+        )
+        form_data = {
+            "name": mailing_list.name,
+            "description": mailing_list.description,
+            "is_active": True,
+            "sort_order": mailing_list.sort_order,
+            "criteria_select": ["tag:retired"],
+        }
+        assert MailingListAdminForm(data=form_data, instance=mailing_list).is_valid()
+
+    @pytest.mark.django_db(transaction=True)
+    def test_tag_deletion_is_guarded_until_selector_removed(self):
+        tag = MemberTag.objects.create(key="protected", display_label="Protected")
+        mailing_list = MailingList.objects.create(
+            name="protected-tag-list", criteria=["tag:protected"]
+        )
+        with pytest.raises(ValidationError, match="mailing list uses it"):
+            MemberTag.objects.filter(pk=tag.pk).delete()
+        mailing_list.criteria = [MailingListCriterion.ACTIVE_MEMBER]
+        mailing_list.save(update_fields=["criteria"])
+        tag.delete()
+
+    @pytest.mark.django_db(transaction=True)
+    def test_role_metadata_deletion_is_guarded_until_selector_removed(self):
+        group = Group.objects.create(name="Protected Mail Role")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="protected_mail_role",
+            display_name="Protected Mail Role",
+            mailing_list_eligible=True,
+        )
+        mailing_list = MailingList.objects.create(
+            name="protected-role-list", criteria=[f"role:{role.key}"]
+        )
+
+        with pytest.raises(ValidationError, match="mailing list uses it"):
+            role.delete()
+
+        mailing_list.criteria = [MailingListCriterion.ACTIVE_MEMBER]
+        mailing_list.save(update_fields=["criteria"])
+        role.delete()
+
+    @pytest.mark.django_db(transaction=True)
+    def test_role_metadata_queryset_deletion_is_guarded(self):
+        group = Group.objects.create(name="Queryset Protected Mail Role")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="queryset_protected_mail_role",
+            display_name="Queryset Protected Mail Role",
+            mailing_list_eligible=True,
+        )
+        MailingList.objects.create(
+            name="queryset-protected-role-list", criteria=[f"role:{role.key}"]
+        )
+
+        with pytest.raises(ValidationError, match="mailing list uses it"):
+            RoleMetadata.objects.filter(pk=role.pk).delete()
+
+    @pytest.mark.django_db(transaction=True)
+    def test_role_group_deletion_is_guarded_until_selector_removed(self):
+        group = Group.objects.create(name="Cascading Protected Mail Role")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="cascading_protected_mail_role",
+            display_name="Cascading Protected Mail Role",
+            mailing_list_eligible=True,
+        )
+        mailing_list = MailingList.objects.create(
+            name="cascading-protected-role-list", criteria=[f"role:{role.key}"]
+        )
+
+        with pytest.raises(ValidationError, match="mailing list uses it"):
+            group.delete()
+
+        mailing_list.criteria = [MailingListCriterion.ACTIVE_MEMBER]
+        mailing_list.save(update_fields=["criteria"])
+        group.delete()
+
+    def test_tag_assignment_does_not_grant_group_permissions(self, active_member):
+        group = Group.objects.create(name="Permission Group")
+        tag = MemberTag.objects.create(key="labels-only", display_label="Labels only")
+        MemberTagAssignment.objects.create(tag=tag, member=active_member)
+        assert not active_member.groups.filter(pk=group.pk).exists()
+
 
 @pytest.mark.django_db
 class TestMailingListOrdering:
@@ -666,3 +925,102 @@ class TestMailingListAdminForm:
         assert not form.is_valid()
         assert "__all__" in form.errors
         assert "criterion" in form.errors["__all__"][0].lower()
+
+    def test_role_choices_use_display_name_and_preserve_stale_selection(self, db):
+        from siteconfig.admin import MailingListAdminForm
+
+        group = Group.objects.create(name="Mail Role")
+        RoleMetadata.objects.create(
+            group=group,
+            key="mail_role",
+            display_name="Mail Role Display",
+            mailing_list_eligible=True,
+        )
+        mailing_list = MailingList.objects.create(
+            name="role-admin-list", criteria=[MailingListCriterion.ACTIVE_MEMBER]
+        )
+        MailingList.objects.filter(pk=mailing_list.pk).update(
+            criteria=["role:old_role"]
+        )
+        mailing_list.refresh_from_db()
+        form = MailingListAdminForm(instance=mailing_list)
+        choices = dict(form.fields["criteria_select"].choices)
+        assert choices["role:mail_role"] == "Mail Role Display"
+        stale_label = choices["role:old_role"].lower()
+        assert "stale" in stale_label and "role metadata" in stale_label
+
+    def test_ineligible_existing_role_is_labeled_and_saveable(self, db):
+        from siteconfig.admin import MailingListAdminForm
+
+        group = Group.objects.create(name="Former Mail Role")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="former_mail_role",
+            display_name="Former Mail Role",
+            mailing_list_eligible=True,
+        )
+        mailing_list = MailingList.objects.create(
+            name="former-role-admin-list", criteria=[f"role:{role.key}"]
+        )
+        role.mailing_list_eligible = False
+        role.save(update_fields=["mailing_list_eligible"])
+
+        form = MailingListAdminForm(
+            instance=mailing_list,
+            data={
+                "name": mailing_list.name,
+                "description": mailing_list.description,
+                "is_active": mailing_list.is_active,
+                "sort_order": mailing_list.sort_order,
+                "criteria_select": [f"role:{role.key}"],
+            },
+        )
+        assert form.is_valid(), form.errors
+        label = dict(form.fields["criteria_select"].choices)[f"role:{role.key}"]
+        assert "Former Mail Role" in label
+        assert "stale/ineligible" in label
+        form.save()
+
+    def test_missing_role_metadata_is_labeled_and_removable(self, db):
+        from siteconfig.admin import MailingListAdminForm
+
+        mailing_list = MailingList.objects.create(
+            name="missing-role-admin-list",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+        )
+        MailingList.objects.filter(pk=mailing_list.pk).update(
+            criteria=["role:missing_mail_role"]
+        )
+        mailing_list.refresh_from_db()
+
+        form = MailingListAdminForm(instance=mailing_list)
+        choices = dict(form.fields["criteria_select"].choices)
+        assert "stale/missing" in choices["role:missing_mail_role"].lower()
+
+        # The stale value remains a valid submitted choice, so an admin can
+        # leave it unchanged or remove it without losing the saved selector.
+        form = MailingListAdminForm(
+            instance=mailing_list,
+            data={
+                "name": mailing_list.name,
+                "description": mailing_list.description,
+                "is_active": mailing_list.is_active,
+                "sort_order": mailing_list.sort_order,
+                "criteria_select": ["role:missing_mail_role"],
+            },
+        )
+        assert form.is_valid(), form.errors
+
+    def test_ineligible_role_selector_is_rejected_for_new_list(self, db):
+        group = Group.objects.create(name="Not Mail Role")
+        RoleMetadata.objects.create(
+            group=group,
+            key="not_mail_role",
+            display_name="Not Mail Role",
+            mailing_list_eligible=False,
+        )
+        mailing_list = MailingList(
+            name="invalid-role-list", criteria=["role:not_mail_role"]
+        )
+        with pytest.raises(ValidationError):
+            mailing_list.full_clean()

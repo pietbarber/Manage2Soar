@@ -7,7 +7,8 @@ import re
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.template import Context, Template
 from django.test import override_settings
@@ -348,6 +349,11 @@ def test_resources_nav_includes_safety_team_links_for_safety_officer():
     )
     safety_officer.safety_officer = True
     safety_officer.save()
+    permission = Permission.objects.get(
+        content_type=ContentType.objects.get(app_label="members", model="safetyreport"),
+        codename="access_safety_reports",
+    )
+    safety_officer.user_permissions.add(permission)
 
     request = RequestFactory().get("/")
     request.user = safety_officer
