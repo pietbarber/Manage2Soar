@@ -5,8 +5,9 @@ Security note:
     The app is deployed on a **GKE private cluster** with a managed L7 load
     balancer in front of the pods.  ``request.META['REMOTE_ADDR']`` inside the
     pod is therefore the *load balancer node* IP, not the end-user IP.  All
-    per-IP logic (login throttling, access logs, kiosk usage tracking) MUST
-    derive the client IP from the ``X-Forwarded-For`` (XFF) header.
+    per-IP logic (login throttling, access logs, kiosk usage tracking) uses
+    ``X-Forwarded-For`` (XFF) only for verified proxy peers; other requests
+    use their direct REMOTE_ADDR.
 
     Which XFF entry is the real client?
         Per the GCP external Application Load Balancer docs, the load balancer
@@ -33,17 +34,15 @@ Security note:
         ``manage2soar/settings_single_host.py`` for the single-host value.
 
     Trust model:
-        - The GKE cluster is not internet-reachable directly; the managed LB
-          (and any CDN, e.g. Cloudflare, added later) is the only upstream, so
-          the LB-observed entry (second from the right) is the most-trusted
-          client hop.
-        - If a future change exposes the pod directly to the internet, this
-          helper becomes spoofable and must be replaced with a
-          trust-list based implementation (e.g. ``django-ipware`` with
-          ``PROXY_LIST``).
+        XFF is accepted only if REMOTE_ADDR belongs to a configured
+        CLIENT_IP_TRUSTED_PROXIES CIDR. Empty allowlists and invalid chains
+        fall back to REMOTE_ADDR. GKE must configure the pod-facing peer CIDRs
+        explicitly; single-host trusts only local nginx by default.
 """
 
 from __future__ import annotations
+
+import ipaddress
 
 from django.conf import settings
 from django.http import HttpRequest
@@ -70,25 +69,46 @@ def _trusted_trailing_proxies() -> int:
 def get_client_ip(request: HttpRequest) -> str:
     """Return the real client IP for ``request``.
 
-    Prefers the client entry of ``X-Forwarded-For`` as observed by the trusted
-    upstream proxy.  Per the GCP external LB docs the LB appends
+    Uses the client entry of ``X-Forwarded-For`` only when the immediate peer
+    is in CLIENT_IP_TRUSTED_PROXIES. Per the GCP external LB docs the LB appends
     ``<client-ip>, <load-balancer-ip>`` to the right of any client-supplied
     value, so the trustworthy client entry is ``CLIENT_IP_TRAILING_PROXIES``
     entries from the right (default second-from-right = ``[-2]`` for the GKE
     path).  This avoids both the spoofable client-controlled left entries and
-    the shared (every-client) right-most LB IP.  Falls back to
-    ``REMOTE_ADDR`` when no ``X-Forwarded-For`` header is present (tests, local
-    development without a proxy, or a misbehaving upstream).
+    the shared (every-client) right-most LB IP. Falls back to
+    ``REMOTE_ADDR`` for untrusted peers, missing or malformed XFF, or a short
+    chain. The proxy must enforce its documented append/replace behavior.
     """
-    x_forwarded_for = request.headers.get("x-forwarded-for")
-    if x_forwarded_for:
-        parts = [part.strip() for part in x_forwarded_for.split(",") if part.strip()]
-        if parts:
-            trailing = _trusted_trailing_proxies()
-            index = -(trailing + 1)
-            # If the chain is shorter than expected (e.g. single-hop proxy that
-            # appended only the real client), fall back to the last entry.
-            if len(parts) >= trailing + 1:
-                return parts[index]
-            return parts[-1]
-    return request.META.get("REMOTE_ADDR", "") or ""
+    remote = request.META.get("REMOTE_ADDR", "") or ""
+    try:
+        peer = ipaddress.ip_address(remote)
+    except ValueError:
+        return remote
+    networks = getattr(settings, "CLIENT_IP_TRUSTED_PROXIES", ())
+    if isinstance(networks, str):
+        networks = networks.split(",")
+    # No configured peers means no header trust, even when the request supplies XFF.
+    trusted = []
+    for network in networks:
+        if network.strip():
+            try:
+                trusted.append(ipaddress.ip_network(network.strip(), strict=False))
+            except ValueError:
+                # A bad deployment value must not make a forged XFF usable.
+                return remote
+    if not any(peer in network for network in trusted):
+        return remote
+
+    xff = request.headers.get("x-forwarded-for", "")
+    if not xff:
+        return remote
+    parts = [part.strip() for part in xff.split(",")]
+    trailing = _trusted_trailing_proxies()
+    if len(parts) <= trailing or any(not part for part in parts):
+        return remote
+    try:
+        addresses = [ipaddress.ip_address(part) for part in parts]
+    except ValueError:
+        return remote
+    # GKE's proxy appends the right-most hop; the observed client precedes it.
+    return str(addresses[-(trailing + 1)])

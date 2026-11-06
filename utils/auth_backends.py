@@ -30,8 +30,8 @@ axes backend so the throttle still applies.
 Google OAuth (and any other ``social_core`` provider) callback
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ``social_django.strategy.DjangoStrategy.authenticate`` injects the
-provider's ``social_core`` backend instance into ``kwargs['backend']`` and
-passes a real ``request`` into Django's ``authenticate()``.  Without
+provider's ``social_core`` backend instance, strategy and storage into
+the Django authentication kwargs. The caller supplies the request. Without
 special-casing, ``AxesStandaloneBackend`` would run
 ``is_allowed()`` with the *empty* password-credential dict and evaluate the
 ``username=''`` bucket (which, with
@@ -42,8 +42,8 @@ through the password-login IP budget would be refused by Axes before
 Issue #1110 was not designed to do.
 
 This backend therefore short-circuits provider-based authentication calls
-(identified by the ``social_core.backends.base.BaseAuth`` ``backend`` kwarg
-that ``DjangoStrategy.authenticate`` adds) and lets the next configured
+(identified by the matching strategy, storage, backend and response kwargs
+that ``DjangoStrategy.authenticate`` passes) and lets the next configured
 backend (``GoogleOAuth2``) handle the sign-in.  Password-form logins never
 pass a ``social_core`` backend through ``authenticate()`` (Django's
 ``LoginView`` calls ``authenticate(request, username=..., password=...)``
@@ -63,20 +63,36 @@ except ImportError:  # pragma: no cover - social_django is a hard dep in this re
     BaseAuth = None  # type: ignore[assignment,misc]
 
 
-def _is_provider_auth_call(kwargs: dict[str, Any]) -> bool:
+def _is_provider_auth_call(
+    request: HttpRequest,
+    username: Optional[str],
+    password: Optional[str],
+    kwargs: dict[str, Any],
+) -> bool:
     """Return True when Django's ``authenticate()`` was called by a
     ``social_core`` provider (e.g. Google OAuth) rather than by a password
     form.
 
-    ``social_django.strategy.DjangoStrategy.authenticate`` is the only call
-    site that adds a ``social_core.backends.base.BaseAuth`` instance under
-    the ``'backend'`` kwarg; the project's ``LoginView`` and Django's test
-    ``Client.login`` never pass that kwarg.
+    A BaseAuth kwarg alone is not proof of a provider login: a programmatic
+    password caller could supply one. Require the matching DjangoStrategy
+    context and provider response, and never exempt password credentials.
     """
     if BaseAuth is None:
         return False
+    from social_django.strategy import DjangoStrategy
+
     backend = kwargs.get("backend")
-    return isinstance(backend, BaseAuth)
+    strategy = kwargs.get("strategy")
+    return (
+        username is None
+        and password is None
+        and isinstance(backend, BaseAuth)
+        and isinstance(strategy, DjangoStrategy)
+        and strategy.request is request
+        and backend.strategy is strategy
+        and kwargs.get("storage") is strategy.storage
+        and "response" in kwargs
+    )
 
 
 class AxesCompatBackend(AxesStandaloneBackend):
@@ -100,14 +116,13 @@ class AxesCompatBackend(AxesStandaloneBackend):
         # Provider-based authentication (Google OAuth / any social_core
         # backend): Django's authenticate() was reached via
         # ``social_django.strategy.DjangoStrategy.authenticate`` which
-        # injects a ``social_core.backends.base.BaseAuth`` instance into
-        # ``kwargs['backend']`` and passes a real request.  Axes' IP-based
+        # injects a matching provider backend, strategy and storage. Axes' IP-based
         # password-login throttle must not fire here, because (a) a shared-IP
         # client that burned the password budget would otherwise be unable to
         # complete a valid Google sign-in, and (b) the Google OAuth2 callback
         # does not carry a password at all, so the username/IP failure
         # counters were populated by unrelated password failures.
-        if _is_provider_auth_call(kwargs):
+        if _is_provider_auth_call(request, username, password, kwargs):
             return None
         # Normal password-form login: delegate to the axes backend so the
         # throttle still applies.
