@@ -1390,13 +1390,6 @@ def _valid_application_form_data(**contact_data):
     }
 
 
-@pytest.mark.django_db
-def test_complete_emergency_contact_is_valid():
-    form = MembershipApplicationForm(data=_valid_application_form_data())
-
-    assert form.is_valid(), form.errors
-
-
 EMERGENCY_CONTACT_FIELDS = (
     "emergency_contact_name",
     "emergency_contact_relationship",
@@ -1404,7 +1397,29 @@ EMERGENCY_CONTACT_FIELDS = (
 )
 
 
+def _set_require_emergency_contact(required):
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.all().delete()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        club_abbreviation="TC",
+        domain_name="testclub.com",
+        membership_application_require_emergency_contact=required,
+    )
+
+
 @pytest.mark.django_db
+@pytest.mark.parametrize("required", [True, False], ids=["required", "optional"])
+def test_complete_emergency_contact_is_valid(required):
+    _set_require_emergency_contact(required)
+    form = MembershipApplicationForm(data=_valid_application_form_data())
+
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("required", [True, False], ids=["required", "optional"])
 @pytest.mark.parametrize(
     "blank_fields",
     [
@@ -1416,13 +1431,18 @@ EMERGENCY_CONTACT_FIELDS = (
         sorted(f.removeprefix("emergency_contact_") for f in fields)
     ),
 )
-def test_incomplete_emergency_contact_is_rejected(blank_fields):
+def test_incomplete_emergency_contact(blank_fields, required):
+    """A partial contact is always rejected; a fully blank one only when required."""
+    _set_require_emergency_contact(required)
     form = MembershipApplicationForm(
         data=_valid_application_form_data(**dict.fromkeys(blank_fields, ""))
     )
 
-    assert not form.is_valid()
-    assert set(form.errors) == blank_fields
+    if not required and blank_fields == set(EMERGENCY_CONTACT_FIELDS):
+        assert form.is_valid(), form.errors
+    else:
+        assert not form.is_valid()
+        assert set(form.errors) == blank_fields
 
 
 @pytest.mark.django_db

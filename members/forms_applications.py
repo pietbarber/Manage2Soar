@@ -2,6 +2,8 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from siteconfig.models import SiteConfiguration
+
 from .models_applications import MembershipApplication
 
 
@@ -359,10 +361,13 @@ class MembershipApplicationForm(forms.ModelForm):
         # Make soaring goals required
         self.fields["soaring_goals"].required = True
 
-        # Require a complete emergency contact on new applications
-        self.fields["emergency_contact_name"].required = True
-        self.fields["emergency_contact_relationship"].required = True
-        self.fields["emergency_contact_phone"].required = True
+        # Require a complete emergency contact if the club turned that on.
+        # Otherwise the model still rejects a partly filled-in contact.
+        config = SiteConfiguration.objects.first()
+        if config and config.membership_application_require_emergency_contact:
+            self.fields["emergency_contact_name"].required = True
+            self.fields["emergency_contact_relationship"].required = True
+            self.fields["emergency_contact_phone"].required = True
 
         # Make aviation experience fields optional for beginners
         self.fields["glider_rating"].required = False

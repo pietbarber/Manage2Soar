@@ -784,6 +784,14 @@ class SiteConfiguration(models.Model):
         default=False,
         help_text="Automatically approve new membership applications (bypass manual review)",
     )
+    membership_application_require_emergency_contact = models.BooleanField(
+        default=False,
+        help_text=(
+            "Require applicants to give an emergency contact's name, relationship, "
+            "and phone number. When off, the contact is optional, but if any part "
+            "is filled in, all three are still required."
+        ),
+    )
 
     # Mail Server Configuration
     manual_whitelist = models.TextField(
