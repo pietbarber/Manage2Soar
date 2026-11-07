@@ -219,6 +219,14 @@
                         </div>
                     </div>
 
+                    <div class="form-group">
+                        <label for="{{ form.country.id_for_label }}" class="form-label">Country</label>
+                        {{ form.country|add_class:"form-select" }}
+                        {% if form.country.errors %}
+                            <div class="invalid-feedback d-block">{{ form.country.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
                     <div class="alert alert-info mb-3" id="address-format-help" style="display: none;">
                         <small><strong>Address Format Help:</strong>
                         <div id="address-examples"></div>
@@ -263,13 +271,6 @@
                                 <div class="invalid-feedback d-block">{{ form.zip_code.errors.0 }}</div>
                             {% endif %}
                         </div>
-                        <div class="form-group">
-                            <label for="{{ form.country.id_for_label }}" class="form-label">Country</label>
-                            {{ form.country|add_class:"form-select" }}
-                            {% if form.country.errors %}
-                                <div class="invalid-feedback d-block">{{ form.country.errors.0 }}</div>
-                            {% endif %}
-                        </div>
                     </div>
                 </div>
             </div>
@@ -282,7 +283,7 @@
 
                 <div class="section-body">
                     <div class="form-group">
-                        <label for="{{ form.emergency_contact_name.id_for_label }}" class="form-label">Emergency Contact Name (optional)</label>
+                        <label for="{{ form.emergency_contact_name.id_for_label }}" class="form-label required-field">Emergency Contact Name</label>
                         {{ form.emergency_contact_name|add_class:"form-control" }}
                         {% if form.emergency_contact_name.errors %}
                             <div class="invalid-feedback d-block">{{ form.emergency_contact_name.errors.0 }}</div>
@@ -291,14 +292,14 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="{{ form.emergency_contact_relationship.id_for_label }}" class="form-label">Relationship (optional)</label>
+                            <label for="{{ form.emergency_contact_relationship.id_for_label }}" class="form-label required-field">Relationship</label>
                             {{ form.emergency_contact_relationship|add_class:"form-control" }}
                             {% if form.emergency_contact_relationship.errors %}
                                 <div class="invalid-feedback d-block">{{ form.emergency_contact_relationship.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="form-group">
-                            <label for="{{ form.emergency_contact_phone.id_for_label }}" class="form-label">Emergency Contact Phone (optional)</label>
+                            <label for="{{ form.emergency_contact_phone.id_for_label }}" class="form-label required-field">Emergency Contact Phone</label>
                             {{ form.emergency_contact_phone|add_class:"form-control" }}
                             {% if form.emergency_contact_phone.errors %}
                                 <div class="invalid-feedback d-block">{{ form.emergency_contact_phone.errors.0 }}</div>
@@ -692,23 +693,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Update field labels
-        if (address1Label) address1Label.innerHTML = labels.address1 + ' <span class="text-danger">*</span>';
-        if (address2Label) address2Label.innerHTML = labels.address2;
-        if (cityLabel) cityLabel.innerHTML = labels.city + ' <span class="text-danger">*</span>';
+        // Update field labels. The red asterisk comes from the
+        // "required-field" CSS class, so toggle that class instead of
+        // adding asterisk markup here.
+        if (address1Label) address1Label.textContent = labels.address1;
+        if (address2Label) address2Label.textContent = labels.address2;
+        if (cityLabel) cityLabel.textContent = labels.city;
 
         // Update state and zip requirements based on country
         if (stateField) {
             stateField.required = isUSA;
             if (stateLabel) {
-                stateLabel.innerHTML = labels.state + (isUSA ? ' <span class="text-danger">*</span>' : '');
+                stateLabel.textContent = labels.state;
+                stateLabel.classList.toggle('required-field', isUSA);
             }
         }
 
         if (zipField) {
             zipField.required = isUSA;
             if (zipLabel) {
-                zipLabel.innerHTML = labels.zip + (isUSA ? ' <span class="text-danger">*</span>' : '');
+                zipLabel.textContent = labels.zip;
+                zipLabel.classList.toggle('required-field', isUSA);
             }
         }
 
