@@ -17,8 +17,10 @@ from instructors.models import (
 from members.authorization import (
     AuthorizationDecision,
     can_manage_ground_instruction,
+    has_admin_model_permission,
     has_membership_application_modify_access,
     has_membership_application_view_access,
+    has_webmaster_compatibility_access,
     resolve_authorization,
 )
 from members.models import RoleMetadata
@@ -57,6 +59,18 @@ def test_inactive_account_denied_even_with_context_and_kiosk(member):
         require_active_member=True,
         allow_kiosk_membership_bypass=True,
     ) == AuthorizationDecision(False, "inactive_account")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("grant", ["is_superuser", "webmaster", "preview"])
+def test_disabled_account_denied_by_webmaster_compatibility_helpers(member, grant):
+    if grant == "preview":
+        member._role_preview_group_name = "Webmasters"
+    else:
+        setattr(member, grant, True)
+    member.is_active = False
+    assert not has_webmaster_compatibility_access(member)
+    assert not has_admin_model_permission(member, "members", "member", "change")
 
 
 @pytest.mark.django_db

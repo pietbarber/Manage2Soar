@@ -19,12 +19,12 @@ requests to `upstream/main` before calling a mapping equivalent.
 | Role and capability backfill | Built-in role keys and their registered capability grants are explicit. Migration `0052` adds missing grants; it must not erase tenant-created Groups, memberships, or unrelated permissions. Approval is still needed for the exact business-action mapping. | `members/role_definitions.py`, `members/migrations/0052_sync_registered_role_capabilities.py`; `members/tests/test_role_definitions.py`, `test_capability_registry_migration.py` |
 | CMS, billing, duty, logsheet, and membership actions | Bounded permission helpers and compatibility paths replace some direct role/staff checks. The global `cms.view_page` capability does not bypass stored page-role restrictions; `cms.change_page` still intentionally grants editor-implied view. Preserve active membership, ownership, page grants, and workflow context where applicable. **Do not claim global authorization parity:** the inventory below still lists unreviewed endpoints. | `cms/models.py`, `cms/permissions.py`, `billing/permissions.py`, `duty_roster/permissions.py`, `logsheet/permissions.py`, `members/authorization.py`; focused app tests |
 | Safety reports | Officer interface uses `members.access_safety_reports` through the shared resolver. The `safety_officer` flag alone is not an authorization grant; submission/audience behavior remains separate. | `members/decorators.py`, `members/views_safety_reports.py`; safety interface/dashboard tests |
-| Stats-dump export | The `stats_monger` flag owns its `legacy:stats_monger` assignment. Migration `0053`/`0054` removes unprovenanced direct grants left by the historical `0045` migration; independently assigned Group/role access remains. This security-first cleanup may remove an unrecorded direct exception and requires tenant-data parity review. | `members/models.py`, `members/migrations/0053_source_aware_stats_monger_grants.py`, `members/migrations/0054_reconcile_stats_monger_direct_grants.py`, `logsheet/permissions.py`; stats-monger tests |
+| Stats-dump export | The `stats_monger` flag owns its `legacy:stats_monger` assignment. Migrations `0053`/`0054` preserve every unprovenanced direct grant because legacy `0045` rows and independent exceptions cannot be distinguished. **Unapproved for deployment:** review `report_stats_export_direct_grants` on an authorized tenant copy; do not silently revoke grants based on the flag. | `members/models.py`, `members/migrations/0053_source_aware_stats_monger_grants.py`, `members/migrations/0054_reconcile_stats_monger_direct_grants.py`, `members/management/commands/report_stats_export_direct_grants.py`; stats-monger tests |
 | Limited member admin editing | Non-superuser editors with `members.change_member` cannot use the separate Django password-change endpoint for another account, including privileged accounts. | `members/admin.py`; admin password-change tests |
 | Member CSV import | Import requires `members.import_member` plus `members.change_member`. Limited editors receive a profile-only resource without role/account-privilege fields; superusers retain the complete resource. | `members/admin.py`, `members/resources.py`, `members/migrations/0056_member_manager_import_permission.py`; member import tests |
 | Ground instruction | Recording requires active membership plus `instructors.can_manage_ground_instruction` or the active legacy instructor path. Inactive members and ordinary users are denied. | `members/authorization.py`, `instructors/decorators.py`, `instructors/views.py`; authorization tests |
 | Role preview | Only active superusers can start/control preview. A selected role projects its permissions for a request; write methods are denied outside DEBUG preview. GET-side effects and preview audit retention remain explicit release decisions. | `members/role_preview.py`; `members/tests/test_role_preview.py` |
-| Written-test administration | Four custom capabilities are explicitly created and granted to Instructor Admins in migration `0008`; the grant does not depend on post-migrate permission creation. | `knowledgetest/migrations/0008_create_and_grant_written_test_capabilities.py`, `members/role_definitions.py`; written-test migration tests |
+| Written-test administration | Four custom capabilities are explicitly created and granted to Instructor Admins in migration `0008`; the grant does not depend on post-migrate permission creation. Compatibility access additionally requires an active account and membership. Business-action parity remains unapproved. | `knowledgetest/migrations/0008_create_and_grant_written_test_capabilities.py`, `members/role_definitions.py`, `knowledgetest/permissions.py`; written-test migration tests |
 | Duty-swap visibility | Calendar filtering uses `duty_roster.view_all_swap_requests` for roles granted broad swap visibility, while ordinary users retain requester/target visibility. | `duty_roster/views.py`, `duty_roster/permissions.py`; duty-swap tests |
 | Rostermeister administration | Rostermeister assignment forms require an active account and active membership; inactive flags no longer authorize read or mutation. | `duty_roster/permissions.py`; roster permission tests |
 | Qualification permissions | Only approved custom actions from an opted-in bundle can be derived from a current qualification. No existing instructor/tow-pilot/duty qualification is mapped automatically. | `members/auth_backends.py`, `instructors/models.py`; `members/tests/test_qualification_permission_bundle.py` |
@@ -227,13 +227,16 @@ Do not mechanically replace every `member.instructor` read with
 7. **Provenance is not yet authoritative for arbitrary direct Group edits.**
    Member admin removes `groups` from the ModelForm's `cleaned_data` while
    `save_m2m()` runs and routes each selected change through
-   `set_manual_role(..., source_key="admin")`. That transactional service grants
-   or revokes only the exact manual source and preserves every other assignment
-   reason for the Group. `Member._sync_groups()` remains the writer for legacy
-   role-field sources. Direct `member.groups.add/remove/set/clear` calls and
-   through-table writes elsewhere still bypass provenance and are unsupported.
-   Do not authorize using assignment rows as the sole source until those direct
-   writes have an agreed enforcement or migration policy.
+   `set_manual_role(..., source_key="admin")`. That transactional service
+   grants or revokes only the exact manual source and preserves every other
+   assignment reason for the Group. The public service requires an authenticated,
+   active, canonical superuser actor; trusted system repair code must use the
+   private internal helper explicitly. `Member._sync_groups()` remains the
+   writer for legacy role-field sources. Direct
+   `member.groups.add/remove/set/clear` calls and through-table writes elsewhere
+   still bypass provenance and are unsupported. Do not authorize using
+   assignment rows as the sole source until those direct writes have an agreed
+   enforcement or migration policy.
 
 ## Test baseline map
 

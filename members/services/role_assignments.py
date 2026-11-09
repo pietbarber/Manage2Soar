@@ -28,8 +28,32 @@ def delete_role_assignments(assignments, *, actor):
         return assignments.delete()
 
 
-def set_manual_role(member, group, *, enabled: bool, actor=None, source_key="admin"):
-    """Grant or revoke exactly one manual source and reconcile its effective role.
+def set_manual_role(member, group, *, enabled: bool, actor, source_key="admin"):
+    """Only an active superuser may grant or revoke a manual role.
+
+    The admin UI and any programmatic caller share this policy boundary.
+    Trusted system repair code must call the private helper explicitly; it
+    cannot impersonate a human administrator by omitting the actor.
+    """
+    if not actor or not getattr(actor, "is_authenticated", False):
+        raise PermissionDenied("An authenticated role administrator is required.")
+    using = member._state.db or router.db_for_write(Member, instance=member)
+    canonical_actor = Member.objects.using(using).filter(pk=actor.pk).first()
+    if (
+        not canonical_actor
+        or not canonical_actor.is_active
+        or not canonical_actor.is_superuser
+    ):
+        raise PermissionDenied("Only an active superuser may assign roles.")
+    return _set_manual_role_internal(
+        member, group, enabled=enabled, actor=canonical_actor, source_key=source_key
+    )
+
+
+def _set_manual_role_internal(
+    member, group, *, enabled: bool, actor=None, source_key="admin"
+):
+    """Trusted internal role reconciliation; never accept untrusted user input.
 
     Repeated grants leave the original actor and timestamps unchanged. A
     revocation without this source does not claim ownership of a direct M2M

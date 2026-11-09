@@ -54,11 +54,14 @@ role. No such mapping is present in the repository.
 * The assignment model allows sources `manual`, `status`, and `legacy`; its
   uniqueness is `(member, group, source, source_key)`. `source_key` is a
   required string. No production code currently writes `source="status"`.
-* Manual role changes go through `set_manual_role()`. A manual revoke removes
-  only the requested manual source. It leaves other provenance, including
-  legacy/status rows, intact; it also leaves an untracked direct group
-  membership intact. New manual grants to metadata-marked non-assignable roles
-  are rejected, while existing grants remain preservable.
+* Manual role changes go through `set_manual_role()`. The public service requires
+  an authenticated, active, canonical superuser actor, so programmatic callers
+  share the admin boundary; trusted repair paths must use the private internal
+  helper. A manual revoke removes only the requested manual source. It leaves
+  other provenance, including legacy/status rows, intact; it also leaves an
+  untracked direct group membership intact. New manual grants to
+  metadata-marked non-assignable roles are rejected, while existing grants
+  remain preservable.
 * The member admin routes group selection through `set_manual_role()`. It
   preserves enabled legacy-flag assignments, converts a deliberately retained
   canonical group to `manual:admin` when its flag is disabled, and removes

@@ -11,7 +11,9 @@ from members.models import (
     RoleMetadata,
 )
 from members.role_audit import actor_scope
-from members.services.role_assignments import set_manual_role
+from members.services.role_assignments import (
+    _set_manual_role_internal as set_manual_role,
+)
 
 
 @pytest.fixture

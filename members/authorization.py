@@ -22,6 +22,8 @@ def has_webmaster_compatibility_access(user):
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
+    if not getattr(user, "is_active", False):
+        return False
     from members.role_preview import has_preview_group
 
     return bool(
@@ -34,6 +36,8 @@ def has_webmaster_compatibility_access(user):
 def has_admin_model_permission(user, app_label, model_name, action):
     """Check one admin model permission with legacy webmaster fallbacks."""
     if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if not getattr(user, "is_active", False):
         return False
     return bool(
         user.has_perm(f"{app_label}.{action}_{model_name}")

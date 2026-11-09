@@ -5,7 +5,12 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied, ValidationError
 
 from members.models import Member, MemberRoleAssignment, RoleMetadata
-from members.services.role_assignments import set_manual_role
+from members.services.role_assignments import (
+    _set_manual_role_internal as set_manual_role,
+)
+from members.services.role_assignments import (
+    set_manual_role as authorized_set_manual_role,
+)
 
 
 @pytest.fixture
@@ -19,6 +24,35 @@ def member():
 @pytest.fixture
 def group():
     return Group.objects.create(name="Service-managed group")
+
+
+@pytest.mark.django_db
+def test_public_role_service_rejects_unauthorized_actors(member, group):
+    ordinary = Member.objects.create_user(username="unauthorized-role-actor")
+    for candidate in (None, ordinary):
+        with pytest.raises(PermissionDenied):
+            authorized_set_manual_role(member, group, enabled=True, actor=candidate)
+    ordinary.is_superuser = True  # Forged in-memory actor state is not authority.
+    with pytest.raises(PermissionDenied):
+        authorized_set_manual_role(member, group, enabled=True, actor=ordinary)
+    assert not member.groups.filter(pk=group.pk).exists()
+    assert not MemberRoleAssignment.objects.filter(member=member, group=group).exists()
+
+
+@pytest.mark.django_db
+def test_public_role_service_requires_active_superuser_for_grant_and_revoke(
+    member, group
+):
+    actor = Member.objects.create_user(
+        username="authorized-role-actor", is_superuser=True
+    )
+    authorized_set_manual_role(member, group, enabled=True, actor=actor)
+    assert member.groups.filter(pk=group.pk).exists()
+    actor.is_active = False
+    actor.save(update_fields=["is_active"])
+    with pytest.raises(PermissionDenied):
+        authorized_set_manual_role(member, group, enabled=False, actor=actor)
+    assert member.groups.filter(pk=group.pk).exists()
 
 
 @pytest.mark.django_db

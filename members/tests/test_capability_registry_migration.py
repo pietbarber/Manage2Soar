@@ -1,10 +1,43 @@
 """Exercise the final capability reconciliation on an existing database state."""
 
+from importlib import import_module
+
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-from members.role_definitions import CANONICAL_ROLES
+from members.role_definitions import CANONICAL_ROLES, CAPABILITY_GRANTS
+
+CAPABILITY_MIGRATION = "members.migrations.0052_sync_registered_role_capabilities"
+
+
+def _ensure_permission(Permission, ContentType, app_label, model, codename):
+    content_type, _ = ContentType.objects.get_or_create(
+        app_label=app_label, model=model
+    )
+    permission, _ = Permission.objects.get_or_create(
+        content_type=content_type,
+        codename=codename,
+        defaults={"name": codename.replace("_", " ").capitalize()},
+    )
+    return permission
+
+
+def test_migration_snapshot_matches_runtime_except_later_written_test_grants():
+    """0052 is frozen; later written-test capabilities belong to migration 0008."""
+    snapshot = import_module(CAPABILITY_MIGRATION).MIGRATED_CAPABILITY_GRANTS
+    assert set(snapshot) == set(CAPABILITY_GRANTS)
+    extra = {
+        "knowledgetest.start_unassigned_written_test",
+        "knowledgetest.delete_any_written_test_attempt",
+        "knowledgetest.view_recent_written_tests",
+        "knowledgetest.delete_any_pending_written_test_assignment",
+    }
+    for role, capabilities in snapshot.items():
+        assert set(CAPABILITY_GRANTS[role]) - set(capabilities) == (
+            extra if role == "instructor_admins" else set()
+        )
+        assert set(capabilities) <= set(CAPABILITY_GRANTS[role])
 
 
 @pytest.mark.django_db(transaction=True)
@@ -25,6 +58,22 @@ def test_capability_sync_restores_missing_grant_without_changing_existing_roles(
         # transaction=True flushes migration-seeded rows between tests. Restore
         # only the canonical prerequisites when this test runs after another
         # transaction test; on a fresh install they are already present.
+        ContentType = old_apps.get_model("contenttypes", "ContentType")
+        migration = import_module(CAPABILITY_MIGRATION)
+        for capabilities in migration.MIGRATED_CAPABILITY_GRANTS.values():
+            for capability in capabilities:
+                app_label, codename = capability.split(".", 1)
+                model = migration.CAPABILITY_CONTENT_TYPES[capability][1]
+                _ensure_permission(Permission, ContentType, app_label, model, codename)
+        cms_edit = _ensure_permission(
+            Permission, ContentType, "cms", "page", "change_page"
+        )
+        stale_permission = _ensure_permission(
+            Permission, ContentType, "auth", "group", "change_group"
+        )
+        custom_permission = _ensure_permission(
+            Permission, ContentType, "members", "member", "view_member"
+        )
         for role in CANONICAL_ROLES:
             group, _ = Group.objects.get_or_create(name=role.group_name)
             RoleMetadata.objects.get_or_create(
@@ -33,20 +82,13 @@ def test_capability_sync_restores_missing_grant_without_changing_existing_roles(
             )
 
         directors = RoleMetadata.objects.select_related("group").get(key="directors")
-        cms_edit = Permission.objects.get(
-            content_type__app_label="cms",
-            content_type__model="page",
-            codename="change_page",
-        )
         # Model a tenant missing one registered grant while retaining custom
         # permissions and manual memberships from before the final migration.
         directors.group.permissions.remove(cms_edit)
+        # A formerly registered capability may still exist in production.
+        # A future registry removal must not silently revoke that tenant grant.
+        directors.group.permissions.add(stale_permission)
         custom_group = Group.objects.create(name="Tenant Custom Role")
-        custom_permission = Permission.objects.get(
-            content_type__app_label="members",
-            content_type__model="member",
-            codename="view_member",
-        )
         custom_group.permissions.add(custom_permission)
         member = Member.objects.create(username="existing-role-member")
         member.groups.add(custom_group)
@@ -57,6 +99,11 @@ def test_capability_sync_restores_missing_grant_without_changing_existing_roles(
         assert (
             Group.objects.get(pk=directors.group_id)
             .permissions.filter(pk=cms_edit.pk)
+            .exists()
+        )
+        assert (
+            Group.objects.get(pk=directors.group_id)
+            .permissions.filter(pk=stale_permission.pk)
             .exists()
         )
         assert RoleMetadata.objects.filter(

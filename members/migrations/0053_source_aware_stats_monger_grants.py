@@ -1,17 +1,8 @@
-"""Reconcile the legacy stats-monger export grant with explicit ownership.
+"""Introduce a source-aware legacy role without deleting ambiguous direct grants.
 
-Migration 0045 wrote directly to ``user_permissions`` and did not record a
-source.  That means a direct grant left by 0045 is indistinguishable from a
-direct grant that an administrator added independently.  At this boundary we
-therefore use the conservative ownership policy required for this sensitive
-permission: every direct stats-export row still present is treated as the
-legacy 0045 grant and removed.  Independent access that has recoverable
-provenance (a separately assigned Group/role) is not changed and remains
-effective through that Group.
-
-Members whose flag is still set receive the source-aware legacy role.  Members
-whose flag was cleared before this migration receive no replacement grant, so
-the old direct grant cannot survive as export access.
+Migration 0045 did not record the source of its direct stats-export grant.
+Administrator exceptions use the same user_permissions row, so no migration
+can safely decide which rows to revoke. Preserve them for operator review.
 """
 
 from django.db import migrations
@@ -52,16 +43,8 @@ def migrate_stats_monger_grants(apps, schema_editor):
         )
         member.groups.db_manager(db_alias).add(group)
 
-    # 0045 left no provenance on direct permission rows.  A direct row still
-    # present now is therefore owned by the legacy migration for reconciliation
-    # purposes.  Remove it for both currently flagged and already-cleared
-    # members; the former now have the source-aware Group assignment above, and
-    # the latter must not retain export access.  Independently assigned Groups
-    # and their provenance rows are deliberately not touched.
-    for member in Member.objects.using(db_alias).filter(
-        user_permissions=permission
-    ).iterator():
-        member.user_permissions.db_manager(db_alias).remove(permission)
+    # 0045 left no provenance on direct rows, so keep every direct grant.
+    # Only an operator-reviewed, explicit reconciliation can remove them.
 
 
 class Migration(migrations.Migration):
