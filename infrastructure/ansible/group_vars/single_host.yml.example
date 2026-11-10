@@ -143,7 +143,7 @@ mail_server_enabled: false
 
 # If enabled, configure these:
 # mail_hostname: "mail.{{ m2s_domain }}"
-# admin_email: "postmaster@{{ m2s_domain }}"
+# admin_email: "your-monitored-mailbox@example.net"
 
 # ============================================================
 # SECURITY SETTINGS

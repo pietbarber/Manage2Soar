@@ -147,6 +147,9 @@
       ansible.builtin.assert:
         that:
           - mail_domain is defined
+          - admin_email is defined
+          - admin_email | string | trim | length > 0
+          - admin_email is match('^[^@\\s]+@[^@\\s]+$')
           - smtp_relay_host is defined
           - vault_smtp_relay_username is defined
           - vault_smtp_relay_password is defined
@@ -159,6 +162,7 @@
         fail_msg: |
           Required mail configuration missing or invalid. Please check:
           - mail_domain: Base domain for mail (e.g., manage2soar.com)
+          - admin_email: Monitored external mailbox for bounce notifications
           - smtp_relay_host: Relay host (mail.smtp2go.com)
           - vault_smtp_relay_username: Relay service credentials (in vault.yml)
           - vault_smtp_relay_password: Relay service credentials (in vault.yml)
@@ -168,6 +172,7 @@
               * Each entry must include:
                   - prefix: Subdomain prefix (e.g., club1)
                   - name: Human-readable club name
+      tags: [always]
 
     - name: Display mail server plan
       ansible.builtin.debug:
@@ -180,7 +185,14 @@
           SMTP Relay: {{ smtp_relay_host }}:{{ smtp_relay_port | default(587) }}
           Tenant Domains:
           {% for club in club_domains %}
-            - {{ club.prefix }}.{{ mail_domain }} ({{ club.name }})
+          {% set explicit_domains = club.domains | default([]) %}
+          {% if explicit_domains is string %}
+          {% set explicit_domains = [explicit_domains] %}
+          {% endif %}
+          {% set tenant_domains = (explicit_domains if (club.use_explicit_domains_only | default(false) | bool) and explicit_domains else [club.prefix ~ '.' ~ mail_domain] + explicit_domains) | unique %}
+          {% for domain in tenant_domains %}
+            - {{ domain }} ({{ club.name }})
+          {% endfor %}
           {% endfor %}
           ========================================
 
@@ -195,9 +207,15 @@
 
     - role: postfix
       tags: [postfix, mail]
+      vars:
+        postfix_rspamd_enabled: "{{ gcp_enable_inbound_smtp | default(true) | bool }}"
 
     - role: opendkim
       tags: [opendkim, dkim, mail]
+
+    - role: rspamd
+      tags: [rspamd, spam, mail]
+      when: gcp_enable_inbound_smtp | default(true) | bool
 
     - role: m2s-mail-sync
       tags: [mail-sync, mail]
@@ -211,18 +229,18 @@
 
     - name: Copy DKIM public keys for DNS configuration
       ansible.builtin.copy:
-        src: "/etc/opendkim/keys/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
-        dest: "/root/dkim-dns-records/{{ item.prefix }}.{{ mail_domain }}.txt"
+        src: "/etc/opendkim/keys/{{ item }}/{{ dkim_selector }}.txt"
+        dest: "/root/dkim-dns-records/{{ item }}.txt"
         remote_src: true
         mode: "0644"
-      loop: "{{ club_domains }}"
+      loop: "{{ opendkim_domains }}"
       register: dkim_copy_results
       failed_when: false
 
     - name: Warn if DKIM public keys could not be copied
       ansible.builtin.debug:
         msg: |
-          WARNING: Failed to copy DKIM public key for {{ item.item.prefix }}.{{ mail_domain }}.
+          WARNING: Failed to copy DKIM public key for {{ item.item }}.
           The key file may not exist. Check if OpenDKIM role completed successfully.
       loop: "{{ dkim_copy_results.results | default([]) }}"
       when:
@@ -231,8 +249,8 @@
 
     - name: Read DKIM public keys
       ansible.builtin.slurp:
-        src: "/etc/opendkim/keys/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
-      loop: "{{ club_domains }}"
+        src: "/etc/opendkim/keys/{{ item }}/{{ dkim_selector }}.txt"
+      loop: "{{ opendkim_domains }}"
       register: dkim_keys
       failed_when: false
 
@@ -249,7 +267,7 @@
 
           {% for result in dkim_keys.results %}
           {% if result.content is defined %}
-          Domain: {{ result.item.prefix }}.{{ mail_domain }}
+          Domain: {{ result.item }}
           ----------------------------------------
           {{ result.content | b64decode }}
 
@@ -262,8 +280,8 @@
 
           For each tenant domain, add this TXT record:
 
-          {% for club in club_domains %}
-          {{ club.prefix }}.{{ mail_domain }}    TXT    "v=spf1 include:spf.smtp2go.com ~all"
+          {% for domain in opendkim_domains %}
+          {{ domain }}    TXT    "v=spf1 include:spf.smtp2go.com ~all"
 
           {% endfor %}
 
@@ -273,8 +291,8 @@
 
           For each tenant domain, add this TXT record at _dmarc.DOMAIN:
 
-          {% for club in club_domains %}
-          _dmarc.{{ club.prefix }}.{{ mail_domain }}    TXT    "v=DMARC1; p=quarantine; rua=mailto:dmarc@{{ club.prefix }}.{{ mail_domain }}"
+          {% for domain in opendkim_domains %}
+          _dmarc.{{ domain }}    TXT    "v=DMARC1; p=quarantine; rua=mailto:dmarc@{{ domain }}"
 
           {% endfor %}
 
@@ -329,8 +347,8 @@
 
           2. Add your sending domains:
              Settings → Sender Domains → Add Domain
-          {% for club in club_domains %}
-             - {{ club.prefix }}.{{ mail_domain }}
+           {% for domain in opendkim_domains %}
+              - {{ domain }}
           {% endfor %}
 
           3. Verify each domain by adding the DKIM and SPF records shown above

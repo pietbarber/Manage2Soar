@@ -220,9 +220,14 @@ m2s_sync_dir: "/opt/m2s-mail-sync"
 # HIGHLY RECOMMENDED: Keep this true until you've verified your mail server
 # configuration and tested with a safe email address.
 email_dev_mode: true  # Set false only after testing mail server
+# Required when mail_server_receive_enabled is true. Use a monitored mailbox
+# outside the domains served by this Postfix instance; do not use postmaster
+# on the local mail domain.
+# admin_email: "your-monitored-mailbox@example.net"
 
 # When email_dev_mode is true, redirect all emails to this address
 # Useful for testing without spamming members during deployment
+# Comma-separated monitored addresses are supported.
 # email_dev_mode_redirect_to: "admin@your-club.com"
 
 # DKIM selector (used in DNS record name)
