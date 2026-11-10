@@ -179,6 +179,7 @@ def test_secretary_group_has_only_registered_capabilities():
         "cms.view_page",
         "cms.change_page",
         "duty_roster.view_all_swap_requests",
+        "duty_roster.can_manage_any_swap",
     }
 
 
@@ -196,6 +197,8 @@ def test_treasurer_group_has_only_registered_capabilities():
         "logsheet.can_export_logsheet_finances",
         "members.view_privileged_contact",
         "duty_roster.view_all_swap_requests",
+        "duty_roster.can_manage_any_swap",
+        "logsheet.can_unfinalize_logsheet",
     }
 
 

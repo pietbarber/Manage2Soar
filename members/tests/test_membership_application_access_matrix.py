@@ -61,7 +61,9 @@ def actor(db):
             options.update(membership_status="Role Account", member_manager=True)
         member = Member.objects.create_user(username=f"access-{role}", **options)
         if role == "group_only":
-            group, _ = Group.objects.get_or_create(name="Member Managers")
+            # An arbitrary group without registered capabilities must not grant
+            # membership-application access merely through group membership.
+            group, _ = Group.objects.get_or_create(name="Unprivileged Group")
             member.groups.add(group)
         if role == "director_group":
             group = Group.objects.get(name="Directors")
