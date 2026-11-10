@@ -9,6 +9,7 @@ from django.urls import reverse
 from cms.models import Page
 from members.authorization import has_role_admin_access
 from members.models import RoleMetadata
+from siteconfig.models import MembershipStatus
 
 User = get_user_model()
 
@@ -24,6 +25,7 @@ def preview_admin(db):
 
 @pytest.fixture
 def role_admin(db):
+    status = MembershipStatus.objects.create(name="Role Preview Active", is_active=True)
     group, _ = Group.objects.get_or_create(name="Member Managers")
     metadata, _ = RoleMetadata.objects.get_or_create(
         group=group,
@@ -38,6 +40,7 @@ def role_admin(db):
         password="test-password",
         member_manager=True,
         is_staff=True,
+        membership_status=status.name,
     )
     member.groups.add(group)
     return member
@@ -219,8 +222,8 @@ def test_role_preview_logs_structured_start_stop_rejected_and_blocked_events(
         {"role_key": "not-a-role"},
     )
     assert any(
-        record.role_preview_outcome == "rejected"
-        and record.role_preview_event["reason"] == "unknown_role"
+        getattr(record, "role_preview_outcome", None) == "rejected"
+        and getattr(record, "role_preview_event", {}).get("reason") == "unknown_role"
         for record in caplog.records
     )
 
@@ -228,13 +231,22 @@ def test_role_preview_logs_structured_start_stop_rejected_and_blocked_events(
         reverse("members:role_preview_start"),
         {"role_key": "directors"},
     )
-    assert any(record.role_preview_outcome == "start" for record in caplog.records)
+    assert any(
+        getattr(record, "role_preview_outcome", None) == "start"
+        for record in caplog.records
+    )
 
     client.post(reverse("cms:edit_page", args=[preview_page.pk]), {})
-    assert any(record.role_preview_outcome == "blocked" for record in caplog.records)
+    assert any(
+        getattr(record, "role_preview_outcome", None) == "blocked"
+        for record in caplog.records
+    )
 
     client.post(reverse("members:role_preview_stop"))
-    assert any(record.role_preview_outcome == "stop" for record in caplog.records)
+    assert any(
+        getattr(record, "role_preview_outcome", None) == "stop"
+        for record in caplog.records
+    )
 
 
 @pytest.mark.django_db
