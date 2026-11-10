@@ -1,6 +1,6 @@
 # M2S Mail Sync Role
 
-This role syncs mailing list membership from the M2S Django API to Postfix virtual aliases and sender whitelists.
+This role syncs mailing list membership from the M2S Django API to Postfix virtual aliases and tenant-scoped sender whitelists.
 
 Administrators with Webmaster access can also create **Email Aliases** in
 Django Admin (`Site Configuration → Email Aliases`).
@@ -34,13 +34,17 @@ This role installs its own Python dependencies:
    - Maps mailing list addresses to recipient emails
    - Format: `members@club.domain.com  alice@gmail.com,bob@yahoo.com,...`
 
-2. **Postfix sender whitelist** (`/etc/postfix/sender_whitelist`)
-   - Lists email addresses allowed to send to mailing lists
+2. **Postfix tenant sender whitelists** (`/etc/postfix/tenant-whitelists/{club}_whitelist`)
+   - Lists email addresses allowed to send to that tenant's mailing lists
    - Format: `sender@email.com  OK`
 
 3. **Rspamd per-club whitelists** (`/etc/rspamd/local.d/whitelists/{club}_whitelist.map`)
    - Per-club sender whitelists for spam bypass (requires SPF PASS)
    - Format: One email per line
+
+4. **Protected-list SPF map** (`/etc/rspamd/local.d/whitelists/protected_lists.map`)
+   - Requires SPF PASS for public mail to every mailing list, including bypass lists
+   - Authenticated submission is exempt
 
 ## Configuration Variables
 
@@ -63,9 +67,9 @@ club_domains:
     api_url: "https://ssc.manage2soar.com/api/email-lists/"
     auth_token: "{{ m2s_api_key }}"  # Optional: per-club token
 
-# Development mode (optional)
+# Development mode (optional; comma-separated addresses are supported)
 dev_mode_enabled: false
-dev_mode_redirect_to: ""
+dev_mode_redirect_to: "developer@example.com"
 ```
 
 ## Development Mode
@@ -117,8 +121,8 @@ Run the script manually to see output:
 # Check virtual aliases
 cat /etc/postfix/virtual
 
-# Check sender whitelist
-cat /etc/postfix/sender_whitelist
+# Check the tenant sender whitelist
+cat /etc/postfix/tenant-whitelists/ssc_whitelist
 
 # Check Rspamd whitelists
 ls -l /etc/rspamd/local.d/whitelists/
@@ -130,7 +134,9 @@ cat /etc/rspamd/local.d/whitelists/ssc_whitelist.map
 - Config file (`config.yml`) has mode `0600` to protect API key
 - Sync script validates email addresses to prevent injection attacks
 - Script runs as root (required for postmap and file permissions)
-- Per-club whitelists provide tenant isolation (one club can't whitelist spammers for another)
+- Postfix authorization maps are tenant-scoped (one club cannot authorize senders for another club's lists)
+- API URLs must use HTTPS; only localhost HTTP endpoints are allowed for development
+- Generated member-address maps are readable only by the mail service accounts
 
 ## Testing
 
@@ -140,7 +146,7 @@ After deployment, verify:
 2. **Config has API key**: `sudo cat /opt/m2s-mail-sync/config.yml | grep auth_token`
 3. **Cron job exists**: `sudo crontab -l | grep m2s-sync`
 4. **Manual run works**: `sudo /opt/m2s-mail-sync/sync-aliases.py`
-5. **Files updated**: `ls -lh /etc/postfix/virtual /etc/postfix/sender_whitelist`
+5. **Files updated**: `ls -lh /etc/postfix/virtual /etc/postfix/tenant-whitelists/`
 
 ## Integration
 
