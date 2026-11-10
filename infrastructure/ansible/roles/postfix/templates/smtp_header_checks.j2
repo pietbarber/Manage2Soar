@@ -15,12 +15,12 @@
 # Gmail and other providers look for these to classify mail.
 
 # Add List-Id header for mailing list identification
-/^From:.*@ssc\.manage2soar\.com/
+/^From:.*-bounces@ssc\.manage2soar\.com/
     PREPEND List-Id: SSC Members <members.ssc.manage2soar.com>
 
 # Add List-Post header (where to send messages to the list)
 # Mail clients use this for "Reply to List" functionality
-/^From:.*@ssc\.manage2soar\.com/
+/^From:.*-bounces@ssc\.manage2soar\.com/
     PREPEND List-Post: <mailto:members@ssc.manage2soar.com>
 
 # Note: We intentionally do NOT set Reply-To header.
@@ -28,5 +28,5 @@
 # while allowing recipients to reply privately to the sender if desired.
 
 # Add Precedence header (helps spam filters recognize bulk mail)
-/^From:.*@ssc\.manage2soar\.com/
+/^From:.*-bounces@ssc\.manage2soar\.com/
     PREPEND Precedence: list

@@ -16,6 +16,16 @@ from typing import Any, Callable, cast
 from unittest.mock import mock_open, patch
 
 _TEMPLATE_PATH = Path(__file__).parent / "templates" / "maillist-rewriter.py.j2"
+_MAIN_CF_TEMPLATE_PATH = Path(__file__).parent / "templates" / "main.cf.j2"
+_MASTER_CF_TEMPLATE_PATH = Path(__file__).parent / "templates" / "master.cf.j2"
+
+
+def test_rewriter_transport_limits_delivery_and_keeps_master_command_clean():
+    main_cf = _MAIN_CF_TEMPLATE_PATH.read_text(encoding="utf-8")
+    master_cf = _MASTER_CF_TEMPLATE_PATH.read_text(encoding="utf-8")
+
+    assert "maillist-rewriter_destination_recipient_limit = 1" in main_cf
+    assert "  -o recipient_limit=1" not in master_cf
 
 
 def load_template_namespace():
@@ -77,6 +87,144 @@ def load_template_namespace():
 def get_callable(namespace, name):
     """Return a named callable from dynamic template namespace."""
     return cast(Callable[..., Any], namespace[name])
+
+
+def test_administrative_forward_not_detected_as_list(tmp_path):
+    ns = load_template_namespace()
+    virtual = tmp_path / "virtual"
+    virtual.write_text(
+        "test@skylinesoaring.org  inbox@example.com\n"
+        "# --- Administrative forwarding aliases ---\n"
+        "admin@skylinesoaring.org  inbox@example.com\n"
+        "admin-bounces@skylinesoaring.org  inbox@example.com\n"
+    )
+    load_lists = get_callable(ns, "_load_lists_from_virtual")
+    load_forwards = get_callable(ns, "_load_forwarding_aliases_from_virtual")
+    assert load_lists(str(virtual)) == {"test@skylinesoaring.org"}
+    assert "admin@skylinesoaring.org" in load_forwards(str(virtual))
+
+    ns["FORWARDING_ALIASES"] = {"admin@skylinesoaring.org"}
+    msg = EmailMessage()
+    msg["From"] = "sender@example.com"
+    msg["To"] = "admin@skylinesoaring.org"
+    msg.set_content("Body")
+    assert (
+        get_callable(ns, "detect_original_list")(msg, ["inbox@example.com"])
+        == "admin@skylinesoaring.org"
+    )
+
+    assert (
+        get_callable(ns, "routing_class")("admin@skylinesoaring.org")
+        == "forwarding_alias"
+    )
+    forwarded = get_callable(ns, "rewrite_forward_headers")(
+        msg, "admin@skylinesoaring.org"
+    )
+    assert "admin@skylinesoaring.org" in forwarded["From"]
+    assert forwarded["Reply-To"] == "sender@example.com"
+    assert forwarded["X-Original-From"] == "sender@example.com"
+
+
+def test_direct_forward_is_detected_without_being_a_list():
+    ns = load_template_namespace()
+    msg = EmailMessage()
+    msg["X-Original-To"] = "admin@skylinesoaring.org"
+    msg["To"] = "preview@example.com"
+    msg["From"] = "sender@example.com"
+    msg.set_content("Body")
+
+    ns["FORWARDING_ALIASES"] = {"admin@skylinesoaring.org"}
+    detect = get_callable(ns, "detect_original_recipient")
+    assert detect(msg, ["preview@example.com"]) is None
+    assert (
+        detect(
+            msg,
+            ["preview@example.com"],
+            trusted_original_recipient="admin@skylinesoaring.org",
+        )
+        == "admin@skylinesoaring.org"
+    )
+    assert "admin@skylinesoaring.org" not in ns["ALL_KNOWN_LISTS"]
+    assert (
+        get_callable(ns, "routing_class")("admin@skylinesoaring.org")
+        == "forwarding_alias"
+    )
+    assert (
+        get_callable(ns, "routing_class")("webmaster@skylinesoaring.org")
+        == "mailing_list"
+    )
+
+
+def test_spoofed_x_original_to_cannot_select_forwarding_alias():
+    ns = load_template_namespace()
+    ns["FORWARDING_ALIASES"] = {"admin@skylinesoaring.org"}
+    msg = EmailMessage()
+    msg["From"] = "attacker@example.net"
+    msg["To"] = "public@example.com"
+    msg["X-Original-To"] = "admin@skylinesoaring.org"
+    msg.set_content("Body")
+
+    assert (
+        get_callable(ns, "detect_original_recipient")(
+            msg,
+            ["public@example.com"],
+            trusted_original_recipient="unmapped@example.com",
+        )
+        is None
+    )
+
+
+def test_forward_headers_use_verified_alias_and_preserve_reply_target():
+    ns = load_template_namespace()
+    msg = EmailMessage()
+    msg["From"] = "Sender <sender@example.com>"
+    msg["Reply-To"] = "replies@example.com"
+    msg["To"] = "preview@example.com"
+    msg.set_content("Body")
+
+    forwarded = get_callable(ns, "rewrite_forward_headers")(
+        msg, "admin@skylinesoaring.org"
+    )
+    assert forwarded["From"] == "Sender via admin <admin@skylinesoaring.org>"
+    assert forwarded["Reply-To"] == "replies@example.com"
+    assert forwarded["X-Original-From"] == "Sender <sender@example.com>"
+
+
+def test_forward_headers_do_not_create_empty_reply_to():
+    ns = load_template_namespace()
+    msg = EmailMessage()
+    msg["To"] = "preview@example.com"
+    msg.set_content("System-generated message")
+
+    forwarded = get_callable(ns, "rewrite_forward_headers")(
+        msg, "admin@skylinesoaring.org"
+    )
+    assert forwarded["From"] == "admin <admin@skylinesoaring.org>"
+    assert "Reply-To" not in forwarded
+    assert "X-Original-From" not in forwarded
+
+
+def test_forward_shadowing_legacy_list_is_not_treated_as_list():
+    ns = load_template_namespace()
+    ns["FORWARDING_ALIASES"] = {"webmaster@skylinesoaring.org"}
+    ns["ALL_KNOWN_LISTS"] = ns["MAILING_LISTS"] - ns["FORWARDING_ALIASES"]
+    msg = EmailMessage()
+    msg["To"] = "webmaster@skylinesoaring.org"
+    msg["From"] = "sender@example.com"
+    msg.set_content("Body")
+    assert (
+        get_callable(ns, "detect_original_list")(msg, ["preview@gmail.com"])
+        == "webmaster@skylinesoaring.org"
+    )
+
+
+def test_bounce_to_shared_dev_inbox_is_not_rewritten_as_list():
+    ns = load_template_namespace()
+    msg = EmailMessage()
+    msg["To"] = "admin-bounces@skylinesoaring.org"
+    msg["From"] = "mailer-daemon@example.com"
+    msg.set_content("Bounce")
+    assert get_callable(ns, "detect_original_list")(msg, ["preview@gmail.com"]) is None
 
 
 def test_to_header_detection():
