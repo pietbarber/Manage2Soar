@@ -11,7 +11,7 @@ User={{ m2s_app_user }}
 Group={{ m2s_app_group }}
 WorkingDirectory={{ m2s_app_home }}/app
 EnvironmentFile={{ m2s_app_home }}/app/.env
-ExecStart={{ m2s_venv_path }}/bin/python manage.py {{ item.command | default(item.name) }}{% if item.arguments is defined %} {{ item.arguments }}{% endif %}
+ExecStart={{ m2s_venv_path }}/bin/python manage.py {{ item.command | default(item.name) }}{% if item.arguments is defined %} {{ item.arguments }}{% endif %} --verbosity=1
 TimeoutStartSec={{ item.timeout }}s
 SyslogIdentifier=m2s-{{ item.name }}
 NoNewPrivileges=true

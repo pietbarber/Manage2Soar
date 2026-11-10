@@ -57,7 +57,7 @@ def test_rendered_axes_cleanup_timer_and_service():
     # Timer targets the oneshot service and is enabled on boot.
     assert "Unit=m2s-cleanup-login-attempts.service" in timer
     # Hourly schedule mirroring the K8s CronJob (minute 0 of every hour).
-    assert "OnCalendar=*:00" in timer
+    assert "OnCalendar=*-*-* *:00:00 UTC" in timer
     assert "WantedBy=timers.target" in timer
 
     # Service runs the cleanup command as the app user, invoking the virtualenv

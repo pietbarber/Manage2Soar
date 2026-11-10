@@ -42,6 +42,8 @@ def test_single_host_matches_active_gke_jobs():
         assert schedule and command
         gke[command[1]] = (schedule[1], section)
 
+    cleanup_schedule, _cleanup_section = gke.pop("cleanup_login_attempts")
+    assert cleanup_schedule == "0 * * * *"
     assert set(single_host) == set(gke)
 
     service_template = Template(
@@ -68,8 +70,20 @@ def test_single_host_matches_active_gke_jobs():
         service = service_template.render(**context)
         timer = timer_template.render(**context)
         assert f"ExecStart=/opt/m2s/venv/bin/python manage.py {command}" in service
+        assert "--verbosity=1" in service
         assert "EnvironmentFile=/opt/m2s/app/.env" in service
         assert f"TimeoutStartSec={job['timeout']}s" in service
         assert f"OnCalendar={job['calendar']}" in timer
         assert f"Unit=m2s-{job['name']}.service" in timer
         assert "Persistent=true" in timer
+
+    cleanup_service = (
+        ROLE / "templates" / "m2s-cleanup-login-attempts.service.j2"
+    ).read_text()
+    cleanup_timer = (
+        ROLE / "templates" / "m2s-cleanup-login-attempts.timer.j2"
+    ).read_text()
+    assert "cleanup_login_attempts --verbosity=1" in cleanup_service
+    assert "EnvironmentFile={{ m2s_app_home }}/app/.env" in cleanup_service
+    assert "TimeoutStartSec=300" in cleanup_service
+    assert "OnCalendar=*-*-* *:00:00 UTC" in cleanup_timer
