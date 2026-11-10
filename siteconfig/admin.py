@@ -194,7 +194,13 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             or request.user.groups.filter(name="Webmasters").exists()
         )
 
-    readonly_fields = ("visiting_pilot_token", "visiting_pilot_token_created")
+    readonly_fields = (
+        "visiting_pilot_token",
+        "visiting_pilot_token_created",
+        # Set only by the setup wizard, which keeps it in step with the
+        # opening entry. Editing it here would skip those checks.
+        "club_accounting_start_date",
+    )
     actions = ["regenerate_visiting_pilot_token"]
     fieldsets = (
         (
@@ -406,6 +412,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             {
                 "fields": (
                     "billing_app_enabled",
+                    "club_accounting_enabled",
+                    "club_accounting_start_date",
                     "billing_rules_enabled",
                     "instructor_time_charges_enabled",
                     "billing_pricing_mode",
@@ -414,6 +422,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "default_instructor_rate_multiplier",
                 ),
                 "description": (
+                    "The books' start date is set on the Finances Setup page "
+                    "under Club Finances. "
                     "The billing app switch controls access to the member ledger and "
                     "automatic ledger posting. The remaining settings only apply when "
                     "the billing app is enabled. "

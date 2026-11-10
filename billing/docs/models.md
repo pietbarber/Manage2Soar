@@ -578,6 +578,8 @@ flowchart TD
 ```
 ## Related Documentation
 
+- [Club Books (General Ledger)](general-ledger.md): `Account`, `JournalEntry`, `JournalLine`
+
 - [Architecture Overview](architecture.md) - System design and flow
 - [API Reference](api.md) - Service layer functions
 - [Development Guide](development.md) - Contributing to billing app

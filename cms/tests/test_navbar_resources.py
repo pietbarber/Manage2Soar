@@ -32,6 +32,7 @@ def test_anonymous_navbar_is_simplified(client):
     assert b'id="logsheetDropdown"' not in response.content
     assert b'id="equipmentDropdown"' not in response.content
     assert b'id="instructorDropdown"' not in response.content
+    assert b'id="clubFinancesDropdown"' not in response.content
 
 
 @pytest.mark.django_db

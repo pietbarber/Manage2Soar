@@ -1265,6 +1265,7 @@ def flight_split_request_list(request):
 
 @active_member_required
 def flight_split_request_detail(request, token):
+    from billing.ledger_services import lock_books
     from billing.periods import is_period_closed, lock_period_for_date
 
     split_request = get_object_or_404(
@@ -1342,6 +1343,9 @@ def flight_split_request_detail(request, token):
         )
 
     with transaction.atomic():
+        # Books lock first, like every other club-books write, so a posting
+        # holding it can't deadlock with this one over the period lock.
+        lock_books()
         split_request = (
             FlightSplitRequest.objects.select_for_update()
             .select_related("flight")
