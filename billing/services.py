@@ -605,9 +605,14 @@ OPENING_BALANCE_OVERRIDE_PREFIX = "Opening balance override: "
 
 #: Longest member description that still fits LedgerEntry.member_description
 #: after the override prefix is added at posting time.
-OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION = LedgerEntry._meta.get_field(
+_member_description_max_length = LedgerEntry._meta.get_field(
     "member_description"
-).max_length - len(OPENING_BALANCE_OVERRIDE_PREFIX)
+).max_length
+if _member_description_max_length is None:
+    raise RuntimeError("LedgerEntry.member_description must define max_length")
+OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION = _member_description_max_length - len(
+    OPENING_BALANCE_OVERRIDE_PREFIX
+)
 
 
 @transaction.atomic
