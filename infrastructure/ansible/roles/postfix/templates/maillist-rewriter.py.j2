@@ -15,8 +15,12 @@ from email.utils import formataddr, getaddresses, parseaddr
 ADMIN_FORWARD_MARKER = '# --- Administrative forwarding aliases ---'
 MAILING_LISTS = {
 {% for club in club_domains %}
-{% if club.domains is defined %}
-{% for domain in club.domains %}
+{% set explicit_domains = club.domains | default([]) %}
+{% if explicit_domains is string %}
+{% set explicit_domains = [explicit_domains] %}
+{% endif %}
+{% set tenant_domains = (explicit_domains if (club.use_explicit_domains_only | default(false)) and explicit_domains else [club.prefix ~ '.' ~ mail_domain] + explicit_domains) | unique %}
+{% for domain in tenant_domains %}
     'members@{{ domain }}',
     'instructors@{{ domain }}',
     'towpilots@{{ domain }}',
@@ -26,16 +30,6 @@ MAILING_LISTS = {
     'treasurer@{{ domain }}',
     'webmaster@{{ domain }}',
 {% endfor %}
-{% else %}
-    'members@{{ club.prefix }}.{{ mail_domain }}',
-    'instructors@{{ club.prefix }}.{{ mail_domain }}',
-    'towpilots@{{ club.prefix }}.{{ mail_domain }}',
-    'directors@{{ club.prefix }}.{{ mail_domain }}',
-    'board@{{ club.prefix }}.{{ mail_domain }}',
-    'private-owners@{{ club.prefix }}.{{ mail_domain }}',
-    'treasurer@{{ club.prefix }}.{{ mail_domain }}',
-    'webmaster@{{ club.prefix }}.{{ mail_domain }}',
-{% endif %}
 {% endfor %}
 }
 
@@ -88,6 +82,7 @@ def _load_routing_snapshot(virtual_file='/etc/postfix/virtual'):
     """Read list and forwarding routes from one consistent virtual-file snapshot."""
     lists = set()
     forwards = set()
+    recipients = {}
     try:
         with open(virtual_file, 'r') as f:
             in_forwards = False
@@ -102,10 +97,15 @@ def _load_routing_snapshot(virtual_file='/etc/postfix/virtual'):
                 if len(parts) != 2 or '@' not in parts[0]:
                     continue
                 address = parts[0].lower()
+                recipients[address] = {
+                    recipient.strip().lower()
+                    for recipient in parts[1].split(',')
+                    if recipient.strip()
+                }
                 (forwards if in_forwards else lists).add(address)
     except OSError as e:
         sys.stderr.write(f"maillist-rewriter: warning: could not read routes: {e}\n")
-    return lists, forwards
+    return lists, forwards, recipients
 
 
 def _is_bounces_alias(addr):
@@ -129,31 +129,40 @@ def _is_bounces_alias(addr):
     return local.endswith('-bounces')
 
 
+def _routing_sets(snapshot):
+    """Build list/forward sets from one virtual-map snapshot."""
+    virtual_lists, virtual_forwards, _ = snapshot
+    forwarding_aliases = {
+        addr for addr in virtual_forwards if not _is_bounces_alias(addr)
+    }
+    known_lists = {
+        addr
+        for addr in (MAILING_LISTS | virtual_lists)
+        if not _is_bounces_alias(addr) and addr not in forwarding_aliases
+    }
+    return known_lists, forwarding_aliases
+
+
 # Combine hardcoded list addresses with any dynamically-configured aliases.
 # Dynamic lists are added by the app's MailingList model and written to
 # /etc/postfix/virtual; we must include them here so they are not bounced.
 # ``*-bounces@`` delivery aliases are excluded so they are never treated as a
 # detectable mailing list (see _is_bounces_alias and issue #1038).
-_VIRTUAL_LISTS, _VIRTUAL_FORWARDS = _load_routing_snapshot()
-FORWARDING_ALIASES = {
-    addr for addr in _VIRTUAL_FORWARDS if not _is_bounces_alias(addr)
-}
-ALL_KNOWN_LISTS = {
-    addr
-    for addr in (MAILING_LISTS | _VIRTUAL_LISTS)
-    if not _is_bounces_alias(addr) and addr not in FORWARDING_ALIASES
-}
+_VIRTUAL_LISTS, _VIRTUAL_FORWARDS, _ = _load_routing_snapshot()
+ALL_KNOWN_LISTS, FORWARDING_ALIASES = _routing_sets(
+    (_VIRTUAL_LISTS, _VIRTUAL_FORWARDS, {})
+)
 
 
-def rewrite_headers(msg, recipient, envelope_sender=None):
+def rewrite_headers(msg, recipient, envelope_sender=None, allow_passthrough=False):
     """
     Rewrite headers Mailman-style:
     - Save original From to Reply-To
     - Rewrite From to list-bounces address with original name
 
     The automated sender ``noreply@<list_domain>`` is passed through unchanged
-    so that transactional notification emails do not appear to come from a
-    bounces address (issue #846).
+    only for authenticated/trusted submission traffic, so public port-25
+    clients cannot spoof the application's sender (issue #846).
 
     The guard uses ``envelope_sender`` (the SMTP envelope sender from the
     ``MAIL FROM`` command as seen by Postfix) when available. This is preferred
@@ -177,10 +186,9 @@ def rewrite_headers(msg, recipient, envelope_sender=None):
     _, _, list_domain = recipient_lower.partition('@')
 
     # Only allow a narrow passthrough for the exact automated sender address
-    # used by the application on the list domain.  Do not exempt arbitrary
-    # same-domain or generic "noreply" senders, because on port 25 the
-    # envelope sender is client-supplied and not inherently trustworthy.
-    if guard_email and guard_email.lower() == f"noreply@{list_domain}":
+    # used by the application on trusted submission traffic. Public port-25
+    # envelope senders are client-supplied and never qualify.
+    if allow_passthrough and guard_email and guard_email.lower() == f"noreply@{list_domain}":
         return msg
 
     # Extract list name and domain (e.g., "webmaster" from "webmaster@domain.com")
@@ -204,6 +212,17 @@ def rewrite_headers(msg, recipient, envelope_sender=None):
     # Add Reply-To if not already present
     if not msg.get('Reply-To') and original_from:
         msg['Reply-To'] = original_from
+
+    # Generate RFC 2369 headers from the actual list recipient.  Do not use a
+    # generic members@ address: board@, instructors@, etc. must advertise
+    # their own List-Post target.  Replace client-supplied values so an inbound
+    # message cannot spoof a different list identity.
+    for header in ('List-Id', 'List-Post', 'Precedence'):
+        if header in msg:
+            del msg[header]
+    msg['List-Id'] = f"{list_name_display} <{list_local}.{list_domain}>"
+    msg['List-Post'] = f"<mailto:{recipient_lower}>"
+    msg['Precedence'] = 'list'
 
     return msg
 
@@ -233,7 +252,9 @@ def rewrite_forward_headers(msg, alias_address):
     return msg
 
 
-def find_list_from_recipients(recipients, preferred_domain=None):
+def find_list_from_recipients(
+    recipients, preferred_domain=None, routing_snapshot=None, known_lists=None
+):
     """
     Reverse-lookup: find which mailing list these recipients belong to
     by checking the virtual aliases file
@@ -243,8 +264,12 @@ def find_list_from_recipients(recipients, preferred_domain=None):
         if preferred_domain:
             preferred_domain = preferred_domain.lower()
 
-        with open('/etc/postfix/virtual', 'r') as f:
-            virtual_content = f.read()
+        # Read the complete map once. The atomic publisher guarantees that
+        # list addresses and their recipients come from the same generation.
+        routing_snapshot = routing_snapshot or _load_routing_snapshot()
+        _, _, routing_recipients = routing_snapshot
+        if known_lists is None:
+            known_lists, _ = _routing_sets(routing_snapshot)
 
         incoming_recipients = {
             r.strip().lower() for r in recipients if r and r.strip()
@@ -252,38 +277,24 @@ def find_list_from_recipients(recipients, preferred_domain=None):
         exact_matches = []
         subset_matches = []
         # Try each list address
-        for list_addr in ALL_KNOWN_LISTS:
-            # Look for line like: "webmaster@domain  user1@...,user2@...,user3@..."
-            for line in virtual_content.split('\n'):
-                # Match exact alias key token to avoid prefix collisions
-                # (e.g. members@... matching members-ops@...).
-                parts = line.split(None, 1)
-                if len(parts) != 2:
+        for list_addr in known_lists:
+            alias_recipients = routing_recipients.get(list_addr, set())
+            if not alias_recipients:
+                continue
+            # Prefer exact matches, but accept subset matches so
+            # BCC+To-self works after virtual alias expansion.
+            if incoming_recipients == alias_recipients:
+                exact_matches.append((list_addr, len(alias_recipients)))
+                continue
+            if alias_recipients.issubset(incoming_recipients):
+                # Tighten subset matching to reduce false positives:
+                # only allow when a preferred domain exists, list
+                # domain matches that preference, and extras are small.
+                if not preferred_domain or not list_addr.endswith('@' + preferred_domain):
                     continue
-                alias_addr = parts[0].strip().lower()
-                if alias_addr != list_addr:
-                    continue
-
-                alias_recipients = {
-                    r.strip().lower() for r in parts[1].split(',') if r.strip()
-                }
-                if not alias_recipients:
-                    continue
-                # Prefer exact matches, but accept subset matches so
-                # BCC+To-self works after virtual alias expansion.
-                if incoming_recipients == alias_recipients:
-                    exact_matches.append((list_addr, len(alias_recipients)))
-                    break
-                if alias_recipients.issubset(incoming_recipients):
-                    # Tighten subset matching to reduce false positives:
-                    # only allow when a preferred domain exists, list
-                    # domain matches that preference, and extras are small.
-                    if not preferred_domain or not list_addr.endswith('@' + preferred_domain):
-                        continue
-                    extra_recipient_count = len(incoming_recipients - alias_recipients)
-                    if extra_recipient_count <= 2:
-                        subset_matches.append((list_addr, len(alias_recipients)))
-                        break
+                extra_recipient_count = len(incoming_recipients - alias_recipients)
+                if extra_recipient_count <= 2:
+                    subset_matches.append((list_addr, len(alias_recipients)))
 
         matches = exact_matches if exact_matches else subset_matches
 
@@ -293,19 +304,22 @@ def find_list_from_recipients(recipients, preferred_domain=None):
         # Deterministic best-match selection:
         # 1) preferred domain when provided
         # 2) largest alias recipient set (most specific)
-        # 3) stable lexical address tie-break
+        # 3) shortest alias (prefer the canonical name over a suffixed alias)
+        # 4) stable lexical address tie-break
         if preferred_domain:
             domain_matches = [m for m in matches if m[0].endswith('@' + preferred_domain)]
             if domain_matches:
                 matches = domain_matches
 
-        best = sorted(matches, key=lambda item: (-item[1], item[0]))[0]
+        best = sorted(matches, key=lambda item: (-item[1], len(item[0]), item[0]))[0]
         return best[0]
     except Exception as e:
         sys.stderr.write(f"maillist-rewriter: error reading /etc/postfix/virtual in find_list_from_recipients: {e}\n")
 
 
-def detect_original_recipient(msg, recipients, trusted_original_recipient=None):
+def detect_original_recipient(
+    msg, recipients, trusted_original_recipient=None, routing_snapshot=None
+):
     """
     Identify the original recipient in priority order.
 
@@ -314,13 +328,22 @@ def detect_original_recipient(msg, recipients, trusted_original_recipient=None):
     content filter may receive recipients after virtual-alias expansion.
     """
     original_to = None
+    supplied_snapshot = routing_snapshot is not None
+    routing_snapshot = routing_snapshot or _load_routing_snapshot()
+    if supplied_snapshot:
+        known_lists, forwarding_aliases = _routing_sets(routing_snapshot)
+    else:
+        # Preserve the compatibility behavior of this helper for callers that
+        # override the module-level route sets.  main() passes an explicit
+        # snapshot, so deployed routing decisions remain generation-consistent.
+        known_lists, forwarding_aliases = ALL_KNOWN_LISTS, FORWARDING_ALIASES
 
     # This value is supplied by Postfix's ${original_recipient} expansion,
     # before virtual alias expansion. Never use a client-provided header for
     # routing when trusted delivery metadata is available.
     if trusted_original_recipient is not None:
         trusted = trusted_original_recipient.strip().lower()
-        resolved = resolve_alias_recipient(trusted)
+        resolved = resolve_alias_recipient(trusted, known_lists, forwarding_aliases)
         if resolved:
             return resolved
         # Postfix supplied metadata is authoritative. Do not fall back to
@@ -331,14 +354,14 @@ def detect_original_recipient(msg, recipients, trusted_original_recipient=None):
     # Use getaddresses() so multi-address To headers are parsed correctly.
     to_addresses = getaddresses(msg.get_all('To', []))
     for _, to_addr in to_addresses:
-        if to_addr and to_addr.lower() in ALL_KNOWN_LISTS:
+        if to_addr and to_addr.lower() in known_lists:
             original_to = to_addr.lower()
             break
 
     # Check Cc headers for reply-all workflows.
     if not original_to:
         for _, cc_addr in getaddresses(msg.get_all('Cc', []) + msg.get_all('CC', [])):
-            if cc_addr and cc_addr.lower() in ALL_KNOWN_LISTS:
+            if cc_addr and cc_addr.lower() in known_lists:
                 original_to = cc_addr.lower()
                 break
 
@@ -347,7 +370,7 @@ def detect_original_recipient(msg, recipients, trusted_original_recipient=None):
     # incorrectly classify it as one of those lists.
     if not original_to:
         for _, addr in to_addresses + getaddresses(msg.get_all('Cc', []) + msg.get_all('CC', [])):
-            if addr and addr.lower() in FORWARDING_ALIASES:
+            if addr and addr.lower() in forwarding_aliases:
                 return addr.lower()
 
     # Extract preferred domain from To/CC header for reverse-lookup fallback
@@ -363,13 +386,13 @@ def detect_original_recipient(msg, recipients, trusted_original_recipient=None):
     # still present. Prefer an explicit list, then a direct alias.
     if not original_to:
         for recipient in recipients:
-            if recipient.lower() in ALL_KNOWN_LISTS:
+            if recipient.lower() in known_lists:
                 original_to = recipient.lower()
                 break
 
     if not original_to:
         for recipient in recipients:
-            if recipient.lower() in FORWARDING_ALIASES:
+            if recipient.lower() in forwarding_aliases:
                 return recipient.lower()
 
     if not original_to:
@@ -379,15 +402,29 @@ def detect_original_recipient(msg, recipients, trusted_original_recipient=None):
             if addr and _is_bounces_alias(addr):
                 return None
         # Fallback supports post-expansion recipients via subset matching.
-        original_to = find_list_from_recipients(recipients, preferred_domain)
+        lookup_lists = known_lists
+        if not supplied_snapshot:
+            lookup_lists, _ = _routing_sets(routing_snapshot)
+        original_to = find_list_from_recipients(
+            recipients,
+            preferred_domain,
+            routing_snapshot=routing_snapshot,
+            known_lists=lookup_lists,
+        )
 
     return original_to
 
 
-def resolve_alias_recipient(address):
+def resolve_alias_recipient(
+    address, known_lists=None, forwarding_aliases=None
+):
     """Resolve Postfix's recipient-delimiter extension to a known address."""
+    known_lists = ALL_KNOWN_LISTS if known_lists is None else known_lists
+    forwarding_aliases = (
+        FORWARDING_ALIASES if forwarding_aliases is None else forwarding_aliases
+    )
     address = address.strip().lower()
-    if address in ALL_KNOWN_LISTS or address in FORWARDING_ALIASES:
+    if address in known_lists or address in forwarding_aliases:
         return address
     if '@' not in address:
         return None
@@ -395,7 +432,7 @@ def resolve_alias_recipient(address):
     if '+' not in local:
         return None
     base = f"{local.split('+', 1)[0]}@{domain}"
-    if base in ALL_KNOWN_LISTS or base in FORWARDING_ALIASES:
+    if base in known_lists or base in forwarding_aliases:
         return base
     return None
 
@@ -404,14 +441,18 @@ def resolve_alias_recipient(address):
 detect_original_list = detect_original_recipient
 
 
-def routing_class(recipient):
+def routing_class(recipient, known_lists=None, forwarding_aliases=None):
     """Return ``mailing_list``, ``forwarding_alias``, or ``None``."""
+    known_lists = ALL_KNOWN_LISTS if known_lists is None else known_lists
+    forwarding_aliases = (
+        FORWARDING_ALIASES if forwarding_aliases is None else forwarding_aliases
+    )
     if not recipient:
         return None
     normalized = recipient.lower()
-    if normalized in FORWARDING_ALIASES:
+    if normalized in forwarding_aliases:
         return "forwarding_alias"
-    if normalized in ALL_KNOWN_LISTS:
+    if normalized in known_lists:
         return "mailing_list"
     return None
 
@@ -419,23 +460,33 @@ def routing_class(recipient):
 def main():
     """
     Content filter: Read email from stdin, rewrite headers, reinject to port 10025
-    Args: nexthop sender recipient1 recipient2 ...
+    Args: nexthop sender original_recipient recipient... traffic_class
     """
-    if len(sys.argv) < 5:
-        sys.stderr.write("Usage: maillist-rewriter.py nexthop sender original_recipient recipient...\n")
+    if len(sys.argv) < 6:
+        sys.stderr.write("Usage: maillist-rewriter.py nexthop sender original_recipient recipient... [public|trusted]\n")
         sys.exit(1)
 
     nexthop = sys.argv[1]
     sender = sys.argv[2]
     trusted_original_recipient = sys.argv[3]
     recipients = sys.argv[4:]
+    traffic_class = recipients.pop()
+    allow_passthrough = traffic_class == 'trusted'
+    if traffic_class not in {'public', 'trusted'} or not recipients:
+        sys.stderr.write("maillist-rewriter: invalid traffic class or recipient list\n")
+        sys.exit(1)
 
     # Read message from stdin
     original_msg = sys.stdin.buffer.read()
     msg = email.message_from_bytes(original_msg)
+    routing_snapshot = _load_routing_snapshot()
+    known_lists, forwarding_aliases = _routing_sets(routing_snapshot)
 
     original_to = detect_original_recipient(
-        msg, recipients, trusted_original_recipient=trusted_original_recipient
+        msg,
+        recipients,
+        trusted_original_recipient=trusted_original_recipient,
+        routing_snapshot=routing_snapshot,
     )
 
     # If list detection failed entirely, this is a transactional email (e.g. password
@@ -459,13 +510,18 @@ def main():
 
     # Rewrite mailing-list recipients and normalize direct forwards to a
     # verified club sender accepted by authenticated SMTP relays.
-    route = routing_class(original_to)
+    route = routing_class(original_to, known_lists, forwarding_aliases)
     is_mailing_list = route == "mailing_list"
     is_forwarding_alias = route == "forwarding_alias"
     if is_mailing_list:
         # Pass the SMTP envelope sender so the passthrough guard uses a
         # Postfix-verified address instead of the (spoofable) From header.
-        msg = rewrite_headers(msg, original_to, envelope_sender=sender)
+        msg = rewrite_headers(
+            msg,
+            original_to,
+            envelope_sender=sender,
+            allow_passthrough=allow_passthrough,
+        )
     elif is_forwarding_alias:
         msg = rewrite_forward_headers(msg, original_to)
 

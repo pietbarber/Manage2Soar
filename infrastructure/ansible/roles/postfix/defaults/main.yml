@@ -7,6 +7,14 @@
 # Postfix configuration directory
 postfix_config_dir: /etc/postfix
 
+# Rspamd is only deployed for mail-receiving variants. Full mail-server and
+# GCP deployments receive by default; single-host passes its explicit toggle.
+postfix_rspamd_enabled: true
+
+# Per-tenant sender authorization maps. These must never be merged into one
+# global whitelist because recipient authorization is tenant-scoped.
+postfix_whitelist_dir: "{{ postfix_config_dir }}/tenant-whitelists"
+
 # Mail server hostname (FQDN for this server)
 # Defaults to the primary domain for single-host deployments
 mail_hostname: "{{ m2s_domain }}"
@@ -64,5 +72,4 @@ single_host_mode: true
 # This variable should be defined once (e.g., in group_vars) to avoid duplication
 # across roles (postfix, opendkim, rspamd).
 # Required format: [{ prefix: "club", name: "My Club" }]
-# club_domains must be provided via group_vars (e.g., group_vars/single_host/vars.yml).
-# This role intentionally does not define a default to avoid duplication across roles.
+club_domains: []
