@@ -54,6 +54,10 @@ class TestThrottledResponseGeneric:
         assert "correct username and password" in body_normal
         assert "correct username and password" in body_throttled
         assert resp_normal.status_code == resp_throttled.status_code == 200
+        assert (
+            resp_normal.cookies["csrftoken"].value
+            == resp_throttled.cookies["csrftoken"].value
+        )
 
         def stable_body(response):
             body = re.sub(
@@ -160,6 +164,13 @@ class TestLockoutResponseRendering:
             attempt()
         locked = attempt()
         assert normal.status_code == locked.status_code == 200
+        from axes.models import AccessAttempt
+
+        assert AccessAttempt.objects.filter(
+            username="xhr_user",
+            ip_address="10.0.0.3",
+            failures_since_start__gte=LIMIT,
+        ).exists(), "The test must establish a real Axes lockout"
         for header in ("Content-Type", "Cache-Control", "X-Frame-Options"):
             assert normal.get(header) == locked.get(header)
 

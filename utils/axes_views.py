@@ -95,4 +95,10 @@ def lockout_response(
     xfo = getattr(settings, "X_FRAME_OPTIONS", "DENY")
     if xfo:
         response["X-Frame-Options"] = str(xfo).upper()
+
+    # Axes replaces the login view response after the normal middleware chain
+    # has rendered it. Preserve cookies set by that response, especially the
+    # CSRF cookie required for the next login attempt.
+    if original_response is not None:
+        response.cookies.update(original_response.cookies)
     return response
