@@ -27,6 +27,15 @@ from .utils.avatar_generator import generate_identicon
 logger = logging.getLogger(__name__)
 
 
+def _reconcile_saved_member(member_id, using):
+    """Reconcile one member after its status change has committed."""
+    from members.services.status_role_reconciliation import reconcile_member
+
+    member = Member.objects.using(using).filter(pk=member_id).first()
+    if member is not None:
+        reconcile_member(member, using=using)
+
+
 def get_membership_status_choices():
     """
     Get membership status choices dynamically from the MembershipStatus model.
@@ -181,7 +190,7 @@ class MemberRoleAssignment(models.Model):
         Group, on_delete=models.CASCADE, related_name="member_role_assignments"
     )
     source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
-    source_key = models.CharField(max_length=100)
+    source_key = models.CharField(max_length=201)
     actor = models.ForeignKey(
         "Member",
         on_delete=models.SET_NULL,
@@ -287,7 +296,7 @@ class MemberRoleAssignmentEvent(models.Model):
     actor_id_snapshot = models.PositiveBigIntegerField(null=True, blank=True)
     actor_username = models.CharField(max_length=150, blank=True)
     source = models.CharField(max_length=20)
-    source_key = models.CharField(max_length=100)
+    source_key = models.CharField(max_length=201)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -712,6 +721,34 @@ class Member(AbstractUser):
         return get_membership_status_choices()
 
     def save(self, *args, **kwargs):
+        using = (
+            kwargs.get("using")
+            or self._state.db
+            or router.db_for_write(type(self), instance=self)
+        )
+        update_fields = kwargs.get("update_fields")
+        previous_status = None
+        persisted_member = False
+        if self.pk:
+            persisted_member = (
+                type(self).objects.using(using).filter(pk=self.pk).exists()
+            )
+            if persisted_member:
+                previous_status = (
+                    type(self)
+                    .objects.using(using)
+                    .filter(pk=self.pk)
+                    .values_list("membership_status", flat=True)
+                    .first()
+                )
+        status_changed = (
+            not persisted_member and self._state.adding and self.membership_status
+        ) or (
+            persisted_member
+            and previous_status != self.membership_status
+            and (update_fields is None or "membership_status" in update_fields)
+        )
+
         # 1) pre-save flags
         # Always allow superusers to access admin
         if self.is_superuser:
@@ -781,12 +818,11 @@ class Member(AbstractUser):
                     )
 
         # 5) now safe to touch M2M
-        using = (
-            kwargs.get("using")
-            or self._state.db
-            or router.db_for_write(type(self), instance=self)
-        )
         transaction.on_commit(lambda: self._sync_groups(using=using), using=using)
+        if status_changed:
+            transaction.on_commit(
+                lambda: _reconcile_saved_member(self.pk, using), using=using
+            )
 
     class Meta:
         verbose_name = "user"
