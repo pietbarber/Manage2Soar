@@ -106,9 +106,27 @@ failures.
    `members.0055_alter_member_options`, `members.0056_member_manager_import_permission`,
    `knowledgetest.0008_create_and_grant_written_test_capabilities`, and
    `instructors.0008_groundinstruction_manage_permission` completed.
-4. Run the role registry parity test against the migrated database.
-5. Compare role permissions and sensitive-action allow/deny results with the
+4. Confirm the new authorization and status-role migrations completed:
+   `members.0057_authorization_capabilities`,
+   `members.0058_alter_memberroleassignment_source_key_and_more`,
+   `siteconfig.0058_membershipstatus_key_membershipstatusrolemapping`, and
+   `siteconfig.0059_membershipstatusrolemappingevent`.
+5. Run the role registry parity test against the migrated database.
+6. Compare role permissions and sensitive-action allow/deny results with the
    pre-release baseline before enabling traffic.
+
+The status-role mapping migration creates no mapping rows. Status-role
+reconciliation is conservative and defaults to read-only reporting:
+
+```bash
+./manage.py reconcile_status_roles --dry-run --json \
+  --settings=manage2soar.settings
+```
+
+Review the report before any explicit apply. If a large population requires
+multiple runs, use `--checkpoint-file` and resume with `--after-member-id`.
+Do not use `--apply` during deployment or against a representative tenant
+without the separate parity approval described below.
 
 The registry migration only adds missing capability grants; it does not revoke
 stale Group permissions removed from a later runtime registry. Migration `0053`
@@ -143,9 +161,10 @@ runtime registry edits cannot change historical replay.
 Do not release until the following are explicitly resolved or accepted by the
 maintainer:
 
-- exact role and qualification capability mappings;
-- unresolved legacy staff-policy contradictions;
-- preview audit retention and GET-side-effect policy;
+- maintainer acceptance of the exact role and qualification capability mappings;
+- maintainer acceptance of any unresolved legacy staff-policy contradictions;
 - review of stats-export access changes caused by the security-first cleanup of
   unprovenanced historical direct grants;
-- clean-install, in-place, and recipient-parity validation results.
+- clean-install and in-place migration validation results;
+- authorized representative-tenant parity results before deployment. This gate
+  is intentionally deferred for the current merge review.
