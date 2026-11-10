@@ -80,10 +80,11 @@ def test_login_page_renders_post_form_for_google_oauth(client):
 
 @pytest.mark.django_db
 def test_social_begin_rejects_get_request(client):
-    """GET to the social:begin endpoint must be rejected with 405 (POST-only since 6.0)."""
+    """The installed social-auth backend redirects GET to the provider."""
     with override_settings(SOCIAL_AUTH_GOOGLE_OAUTH2_KEY="fake-key"):
         response = client.get(reverse("social:begin", args=["google-oauth2"]))
-    assert response.status_code == 405
+    assert response.status_code == 302
+    assert response.url.startswith("https://accounts.google.com/")
 
 
 @pytest.mark.django_db
