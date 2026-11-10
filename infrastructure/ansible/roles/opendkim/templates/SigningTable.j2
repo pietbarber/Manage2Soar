@@ -5,8 +5,8 @@
 # Format: pattern key-name
 
 # Club domains (auto-generated from club_domains)
-{% for club in club_domains %}
-*@{{ club.prefix }}.{{ mail_domain }} {{ dkim_selector }}._domainkey.{{ club.prefix }}.{{ mail_domain }}
+{% for domain in opendkim_domains %}
+*@{{ domain }} {{ dkim_selector }}._domainkey.{{ domain }}
 {% endfor %}
 
 # Additional domains (custom/production domains)
