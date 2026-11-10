@@ -16,6 +16,16 @@ from typing import Any, Callable, cast
 from unittest.mock import mock_open, patch
 
 _TEMPLATE_PATH = Path(__file__).parent / "templates" / "maillist-rewriter.py.j2"
+_MAIN_CF_TEMPLATE_PATH = Path(__file__).parent / "templates" / "main.cf.j2"
+_MASTER_CF_TEMPLATE_PATH = Path(__file__).parent / "templates" / "master.cf.j2"
+
+
+def test_rewriter_transport_limits_delivery_and_keeps_master_command_clean():
+    main_cf = _MAIN_CF_TEMPLATE_PATH.read_text(encoding="utf-8")
+    master_cf = _MASTER_CF_TEMPLATE_PATH.read_text(encoding="utf-8")
+
+    assert "maillist-rewriter_destination_recipient_limit = 1" in main_cf
+    assert "  -o recipient_limit=1" not in master_cf
 
 
 def load_template_namespace():
