@@ -39,6 +39,7 @@ class TestSingleIPThrottle:
         for i, u in enumerate(self._ip_users()[: LIMIT - 1]):
             resp = _failed_login(client, u, ip="10.0.0.1")
             assert resp.status_code == 200, f"Attempt {i + 1} unexpectedly throttled"
+            assert resp.wsgi_request.axes_locked_out is False
 
     def test_failure_at_limit_throttled(self):
         """The LIMIT-th distinct-username failure from one IP is throttled.
@@ -58,6 +59,7 @@ class TestSingleIPThrottle:
         assert (
             resp.status_code == 200
         ), f"Per-IP bucket should trip on the {LIMIT}th distinct-username failure"
+        assert resp.wsgi_request.axes_locked_out is True
 
     def test_different_ip_with_different_username_not_throttled(self):
         """A different (username, IP) pair should have its own budget.
@@ -100,6 +102,7 @@ class TestPerUsernameThrottle:
         # LIMIT-th IP, same username → throttled (per-username bucket)
         resp = _failed_login(client, "bob", ip="192.168.2.1")
         assert resp.status_code == 200, "Per-username bucket should trip"
+        assert resp.wsgi_request.axes_locked_out is True
 
     def test_different_username_not_throttled(self):
         """A different username should not be affected by another user's throttle."""
@@ -110,13 +113,16 @@ class TestPerUsernameThrottle:
         # Exhaust bob's per-username budget
         for i in range(LIMIT - 1):
             ip = f"172.16.1.{i + 1}"
-            _failed_login(client, "bob", ip=ip)
-        _failed_login(client, "bob", ip="172.16.2.1")  # now bob is throttled
+            resp = _failed_login(client, "bob", ip=ip)
+            assert resp.wsgi_request.axes_locked_out is False
+        resp = _failed_login(client, "bob", ip="172.16.2.1")
+        assert resp.wsgi_request.axes_locked_out is True
         # Carol from a fresh IP should still work
         resp = _failed_login(client, "carol", ip="172.16.3.1")
         assert (
             resp.status_code == 200
         ), "Different username should have independent budget"
+        assert resp.wsgi_request.axes_locked_out is False
 
 
 @pytest.mark.django_db
@@ -301,6 +307,7 @@ class TestSharedStorage:
         # Next failure from client1 should be throttled
         resp = _failed_login(client1, "ivan", ip=ip)
         assert resp.status_code == 200
+        assert resp.wsgi_request.axes_locked_out is True
 
 
 @pytest.mark.django_db
@@ -327,6 +334,7 @@ class TestXForwardedForThrottleKey:
         assert (
             resp.status_code == 200
         ), "Different XFF + username should have independent budget"
+        assert resp.wsgi_request.axes_locked_out is False
 
     def test_same_xff_shares_budget(self):
         """Same XFF value → shared budget (even from different 'workers')."""
@@ -338,9 +346,11 @@ class TestXForwardedForThrottleKey:
 
         # (LIMIT-1) from client1
         for _ in range(LIMIT - 1):
-            _failed_login(client1, "mallory", ip=ip)
+            resp = _failed_login(client1, "mallory", ip=ip)
+            assert resp.wsgi_request.axes_locked_out is False
         # 1 from client2
         _failed_login(client2, "mallory", ip=ip)
         # Next from client1 → throttled
         resp = _failed_login(client1, "mallory", ip=ip)
         assert resp.status_code == 200
+        assert resp.wsgi_request.axes_locked_out is True
