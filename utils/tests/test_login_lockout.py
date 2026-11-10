@@ -199,6 +199,7 @@ class TestLockoutResponseRendering:
 
     def test_lockout_callable_tolerates_async_axes_argument_shape(self):
         """Axes' async middleware passes credentials as the second argument."""
+        from django.contrib.auth.models import AnonymousUser
         from django.test import RequestFactory
 
         from utils.axes_views import lockout_response
@@ -207,6 +208,7 @@ class TestLockoutResponseRendering:
             reverse("login"),
             {"username": "async-user", "password": "wrong"},
         )
+        request.user = AnonymousUser()
         response = lockout_response(request, {"username": "async-user"})
 
         assert response.status_code == 200
