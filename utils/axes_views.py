@@ -99,6 +99,8 @@ def lockout_response(
     # Axes replaces the login view response after the normal middleware chain
     # has rendered it. Preserve cookies set by that response, especially the
     # CSRF cookie required for the next login attempt.
-    if original_response is not None:
+    if isinstance(original_response, HttpResponseBase):
         response.cookies.update(original_response.cookies)
+        if original_response.get("Vary"):
+            response["Vary"] = original_response["Vary"]
     return response

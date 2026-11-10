@@ -70,7 +70,12 @@ class TestThrottledResponseGeneric:
             )
 
         assert stable_body(resp_normal) == stable_body(resp_throttled)
-        for header in ("Content-Type", "Cache-Control", "X-Frame-Options"):
+        for header in (
+            "Content-Type",
+            "Cache-Control",
+            "Vary",
+            "X-Frame-Options",
+        ):
             assert resp_normal.get(header) == resp_throttled.get(header)
 
 
@@ -168,10 +173,15 @@ class TestLockoutResponseRendering:
 
         assert AccessAttempt.objects.filter(
             username="xhr_user",
-            ip_address="10.0.0.3",
+            ip_address="10.14.0.3",
             failures_since_start__gte=LIMIT,
         ).exists(), "The test must establish a real Axes lockout"
-        for header in ("Content-Type", "Cache-Control", "X-Frame-Options"):
+        for header in (
+            "Content-Type",
+            "Cache-Control",
+            "Vary",
+            "X-Frame-Options",
+        ):
             assert normal.get(header) == locked.get(header)
 
         def without_csrf(response):
@@ -186,6 +196,21 @@ class TestLockoutResponseRendering:
             )
 
         assert without_csrf(normal) == without_csrf(locked)
+
+    def test_lockout_callable_tolerates_async_axes_argument_shape(self):
+        """Axes' async middleware passes credentials as the second argument."""
+        from django.test import RequestFactory
+
+        from utils.axes_views import lockout_response
+
+        request = RequestFactory().post(
+            reverse("login"),
+            {"username": "async-user", "password": "wrong"},
+        )
+        response = lockout_response(request, {"username": "async-user"})
+
+        assert response.status_code == 200
+        assert "correct username and password" in response.content.decode()
 
     def test_html_lockout_has_frame_and_cache_protection(self):
         """The throttled HTML response must carry the X-Frame-Options and
