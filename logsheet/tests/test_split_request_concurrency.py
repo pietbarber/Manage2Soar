@@ -5,7 +5,6 @@ two requests at the same moment would, so these tests use transaction=True.
 """
 
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
@@ -78,17 +77,25 @@ def test_split_approval_and_period_close_at_once_do_not_deadlock(monkeypatch):
         expires_at=timezone.now() + timedelta(days=7),
     )
 
-    # Pause the approval just before it locks the billing period, while it
-    # holds whatever it locked first, so the close can start in that gap.
-    pausing = threading.Event()
+    period_locked = threading.Event()
+    approval_resuming = threading.Event()
     original = periods.lock_period_for_date
+    original_save = BillingPeriod.save
 
     def slow(period_date):
-        pausing.set()
-        time.sleep(0.5)
+        assert period_locked.wait(5), "period close did not acquire its lock"
+        approval_resuming.set()
         return original(period_date)
 
+    def signal_period_lock(self, *args, **kwargs):
+        result = original_save(self, *args, **kwargs)
+        if self.is_closed:
+            period_locked.set()
+            assert approval_resuming.wait(5), "approval did not resume"
+        return result
+
     monkeypatch.setattr(periods, "lock_period_for_date", slow)
+    monkeypatch.setattr(BillingPeriod, "save", signal_period_lock)
 
     @threaded
     def approve():
@@ -101,7 +108,6 @@ def test_split_approval_and_period_close_at_once_do_not_deadlock(monkeypatch):
 
     @threaded
     def close():
-        pausing.wait(5)
         periods.close_period(
             year=log_date.year,
             month=log_date.month,
