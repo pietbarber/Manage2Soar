@@ -1,0 +1,45 @@
+/*
+ * Project admin theme fixes.
+ *
+ * Django admin supports light/dark variables; keep custom helper and fieldset
+ * description text on those variables so descriptions stay readable in either
+ * mode.
+ */
+
+.admin-helper {
+    align-items: center;
+    background: var(--body-bg);
+    border: 1px solid var(--hairline-color);
+    border-radius: 4px;
+    color: var(--body-fg);
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 10px;
+}
+
+.admin-helper .helper-text,
+.admin-helper .helper-text * {
+    color: var(--body-fg);
+}
+
+.admin-helper .helper-docs {
+    background: var(--button-bg);
+    border-radius: 14px;
+    color: var(--button-fg);
+    font-size: 12px;
+    padding: 6px 10px;
+    text-decoration: none;
+}
+
+.admin-helper .helper-docs:focus,
+.admin-helper .helper-docs:hover {
+    background: var(--button-hover-bg);
+    color: var(--button-fg);
+}
+
+.module .description,
+fieldset .description,
+.inline-group .description {
+    color: var(--body-quiet-color);
+}
