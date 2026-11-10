@@ -1431,6 +1431,9 @@ class MembershipStatus(models.Model):
         result = super().save(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
+        # Invalidate immediately so later writes in the same transaction see
+        # the new status policy; on_commit covers requests after a commit too.
+        clear_active_membership_statuses_cache()
         transaction.on_commit(clear_active_membership_statuses_cache)
         if previous_is_active is not None and previous_is_active != self.is_active:
             _schedule_status_role_reconciliation(self.pk, using or self._state.db)
@@ -1458,6 +1461,7 @@ class MembershipStatus(models.Model):
         result = super().delete(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
+        clear_active_membership_statuses_cache()
         transaction.on_commit(clear_active_membership_statuses_cache)
         return result
 

@@ -769,10 +769,10 @@ class Member(AbstractUser):
                 )
 
         # 2) Sync is_active with membership status
-        # Only activate Django User if member has an active membership status
-        # This ensures login access is automatically managed based on membership status
+        # An active membership cannot override an explicit account deactivation.
+        # Inactive membership still always disables the Django account.
         if not self.is_superuser:  # Don't override superuser active status
-            self.is_active = self.is_active_member()
+            self.is_active = self.is_active and self.is_active_member()
 
         # 3) persist first so generated media can use the member's immutable PK
         super().save(*args, **kwargs)

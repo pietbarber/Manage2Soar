@@ -436,3 +436,17 @@ class MembershipStatusIntegrationTests(TestCase):
 
         # Member should now be inactive
         self.assertFalse(member.is_active_member())
+
+    def test_explicit_account_deactivation_is_preserved(self):
+        member = Member.objects.create_user(
+            username="explicitly-disabled",
+            membership_status=self.active_status.name,
+            is_active=False,
+        )
+
+        self.assertFalse(member.is_active)
+
+        member.save()
+
+        member.refresh_from_db()
+        self.assertFalse(member.is_active)
