@@ -1,8 +1,7 @@
 # Membership-status → role reconciliation policy
 
-**Status:** proposal; documentation only. This is not an implementation or a
-database migration. Decisions marked **Product approval required** must be
-settled before schema or synchronization work starts.
+**Status:** approved implementation policy. The schema and safe per-member
+reconciler are implemented; no initial status-to-role mappings are seeded.
 
 ## 1. Scope and terminology
 
@@ -19,23 +18,24 @@ role. No such mapping is present in the repository.
 
 ### Membership status
 
-* `siteconfig.MembershipStatus` has a unique, user-visible `name`,
-  `is_active`, flight eligibility flags, ordering, and description. It has no
-  stable key separate from `name` and no role mapping field.
+* `siteconfig.MembershipStatus` has a unique, user-visible `name`, an immutable
+  normalized `key`, `is_active`, flight eligibility flags, ordering, and
+  description. Explicit status-role mappings are stored separately.
 * `Member.membership_status` is a nullable/blank `CharField` that stores the
   status name, not a foreign key. Form choices are read dynamically from all
   `MembershipStatus` rows, ordered by `sort_order` and name.
 * `Member.is_active_member()` is true only when the stored name is in
   `MembershipStatus.get_active_statuses()`. `Member.save()` derives Django
-  `is_active` from that result (except for superusers). Changing a status row’s
-  `is_active` therefore changes eligibility on subsequent checks and cache
-  invalidation, but does not itself save every affected member.
+  `is_active` from that result (except for superusers) and schedules
+  reconciliation after a committed status change. Changing a status row’s
+  `is_active` also schedules affected members.
 * Deleting a status is blocked when any member stores its name. Renaming is
   allowed by the model/admin and changes the status name, while existing
   members still contain the old string; this is a consistency hazard.
 * Membership-status administration is available to superusers, Webmasters,
-  and Member Managers. The admin currently has no mapping or reconciliation
-  preview.
+  and Member Managers. Status-role mappings are restricted to superusers and
+  Webmasters; the `reconcile_status_roles` command provides dry-run/apply
+  reporting.
 
 ### Existing group synchronization
 
@@ -53,7 +53,8 @@ role. No such mapping is present in the repository.
   existing manual-role service uses the same member-row lock and a transaction.
 * The assignment model allows sources `manual`, `status`, and `legacy`; its
   uniqueness is `(member, group, source, source_key)`. `source_key` is a
-  required string. No production code currently writes `source="status"`.
+  required string. The status-role service writes only this provenance and
+  never rewrites other sources.
 * Manual role changes go through `set_manual_role()`. The public service requires
   an authenticated, active, canonical superuser actor, so programmatic callers
   share the admin boundary; trusted repair paths must use the private internal
@@ -86,7 +87,7 @@ role. No such mapping is present in the repository.
   `untracked` when permission sources are reported. Direct M2M membership with
   no assignment row is intentionally not “explained” or removed.
 
-## 3. Proposed policy
+## 3. Approved policy
 
 ### 3.1 Explicit mapping, not name convention
 
@@ -96,7 +97,7 @@ recommended conceptual row is:
 | Field | Rule |
 | --- | --- |
 | membership status | FK to `MembershipStatus`; immutable identity, not display name |
-| role | FK to `Group`, preferably constrained to a group with `RoleMetadata` |
+| role | FK to `Group` with required `RoleMetadata` |
 | enabled | Allows a mapping to be retired without deleting history |
 | audit fields | created/updated timestamps and actor if the admin workflow supports it |
 
@@ -105,9 +106,9 @@ ambiguous duplicate active rows. A role is granted only by an enabled mapping;
 `is_active`, `can_be_pilot`, and `can_be_passenger` do **not** implicitly grant
 roles. In particular, “active” is not a role mapping.
 
-**Product approval required:** whether mappings may target groups without
-`RoleMetadata`, and which roles (if any) should be configured initially. This
-proposal intentionally names no initial status/role pairs.
+**Approved default:** mappings may target only groups with `RoleMetadata`. The
+initial mapping table is intentionally empty; each status-to-role pair must be
+configured explicitly by an authorized administrator.
 
 ### 3.2 Stable identity and `source_key`
 
@@ -133,9 +134,9 @@ Use these exact provenance rules:
   all roles. That permits one role mapping to be retired without revoking
   unrelated status-derived roles.
 
-**Product approval required:** whether the canonical status key is a newly
-  administered slug or an immutable encoded database identity. Do not use the
-  mutable current `name` as the long-term key.
+**Approved default:** use a normalized immutable slug generated during the
+identity backfill. Display-name edits preserve that key; keys cannot contain
+`:`, and the migration stops on collisions rather than guessing.
 
 ### 3.3 Preservation and removal rules
 
@@ -159,17 +160,15 @@ reporting and admin UI must make that visible rather than silently “fixing” 
 
 ### 3.4 Inactive statuses
 
-Recommended default: an inactive status has no desired `status` assignments.
+Approved default: an inactive status has no desired `status` assignments.
 On transition to inactive, remove only status-source rows; retain manual,
 legacy, and unexplained memberships. On reactivation, recompute from current
 enabled mappings and recreate missing status rows. This is consistent with
 the existing use of `is_active` for member access, while avoiding destructive
 loss of separately owned role grants.
 
-**Product approval required:** whether a configured mapping should still grant
-its role while the status is inactive. The implementation must not silently
-choose a different interpretation. If approval is “inactive still grants,”
-change the desired-set rule and document the security rationale.
+Configured mappings remain available for reactivation, but inactivity revokes
+only status-owned rows.
 
 Status changes must also continue to follow existing `Member.save()` behavior:
 inactive members become `is_active=False`, so a role assignment may exist as
