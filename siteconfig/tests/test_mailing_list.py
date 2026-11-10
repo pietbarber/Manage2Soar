@@ -49,7 +49,8 @@ class TestEmailAlias:
             EmailAlias(name="board", destination="inbox@example.com").full_clean()
 
     @pytest.mark.parametrize(
-        "name", ["bad name", "UPPER", "bad@domain", "test-bounces", "a..b"]
+        "name",
+        ["bad name", "UPPER", "bad@domain", "test-bounces", "a..b", "board+special"],
     )
     def test_rejects_invalid_names(self, name):
         with pytest.raises(ValidationError):
@@ -61,6 +62,23 @@ class TestEmailAlias:
         )
         with pytest.raises(ValidationError):
             EmailAlias(name="contact", destination="contact@example.org").full_clean()
+
+    @pytest.mark.parametrize(
+        "name",
+        ["bad name", "UPPER", "bad@domain", "test-bounces", "a..b", "board+special"],
+    )
+    def test_mailing_list_rejects_invalid_alias_names(self, name):
+        with pytest.raises(ValidationError):
+            MailingList(
+                name=name, criteria=[MailingListCriterion.DIRECTOR]
+            ).full_clean()
+
+    def test_mixed_case_bounce_name_is_reserved(self):
+        with pytest.raises(ValidationError):
+            MailingList(
+                name="ADMIN-BOUNCES",
+                criteria=[MailingListCriterion.DIRECTOR],
+            ).full_clean()
 
 
 @pytest.fixture
