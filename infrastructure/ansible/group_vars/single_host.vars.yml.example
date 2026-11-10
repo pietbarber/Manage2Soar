@@ -208,7 +208,7 @@ mail_server_receive_enabled: false
 club_domains:
   - prefix: "{{ club_prefix }}"
     name: "{{ club_name }}"
-    api_url: "{{ canonical_url | default('https://' ~ m2s_domain) }}/api/email-lists/"
+    api_url: "{{ m2s_site_url }}/api/email-lists/"
     domains:
       - "{{ club_prefix }}.{{ mail_domain }}"
 

@@ -86,6 +86,7 @@ postlog   unix-dgram n  -       n       -       1       postlogd
 # pointing to original sender (Mailman-style)
 maillist-rewriter unix  -       n       n       -       10      pipe
   flags=Rq user=nobody argv=/usr/local/bin/maillist-rewriter.py ${nexthop} ${sender} ${original_recipient} ${recipient}
+  -o recipient_limit=1
 
 # Reinjection port (after content filter)
 127.0.0.1:10025 inet n  -       y       -       -       smtpd

@@ -125,7 +125,15 @@ def test_direct_forward_is_detected_without_being_a_list():
 
     ns["FORWARDING_ALIASES"] = {"admin@skylinesoaring.org"}
     detect = get_callable(ns, "detect_original_recipient")
-    assert detect(msg, ["preview@example.com"]) == "admin@skylinesoaring.org"
+    assert detect(msg, ["preview@example.com"]) is None
+    assert (
+        detect(
+            msg,
+            ["preview@example.com"],
+            trusted_original_recipient="admin@skylinesoaring.org",
+        )
+        == "admin@skylinesoaring.org"
+    )
     assert "admin@skylinesoaring.org" not in ns["ALL_KNOWN_LISTS"]
     assert (
         get_callable(ns, "routing_class")("admin@skylinesoaring.org")
@@ -134,6 +142,25 @@ def test_direct_forward_is_detected_without_being_a_list():
     assert (
         get_callable(ns, "routing_class")("webmaster@skylinesoaring.org")
         == "mailing_list"
+    )
+
+
+def test_spoofed_x_original_to_cannot_select_forwarding_alias():
+    ns = load_template_namespace()
+    ns["FORWARDING_ALIASES"] = {"admin@skylinesoaring.org"}
+    msg = EmailMessage()
+    msg["From"] = "attacker@example.net"
+    msg["To"] = "public@example.com"
+    msg["X-Original-To"] = "admin@skylinesoaring.org"
+    msg.set_content("Body")
+
+    assert (
+        get_callable(ns, "detect_original_recipient")(
+            msg,
+            ["public@example.com"],
+            trusted_original_recipient="unmapped@example.com",
+        )
+        is None
     )
 
 
