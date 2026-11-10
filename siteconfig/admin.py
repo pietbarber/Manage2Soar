@@ -17,6 +17,8 @@ from .models import (
     MembershipBillingRule,
     MembershipGliderRentalRule,
     MembershipStatus,
+    MembershipStatusRoleMapping,
+    MembershipStatusRoleMappingEvent,
     SiteConfiguration,
 )
 
@@ -613,6 +615,7 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
             None,
             {
                 "fields": (
+                    "key",
                     "name",
                     "is_active",
                     "can_be_pilot",
@@ -628,7 +631,7 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
         ),
     )
 
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("key", "created_at", "updated_at")
 
     def has_change_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to edit membership statuses
@@ -699,6 +702,158 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
         "Sort order controls the display order in dropdowns (lower numbers first). "
         "⚠️ Be careful when deleting statuses - existing members may be using them!"
     )
+
+
+@admin.register(MembershipStatusRoleMapping)
+class MembershipStatusRoleMappingAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "status_identity",
+        "role",
+        "enabled",
+        "affected_member_count",
+        "updated_at",
+    )
+    list_editable = ("enabled",)
+    list_filter = ("enabled", "membership_status")
+    search_fields = ("membership_status__name", "membership_status__key", "role__name")
+    autocomplete_fields = ("membership_status", "role")
+    readonly_fields = ("reconciliation_preview", "created_at", "updated_at")
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "membership_status",
+                    "role",
+                    "enabled",
+                    "reconciliation_preview",
+                )
+            },
+        ),
+        ("Timestamps", {"fields": ("created_at", "updated_at")}),
+    )
+
+    @admin.display(description="Membership status")
+    def status_identity(self, obj):
+        status = obj.membership_status
+        return f"{status.key} ({status.name})"
+
+    @admin.display(description="Affected members")
+    def affected_member_count(self, obj):
+        from members.models import Member
+
+        return Member.objects.filter(
+            membership_status=obj.membership_status.name
+        ).count()
+
+    @admin.display(description="Reconciliation preview")
+    def reconciliation_preview(self, obj):
+        if obj is None or not obj.pk:
+            return "Save the mapping before previewing its impact."
+
+        from members.models import Member
+        from members.services.status_role_reconciliation import plan
+
+        grants = revokes = ambiguous = unexplained = 0
+        for member in Member.objects.filter(
+            membership_status=obj.membership_status.name
+        ).order_by("pk"):
+            current_plan = plan(member)
+            grants += len(current_plan.grants)
+            revokes += len(current_plan.revokes)
+            ambiguous += bool(current_plan.issues)
+            unexplained += bool(current_plan.unexplained_group_ids)
+        summary = (
+            f"Members: {self.affected_member_count(obj)}\n"
+            f"Planned status grants: {grants}\n"
+            f"Planned status revokes: {revokes}\n"
+            f"Ambiguous members: {ambiguous}\n"
+            f"Members with unexplained groups: {unexplained}\n\n"
+            "Use reconcile_status_roles --dry-run for the detailed report."
+        )
+        return format_html("<pre style='white-space: pre-wrap'>{}</pre>", summary)
+
+    def _has_mapping_admin_permission(self, request):
+        return request.user.is_superuser or has_preview_group(
+            request.user, "Webmasters"
+        )
+
+    def has_module_permission(self, request):
+        return self._has_mapping_admin_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self._has_mapping_admin_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_mapping_admin_permission(request)
+
+    def has_add_permission(self, request):
+        return self._has_mapping_admin_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._has_mapping_admin_permission(request)
+
+    def save_model(self, request, obj, form, change):
+        from siteconfig.audit import actor_scope
+
+        with actor_scope(request.user):
+            super().save_model(request, obj, form, change)
+
+    def delete_model(self, request, obj):
+        from siteconfig.audit import actor_scope
+
+        with actor_scope(request.user):
+            super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        from siteconfig.audit import actor_scope
+
+        with actor_scope(request.user):
+            queryset.delete()
+
+
+@admin.register(MembershipStatusRoleMappingEvent)
+class MembershipStatusRoleMappingEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "timestamp",
+        "action",
+        "status_key",
+        "status_name",
+        "role_key",
+        "role_name",
+        "enabled",
+        "actor_username",
+    )
+    list_filter = ("action", "enabled", "timestamp")
+    search_fields = (
+        "status_key",
+        "status_name",
+        "role_key",
+        "role_name",
+        "actor_username",
+    )
+    readonly_fields = tuple(
+        field.name for field in MembershipStatusRoleMappingEvent._meta.fields
+    )
+    ordering = ("-timestamp", "-pk")
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser or has_preview_group(
+            request.user, "Webmasters"
+        )
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(MembershipBillingRule)
