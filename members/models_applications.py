@@ -385,9 +385,9 @@ class MembershipApplication(models.Model):
             self.phone,
             self.address_line1,
             self.city,
-            self.state,
-            self.zip_code,
         ]
+        if self.country in ("USA", "US"):
+            required_fields.extend((self.state, self.zip_code))
 
         # All required fields must be filled
         if not all(required_fields):

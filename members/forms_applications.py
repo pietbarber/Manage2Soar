@@ -361,6 +361,18 @@ class MembershipApplicationForm(forms.ModelForm):
         # Make soaring goals required
         self.fields["soaring_goals"].required = True
 
+        # State and postal code are required for US addresses only. The model
+        # fields are non-blank for legacy US applications, so override their
+        # generated form requirements when a submitted non-US country is used.
+        country = (
+            self.data.get(self.add_prefix("country"))
+            if self.is_bound
+            else self.initial.get("country")
+        ) or self.fields["country"].initial
+        if country != "USA":
+            self.fields["state"].required = False
+            self.fields["zip_code"].required = False
+
         # Require a complete emergency contact if the club turned that on.
         # Otherwise the model still rejects a partly filled-in contact.
         config = SiteConfiguration.objects.first()
