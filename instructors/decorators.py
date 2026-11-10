@@ -4,10 +4,16 @@ from functools import wraps
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import get_object_or_404, redirect, render
 
-from members.authorization import can_manage_ground_instruction
+from members.authorization import (
+    can_manage_ground_instruction,
+    has_training_record_access,
+    has_training_record_action,
+)
 from members.models import Member
 from members.utils import is_active_member
 from members.utils.permissions import SAFETY_REPORT_PERMISSION
+
+BULK_QUALIFICATION_PERMISSION = "instructors.can_bulk_assign_qualification"
 
 ####################################################
 # instructor_required
@@ -38,7 +44,7 @@ def instructor_required(view_func):
         if not is_active_member(user):
             return render(request, "403.html", status=403)
 
-        if not getattr(user, "instructor", False):
+        if not has_training_record_action(user):
             return render(request, "403.html", status=403)
 
         return view_func(request, *args, **kwargs)
@@ -95,7 +101,7 @@ def member_or_instructor_required(view_func):
         if not is_active_member(user):
             return render(request, "403.html", status=403)
 
-        if user == member or getattr(user, "instructor", False):
+        if user == member or has_training_record_access(user):
             return view_func(request, member_id, *args, **kwargs)
 
         return render(request, "403.html", status=403)
@@ -139,8 +145,10 @@ def instructor_or_safety_officer_required(view_func):
         # Instructors retain their existing role behavior; safety access is an
         # explicit capability rather than a legacy boolean authorization read.
         if not (
-            getattr(user, "instructor", False)
+            has_training_record_action(user)
+            or user.has_perm(BULK_QUALIFICATION_PERMISSION)
             or user.has_perm(SAFETY_REPORT_PERMISSION)
+            or getattr(user, "safety_officer", False)
         ):
             return render(request, "403.html", status=403)
 

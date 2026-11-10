@@ -12,13 +12,18 @@ from dataclasses import dataclass
 from members.utils.membership import is_active_member
 
 GROUND_INSTRUCTION_PERMISSION = "instructors.can_manage_ground_instruction"
+WEBMASTER_MANAGEMENT_PERMISSION = "members.can_manage_member_roles"
+TRAINING_VIEW_PERMISSION = "instructors.view_trainingrecord"
+TRAINING_RECORD_PERMISSION = "instructors.can_record_instruction"
 
 
 def has_webmaster_compatibility_access(user):
     """Return the legacy webmaster-level grant used during the transition.
 
-    The flag and group are intentionally retained as compatibility fallbacks;
-    neither ordinary staff status nor membership status grants this access.
+    Webmaster authority is represented by the approved capability.  The legacy
+    flag remains a compatibility fallback for accounts that have not yet passed
+    through role synchronization; staff status and membership status do not
+    grant this access.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
@@ -28,6 +33,7 @@ def has_webmaster_compatibility_access(user):
 
     return bool(
         getattr(user, "is_superuser", False)
+        or user.has_perm(WEBMASTER_MANAGEMENT_PERMISSION)
         or getattr(user, "webmaster", False)
         or has_preview_group(user, "Webmasters")
     )
@@ -87,9 +93,34 @@ def has_membership_application_modify_access(user):
     if not getattr(user, "is_active", False) or not is_active_member(user):
         return False
     return bool(
-        getattr(user, "member_manager", False)
+        user.has_perm("members.can_manage_membership_applications")
+        or getattr(user, "member_manager", False)
         or has_webmaster_compatibility_access(user)
     )
+
+
+def has_training_record_access(user):
+    """Return whether an active member may view another member's training."""
+    decision = resolve_authorization(
+        user,
+        TRAINING_VIEW_PERMISSION,
+        require_active_member=True,
+    )
+    if decision.allow:
+        return True
+    return decision.reason == "no_grant" and bool(getattr(user, "instructor", False))
+
+
+def has_training_record_action(user):
+    """Return whether an active member may record training data."""
+    decision = resolve_authorization(
+        user,
+        TRAINING_RECORD_PERMISSION,
+        require_active_member=True,
+    )
+    if decision.allow:
+        return True
+    return decision.reason == "no_grant" and bool(getattr(user, "instructor", False))
 
 
 @dataclass(frozen=True)

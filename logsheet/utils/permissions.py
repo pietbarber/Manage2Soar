@@ -7,6 +7,7 @@ particularly for determining who can unfinalize a logsheet.
 
 from typing import TYPE_CHECKING, Optional, Union
 
+from logsheet.permissions import UNFINALIZE_PERMISSION
 from members.authorization import has_webmaster_compatibility_access
 
 if TYPE_CHECKING:
@@ -43,9 +44,7 @@ def can_unfinalize_logsheet(
         return True
 
     # Treasurers can unfinalize any logsheet to correct errors
-    if user.has_perm("logsheet.can_manage_logsheet_finances") or getattr(
-        user, "treasurer", False
-    ):
+    if user.has_perm(UNFINALIZE_PERMISSION) or getattr(user, "treasurer", False):
         return True
 
     # Webmasters can unfinalize any logsheet for administrative purposes

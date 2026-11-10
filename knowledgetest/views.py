@@ -53,17 +53,8 @@ VIEW_RECENT_TESTS = "knowledgetest.view_recent_written_tests"
 DELETE_ANY_ASSIGNMENT = "knowledgetest.delete_any_pending_written_test_assignment"
 
 
-def _legacy_written_test_admin_access(user):
-    """Compatibility for ambiguous Webmaster/Chief Flight Instructor roles.
-
-    Existing deployments used named Webmaster/Chief Flight Instructor roles
-    as the effective grant for these actions.
-    """
-    return has_written_test_admin_access(user)
-
-
 def _has_written_test_capability(user, permission):
-    return bool(user.has_perm(permission) or _legacy_written_test_admin_access(user))
+    return bool(user.has_perm(permission) or has_written_test_admin_access(user))
 
 
 def _get_site_config():

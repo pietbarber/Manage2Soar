@@ -74,6 +74,7 @@ from knowledgetest.views import get_presets
 from logsheet.models import Flight, Towplane
 from logsheet.utils.finalization_email import html_to_text_preserve_links
 from logsheet.utils.tow_logbook import get_tow_logbook_data
+from members.authorization import has_training_record_access
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -588,7 +589,7 @@ def member_training_grid(request, member_id):
         .select_related("instructor")
         .prefetch_related("lesson_scores__lesson")
     )
-    if request.user != member and not request.user.instructor:
+    if request.user != member and not has_training_record_access(request.user):
         raise PermissionDenied
 
     # Keep one grid column per saved report and add a pending column for
@@ -1111,7 +1112,7 @@ def log_ground_instruction(request):
 
 
 def is_instructor(user):
-    return user.is_authenticated and user.instructor
+    return has_training_record_action(user)
 
 
 ####################################################
@@ -1803,7 +1804,7 @@ def member_logbook(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
     # Determine which years to show
 
@@ -2848,7 +2849,7 @@ def export_member_logbook_csv(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
 
     def format_hhmm(duration):
@@ -3179,7 +3180,7 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
 
     events, report_lookup, rating_date = _build_logbook_events(

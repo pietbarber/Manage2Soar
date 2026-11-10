@@ -3,6 +3,7 @@
 FINANCE_PERMISSION = "logsheet.can_manage_logsheet_finances"
 FINANCE_EXPORT_PERMISSION = "logsheet.can_export_logsheet_finances"
 STATS_DUMP_EXPORT_PERMISSION = "logsheet.can_export_stats_dump"
+UNFINALIZE_PERMISSION = "logsheet.can_unfinalize_logsheet"
 
 
 def has_logsheet_finance_access(user, *, export=False):

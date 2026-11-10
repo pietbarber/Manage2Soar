@@ -34,11 +34,15 @@ def has_cms_edit_access(user):
 
 
 def has_legacy_cms_officer_access(user):
-    """Temporary compatibility for officer flags during role backfill."""
+    """Return CMS editing capability with the legacy officer transition path.
+
+    Stored page-role restrictions and per-member editor grants remain separate
+    contextual checks in ``Page.can_user_access`` and ``Page.can_user_edit``.
+    """
+    if has_cms_edit_access(user):
+        return True
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if not getattr(user, "is_active", False) or not is_active_member(user):
         return False
-    if has_webmaster_compatibility_access(user):
-        return True
     return bool(getattr(user, "director", False) or getattr(user, "secretary", False))

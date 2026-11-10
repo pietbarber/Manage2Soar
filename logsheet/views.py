@@ -29,9 +29,9 @@ from django.views.decorators.http import require_GET, require_POST
 
 from billing.decorators import billing_app_required
 from duty_roster.models import GliderReservation
+from members.authorization import has_webmaster_compatibility_access
 from members.decorators import active_member_required
 from members.models import Member
-from members.role_preview import has_preview_group
 from siteconfig.models import (
     MembershipBillingRule,
     MembershipGliderRentalRule,
@@ -4493,7 +4493,7 @@ def maintenance_deadlines(request):
 
     # Determine which deadlines the user can update
     member = request.user
-    is_webmaster = member.is_superuser or has_preview_group(member, "Webmasters")
+    is_webmaster = has_webmaster_compatibility_access(member)
 
     # Get all aircraft this member is a meister for
     meister_gliders = set()
@@ -4564,7 +4564,7 @@ def update_maintenance_deadline(request, deadline_id):
     member = request.user
 
     # Check permissions: webmaster OR aircraft meister for this aircraft
-    is_webmaster = member.is_superuser or has_preview_group(member, "Webmasters")
+    is_webmaster = has_webmaster_compatibility_access(member)
 
     # Validate that deadline has either glider or towplane
     if not deadline.glider and not deadline.towplane:
@@ -4647,7 +4647,7 @@ def update_towplane_oil_deadline(request, towplane_id):
         )
     ) - quantizer
 
-    is_webmaster = member.is_superuser or has_preview_group(member, "Webmasters")
+    is_webmaster = has_webmaster_compatibility_access(member)
     is_meister = AircraftMeister.objects.filter(
         towplane=towplane, member=member
     ).exists()

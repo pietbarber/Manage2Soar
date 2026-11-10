@@ -7,6 +7,7 @@ from members.authorization import (
     can_manage_ground_instruction,
     has_membership_application_view_access,
     has_role_admin_access,
+    has_training_record_action,
     has_webmaster_compatibility_access,
 )
 from members.utils.membership import is_active_member
@@ -32,9 +33,9 @@ def authorization(request):
             ),
             "commercial_ticket": bool(
                 getattr(user, "duty_officer", False)
-                or getattr(user, "treasurer", False)
+                or has_perm("logsheet.can_manage_logsheet_finances")
             ),
-            "instructor": bool(getattr(user, "instructor", False)),
+            "instructor": has_training_record_action(user),
             "ground_instruction": can_manage_ground_instruction(user),
             "safety_reports": bool(
                 has_perm("members.access_safety_reports")
@@ -43,10 +44,13 @@ def authorization(request):
             ),
             "rostermeister": bool(
                 has_perm("duty_roster.edit_dutyroster_message")
+                or has_perm("duty_roster.can_generate_roster")
                 or getattr(user, "rostermeister", False)
             ),
             "roster_admin": bool(
                 has_perm("duty_roster.edit_dutyroster_message")
+                or has_perm("duty_roster.can_generate_roster")
+                or has_perm("duty_roster.can_edit_roster")
                 or getattr(user, "rostermeister", False)
                 or getattr(user, "is_staff", False)
                 or getattr(user, "is_superuser", False)
