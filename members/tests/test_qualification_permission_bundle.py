@@ -11,6 +11,7 @@ from django.utils import timezone
 from instructors.admin import ClubQualificationTypeAdmin
 from instructors.models import (
     ClubQualificationType,
+    GroundInstruction,
     MemberQualification,
     QualificationPermissionGrant,
 )
@@ -35,9 +36,9 @@ def bundle(db):
         qualification_permission_bundle=True,
     )
     permission, _ = Permission.objects.get_or_create(
-        content_type=ContentType.objects.get_for_model(ClubQualificationType),
-        codename="can_operate_aircraft",
-        defaults={"name": "Can operate aircraft"},
+        content_type=ContentType.objects.get_for_model(GroundInstruction),
+        codename="can_manage_ground_instruction",
+        defaults={"name": "Can manage ground instruction"},
     )
     group.permissions.add(permission)
     QualificationPermissionGrant.objects.create(group=group, permission=permission)

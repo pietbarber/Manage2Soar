@@ -295,6 +295,9 @@ class ClubQualificationTypeAdmin(AdminHelperMixin, admin.ModelAdmin):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "permission_group":
             allowed_permission_ids = safe_qualification_permissions().values("pk")
+            disallowed_permission_ids = Permission.objects.exclude(
+                pk__in=allowed_permission_ids
+            ).values("pk")
             kwargs["queryset"] = (
                 Group.objects.filter(
                     qualificationpermissiongrant__isnull=False,
@@ -304,6 +307,7 @@ class ClubQualificationTypeAdmin(AdminHelperMixin, admin.ModelAdmin):
                     role_metadata__is_system_managed=False,
                 )
                 .filter(permissions__in=allowed_permission_ids)
+                .exclude(permissions__in=disallowed_permission_ids)
                 .distinct()
                 .order_by("name")
             )

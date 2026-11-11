@@ -1,6 +1,8 @@
 import logging
+from importlib import import_module
 
 import pytest
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import override_settings
@@ -194,6 +196,47 @@ def test_role_preview_management_page_remains_accessible_while_active(
 
     assert response.status_code == 200
     assert b"Exit preview" in response.content
+
+
+@pytest.mark.django_db
+def test_role_preview_get_does_not_persist_projection_or_mutate_session(
+    client, preview_admin, monkeypatch
+):
+    client.force_login(preview_admin)
+    client.post(
+        reverse("members:role_preview_start"),
+        {"role_key": "directors"},
+    )
+    preview_admin.refresh_from_db()
+    persisted_state = {
+        "is_superuser": preview_admin.is_superuser,
+        "is_staff": preview_admin.is_staff,
+        "director": preview_admin.director,
+        "webmaster": preview_admin.webmaster,
+    }
+    session_before = dict(client.session)
+    session_store = import_module(settings.SESSION_ENGINE).SessionStore
+    session_saves = []
+    original_save = session_store.save
+
+    def track_save(store, *args, **kwargs):
+        session_saves.append(store.session_key)
+        return original_save(store, *args, **kwargs)
+
+    monkeypatch.setattr(session_store, "save", track_save)
+
+    response = client.get(reverse("members:role_preview"))
+
+    assert response.status_code == 200
+    assert session_saves == []
+    assert dict(client.session) == session_before
+    preview_admin.refresh_from_db()
+    assert {
+        "is_superuser": preview_admin.is_superuser,
+        "is_staff": preview_admin.is_staff,
+        "director": preview_admin.director,
+        "webmaster": preview_admin.webmaster,
+    } == persisted_state
 
 
 @pytest.mark.django_db
