@@ -248,6 +248,9 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
 
 # Email configuration
 M2S_MAIL_API_KEY = os.getenv("M2S_MAIL_API_KEY", "")
+# Email safety settings are read directly by scheduled email commands.
+EMAIL_DEV_MODE = os.getenv("EMAIL_DEV_MODE", "false").lower() in ("true", "1", "yes")
+EMAIL_DEV_MODE_REDIRECT_TO = os.getenv("EMAIL_DEV_MODE_REDIRECT_TO", "")
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )

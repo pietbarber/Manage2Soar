@@ -29,6 +29,11 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
+    # Stats dump exports are served only through the authenticated Django endpoint.
+    location ^~ {{ nginx_media_url }}exports/stats_dumps/ {
+        deny all;
+    }
+
     # Media files (user uploads)
     location {{ nginx_media_url }} {
         alias {{ nginx_media_root }}/;

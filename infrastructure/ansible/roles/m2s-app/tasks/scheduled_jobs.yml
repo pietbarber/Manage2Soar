@@ -1,0 +1,56 @@
+---
+- name: Find installed Django scheduled job timers
+  ansible.builtin.find:
+    paths: /etc/systemd/system
+    patterns: "m2s-*.timer"
+    file_type: file
+  register: m2s_installed_job_timers
+
+- name: Stop and disable Django scheduled job timers no longer configured
+  ansible.builtin.systemd:
+    name: "{{ item.path | basename }}"
+    state: stopped
+    enabled: false
+  loop: "{{ m2s_installed_job_timers.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when:
+    - item.path | basename != "m2s-cleanup-login-attempts.timer"
+    - >-
+      (item.path | basename | regex_replace('\.timer$', '') | regex_replace('^m2s-', ''))
+      not in (m2s_scheduled_jobs | map(attribute='name') | list)
+
+- name: Install Django scheduled job services
+  ansible.builtin.template:
+    src: scheduled-job.service.j2
+    dest: "/etc/systemd/system/m2s-{{ item.name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ m2s_scheduled_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: m2s_job_services
+
+- name: Install Django scheduled job timers
+  ansible.builtin.template:
+    src: scheduled-job.timer.j2
+    dest: "/etc/systemd/system/m2s-{{ item.name }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ m2s_scheduled_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: m2s_job_timers
+
+- name: Enable Django scheduled job timers
+  ansible.builtin.systemd:
+    name: "m2s-{{ item.name }}.timer"
+    enabled: true
+    state: "{{ 'restarted' if m2s_job_timers.results[index].changed else 'started' }}"
+    daemon_reload: "{{ m2s_job_services.results[index].changed or m2s_job_timers.results[index].changed }}"
+  loop: "{{ m2s_scheduled_jobs }}"
+  loop_control:
+    index_var: index
+    label: "{{ item.name }}"
