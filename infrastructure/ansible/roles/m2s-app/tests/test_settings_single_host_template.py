@@ -29,6 +29,8 @@ def test_rendered_single_host_settings_protect_social_auth_user_fields():
         "last_name",
         "email",
     ]
+    assert "EMAIL_DEV_MODE = os.getenv(" in rendered_settings
+    assert "EMAIL_DEV_MODE_REDIRECT_TO = os.getenv(" in rendered_settings
 
 
 def test_rendered_axes_cleanup_timer_and_service():

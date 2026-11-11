@@ -368,6 +368,10 @@ duty delinquent report. They run as the app user with the same `.env` as
 Gunicorn. Schedules use UTC regardless of the host timezone, and missed runs
 are caught up once when the host comes back online. The configured jobs and
 timeouts are in `infrastructure/ansible/roles/m2s-app/defaults/main.yml`.
+On redeployment, timers removed from that list are stopped and disabled; the
+separately managed django-axes cleanup timer is unaffected. Stats dump files
+remain on the media filesystem but direct `/media/exports/stats_dumps/` access
+is blocked by NGINX; downloads continue through the authenticated Django view.
 
 ```bash
 sudo systemctl list-timers 'm2s-*.timer'

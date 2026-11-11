@@ -87,3 +87,43 @@ def test_single_host_matches_active_gke_jobs():
     assert "EnvironmentFile={{ m2s_app_home }}/app/.env" in cleanup_service
     assert "TimeoutStartSec=300" in cleanup_service
     assert "OnCalendar=*-*-* *:00:00 UTC" in cleanup_timer
+
+
+def test_scheduled_job_tasks_reconcile_removed_timers_without_stopping_axes():
+    tasks = yaml.safe_load((ROLE / "tasks" / "scheduled_jobs.yml").read_text())
+    find_task = next(
+        task
+        for task in tasks
+        if task["name"] == "Find installed Django scheduled job timers"
+    )
+    assert find_task["ansible.builtin.find"]["patterns"] == "m2s-*.timer"
+
+    stop_task = next(
+        task
+        for task in tasks
+        if task["name"]
+        == "Stop and disable Django scheduled job timers no longer configured"
+    )
+    assert stop_task["ansible.builtin.systemd"]["state"] == "stopped"
+    assert stop_task["ansible.builtin.systemd"]["enabled"] is False
+    assert any(
+        "m2s-cleanup-login-attempts.timer" in condition
+        for condition in stop_task["when"]
+    )
+
+
+def test_stats_dump_exports_are_blocked_in_all_media_serving_nginx_templates():
+    template_dir = ANSIBLE / "roles" / "nginx" / "templates"
+    for template_name in (
+        "m2s-ssl.conf.j2",
+        "m2s-nossl.conf.j2",
+        "m2s-public-proxy.conf.j2",
+    ):
+        template = (template_dir / template_name).read_text()
+        private_location = (
+            "location ^~ /media/exports/stats_dumps/ {\n        deny all;"
+        )
+        assert private_location in template
+        assert template.index(private_location) < template.index(
+            "location {{ nginx_media_url }}"
+        )
