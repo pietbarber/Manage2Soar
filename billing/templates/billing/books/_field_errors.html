@@ -1,0 +1,5 @@
+{% comment %}
+A field's errors, with the id Django's aria-describedby points the input at.
+Usage: {% include "billing/books/_field_errors.html" with field=form.amount %}
+{% endcomment %}
+{% if field.errors %}<div class="invalid-feedback d-block" id="{{ field.auto_id }}_error">{% for error in field.errors %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}

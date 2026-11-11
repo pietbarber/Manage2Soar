@@ -57,6 +57,7 @@ class TestNavbarResourcesDrawer(DjangoPlaywrightTestCase):
         assert offcanvas.locator("#logsheetDropdown").count() == 0
         assert offcanvas.locator("#equipmentDropdown").count() == 0
         assert offcanvas.locator("#instructorDropdown").count() == 0
+        assert offcanvas.locator("#clubFinancesDropdown").count() == 0
 
         self.page.click("#resourcesDropdown")
         self.page.wait_for_selector("#resourcesDropdown + .dropdown-menu.show")
@@ -76,6 +77,7 @@ class TestNavbarResourcesDrawer(DjangoPlaywrightTestCase):
         assert offcanvas.locator("#logsheetDropdown").count() == 1
         assert offcanvas.locator("#equipmentDropdown").count() == 1
         assert offcanvas.locator("#resourcesDropdown").count() == 1
+        assert offcanvas.locator("#clubFinancesDropdown").count() == 0
 
         assert offcanvas.locator("a.nav-link", has_text="Contact Us").count() == 0
         assert (

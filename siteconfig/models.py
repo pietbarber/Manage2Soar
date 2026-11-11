@@ -1,4 +1,5 @@
 import logging
+import re
 from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -6,7 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, validate_email
 from django.db import models, transaction
 from django.db.models import Q
 from django.db.models.signals import post_delete, post_save, pre_delete
@@ -194,6 +195,12 @@ class MailingList(models.Model):
 
     def clean(self):
         """Validate that criteria contains valid criterion codes."""
+        if self.name:
+            alias_name = self.name.removesuffix("-bounces")
+            if EmailAlias.objects.filter(name__iexact=alias_name).exists():
+                raise ValidationError(
+                    {"name": "This address is reserved by an email alias."}
+                )
         # Reject empty criteria - a mailing list must have at least one criterion
         if not self.criteria:
             raise ValidationError("At least one criterion must be selected.")
@@ -485,6 +492,62 @@ class MemberNameOrdering(models.TextChoices):
 
     FIRST_NAME = "first_name", "First name"
     LAST_NAME = "last_name", "Last name"
+
+
+class EmailAlias(models.Model):
+    """Forward an individual club address without mailing-list header rewriting."""
+
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Address before @ (e.g., admin for admin@your-club.org).",
+    )
+    destination = models.EmailField(
+        help_text="External mailbox to receive messages sent to this address."
+    )
+    description = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Email Alias"
+        verbose_name_plural = "Email Aliases"
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9._+-]*[a-z0-9])?", self.name or "") or (
+            ".." in self.name or self.name.endswith(".")
+        ):
+            raise ValidationError(
+                {"name": "Use a lowercase email local part (letters, digits, . _ + -)."}
+            )
+        if self.name.endswith("-bounces"):
+            raise ValidationError(
+                {"name": "Bounce addresses are reserved for mailing lists."}
+            )
+        if MailingList.objects.filter(
+            Q(name__iexact=self.name) | Q(name__iexact=f"{self.name}-bounces")
+        ).exists():
+            raise ValidationError({"name": "This address is already a mailing list."})
+
+        try:
+            validate_email(self.destination)
+        except ValidationError as exc:
+            raise ValidationError(
+                {"destination": "Enter a valid destination email."}
+            ) from exc
+
+        config = SiteConfiguration.objects.first()
+        if config and self.destination.lower().endswith(
+            "@" + config.domain_name.strip().lower().rstrip(".")
+        ):
+            raise ValidationError(
+                {"destination": "Forward to an external mailbox to avoid mail loops."}
+            )
 
 
 class SiteConfiguration(models.Model):
@@ -816,6 +879,22 @@ class SiteConfiguration(models.Model):
             "Enable the member billing ledger, billing views, and automatic "
             "ledger posting for this site. Billing rule settings only apply "
             "when this master switch is enabled."
+        ),
+    )
+    club_accounting_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Enable the treasurer's double-entry club books (chart of accounts, "
+            "club ledger, expenses, income, and transfers) under the Club "
+            "Finances menu. Requires the billing app."
+        ),
+    )
+    club_accounting_start_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text=(
+            "First day covered by the club books. The opening entry must be dated "
+            "on this day; every other entry must be dated on or after it."
         ),
     )
     billing_period_close_policy = models.CharField(
@@ -1195,6 +1274,11 @@ class SiteConfiguration(models.Model):
                 errors["club_timezone"] = (
                     "Enter a valid IANA timezone (for example, America/New_York)."
                 )
+
+        if self.club_accounting_enabled and not self.billing_app_enabled:
+            errors["club_accounting_enabled"] = (
+                "Club accounting requires the billing app to be enabled."
+            )
 
         if errors:
             raise ValidationError(errors)

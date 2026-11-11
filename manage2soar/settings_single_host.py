@@ -105,11 +105,11 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "axes.middleware.AxesMiddleware",  # Issue #1110: login rate limiting
     "members.role_preview.RolePreviewMiddleware",
     "utils.middleware.KioskAutoLoginMiddleware",  # Issue #364: Kiosk auto-reauth
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -249,6 +249,10 @@ AUTHENTICATION_BACKENDS = (
 # carries only the real client — the last entry.  CLIENT_IP_TRAILING_PROXIES=0
 # selects that last entry (see utils.ip_utils.get_client_ip).
 CLIENT_IP_TRAILING_PROXIES = 0
+# nginx connects to the app locally and replaces XFF with its observed peer.
+CLIENT_IP_TRUSTED_PROXIES = os.getenv(
+    "CLIENT_IP_TRUSTED_PROXIES", "127.0.0.1/32,::1/128"
+).split(",")
 AXES_ENABLED = True
 AXES_FAILURE_LIMIT = 5  # max failures before throttle (per IP AND per username)
 AXES_COOLOFF_TIME = timedelta(minutes=15)
@@ -259,7 +263,7 @@ AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
 AXES_RESET_ON_SUCCESS = False
 AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_VERBOSE = False
-AXES_HTTP_RESPONSE_CODE = 429
+AXES_HTTP_RESPONSE_CODE = 200
 # Re-render the real login form with the generic error and a single consistent
 # status for both HTML and XHR — indistinguishable from a normal failed login.
 AXES_LOCKOUT_CALLABLE = "utils.axes_views.lockout_response"
@@ -307,6 +311,7 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
     )
 
 # Email configuration
+M2S_MAIL_API_KEY = os.getenv("M2S_MAIL_API_KEY", "")
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )

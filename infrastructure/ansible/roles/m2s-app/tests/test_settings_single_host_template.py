@@ -85,6 +85,8 @@ def test_rendered_single_host_settings_protect_social_auth_user_fields():
         "last_name",
         "email",
     ]
+    assert "EMAIL_DEV_MODE = os.getenv(" in rendered_settings
+    assert "EMAIL_DEV_MODE_REDIRECT_TO = os.getenv(" in rendered_settings
 
 
 def test_rendered_axes_cleanup_timer_and_service():
@@ -113,7 +115,7 @@ def test_rendered_axes_cleanup_timer_and_service():
     # Timer targets the oneshot service and is enabled on boot.
     assert "Unit=m2s-cleanup-login-attempts.service" in timer
     # Hourly schedule mirroring the K8s CronJob (minute 0 of every hour).
-    assert "OnCalendar=*:00" in timer
+    assert "OnCalendar=*-*-* *:00:00 UTC" in timer
     assert "WantedBy=timers.target" in timer
 
     # Service runs the cleanup command as the app user, invoking the virtualenv

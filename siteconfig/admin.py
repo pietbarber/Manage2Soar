@@ -12,6 +12,7 @@ from utils.admin_helpers import AdminHelperMixin
 from .models import (
     MEMBER_PROFILE_POLICY_FIELDS,
     ChargeableItem,
+    EmailAlias,
     MailingList,
     MailingListCriterion,
     MembershipBillingRule,
@@ -269,7 +270,13 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             request.user, "siteconfig", "siteconfiguration", "change"
         )
 
-    readonly_fields = ("visiting_pilot_token", "visiting_pilot_token_created")
+    readonly_fields = (
+        "visiting_pilot_token",
+        "visiting_pilot_token_created",
+        # Set only by the setup wizard, which keeps it in step with the
+        # opening entry. Editing it here would skip those checks.
+        "club_accounting_start_date",
+    )
     actions = ["regenerate_visiting_pilot_token"]
     fieldsets = (
         (
@@ -481,6 +488,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             {
                 "fields": (
                     "billing_app_enabled",
+                    "club_accounting_enabled",
+                    "club_accounting_start_date",
                     "billing_rules_enabled",
                     "instructor_time_charges_enabled",
                     "billing_pricing_mode",
@@ -489,6 +498,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "default_instructor_rate_multiplier",
                 ),
                 "description": (
+                    "The books' start date is set on the Finances Setup page "
+                    "under Club Finances. "
                     "The billing app switch controls access to the member ledger and "
                     "automatic ledger posting. The remaining settings only apply when "
                     "the billing app is enabled. "
@@ -999,6 +1010,35 @@ class MembershipGliderRentalRuleAdmin(AdminHelperMixin, admin.ModelAdmin):
         "rental overrides for matrix billing mode. Example: Junior + Glider X = "
         "$0.00/hr while other junior gliders still use status-wide or base rates."
     )
+
+
+@admin.register(EmailAlias)
+class EmailAliasAdmin(AdminHelperMixin, admin.ModelAdmin):
+    admin_helper_message = (
+        "Email aliases are synchronized to the mail server about once per minute."
+    )
+    list_display = ("name", "destination", "description", "is_active")
+    list_editable = ("is_active",)
+    search_fields = ("name", "destination", "description")
+    list_filter = ("is_active",)
+
+    def _has_webmaster_permission(self, request):
+        return (
+            request.user.is_superuser
+            or request.user.groups.filter(name="Webmasters").exists()
+        )
+
+    def has_view_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    def has_add_permission(self, request):
+        return self._has_webmaster_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
 
 
 @admin.register(MailingList)
