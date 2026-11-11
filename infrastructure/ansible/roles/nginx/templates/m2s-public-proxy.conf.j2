@@ -37,7 +37,7 @@ server {
     }
 
     # Stats dump exports are served only through the authenticated Django endpoint.
-    location ^~ /media/exports/stats_dumps/ {
+    location ^~ {{ nginx_media_url }}exports/stats_dumps/ {
         deny all;
     }
 

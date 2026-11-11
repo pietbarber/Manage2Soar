@@ -119,11 +119,18 @@ def test_stats_dump_exports_are_blocked_in_all_media_serving_nginx_templates():
         "m2s-nossl.conf.j2",
         "m2s-public-proxy.conf.j2",
     ):
-        template = (template_dir / template_name).read_text()
-        private_location = (
-            "location ^~ /media/exports/stats_dumps/ {\n        deny all;"
-        )
-        assert private_location in template
-        assert template.index(private_location) < template.index(
-            "location {{ nginx_media_url }}"
-        )
+        raw_template = (template_dir / template_name).read_text()
+        # Check the rendered default prefix and an operator-overridden one so the
+        # deny rule tracks nginx_media_url instead of a hardcoded /media/ prefix.
+        for media_url in ("/media/", "/uploads/"):
+            rendered = Template(raw_template).render(
+                nginx_media_url=media_url,
+                nginx_https_port=443,
+            )
+            private_location = (
+                f"location ^~ {media_url}exports/stats_dumps/ {{\n        deny all;"
+            )
+            assert private_location in rendered
+            assert rendered.index(private_location) < rendered.index(
+                f"location {media_url} {{"
+            )
