@@ -76,8 +76,9 @@ def get_client_ip(request: HttpRequest) -> str:
     entries from the right (default second-from-right = ``[-2]`` for the GKE
     path).  This avoids both the spoofable client-controlled left entries and
     the shared (every-client) right-most LB IP. Falls back to
-    ``REMOTE_ADDR`` for untrusted peers, missing or malformed XFF, or a short
-    chain. The proxy must enforce its documented append/replace behavior.
+    ``REMOTE_ADDR`` for untrusted peers, missing XFF, or a short or malformed
+    proxy-controlled suffix. The proxy must enforce its documented append/
+    replace behavior.
     """
     remote = request.META.get("REMOTE_ADDR", "") or ""
     try:
@@ -104,11 +105,12 @@ def get_client_ip(request: HttpRequest) -> str:
         return remote
     parts = [part.strip() for part in xff.split(",")]
     trailing = _trusted_trailing_proxies()
-    if len(parts) <= trailing or any(not part for part in parts):
+    suffix = parts[-(trailing + 1) :]
+    if len(suffix) != trailing + 1 or any(not part for part in suffix):
         return remote
     try:
-        addresses = [ipaddress.ip_address(part) for part in parts]
+        addresses = [ipaddress.ip_address(part) for part in suffix]
     except ValueError:
         return remote
-    # GKE's proxy appends the right-most hop; the observed client precedes it.
-    return str(addresses[-(trailing + 1)])
+    # Validate only the proxy-controlled suffix; everything before it is untrusted.
+    return str(addresses[0])

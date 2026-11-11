@@ -46,6 +46,9 @@ class TestClientIpSelection:
             "right-most is the shared LB IP and the left is client-controlled."
         )
 
+    def test_ignores_malformed_client_supplied_prefix(self):
+        assert self._ip("bad, 203.0.113.5, 198.51.100.99") == "203.0.113.5"
+
     def test_clean_two_entry_header(self):
         """Clean header with no spoofing: ``<client>, <load-balancer>`` → client."""
         assert self._ip("198.51.100.7, 198.51.100.99") == "198.51.100.7"

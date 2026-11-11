@@ -35,7 +35,8 @@ class TestKioskUnaffected:
             _failed_login(client, "kiosk_user", ip="10.10.10.10")
         _failed_login(client, "kiosk_user", ip="10.10.10.10")  # now locked
         resp = _failed_login(client, "kiosk_user", ip="10.10.10.10")
-        assert resp.status_code == 200  # Confirmed throttled
+        assert resp.status_code == 200
+        assert resp.wsgi_request.axes_locked_out is True
 
         # Kiosk middleware should still authenticate via cookies
         # (simulates a kiosk device with valid token + fingerprint)
