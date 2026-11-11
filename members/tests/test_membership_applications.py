@@ -326,28 +326,6 @@ class MembershipApplicationFormTests:
         form = MembershipApplicationForm(data=form_data)
         assert form.is_valid()
 
-    def test_non_us_form_allows_blank_state_and_zip(self):
-        form_data = {
-            "first_name": "Jane",
-            "last_name": "Doe",
-            "email": "jane@example.com",
-            "phone": "555-123-4567",
-            "address_line1": "1-2-3 Ginza",
-            "city": "Tokyo",
-            "country": "JPN",
-            "state": "",
-            "zip_code": "",
-            "soaring_goals": "I want to learn gliding",
-            "agrees_to_terms": True,
-            "agrees_to_safety_rules": True,
-            "agrees_to_financial_obligations": True,
-        }
-
-        form = MembershipApplicationForm(data=form_data)
-
-        assert form.is_valid(), form.errors
-        assert form.instance.can_be_approved()
-
     @pytest.mark.parametrize(
         ("field", "value"),
         [
@@ -1465,6 +1443,30 @@ def test_incomplete_emergency_contact(blank_fields, required):
     else:
         assert not form.is_valid()
         assert set(form.errors) == blank_fields
+
+
+@pytest.mark.django_db
+def test_non_us_form_allows_blank_state_and_zip():
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "email": "jane@example.com",
+        "phone": "555-123-4567",
+        "address_line1": "1-2-3 Ginza",
+        "city": "Tokyo",
+        "country": "JPN",
+        "state": "",
+        "zip_code": "",
+        "soaring_goals": "I want to learn gliding",
+        "agrees_to_terms": True,
+        "agrees_to_safety_rules": True,
+        "agrees_to_financial_obligations": True,
+    }
+
+    form = MembershipApplicationForm(data=form_data)
+
+    assert form.is_valid(), form.errors
+    assert form.instance.can_be_approved()
 
 
 @pytest.mark.django_db
