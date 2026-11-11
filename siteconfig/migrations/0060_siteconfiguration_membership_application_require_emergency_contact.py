@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('siteconfig', '0057_siteconfiguration_show_today_roster_group'),
+        ('siteconfig', '0059_club_accounting'),
     ]
 
     operations = [
