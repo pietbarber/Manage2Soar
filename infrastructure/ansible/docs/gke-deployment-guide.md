@@ -152,6 +152,12 @@ gke_cluster_zone: "us-central1-c"
 gke_django_allowed_hosts: "your-domain.com,www.your-domain.com"
 gke_replicas: 2
 
+# Comma-separated CIDRs of the actual immediate pod-facing proxy/node peers.
+# Determine these from request.META['REMOTE_ADDR'] in your deployment, then
+# restrict pod ingress to those peers. Do not use 0.0.0.0/0 or ::/0.
+# Leaving this unset ignores X-Forwarded-For (all clients share the peer IP).
+client_ip_trusted_proxies: "192.0.2.0/24"  # example only; replace before deploying
+
 # Database Connection
 gke_db_host: "192.0.2.1"  # Internal IP of your PostgreSQL
 gke_db_name: "m2s"

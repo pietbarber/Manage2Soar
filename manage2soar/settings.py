@@ -418,8 +418,8 @@ AUTHENTICATION_BACKENDS = (
 #   the django-axes docs and StackOverflow).  We point axes at the
 #   shared utils.ip_utils.get_client_ip helper — the same helper already
 #   used by the kiosk middleware, cms.views, and members.views_kiosk —
-#   which reads the right-most X-Forwarded-For entry (the one the LB
-#   appended itself, and therefore the one a client cannot spoof).
+#   which accepts XFF only from configured trusted pod-facing peers and
+#   selects the LB-observed client hop (second from right on GKE).
 #
 # Per-IP / per-username counters:
 #   AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"] makes axes
@@ -454,6 +454,9 @@ AXES_CLIENT_IP_CALLABLE = "utils.ip_utils.get_client_ip"
 # after the real client in the XFF chain, so the client is second-from-right.
 # See utils.ip_utils.get_client_ip and the GCP external LB X-Forwarded-For docs.
 CLIENT_IP_TRAILING_PROXIES = 1
+# Only accept forwarded addresses from explicitly configured pod-facing proxies.
+# Set to the actual GKE proxy/node CIDRs at deployment; empty is fail-closed.
+CLIENT_IP_TRUSTED_PROXIES = os.getenv("CLIENT_IP_TRUSTED_PROXIES", "").split(",")
 # Lock out when EITHER username OR IP exceeds the limit (independent buckets)
 AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
 # Do NOT wipe the failure counters on a successful login.  Keeping the
@@ -471,13 +474,11 @@ AXES_RESET_ON_SUCCESS = False
 # after a bounded window.
 AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_VERBOSE = False
-AXES_HTTP_RESPONSE_CODE = (
-    429  # return 429 (not 403) when throttled — generic, no lockout disclosure
-)
+AXES_HTTP_RESPONSE_CODE = 200
 # Issue #1110: custom lockout rendering.  Instead of the default bare-text/
 # JSON/redirect lockout body, this callable re-renders the real login form
 # with the same generic "correct username and password" error and returns a
-# single consistent 429 status for both HTML and XHR clients.  The result is
+# same 200 status and HTML body for both HTML and XHR clients. The result is
 # indistinguishable from an ordinary failed login — no lockout disclosure.
 AXES_LOCKOUT_CALLABLE = "utils.axes_views.lockout_response"
 # Issue #1110: the lockout response must NOT reveal that the account is
