@@ -156,6 +156,61 @@ runtime registry edits cannot change historical replay.
   PostgreSQL database, compare role/group memberships, and obtain maintainer
   approval before production repair.
 
+## Troubleshooting permission and preview state
+
+### Permission changes appear not to take effect
+
+Django's ordinary model backend caches user and Group permissions on the user
+object. After changing a direct permission or Group membership, verify the
+change with a fresh `Member` instance (or clear the permission cache) before
+concluding that authorization is incorrect:
+
+```python
+from members.models import Member
+
+member = Member.objects.get(pk=member.pk)
+member.has_perm("app_label.permission_codename")
+```
+
+Qualification-derived permissions are evaluated from current qualification
+records and should reflect expiry, revocation, and membership changes without
+reloading the user. If they do not, check `is_qualified`, `expiration_date`,
+qualification obsolescence, active membership, and the bundle's explicit
+`QualificationPermissionGrant` rows.
+
+### Role preview appears stuck or exposes the wrong role
+
+Role preview is session-scoped and only active superusers may control it. Check
+the following in order:
+
+1. Confirm the session contains the selected stable `role_key`, not a display
+   name or Group name.
+2. Confirm the corresponding `RoleMetadata` row and Group still exist.
+3. Stop the preview through its POST control, then start it again.
+4. Confirm the request is using the same browser session and deployment.
+5. Outside DEBUG, expect unsafe preview methods to be denied; preview must not
+   be used as a write-testing mechanism in production.
+
+Preview start, stop, rejection, and blocked-method events are structured log
+events. Retention and export of those events remain release-policy decisions;
+do not treat an absent application log as proof that no preview occurred.
+
+### Unresolved legacy Group membership
+
+Do not repair a disputed membership with direct `groups.clear()` or through
+table writes. First capture the member, Group, current role flags, and any
+`MemberRoleAssignment` source rows. Determine whether the membership is:
+
+- flag-synchronized;
+- manually assigned through the admin/service;
+- created by a migration or reconciliation; or
+- unprovenanced legacy data.
+
+Remove or add only the specific assignment source through the supported role
+assignment service. Preserve the Group membership when another source still
+exists. For unprovenanced records, stop and obtain an approved tenant-specific
+repair decision; migrations must not infer ownership from the flag alone.
+
 ## Release blockers
 
 Do not release until the following are explicitly resolved or accepted by the
