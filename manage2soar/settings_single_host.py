@@ -12,6 +12,7 @@ import os
 import re
 
 # Basic Django settings
+from datetime import timedelta
 from pathlib import Path
 
 from django.contrib.messages import constants as messages
@@ -71,6 +72,7 @@ INSTALLED_APPS = [
     "knowledgetest",
     "utils",
     "widget_tweaks",
+    "axes",  # Issue #1110: login rate limiting
 ]
 
 MIDDLEWARE = [
@@ -79,9 +81,10 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "axes.middleware.AxesMiddleware",  # Issue #1110: login rate limiting
     "utils.middleware.KioskAutoLoginMiddleware",  # Issue #364: Kiosk auto-reauth
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -186,9 +189,47 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "members.Member"
 
 # Authentication backends
+# AxesCompatBackend must come first so the login throttle (Issue #1110) applies
+# to every password login, including single-host deployments (without it this
+# settings file would accept unlimited /login/ attempts).
 AUTHENTICATION_BACKENDS = (
+    "utils.auth_backends.AxesCompatBackend",
     "social_core.backends.google.GoogleOAuth2",
     "django.contrib.auth.backends.ModelBackend",
+)
+
+#############################################################
+# Login throttling (Issue #1110)
+#############################################################
+# Mirrors manage2soar/settings.py so the single-host deployment enforces the
+# same brute-force / spray / stuffing protection on POST /login/.
+#
+# The single-host topology is a single-hop reverse proxy in front of the app
+# (the public proxy owns 80/443 and forwards to this backend), so the XFF chain
+# carries only the real client — the last entry.  CLIENT_IP_TRAILING_PROXIES=0
+# selects that last entry (see utils.ip_utils.get_client_ip).
+CLIENT_IP_TRAILING_PROXIES = 0
+# nginx connects to the app locally and replaces XFF with its observed peer.
+CLIENT_IP_TRUSTED_PROXIES = os.getenv(
+    "CLIENT_IP_TRUSTED_PROXIES", "127.0.0.1/32,::1/128"
+).split(",")
+AXES_ENABLED = True
+AXES_FAILURE_LIMIT = 5  # max failures before throttle (per IP AND per username)
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+AXES_CLIENT_IP_CALLABLE = "utils.ip_utils.get_client_ip"
+AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
+# Do NOT wipe counters on success (a correct password must not clear an
+# in-flight lockout) and do NOT extend the cooldown on retries while locked.
+AXES_RESET_ON_SUCCESS = False
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
+AXES_VERBOSE = False
+AXES_HTTP_RESPONSE_CODE = 200
+# Re-render the real login form with the generic error and a single consistent
+# status for both HTML and XHR — indistinguishable from a normal failed login.
+AXES_LOCKOUT_CALLABLE = "utils.axes_views.lockout_response"
+AXES_COOLOFF_MESSAGE = (
+    "Please enter a correct username and password. "
+    "Note that both fields may be case-sensitive."
 )
 
 # Social Auth configuration (Google OAuth)
@@ -230,6 +271,7 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
     )
 
 # Email configuration
+M2S_MAIL_API_KEY = os.getenv("M2S_MAIL_API_KEY", "")
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )

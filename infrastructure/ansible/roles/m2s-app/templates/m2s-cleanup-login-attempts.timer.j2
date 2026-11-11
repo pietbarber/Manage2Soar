@@ -1,0 +1,28 @@
+# Systemd timer that triggers ``m2s-cleanup-login-attempts.service`` hourly.
+#
+# Mirrors the ``0 * * * *`` schedule of the ``cleanup-login-attempts``
+# CronJob in ``k8s-cronjobs.yaml`` so the 24-hour retention window applied
+# by ``cleanup_login_attempts`` (issue #1110) is enforced on single-host
+# deployments as well.  Previously single-host.yml ran the ``m2s-app`` role
+# which never scheduled the cleanup, so stale AccessAttempt/AccessFailureLog
+# rows from one-off usernames/IPs accumulated indefinitely.
+#
+# ``Persistent=true`` backfills the last missed run if the host was down at
+# the scheduled time (e.g. reboot / suspend), which is the closest analog to
+# K8s CronJob's ``successfulJobsHistoryLimit`` behavior for a host that is
+# not always on.
+#
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+[Unit]
+Description=Hourly django-axes cleanup for Manage2Soar (issue #1110)
+
+[Timer]
+# Hourly at minute 0, matching the K8s CronJob schedule.
+OnCalendar=*-*-* *:00:00 UTC
+Persistent=true
+AccuracySec=1m
+Unit=m2s-cleanup-login-attempts.service
+
+[Install]
+WantedBy=timers.target

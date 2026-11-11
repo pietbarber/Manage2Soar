@@ -669,3 +669,49 @@ spec:
             - name: gcp-sa-key
               secret:
                 secretName: gcp-sa-key
+
+---
+# Hourly: Clean up stale django-axes AccessLog rows (Issue #1110)
+# The 24 h retention is well past the 15-min AXES_COOLOFF_TIME window, so
+# deleting old rows cannot break an in-flight throttle.  BaseCronJobCommand
+# provides distributed locking so multiple pods don't race on the cleanup.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-login-attempts
+  namespace: default
+  labels:
+    app: manage2soar
+    cronjob: cleanup-login-attempts
+spec:
+  schedule: "0 * * * *" # Hourly at minute 0
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 300 # 5 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: cleanup-login-attempts
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - cleanup_login_attempts
+                - --verbosity=1
+              workingDir: /app
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"

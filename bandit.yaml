@@ -1,4 +1,3 @@
-# yaml-language-server: $schema=https://json.schemastore.org/yamllint.json
 # Bandit configuration for Manage2Soar Django project
 # Focuses on real security issues while reducing noise from tests
 
@@ -10,8 +9,6 @@ exclude_dirs:
   - media
   - tinymce
   - node_modules
-
-exclude:
   - "*/migrations/*"
   - "*/tests/*"
   - "*/test_*.py"
