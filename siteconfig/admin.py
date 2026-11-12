@@ -467,6 +467,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             {
                 "fields": (
                     "membership_application_enabled",
+                    "membership_application_require_emergency_contact",
                     "membership_application_terms",
                 ),
                 "description": (
