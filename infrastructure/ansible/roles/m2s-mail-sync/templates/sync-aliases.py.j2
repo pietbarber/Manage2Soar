@@ -23,6 +23,8 @@ from urllib.parse import urlsplit
 import requests
 import yaml
 
+MAP_LOCK_FILE = '/run/lock/m2s-mail-map.lock'
+
 
 def load_config():
     """Load configuration from YAML file."""
@@ -399,7 +401,7 @@ def generate_bypass_lists_map(clubs_bypass_lists):
                     continue
                 for domain in domains:
                     lines.append(
-                        f"^{re.escape(list_name)}(?:\\+[^@]+)?@{re.escape(domain)}$"
+                        f"/^{re.escape(list_name)}(?:\\+[^@]+)?@{re.escape(domain)}$/i"
                     )
 
     return '\n'.join(lines)
@@ -419,7 +421,7 @@ def generate_protected_lists_map(clubs_data):
             recipient = f"{list_name}@{domain}"
             if is_valid_alias_name(list_name):
                 lines.append(
-                    f"^{re.escape(list_name)}(?:\\+[^@]+)?@{re.escape(domain)}$"
+                    f"/^{re.escape(list_name)}(?:\\+[^@]+)?@{re.escape(domain)}$/i"
                 )
     return '\n'.join(lines)
 
@@ -561,11 +563,13 @@ def write_and_postmap(filepath, content):
         lock_fd = None
         try:
             lock_fd = os.open(
-                '/run/lock/m2s-mail-sync.lock', os.O_CREAT | os.O_RDWR, 0o644
+                MAP_LOCK_FILE, os.O_RDWR
             )
             fcntl.flock(lock_fd, fcntl.LOCK_EX)
         except OSError:
-            lock_fd = None
+            if lock_fd is not None:
+                os.close(lock_fd)
+            raise
 
         database_backup = None
         try:

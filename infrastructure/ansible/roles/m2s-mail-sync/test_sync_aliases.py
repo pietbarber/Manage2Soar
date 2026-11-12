@@ -135,6 +135,8 @@ def test_forwarding_to_legacy_local_domain_is_rejected():
 def test_virtual_map_publish_is_readable_by_rewriter(tmp_path):
     sync = load_sync_module()
     virtual_file = tmp_path / "virtual"
+    sync.MAP_LOCK_FILE = str(tmp_path / "map.lock")
+    Path(sync.MAP_LOCK_FILE).touch()
 
     def fake_postmap(command, check):
         Path(f"{command[1]}.db").write_text("database")
@@ -150,6 +152,36 @@ def test_virtual_map_publish_is_readable_by_rewriter(tmp_path):
 
     assert stat.S_IMODE(os.stat(virtual_file).st_mode) == 0o640
     run.assert_called_once()
+
+
+def test_virtual_map_restores_database_if_source_publish_fails(tmp_path):
+    sync = load_sync_module()
+    sync.MAP_LOCK_FILE = str(tmp_path / "map.lock")
+    Path(sync.MAP_LOCK_FILE).touch()
+    virtual_file = tmp_path / "virtual"
+    virtual_file.write_text("old source")
+    database_file = tmp_path / "virtual.db"
+    database_file.write_text("old database")
+    real_replace = os.replace
+
+    def fake_replace(source, target):
+        if target == str(virtual_file):
+            raise OSError("source publication failed")
+        return real_replace(source, target)
+
+    def fake_postmap(command, check):
+        Path(f"{command[1]}.db").write_text("new database")
+
+    with patch.object(sync.subprocess, "run", side_effect=fake_postmap), patch.object(
+        sync.grp, "getgrnam", return_value=type("Group", (), {"gr_gid": os.getgid()})()
+    ), patch.object(sync.os, "chown"), patch.object(
+        sync.os, "replace", side_effect=fake_replace
+    ):
+        with pytest.raises(OSError, match="source publication failed"):
+            sync.write_and_postmap(str(virtual_file), "new source")
+
+    assert virtual_file.read_text() == "old source"
+    assert database_file.read_text() == "old database"
 
 
 def test_forwarding_alias_rejects_legacy_local_domain():
@@ -212,8 +244,8 @@ def test_protected_rspamd_map_includes_bypass_lists_for_spf():
     content = sync.generate_protected_lists_map(
         {"club.example.org": {"lists": {"board": [], "webmaster": []}}}
     )
-    assert r"^board(?:\+[^@]+)?@club\.example\.org$" in content
-    assert r"^webmaster(?:\+[^@]+)?@club\.example\.org$" in content
+    assert r"/^board(?:\+[^@]+)?@club\.example\.org$/i" in content
+    assert r"/^webmaster(?:\+[^@]+)?@club\.example\.org$/i" in content
 
 
 def test_bypass_rspamd_map_matches_tagged_recipients():
@@ -221,7 +253,7 @@ def test_bypass_rspamd_map_matches_tagged_recipients():
     content = sync.generate_bypass_lists_map(
         {"club": {"domains": ["club.example.org"], "bypass_lists": ["webmaster"]}}
     )
-    assert r"^webmaster(?:\+[^@]+)?@club\.example\.org$" in content
+    assert r"/^webmaster(?:\+[^@]+)?@club\.example\.org$/i" in content
 
 
 def test_forwarding_and_list_bounces_route_to_external_admin():

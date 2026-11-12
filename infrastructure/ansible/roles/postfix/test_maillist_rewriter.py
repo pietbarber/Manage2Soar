@@ -100,6 +100,7 @@ def load_template_namespace():
         assert spec is not None and spec.loader is not None
         module = module_from_spec(spec)
         spec.loader.exec_module(module)
+        module.MAP_LOCK_FILE = "/dev/null"
         return cast(dict[str, Any], module.__dict__)
     finally:
         tmp_path.unlink(missing_ok=True)

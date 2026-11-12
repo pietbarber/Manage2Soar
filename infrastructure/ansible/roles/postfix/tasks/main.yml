@@ -72,6 +72,24 @@
     groups: postfix
     append: true
 
+- name: Create shared routing map publication lock
+  ansible.builtin.file:
+    path: /run/lock/m2s-mail-map.lock
+    state: touch
+    owner: root
+    group: postfix
+    mode: "0660"
+    modification_time: preserve
+    access_time: preserve
+
+- name: Restore routing map lock on boot
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/m2s-mail-map.conf
+    content: "f /run/lock/m2s-mail-map.lock 0660 root postfix -\n"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Create Postfix main.cf
   ansible.builtin.template:
     src: main.cf.j2
