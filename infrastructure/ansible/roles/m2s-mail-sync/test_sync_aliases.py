@@ -212,8 +212,16 @@ def test_protected_rspamd_map_includes_bypass_lists_for_spf():
     content = sync.generate_protected_lists_map(
         {"club.example.org": {"lists": {"board": [], "webmaster": []}}}
     )
-    assert "board@club.example.org" in content
-    assert "webmaster@club.example.org" in content
+    assert r"^board(?:\+[^@]+)?@club\.example\.org$" in content
+    assert r"^webmaster(?:\+[^@]+)?@club\.example\.org$" in content
+
+
+def test_bypass_rspamd_map_matches_tagged_recipients():
+    sync = load_sync_module()
+    content = sync.generate_bypass_lists_map(
+        {"club": {"domains": ["club.example.org"], "bypass_lists": ["webmaster"]}}
+    )
+    assert r"^webmaster(?:\+[^@]+)?@club\.example\.org$" in content
 
 
 def test_forwarding_and_list_bounces_route_to_external_admin():

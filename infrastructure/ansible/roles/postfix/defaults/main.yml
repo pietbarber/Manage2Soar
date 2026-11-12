@@ -15,6 +15,9 @@ postfix_rspamd_enabled: true
 # global whitelist because recipient authorization is tenant-scoped.
 postfix_whitelist_dir: "{{ postfix_config_dir }}/tenant-whitelists"
 
+# The content filter only needs read access to routing maps through postfix.
+postfix_filter_user: m2s-mail-filter
+
 # Mail server hostname (FQDN for this server)
 # Defaults to the primary domain for single-host deployments
 mail_hostname: "{{ m2s_domain }}"

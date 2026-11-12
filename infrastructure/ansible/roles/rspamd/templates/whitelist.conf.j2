@@ -55,6 +55,7 @@ rules {
     action = "no action";
     # Match any sender when recipient is in bypass list
     rcpt_map = "file:///etc/rspamd/local.d/whitelists/bypass_lists.map";
+    regexp = true;
     description = "Bypass whitelist for service accounts (treasurer, webmaster, etc.) - requires SPF pass";
   }
 }

@@ -33,7 +33,7 @@
 
 - name: Resolve mail-sync tenant domains for uniqueness validation
   ansible.builtin.set_fact:
-    m2s_mail_sync_resolved_tenant_domains: "{{ (m2s_mail_sync_resolved_tenant_domains | default([])) + (_tenant_domains | map('lower') | list) }}"
+    m2s_mail_sync_resolved_tenant_domains: "{{ ((m2s_mail_sync_resolved_tenant_domains | default([])) + (_tenant_domains | map('lower') | unique | list)) | unique | list }}"
   vars:
     _explicit_domains: "{{ [item.domains] if (item.domains is defined and item.domains is string) else (item.domains | default([])) }}"
     _base_mail_domain: "{{ mail_domain | default(m2s_domain | default('')) }}"
@@ -58,6 +58,7 @@
   ansible.builtin.set_fact:
     m2s_mail_sync_local_domains: "{{ [mail_hostname | default(m2s_domain | default(''), true), 'localhost', 'localhost.' ~ (mail_domain | default(m2s_domain | default('')))] | reject('equalto', '') | list }}"
   when: admin_email is defined or (mail_server_receive_enabled | default(true) | bool)
+  tags: [always]
 
 - name: Add tenant mail domains to the local-domain safety set
   ansible.builtin.set_fact:
@@ -73,6 +74,7 @@
   when: m2s_mail_sync_local_domains is defined
   loop_control:
     label: "{{ item.prefix }}"
+  tags: [always]
 
 - name: Require an external monitored bounce mailbox
   ansible.builtin.assert:

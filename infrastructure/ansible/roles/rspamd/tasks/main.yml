@@ -143,11 +143,13 @@
     dest: /etc/rspamd/local.d/multimap.conf
     content: |
       # Reject messages to protected lists when the envelope sender does not
-      # pass SPF. Authenticated submission is marked ORIGINATING by Postfix.
+      # pass SPF. Trusted submission is configured without this milter in
+      # master.cf, so this rule only applies to public SMTP.
       M2S_PROTECTED_LIST_SPF {
         type = "rcpt";
         map = "file:///etc/rspamd/local.d/whitelists/protected_lists.map";
-        require_symbols = "!R_SPF_ALLOW & !ORIGINATING";
+        regexp = true;
+        require_symbols = "!R_SPF_ALLOW";
         action = "reject";
         message = "Sender authentication failed for this mailing list.";
         description = "Require SPF for public mail to protected mailing lists";

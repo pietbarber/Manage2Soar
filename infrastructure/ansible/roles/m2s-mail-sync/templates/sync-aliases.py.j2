@@ -8,6 +8,7 @@ This script is run by cron every minute.
 """
 
 import grp
+import fcntl
 import hashlib
 import os
 import pwd
@@ -397,7 +398,9 @@ def generate_bypass_lists_map(clubs_bypass_lists):
                     print(f"[{datetime.now()}] WARNING: Invalid bypass-list name for {club_prefix}, skipping")
                     continue
                 for domain in domains:
-                    lines.append(f"{list_name}@{domain}")
+                    lines.append(
+                        f"^{re.escape(list_name)}(?:\\+[^@]+)?@{re.escape(domain)}$"
+                    )
 
     return '\n'.join(lines)
 
@@ -415,7 +418,9 @@ def generate_protected_lists_map(clubs_data):
         for list_name in data['lists']:
             recipient = f"{list_name}@{domain}"
             if is_valid_alias_name(list_name):
-                lines.append(recipient)
+                lines.append(
+                    f"^{re.escape(list_name)}(?:\\+[^@]+)?@{re.escape(domain)}$"
+                )
     return '\n'.join(lines)
 
 
@@ -545,17 +550,44 @@ def write_and_postmap(filepath, content):
         os.chown(temp_path, 0, postfix_gid)
         os.chmod(temp_path, 0o640)
 
-        # Build the database beside the temporary source. Publish the database
-        # first, then the source, so a postmap or source-replacement failure
-        # leaves Postfix using the previous complete pair rather than mixing a
-        # new source with an old database.
+        # Build the database beside the temporary source. The rewriter takes
+        # the same lock before reading the source map, so publishing the pair
+        # under this lock cannot expose mixed generations to either reader.
         subprocess.run(['/usr/sbin/postmap', temp_path], check=True)
         if not os.path.exists(temp_database_path):
             raise RuntimeError(f'postmap did not create {temp_database_path}')
         os.chown(temp_database_path, 0, postfix_gid)
         os.chmod(temp_database_path, 0o640)
-        os.replace(temp_database_path, database_path)
-        os.replace(temp_path, filepath)
+        lock_fd = None
+        try:
+            lock_fd = os.open(
+                '/run/lock/m2s-mail-sync.lock', os.O_CREAT | os.O_RDWR, 0o644
+            )
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        except OSError:
+            lock_fd = None
+
+        database_backup = None
+        try:
+            if os.path.exists(database_path):
+                backup_fd, database_backup = tempfile.mkstemp(dir=directory)
+                os.close(backup_fd)
+                os.unlink(database_backup)
+                os.replace(database_path, database_backup)
+            os.replace(temp_database_path, database_path)
+            os.replace(temp_path, filepath)
+        except Exception:
+            if os.path.exists(database_path):
+                os.unlink(database_path)
+            if database_backup and os.path.exists(database_backup):
+                os.replace(database_backup, database_path)
+            raise
+        finally:
+            if database_backup and os.path.exists(database_backup):
+                os.unlink(database_backup)
+            if lock_fd is not None:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                os.close(lock_fd)
     except Exception:
         for path in (temp_path, temp_database_path):
             if os.path.exists(path):

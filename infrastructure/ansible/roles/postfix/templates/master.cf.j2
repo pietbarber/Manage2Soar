@@ -28,7 +28,9 @@ submission inet n       -       y       -       -       smtpd
   -o smtpd_sender_restrictions=
   -o smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject
   -o smtpd_relay_restrictions=permit_mynetworks,permit_sasl_authenticated,reject
-  -o milter_macro_daemon_name=ORIGINATING
+  # Trusted submission is intentionally excluded from Rspamd SPF/list checks;
+  # OpenDKIM still signs the message and the content filter still rewrites it.
+  -o smtpd_milters=unix:/opendkim/opendkim.sock
   -o content_filter=maillist-rewriter-submission:dummy
 
 # Pickup service
@@ -86,10 +88,10 @@ postlog   unix-dgram n  -       n       -       1       postlogd
 # Rewrites From headers to list address and adds Reply-To
 # pointing to original sender (Mailman-style)
 maillist-rewriter-inbound unix  -       n       n       -       10      pipe
-  flags=Rq user=postfix null_sender= argv=/usr/local/bin/maillist-rewriter.py ${nexthop} ${sender} ${original_recipient} ${recipient} public
+  flags=Rq user={{ postfix_filter_user }} null_sender= argv=/usr/local/bin/maillist-rewriter.py ${nexthop} ${sender} ${original_recipient} ${recipient} public
 
 maillist-rewriter-submission unix  -       n       n       -       10      pipe
-  flags=Rq user=postfix null_sender= argv=/usr/local/bin/maillist-rewriter.py ${nexthop} ${sender} ${original_recipient} ${recipient} trusted
+  flags=Rq user={{ postfix_filter_user }} null_sender= argv=/usr/local/bin/maillist-rewriter.py ${nexthop} ${sender} ${original_recipient} ${recipient} trusted
 
 # Reinjection port (after content filter)
 127.0.0.1:10025 inet n  -       y       -       -       smtpd

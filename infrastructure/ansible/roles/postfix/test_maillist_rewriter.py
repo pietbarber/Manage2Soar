@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any, Callable, cast
 from unittest.mock import mock_open, patch
 
+from jinja2 import Environment
+
 _TEMPLATE_PATH = Path(__file__).parent / "templates" / "maillist-rewriter.py.j2"
 _MAIN_CF_TEMPLATE_PATH = Path(__file__).parent / "templates" / "main.cf.j2"
 _MASTER_CF_TEMPLATE_PATH = Path(__file__).parent / "templates" / "master.cf.j2"
@@ -26,6 +28,23 @@ def test_rewriter_transport_limits_delivery_and_keeps_master_command_clean():
 
     assert "maillist-rewriter_destination_recipient_limit = 1" in main_cf
     assert "  -o recipient_limit=1" not in master_cf
+    assert "user={{ postfix_filter_user }}" in master_cf
+    assert "smtpd_milters=unix:/opendkim/opendkim.sock" in master_cf
+
+
+def test_main_cf_restriction_classes_keep_each_definition_on_its_own_line():
+    environment = Environment()
+    environment.filters["bool"] = bool
+    rendered = environment.from_string(_MAIN_CF_TEMPLATE_PATH.read_text()).render(
+        club_domains=[{"prefix": "single"}],
+        postfix_config_dir="/etc/postfix",
+        postfix_whitelist_dir="/etc/postfix/tenant-whitelists",
+        mail_hostname="mail.example.org",
+        mail_domain="example.org",
+        trusted_relay_ips=[],
+        postfix_rspamd_enabled=True,
+    )
+    assert "smtpd_restriction_classes = whitelist_required_single" in rendered
 
 
 def load_template_namespace():

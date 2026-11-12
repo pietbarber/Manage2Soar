@@ -5,6 +5,7 @@ Rewrites From header to list address and sets Reply-To to original sender
 Uses X-Original-To header to find the original recipient before alias expansion
 """
 import email
+import fcntl
 import os
 import smtplib
 import sys
@@ -83,7 +84,18 @@ def _load_routing_snapshot(virtual_file='/etc/postfix/virtual'):
     lists = set()
     forwards = set()
     recipients = {}
+    lock_fd = None
     try:
+        # m2s-mail-sync publishes the source map and its Postfix database
+        # while holding this lock. Taking a shared lock prevents this reader
+        # from observing a source/database mixed generation.
+        try:
+            lock_fd = os.open(
+                '/run/lock/m2s-mail-sync.lock', os.O_CREAT | os.O_RDWR, 0o644
+            )
+            fcntl.flock(lock_fd, fcntl.LOCK_SH)
+        except OSError:
+            lock_fd = None
         with open(virtual_file, 'r') as f:
             in_forwards = False
             for raw_line in f:
@@ -105,6 +117,10 @@ def _load_routing_snapshot(virtual_file='/etc/postfix/virtual'):
                 (forwards if in_forwards else lists).add(address)
     except OSError as e:
         sys.stderr.write(f"maillist-rewriter: warning: could not read routes: {e}\n")
+    finally:
+        if lock_fd is not None:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
     return lists, forwards, recipients
 
 

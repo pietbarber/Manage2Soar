@@ -76,7 +76,11 @@ broken_sasl_auth_clients = yes
 
 # Restriction classes (reusable tenant-scoped authorization rules)
 # Each recipient access entry selects the whitelist for that recipient's tenant.
-smtpd_restriction_classes = {% for club in club_domains %}whitelist_required_{{ club.prefix | replace('-', '_') }}{% if not loop.last %}, {% endif %}{% endfor %}
+{% set restriction_classes = namespace(values=[]) %}
+{% for club in club_domains %}
+{% set restriction_classes.values = restriction_classes.values + ['whitelist_required_' ~ (club.prefix | replace('-', '_'))] %}
+{% endfor %}
+smtpd_restriction_classes = {{ restriction_classes.values | join(', ') }}
 {% for club in club_domains %}
 whitelist_required_{{ club.prefix | replace('-', '_') }} = check_sender_access hash:{{ postfix_whitelist_dir }}/{{ club.prefix }}_whitelist, reject
 {% endfor %}
