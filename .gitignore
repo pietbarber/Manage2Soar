@@ -270,3 +270,8 @@ infrastructure/ansible/group_vars/all/vault.yml
 
 .mcp.json
 .claude.json
+
+# Local agent/tool output
+.opencode/
+.playwright-mcp/
+graphify-out/
