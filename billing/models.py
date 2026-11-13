@@ -38,6 +38,7 @@ class BillingPeriod(models.Model):
     is_closed = models.BooleanField(default=False)
 
     class Meta:
+        permissions = (("can_manage_billing", "Can manage member billing"),)
         constraints = [
             models.UniqueConstraint(
                 fields=("year", "month"), name="billing_period_unique_month"

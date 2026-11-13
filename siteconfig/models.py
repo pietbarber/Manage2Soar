@@ -4,12 +4,16 @@ from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.validators import MaxValueValidator, MinValueValidator, validate_email
 from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.signals import post_delete, post_save, pre_delete
+from django.dispatch import receiver
 from django.utils.crypto import get_random_string
+from django.utils.text import slugify
 from tinymce.models import HTMLField
 
 from utils.favicon import generate_favicon_from_logo
@@ -23,6 +27,18 @@ MEMBER_PROFILE_POLICY_FIELDS = (
     "password",
     "contact_visibility",
 )
+
+
+def _schedule_status_role_reconciliation(status_id, using):
+    """Reconcile affected members only after configuration commits."""
+    if not status_id:
+        return
+    from members.services.status_role_reconciliation import reconcile_status_members
+
+    transaction.on_commit(
+        lambda: reconcile_status_members(status_id, using=using), using=using
+    )
+
 
 # Keep the stored shape compatible with older pods during rollout and rollback.
 LEGACY_MEMBER_PROFILE_POLICY_DEFAULTS = {
@@ -189,15 +205,160 @@ class MailingList(models.Model):
         if not self.criteria:
             raise ValidationError("At least one criterion must be selected.")
 
+        if not isinstance(self.criteria, list) or any(
+            not isinstance(criterion, str) for criterion in self.criteria
+        ):
+            raise ValidationError("Criteria must be a list of strings.")
+
         valid_codes = {c[0] for c in MailingListCriterion.choices}
-        invalid = [c for c in self.criteria if c not in valid_codes]
+        persisted_criteria = self._persisted_criteria()
+        role_keys = {
+            role_key
+            for criterion in self.criteria
+            if (role_key := self._role_key_from_selector(criterion)) is not None
+        }
+        role_metadata = {
+            role.key: role for role in self._role_metadata().filter(key__in=role_keys)
+        }
+        from members.models import MemberTag
+
+        tag_keys = {
+            tag_key
+            for criterion in self.criteria
+            if (tag_key := self._tag_key_from_selector(criterion)) is not None
+        }
+        tags = {tag.key: tag for tag in MemberTag.objects.filter(key__in=tag_keys)}
+        invalid = []
+        for criterion in self.criteria:
+            if criterion in valid_codes:
+                continue
+            role_key = self._role_key_from_selector(criterion)
+            role = role_metadata.get(role_key) if role_key is not None else None
+            tag_key = self._tag_key_from_selector(criterion)
+            tag = tags.get(tag_key) if tag_key is not None else None
+            # Eligibility controls adding a role to an audience.  A selector
+            # already stored on a list remains valid while it is retained,
+            # including when the role is later marked ineligible or retired.
+            if role_key is not None:
+                invalid_selector = (
+                    role is None and criterion not in persisted_criteria
+                ) or (
+                    role is not None
+                    and not role.mailing_list_eligible
+                    and criterion not in persisted_criteria
+                )
+            elif tag_key is not None:
+                invalid_selector = (
+                    tag is None and criterion not in persisted_criteria
+                ) or (
+                    tag is not None
+                    and not tag.is_active
+                    and criterion not in persisted_criteria
+                )
+            else:
+                invalid_selector = True
+            if invalid_selector:
+                invalid.append(criterion)
         if invalid:
             raise ValidationError(f"Invalid criteria codes: {', '.join(invalid)}")
 
     def get_criteria_display(self):
         """Return human-readable list of criteria."""
         criterion_map = dict(MailingListCriterion.choices)
-        return [criterion_map.get(c, c) for c in self.criteria]
+        role_keys = {
+            criterion: key
+            for criterion in self.criteria
+            if (key := self._role_key_from_selector(criterion)) is not None
+        }
+        role_metadata = {
+            role.key: role
+            for role in self._role_metadata().filter(key__in=role_keys.values())
+        }
+        from members.models import MemberTag
+
+        tag_keys = {
+            criterion: key
+            for criterion in self.criteria
+            if (key := self._tag_key_from_selector(criterion)) is not None
+        }
+        tags = {
+            tag.key: tag for tag in MemberTag.objects.filter(key__in=tag_keys.values())
+        }
+        return [
+            (
+                self._role_display(role_keys[c], role_metadata.get(role_keys[c]))
+                if c in role_keys
+                else (
+                    self._tag_display(tag_keys[c], tags.get(tag_keys[c]))
+                    if c in tag_keys
+                    else criterion_map.get(c, c)
+                )
+            )
+            for c in self.criteria
+        ]
+
+    @staticmethod
+    def _role_key_from_selector(criterion):
+        """Return a safely parsed role key, or None for non-role criteria."""
+        if not isinstance(criterion, str) or not criterion.startswith("role:"):
+            return None
+        key = criterion[5:]
+        if (
+            not key
+            or len(key) > 100
+            or ":" in key
+            or any(character.isspace() or ord(character) < 32 for character in key)
+        ):
+            return None
+        return key
+
+    @staticmethod
+    def _tag_key_from_selector(criterion):
+        """Return a safely parsed tag key, or None for non-tag criteria."""
+        if not isinstance(criterion, str) or not criterion.startswith("tag:"):
+            return None
+        key = criterion[4:]
+        if (
+            not key
+            or len(key) > 100
+            or ":" in key
+            or any(character.isspace() or ord(character) < 32 for character in key)
+        ):
+            return None
+        return key
+
+    @staticmethod
+    def _role_metadata():
+        from members.models import RoleMetadata
+
+        return RoleMetadata.objects.all()
+
+    def _persisted_criteria(self):
+        if not self.pk:
+            return set()
+        return set(
+            type(self)
+            .objects.filter(pk=self.pk)
+            .values_list("criteria", flat=True)
+            .first()
+            or []
+        )
+
+    @staticmethod
+    def _role_display(role_key, role=None):
+        if role is None:
+            return f"⚠️ role:{role_key} (stale role; metadata unavailable)"
+        if not role.mailing_list_eligible:
+            return f"⚠️ {role.display_name} (stale/ineligible role)"
+        return role.display_name
+
+    @staticmethod
+    def _tag_display(tag_key, tag=None):
+        if tag is None:
+            return f"⚠️ tag:{tag_key} (stale tag; metadata unavailable)"
+        if not tag.is_active:
+            return f"⚠️ {tag.display_label} (stale/inactive tag)"
+        return tag.display_label
 
     def get_subscribers(self):
         """
@@ -237,6 +398,20 @@ class MailingList(models.Model):
         if criterion == MailingListCriterion.ACTIVE_MEMBER:
             return base_active
 
+        role_key = self._role_key_from_selector(criterion)
+        if role_key is not None:
+            # Role audiences are based on actual Group membership, never on
+            # permissions inherited by a member through a group.
+            # Once selected, a role selector is an explicit audience source.
+            # Do not re-apply mailing_list_eligible here: that flag only
+            # controls whether a role may be selected for a new list.
+            return base_active & Q(groups__role_metadata__key=role_key)
+
+        tag_key = self._tag_key_from_selector(criterion)
+        if tag_key is not None:
+            # Tags are audience membership only and never grant permissions.
+            return base_active & Q(member_tags__key=tag_key)
+
         # Boolean role fields on Member model
         boolean_fields = {
             MailingListCriterion.INSTRUCTOR: "instructor",
@@ -273,6 +448,43 @@ class MailingList(models.Model):
     def get_subscriber_count(self):
         """Return count of subscribers to this list."""
         return self.get_subscribers().count()
+
+
+@receiver(pre_delete, sender="members.MemberTag")
+def prevent_referenced_member_tag_deletion(sender, instance, using, **kwargs):
+    """Keep configured mailing-list audiences from becoming dangling."""
+    if any(
+        f"tag:{instance.key}" in (criteria or [])
+        for criteria in MailingList.objects.using(using).values_list(
+            "criteria", flat=True
+        )
+    ):
+        raise ValidationError(
+            f"Cannot delete tag '{instance.key}' while a mailing list uses it."
+        )
+
+
+def _mailing_list_uses_role_key(role_key, using):
+    """Return whether a mailing list still contains the role selector."""
+    return any(
+        f"role:{role_key}" in (criteria or [])
+        for criteria in MailingList.objects.using(using).values_list(
+            "criteria", flat=True
+        )
+    )
+
+
+@receiver(pre_delete, sender="members.RoleMetadata")
+def prevent_referenced_role_metadata_deletion(sender, instance, using, **kwargs):
+    """Keep configured mailing-list audiences from becoming dangling."""
+    if _mailing_list_uses_role_key(instance.key, using):
+        raise ValidationError(
+            f"Cannot delete role '{instance.key}' while a mailing list uses it."
+        )
+
+
+# Group deletion cascades through RoleMetadata and therefore reaches the same
+# guard. RoleMetadata.save() separately enforces stable-key immutability.
 
 
 class MemberNameOrdering(models.TextChoices):
@@ -1221,6 +1433,13 @@ class MembershipStatus(models.Model):
     This replaces the hardcoded membership status lists in members.constants.
     """
 
+    key = models.CharField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        editable=False,
+        help_text="Immutable stable identifier used by status-role provenance.",
+    )
     name = models.CharField(
         max_length=50,
         unique=True,
@@ -1258,11 +1477,50 @@ class MembershipStatus(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        """Override save to clear membership status cache."""
+        """Preserve the stable key while allowing the display name to change."""
+        using = kwargs.get("using") or self._state.db
+        previous_is_active = None
+        if self.pk:
+            previous_is_active = (
+                type(self)
+                .objects.using(using)
+                .filter(pk=self.pk)
+                .values_list("is_active", flat=True)
+                .first()
+            )
+        if self.pk:
+            persisted_key = (
+                type(self)
+                .objects.using(using)
+                .filter(pk=self.pk)
+                .values_list("key", flat=True)
+                .first()
+            )
+            if persisted_key and self.key != persisted_key:
+                raise ValidationError({"key": "Status keys cannot be changed."})
+            self.key = persisted_key or self.key
+        elif not self.key:
+            self.key = slugify(self.name)
+
+        if not self.key or ":" in self.key or self.key != slugify(self.key):
+            raise ValidationError(
+                {
+                    "key": (
+                        "Status keys must be non-empty normalized identifiers "
+                        "and may not contain ':'."
+                    )
+                }
+            )
+        self.full_clean()
         result = super().save(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
+        # Invalidate immediately so later writes in the same transaction see
+        # the new status policy; on_commit covers requests after a commit too.
+        clear_active_membership_statuses_cache()
         transaction.on_commit(clear_active_membership_statuses_cache)
+        if previous_is_active is not None and previous_is_active != self.is_active:
+            _schedule_status_role_reconciliation(self.pk, using or self._state.db)
         return result
 
     def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:
@@ -1287,6 +1545,7 @@ class MembershipStatus(models.Model):
         result = super().delete(*args, **kwargs)
         from members.utils.membership import clear_active_membership_statuses_cache
 
+        clear_active_membership_statuses_cache()
         transaction.on_commit(clear_active_membership_statuses_cache)
         return result
 
@@ -1302,6 +1561,222 @@ class MembershipStatus(models.Model):
             (status.name, status.name)
             for status in cls.objects.all().order_by("sort_order", "name")
         ]
+
+
+class MembershipStatusRoleMapping(models.Model):
+    """An explicit, administratively configured status-to-role mapping."""
+
+    membership_status = models.ForeignKey(
+        MembershipStatus,
+        on_delete=models.PROTECT,
+        related_name="role_mappings",
+    )
+    role = models.ForeignKey(
+        "auth.Group",
+        on_delete=models.PROTECT,
+        related_name="membership_status_role_mappings",
+    )
+    enabled = models.BooleanField(
+        default=True,
+        help_text="Only enabled mappings grant status-owned role assignments.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Membership status role mapping"
+        verbose_name_plural = "Membership status role mappings"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("membership_status", "role"),
+                name="unique_membership_status_role_mapping",
+            )
+        ]
+        ordering = ("membership_status__sort_order", "membership_status__name", "pk")
+
+    def clean(self):
+        super().clean()
+        if self.role_id:
+            from members.models import RoleMetadata
+
+            metadata = (
+                RoleMetadata.objects.filter(group_id=self.role_id).values("key").first()
+            )
+            if metadata is None:
+                raise ValidationError(
+                    {"role": "Status mappings may target only metadata-backed roles."}
+                )
+            if not metadata["key"] or ":" in metadata["key"]:
+                raise ValidationError(
+                    {"role": "The target role has an invalid stable key."}
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.membership_status} → {self.role}"
+
+
+class MembershipStatusRoleMappingEventQuerySet(models.QuerySet):
+    """Prevent ordinary bulk APIs from bypassing audit immutability."""
+
+    _ALLOWED_FK_CLEARS = {"mapping", "actor"}
+
+    def update(self, **kwargs):
+        if (
+            kwargs
+            and set(kwargs) <= self._ALLOWED_FK_CLEARS
+            and all(value is None for value in kwargs.values())
+        ):
+            return super().update(**kwargs)
+        raise ValidationError("Membership status mapping audit events are immutable.")
+
+    def bulk_create(self, *args, **kwargs):
+        raise ValidationError(
+            "Membership status mapping audit events must be appended individually."
+        )
+
+    def delete(self):
+        raise ValidationError(
+            "Membership status mapping audit events cannot be deleted."
+        )
+
+
+class MembershipStatusRoleMappingEvent(models.Model):
+    """Append-only audit snapshot for status-role mapping configuration."""
+
+    ACTION_CHOICES = (
+        ("created", "Created"),
+        ("updated", "Updated"),
+        ("deleted", "Deleted"),
+    )
+
+    mapping = models.ForeignKey(
+        MembershipStatusRoleMapping,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="audit_events",
+    )
+    mapping_id_snapshot = models.PositiveBigIntegerField()
+    status_key = models.CharField(max_length=100)
+    status_name = models.CharField(max_length=50)
+    role_key = models.CharField(max_length=100, blank=True)
+    role_name = models.CharField(max_length=150)
+    enabled = models.BooleanField()
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    actor = models.ForeignKey(
+        "members.Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="membership_status_mapping_events",
+    )
+    actor_username = models.CharField(max_length=150, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        base_manager_name = "objects"
+        ordering = ("timestamp", "pk")
+
+    objects = models.Manager.from_queryset(MembershipStatusRoleMappingEventQuerySet)()
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValidationError(
+                "Membership status mapping audit events are immutable."
+            )
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(
+            "Membership status mapping audit events cannot be deleted."
+        )
+
+
+@receiver(post_save, sender=MembershipStatusRoleMapping)
+def reconcile_members_after_status_role_mapping_save(sender, instance, using, **kwargs):
+    _schedule_status_role_reconciliation(instance.membership_status_id, using)
+
+    _record_status_role_mapping_event(
+        instance, "created" if kwargs.get("created") else "updated", using
+    )
+
+
+@receiver(post_delete, sender=MembershipStatusRoleMapping)
+def reconcile_members_after_status_role_mapping_delete(
+    sender, instance, using, **kwargs
+):
+    _schedule_status_role_reconciliation(instance.membership_status_id, using)
+
+    _record_status_role_mapping_event(instance, "deleted", using)
+
+
+def _record_status_role_mapping_event(instance, action, using):
+    from siteconfig.audit import get_actor
+
+    status = (
+        MembershipStatus.objects.using(using)
+        .filter(pk=instance.membership_status_id)
+        .first()
+    )
+    if status is None:
+        status_key = getattr(instance, "_audit_status_key", "")
+        status_name = getattr(instance, "_audit_status_name", "")
+    else:
+        status_key = status.key
+        status_name = status.name
+
+    from members.models import RoleMetadata
+
+    role_name = Group.objects.using(using).filter(pk=instance.role_id).values_list(
+        "name", flat=True
+    ).first() or getattr(instance, "_audit_role_name", "")
+    role_key = RoleMetadata.objects.using(using).filter(
+        group_id=instance.role_id
+    ).values_list("key", flat=True).first() or getattr(instance, "_audit_role_key", "")
+    actor = get_actor()
+    MembershipStatusRoleMappingEvent.objects.using(using).create(
+        mapping_id=instance.pk if action != "deleted" else None,
+        mapping_id_snapshot=instance.pk,
+        status_key=status_key,
+        status_name=status_name,
+        role_key=role_key,
+        role_name=role_name,
+        enabled=instance.enabled,
+        action=action,
+        actor_id=getattr(actor, "pk", None),
+        actor_username=(actor.get_username() if actor is not None else ""),
+    )
+
+
+@receiver(pre_delete, sender=MembershipStatusRoleMapping)
+def snapshot_status_role_mapping_for_delete(sender, instance, using, **kwargs):
+    status = (
+        MembershipStatus.objects.using(using)
+        .filter(pk=instance.membership_status_id)
+        .first()
+    )
+    instance._audit_status_key = getattr(status, "key", "")
+    instance._audit_status_name = getattr(status, "name", "")
+    instance._audit_role_name = (
+        Group.objects.using(using)
+        .filter(pk=instance.role_id)
+        .values_list("name", flat=True)
+        .first()
+        or ""
+    )
+    from members.models import RoleMetadata
+
+    instance._audit_role_key = (
+        RoleMetadata.objects.using(using)
+        .filter(group_id=instance.role_id)
+        .values_list("key", flat=True)
+        .first()
+        or ""
+    )
 
 
 class MembershipBillingRule(models.Model):

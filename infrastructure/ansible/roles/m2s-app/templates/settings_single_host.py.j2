@@ -1,21 +1,33 @@
 """
 Django settings for single-host deployment (without Google Cloud Storage).
 
-This settings file is designed for single-host deployments that use local
-filesystem storage instead of Google Cloud Storage.
+This settings file is rendered by Ansible over the checked-in module of the
+same name for single-host deployments.
 
-Managed by Ansible - DO NOT EDIT MANUALLY
+Managed by Ansible - DO NOT EDIT MANUALLY.
+
+Keep this template in sync with manage2soar/settings_single_host.py. The
+settings contract test renders this template and fails when the two drift.
 """
 
 import os
 import re
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 
 from django.contrib.messages import constants as messages
+from dotenv import load_dotenv
+
+from manage2soar.settings_env import is_testing
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
+
+# Test detection is limited to explicit configuration and test runner names.
+# It must never enable DEBUG or weaken production security defaults.
+TESTING = is_testing()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
@@ -23,15 +35,39 @@ if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY not set in environment!")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # Deployment/bootstrap fallback for links when SiteConfiguration is unavailable.
 # Once the database is available, SiteConfiguration.canonical_url is authoritative.
-SITE_URL = os.getenv("SITE_URL")
+SITE_URL = os.getenv("SITE_URL", "")
 if not SITE_URL:
-    raise ValueError("SITE_URL not set in environment!")
+    if DEBUG or TESTING:
+        SITE_URL = "http://127.0.0.1:8001"
+    else:
+        # Validate that SITE_URL is set in production
+        raise ValueError(
+            "SITE_URL environment variable must be set in production (DEBUG=False). "
+            "Example: SITE_URL=https://manage2soar.yourclub.org"
+        )
+
+# Keep trusted origins aligned with the base/GKE settings.  The deployment
+# template always supplies CSRF_TRUSTED_ORIGINS; fall back to SITE_URL so a
+# manually configured single-host install still works without a second source
+# of truth for its public origin.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        SITE_URL or "http://127.0.0.1:8001",
+    ).split(",")
+    if origin.strip()
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -45,6 +81,7 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "reversion",
     "django_htmx",
+    "django_extensions",
     "tinymce",
     "social_django",
     "members",
@@ -70,6 +107,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "axes.middleware.AxesMiddleware",  # Issue #1110: login rate limiting
+    "members.role_preview.RolePreviewMiddleware",
     "utils.middleware.KioskAutoLoginMiddleware",  # Issue #364: Kiosk auto-reauth
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -90,6 +128,8 @@ TEMPLATES = [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
+                "members.role_preview.role_preview_context",
+                "members.context_processors.authorization",
                 "django.contrib.messages.context_processors.messages",
                 "social_django.context_processors.backends",
                 "social_django.context_processors.login_redirect",
@@ -118,7 +158,9 @@ DATABASES = {
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -134,6 +176,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = os.getenv("STATIC_ROOT", "/var/www/m2s/static")
 STATICFILES_DIRS = [BASE_DIR / "static"]
+TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
 
 # Media files - LOCAL FILESYSTEM
 MEDIA_URL = "/media/"
@@ -147,11 +190,18 @@ MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/var/www/m2s/media")
 # The dedicated directory is provisioned (and cleaned up by the systemd-tmpfiles
 # retention rule) by the m2s-app Ansible role, so it stays owned by the app user
 # and is never web-served. The m2s_import_export_tmp_dir Ansible variable is the
-# single source of truth: it is written into app/.env (IMPORT_EXPORT_TMP_DIR),
-# and both provisioning and cleanup derive from the same variable. Do not point
-# IMPORT_EXPORT_TMP_DIR at an unprovisioned path, or the directory may not exist
-# and abandoned member CSVs will bypass the retention policy (issue #1071).
-IMPORT_EXPORT_TMP_DIR = os.getenv("IMPORT_EXPORT_TMP_DIR", "{{ m2s_import_export_tmp_dir }}")
+# single source of truth and is written into app/.env (IMPORT_EXPORT_TMP_DIR),
+# which defaults to this same path. Do not point IMPORT_EXPORT_TMP_DIR at an
+# unprovisioned path, or the directory may not exist and abandoned member CSVs
+# will bypass the retention policy (issue #1071).
+IMPORT_EXPORT_TMP_DIR = os.getenv(
+    "IMPORT_EXPORT_TMP_DIR",
+    (
+        str(Path(tempfile.gettempdir()) / "m2s-import-export-tmp")
+        if TESTING or DEBUG
+        else "{{ m2s_import_export_tmp_dir }}"
+    ),
+)
 
 STORAGES = {
     "default": {
@@ -162,7 +212,11 @@ STORAGES = {
         "OPTIONS": {"location": IMPORT_EXPORT_TMP_DIR},
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if TESTING
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
     },
 }
 IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.MediaStorage"
@@ -180,6 +234,7 @@ AUTHENTICATION_BACKENDS = (
     "utils.auth_backends.AxesCompatBackend",
     "social_core.backends.google.GoogleOAuth2",
     "django.contrib.auth.backends.ModelBackend",
+    "members.auth_backends.QualificationPermissionBackend",
 )
 
 #############################################################
@@ -237,9 +292,10 @@ SOCIAL_AUTH_PIPELINE = (
 )
 
 # Club prefix for multi-tenant support
-CLUB_PREFIX = os.getenv("CLUB_PREFIX", "tsc")
+CLUB_PREFIX = os.getenv("CLUB_PREFIX", "ssc")
 
 # Validate CLUB_PREFIX to prevent path traversal attacks
+
 if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
     raise Exception(
         f"Invalid CLUB_PREFIX '{CLUB_PREFIX}'. "
@@ -260,6 +316,8 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() in ("true", "1", "ye
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@example.com")
+EMAIL_DEV_MODE = os.getenv("EMAIL_DEV_MODE", "false").lower() in ("true", "1", "yes")
+EMAIL_DEV_MODE_REDIRECT_TO = os.getenv("EMAIL_DEV_MODE_REDIRECT_TO", "")
 
 # Security settings for production
 # Only enable SSL-related settings if SSL is actually configured
@@ -271,17 +329,27 @@ if not DEBUG:
         SECURE_SSL_REDIRECT = True
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
-
-    # SameSite cookie settings to prevent CSRF attacks
-    # Lax = cookies sent with same-site requests and top-level navigation (recommended)
-    # Strict = cookies only sent with same-site requests (more restrictive)
-    # None = cookies sent with all requests (requires Secure flag)
+        # Match the base/GKE production policy.  HSTS is only safe once the
+        # deployment is actually serving HTTPS end to end.
+        SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+        if SECURE_HSTS_SECONDS > 0:
+            SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+            SECURE_HSTS_PRELOAD = True
+    # SameSite cookie settings to prevent CSRF attacks.  Lax keeps ordinary
+    # same-site requests and top-level navigation working.
     SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
     CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
-
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
+
+# Kiosk cookies follow the same rule as session/CSRF cookies: secure by
+# default for a real single-host deployment, but usable over HTTP in local
+# development and tests.  Always define the setting because kiosk views are
+# also exercised while migrations are being applied.
+KIOSK_COOKIE_SECURE = os.getenv(
+    "KIOSK_COOKIE_SECURE", "False" if TESTING or DEBUG else "True"
+).lower() in ("true", "1", "yes")
 
 # TinyMCE configuration
 TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
@@ -293,11 +361,7 @@ TINYMCE_PDF_TRUSTED_URL_PREFIXES = [
     if prefix.strip()
 ]
 
-# Serve PDF.js through Django so protected PDF endpoints keep same-origin
-# credentials; the asset route serves the vendored files from the app image.
 PDF_VIEWER_URL = "/cms/pdf-viewer/pdfjs-viewer/viewer.html"
-
-# External PDF proxy (Issue #1069 Phase 3). Off by default (empty allowlist).
 CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS = [
     host.strip().lower()
     for host in os.getenv("CMS_EXTERNAL_PDF_PROXY_ALLOWED_HOSTS", "").split(",")
@@ -370,6 +434,7 @@ LOGGING = {
 }
 
 # Django messages framework tags
+
 MESSAGE_TAGS = {
     messages.ERROR: "danger",
 }

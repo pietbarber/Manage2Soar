@@ -16,7 +16,6 @@
 import logging
 import os
 import re
-import sys
 import tempfile
 from datetime import timedelta
 from pathlib import Path
@@ -26,13 +25,12 @@ from django.shortcuts import redirect
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 
+from manage2soar.settings_env import is_testing
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # Define the base directory of the Django project.
 # This calculates the path to the directory containing 'manage.py'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Detect if we're running in a test environment to prevent test pollution
-TESTING = any(arg.startswith("test") for arg in sys.argv[1:2])
 
 # Load environment variables from the .env file located in the BASE_DIR.
 # This ensures that sensitive information and configuration can be managed
@@ -40,7 +38,14 @@ TESTING = any(arg.startswith("test") for arg in sys.argv[1:2])
 dotenv_path = BASE_DIR / ".env"
 if dotenv_path.exists():
     load_dotenv(dotenv_path)
-elif not TESTING:  # Only log if not in test environment
+
+# Detecting tests must never change DEBUG or other security defaults.  Keep
+# the classification in one place so base and single-host settings agree.
+# Classify after ``load_dotenv`` so an explicit ``DJANGO_TESTING`` in ``.env``
+# takes effect consistently with the single-host module.
+TESTING = is_testing()
+
+if not dotenv_path.exists() and not TESTING:  # Only log outside tests
     logger = logging.getLogger(__name__)
     logger.warning(
         f".env file not found at {dotenv_path}. Relying on system environment variables."
@@ -105,10 +110,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # Issue #1110: Login throttling middleware (django-axes).
-    # Must run AFTER AuthenticationMiddleware (needs request.user) and BEFORE
-    # KioskAutoLoginMiddleware to preserve the Issue #709 ordering contract
-    # (Kiosk must run before CsrfViewMiddleware).
     "axes.middleware.AxesMiddleware",
+    "members.role_preview.RolePreviewMiddleware",
     # Issue #709: KioskAutoLoginMiddleware MUST run before CsrfViewMiddleware.
     # login() calls rotate_token(), which replaces request.META["CSRF_COOKIE"].
     # CsrfViewMiddleware.process_request (running after) overwrites that with
@@ -148,6 +151,8 @@ TEMPLATES = [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
+                "members.role_preview.role_preview_context",
+                "members.context_processors.authorization",
                 "django.contrib.messages.context_processors.messages",
                 "social_django.context_processors.backends",
                 "social_django.context_processors.login_redirect",
@@ -401,6 +406,7 @@ AUTHENTICATION_BACKENDS = (
     "utils.auth_backends.AxesCompatBackend",
     "social_core.backends.google.GoogleOAuth2",
     "django.contrib.auth.backends.ModelBackend",
+    "members.auth_backends.QualificationPermissionBackend",
 )
 
 

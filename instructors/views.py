@@ -29,6 +29,7 @@ from django.views.generic import FormView
 
 from instructors import foreflight_export as ff
 from instructors.decorators import (
+    ground_instruction_required,
     instructor_or_safety_officer_required,
     instructor_required,
 )
@@ -73,6 +74,7 @@ from knowledgetest.views import get_presets
 from logsheet.models import Flight, Towplane
 from logsheet.utils.finalization_email import html_to_text_preserve_links
 from logsheet.utils.tow_logbook import get_tow_logbook_data
+from members.authorization import has_training_record_access, has_training_record_action
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -587,7 +589,7 @@ def member_training_grid(request, member_id):
         .select_related("instructor")
         .prefetch_related("lesson_scores__lesson")
     )
-    if request.user != member and not request.user.instructor:
+    if request.user != member and not has_training_record_access(request.user):
         raise PermissionDenied
 
     # Keep one grid column per saved report and add a pending column for
@@ -907,16 +909,21 @@ def member_training_grid(request, member_id):
 ####################################################
 
 
-@instructor_required
+@ground_instruction_required
 def log_ground_instruction(request):
     # Accept either 'student' or 'student_id' as the query parameter for
     # compatibility with multiple templates/links in the codebase.
+    can_assign_qualification = has_training_record_action(request.user)
     student_id = request.GET.get("student") or request.GET.get("student_id")
     student = get_object_or_404(Member, pk=student_id) if student_id else None
     lessons = TrainingLesson.objects.all().order_by("sort_key")
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
+        if (
+            form_type == "qualification" or request.POST.get("qual_qualification")
+        ) and not can_assign_qualification:
+            raise PermissionDenied
 
         if form_type == "qualification" and student:
             # Handle qualification assignment
@@ -1018,6 +1025,8 @@ def log_ground_instruction(request):
                     messages.success(
                         request, "Ground instruction session logged successfully."
                     )
+                if student is not None and not has_training_record_access(request.user):
+                    return redirect("members:member_view", member_id=student.id)
                 if student is not None:
                     return redirect(
                         "instructors:member_instruction_record", member_id=student.id
@@ -1091,6 +1100,7 @@ def log_ground_instruction(request):
             "existing_qualifications": existing_qualifications,
             "qualification_form": qualification_form,
             "all_qualifications": all_qualifications,
+            "can_assign_qualification": can_assign_qualification,
         },
     )
 
@@ -1110,7 +1120,7 @@ def log_ground_instruction(request):
 
 
 def is_instructor(user):
-    return user.is_authenticated and user.instructor
+    return has_training_record_action(user)
 
 
 ####################################################
@@ -1802,7 +1812,7 @@ def member_logbook(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
     # Determine which years to show
 
@@ -2847,7 +2857,7 @@ def export_member_logbook_csv(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
 
     def format_hhmm(duration):
@@ -3178,7 +3188,7 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
 
     events, report_lookup, rating_date = _build_logbook_events(

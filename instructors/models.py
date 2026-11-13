@@ -1,10 +1,17 @@
 import re
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from tinymce.models import HTMLField
 
-from members.models import Member
+from members.models import Member, RoleMetadata
 from utils.upload_entropy import upload_quals_icon
+
+# Qualification-derived permissions are an explicit security boundary. Add a
+# capability here only after reviewing its business impact and endpoint policy.
+QUALIFICATION_ALLOWED_PERMISSIONS = frozenset(
+    {"instructors.can_manage_ground_instruction"}
+)
 
 SCORE_CHOICES = [
     ("1", "1 - Introduced (Discussed/Demonstrated)"),
@@ -276,6 +283,9 @@ class GroundInstruction(models.Model):
 
     class Meta:
         ordering = ["-date"]
+        permissions = [
+            ("can_manage_ground_instruction", "Can manage ground instruction"),
+        ]
         indexes = [
             models.Index(fields=["student"]),
             models.Index(fields=["instructor"]),
@@ -346,9 +356,107 @@ class ClubQualificationType(models.Model):
     )
     is_obsolete = models.BooleanField(default=False)
     tooltip = models.TextField(blank=True)
+    permission_group = models.ForeignKey(
+        "auth.Group",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="qualification_types",
+        help_text=(
+            "Optional opted-in Group whose explicit custom action permissions "
+            "apply while qualified; standard add/change/delete/view permissions "
+            "are not allowed."
+        ),
+    )
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        super().clean()
+        if not self.permission_group_id:
+            return
+        try:
+            metadata = self.permission_group.role_metadata
+        except RoleMetadata.DoesNotExist:
+            metadata = None
+        if (
+            metadata is None
+            or not metadata.qualification_permission_bundle
+            or metadata.is_builtin
+            or metadata.is_protected
+            or metadata.is_system_managed
+        ):
+            raise ValidationError(
+                {
+                    "permission_group": (
+                        "Select an opted-in, non-built-in, non-protected, "
+                        "non-system-managed Group."
+                    )
+                }
+            )
+        if any(
+            f"{permission.content_type.app_label}.{permission.codename}"
+            not in QUALIFICATION_ALLOWED_PERMISSIONS
+            for permission in self.permission_group.permissions.select_related(
+                "content_type"
+            )
+        ):
+            raise ValidationError(
+                {
+                    "permission_group": (
+                        "Qualification bundles cannot include broad "
+                        "authentication or administration permissions."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class QualificationPermissionGrant(models.Model):
+    """Explicit per-permission approval for a qualification bundle action."""
+
+    group = models.ForeignKey("auth.Group", on_delete=models.CASCADE)
+    permission = models.ForeignKey("auth.Permission", on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("group", "permission"),
+                name="unique_qualification_permission_grant",
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+        permission_name = (
+            f"{self.permission.content_type.app_label}.{self.permission.codename}"
+            if self.permission_id
+            else ""
+        )
+        if (
+            not self.group_id
+            or not self.permission_id
+            or permission_name not in QUALIFICATION_ALLOWED_PERMISSIONS
+        ):
+            raise ValidationError(
+                "Only explicitly approved, non-CRUD custom action permissions may be qualification-derived."
+            )
+        if (
+            self.group_id
+            and self.permission_id
+            and not self.group.permissions.filter(pk=self.permission_id).exists()
+        ):
+            raise ValidationError(
+                "The permission must already be assigned to the selected bundle Group."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 ####################################################

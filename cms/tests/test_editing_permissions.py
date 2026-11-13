@@ -5,8 +5,11 @@ Tests the new role-based editing permission system added in Issue #273.
 """
 
 import pytest
+from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Permission
+from django.contrib.contenttypes.models import ContentType
+from django.http import HttpRequest
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -67,6 +70,19 @@ class EditingPermissionFunctionTests(TestCase):
         self.assertTrue(can_edit_page(self.webmaster, self.public_page))
         self.assertTrue(can_edit_page(self.webmaster, self.member_page))
         self.assertTrue(can_edit_page(self.webmaster, self.board_page))
+
+    def test_registered_page_capabilities_keep_edit_access_without_role_flags(self):
+        """The edit capability grants view through the editor context."""
+        content_type = ContentType.objects.get_for_model(Page)
+        self.member.user_permissions.add(
+            *Permission.objects.filter(
+                content_type=content_type,
+                codename__in=["view_page", "change_page"],
+            )
+        )
+
+        self.assertTrue(self.board_page.can_user_access(self.member))
+        self.assertTrue(can_edit_page(self.member, self.board_page))
 
     def test_can_edit_page_public_pages_officer_access(self):
         """
@@ -574,6 +590,41 @@ class WebmasterAdminPermissionTests(TestCase):
         self.assertTrue(
             self.document_admin.has_module_permission(self.superuser_request)
         )
+
+    def test_cms_model_permissions_are_an_additive_transition_grant(self):
+        """Exact model grants work without making ordinary staff webmasters."""
+        from cms.admin import PageRolePermissionAdmin
+
+        permission_admin = PageRolePermissionAdmin(PageRolePermission, AdminSite())
+        model_user = User.objects.create_user(
+            username="cms-model-permissions", is_staff=True
+        )
+        User.objects.filter(pk=model_user.pk).update(is_active=True)
+        model_user.refresh_from_db()
+        content_type = ContentType.objects.get_for_model(PageRolePermission)
+        model_user.user_permissions.add(
+            *Permission.objects.filter(
+                content_type=content_type,
+                codename__in=[
+                    "view_pagerolepermission",
+                    "add_pagerolepermission",
+                    "change_pagerolepermission",
+                    "delete_pagerolepermission",
+                ],
+            )
+        )
+        request = HttpRequest()
+        request.user = User.objects.get(pk=model_user.pk)
+
+        assert permission_admin.has_module_permission(request)
+        assert permission_admin.has_view_permission(request)
+        assert permission_admin.has_add_permission(request)
+        assert permission_admin.has_change_permission(request)
+        assert permission_admin.has_delete_permission(request)
+
+        staff = User.objects.create_user(username="cms-ordinary-staff", is_staff=True)
+        request.user = staff
+        assert not permission_admin.has_module_permission(request)
 
 
 @pytest.mark.django_db

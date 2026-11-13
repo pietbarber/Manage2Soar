@@ -6,7 +6,9 @@ Notifies membership managers about important member events.
 import logging
 
 from django.conf import settings
-from django.db.models.signals import post_save
+from django.contrib.auth.models import Group
+from django.db import models
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete
 from django.dispatch import receiver
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -17,9 +19,233 @@ from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import build_absolute_url, get_canonical_url
 
-from .models import Member
+from .models import (
+    Member,
+    MemberRoleAssignment,
+    MemberRoleAssignmentEvent,
+    RoleMetadata,
+)
+from .role_audit import get_actor, is_internal_group_write
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(m2m_changed, sender=Member.groups.through)
+def warn_external_member_group_write(
+    sender, instance, action, reverse, model, pk_set, using, **kwargs
+):
+    """Warn about direct Group membership writes without changing them."""
+    if is_internal_group_write():
+        return
+    if action not in {"post_add", "post_remove", "pre_clear"}:
+        return
+
+    if reverse:
+        group_ids = [instance.pk]
+        member_ids = sorted(pk_set or ())
+        if action == "pre_clear":
+            member_ids = sorted(
+                sender.objects.using(using)
+                .filter(group_id=instance.pk)
+                .values_list("member_id", flat=True)
+            )
+    else:
+        member_ids = [instance.pk]
+        group_ids = sorted(pk_set or ())
+        if action == "pre_clear":
+            group_ids = sorted(
+                sender.objects.using(using)
+                .filter(member_id=instance.pk)
+                .values_list("group_id", flat=True)
+            )
+
+    actor = get_actor()
+
+    logger.warning(
+        "External Member.groups write detected",
+        extra={
+            "event": "external_member_group_write",
+            "action": action,
+            "operation": (
+                "clear" if action == "pre_clear" else action.removeprefix("post_")
+            ),
+            "member_id": instance.pk if not reverse else None,
+            "member_ids": member_ids,
+            "group_id": instance.pk if reverse else None,
+            "group_ids": group_ids,
+            "actor_id": getattr(actor, "pk", None),
+            "actor": getattr(actor, "username", None),
+            "using": using,
+        },
+    )
+
+
+def _deleting_model(origin):
+    """Return the top-level model being deleted, when Django provides it."""
+    if isinstance(origin, models.Model):
+        return type(origin)
+    return getattr(origin, "model", None)
+
+
+def _assignment_identity(instance, using):
+    """Read canonical identity for an assignment before it is removed.
+
+    Django sends ``pre_delete`` for every object in a deletion plan before
+    deleting any of them, so this snapshot still sees the Member, Group, and
+    RoleMetadata rows even during a cascade.
+    """
+    return {
+        "member_username": (
+            Member.objects.using(using)
+            .filter(pk=instance.member_id)
+            .values_list("username", flat=True)
+            .first()
+            or ""
+        ),
+        "group_name": (
+            Group.objects.using(using)
+            .filter(pk=instance.group_id)
+            .values_list("name", flat=True)
+            .first()
+            or ""
+        ),
+        "role_key": (
+            RoleMetadata.objects.using(using)
+            .filter(group_id=instance.group_id)
+            .values_list("key", flat=True)
+            .first()
+            or ""
+        ),
+    }
+
+
+@receiver(pre_delete, sender=MemberRoleAssignment)
+def snapshot_deleted_role_assignment(sender, instance, using, **kwargs):
+    """Capture related identity before a cascade deletes it.
+
+    Without this, a Group cascade can remove RoleMetadata before the
+    assignment's post-delete signal runs, losing the stable ``role_key`` from
+    the revoke event exactly when the historical record matters most.
+    """
+    snapshot = _assignment_identity(instance, using)
+    instance._audit_member_username = snapshot["member_username"]
+    instance._audit_group_name = snapshot["group_name"]
+    instance._audit_role_key = snapshot["role_key"]
+
+
+@receiver(post_save, sender=MemberRoleAssignment)
+def record_created_role_assignment(sender, instance, created, using, **kwargs):
+    """Append a grant event for every assignment creation.
+
+    This is the model-level backstop for direct ORM creation.  The supported
+    service path sets :func:`members.role_audit.actor_scope`, so it records the
+    administrator; an uncovered direct write is recorded as a system grant
+    unless the assignment itself names an actor.  Updates are rejected by the
+    model, and bulk creation is rejected by its manager, so create is the only
+    uncovered mutation path.
+    """
+    if not created or kwargs.get("raw"):
+        # Fixture loads create historical rows, not live administrative
+        # actions; do not manufacture audit events for them.
+        return
+
+    using = using or instance._state.db
+    snapshot = _assignment_identity(instance, using)
+    actor = get_actor()
+    if actor is None and instance.actor_id is not None:
+        actor = Member.objects.using(using).filter(pk=instance.actor_id).first()
+    actor_id = actor.pk if actor is not None and actor.pk is not None else None
+    actor_username = ""
+    if actor_id is not None:
+        actor_username = Member.objects.using(using).filter(pk=actor_id).values_list(
+            "username", flat=True
+        ).first() or (actor.get_username() if actor is not None else "")
+
+    MemberRoleAssignmentEvent.objects.using(using).create(
+        member_id=instance.member_id,
+        member_id_snapshot=instance.member_id,
+        member_username=snapshot["member_username"],
+        group_id=instance.group_id,
+        group_id_snapshot=instance.group_id,
+        group_name=snapshot["group_name"],
+        role_key=snapshot["role_key"],
+        action="grant",
+        actor_id=actor_id,
+        actor_id_snapshot=actor_id,
+        actor_username=actor_username,
+        source=instance.source,
+        source_key=instance.source_key,
+    )
+
+
+@receiver(post_delete, sender=MemberRoleAssignment)
+def record_deleted_role_assignment(sender, instance, using, **kwargs):
+    """Append a revoke event for every assignment deletion, including cascades.
+
+    Assignment rows are provenance, not the audit ledger.  The ledger keeps
+    snapshot identity so it survives the deletion that triggered it.  When a
+    Member or Group cascade is in progress, the convenience foreign keys are
+    left null: the parent row is about to disappear, and Django has already
+    planned its SET_NULL updates before this new event row exists.
+    """
+    origin = kwargs.get("origin")
+    deleting_model = _deleting_model(origin)
+    deleting_origin_unknown = deleting_model is None
+
+    member_id = instance.member_id
+    group_id = instance.group_id
+    actor = get_actor()
+    actor_id = actor.pk if actor is not None and actor.pk is not None else None
+    actor_id_snapshot = actor_id
+
+    if deleting_model is Member:
+        member_id = None
+        # The actor may be a different Member in the same delete set.  Django
+        # cannot know that here, and a live FK to a row that is also being
+        # deleted aborts the cascade.  The snapshot fields retain attribution.
+        actor_id = None
+    elif deleting_model is Group:
+        group_id = None
+    elif deleting_origin_unknown:
+        # Conservatively avoid an FK to a parent whose delete ordering is
+        # unknown; the snapshot fields still carry the complete identity.
+        member_id = None
+        group_id = None
+        actor_id = None
+
+    if hasattr(instance, "_audit_role_key"):
+        member_username = instance._audit_member_username
+        group_name = instance._audit_group_name
+        role_key = instance._audit_role_key
+    else:
+        snapshot = _assignment_identity(instance, using)
+        member_username = snapshot["member_username"]
+        group_name = snapshot["group_name"]
+        role_key = snapshot["role_key"]
+
+    actor_username = ""
+    if actor_id_snapshot is not None:
+        actor_username = Member.objects.using(using).filter(
+            pk=actor_id_snapshot
+        ).values_list("username", flat=True).first() or (
+            actor.get_username() if actor is not None else ""
+        )
+
+    MemberRoleAssignmentEvent.objects.using(using).create(
+        member_id=member_id,
+        member_id_snapshot=instance.member_id,
+        member_username=member_username,
+        group_id=group_id,
+        group_id_snapshot=instance.group_id,
+        group_name=group_name,
+        role_key=role_key,
+        action="revoke",
+        actor_id=actor_id,
+        actor_id_snapshot=actor_id_snapshot,
+        actor_username=actor_username,
+        source=instance.source,
+        source_key=instance.source_key,
+    )
 
 
 def _membership_application_email_urls(application, site_url):

@@ -265,7 +265,7 @@
             {% endif %}
           </div>
           <div class="d-flex gap-2">
-            {% if student and qualification_form %}
+            {% if student and qualification_form and can_assign_qualification %}
               <button type="button" class="btn btn-info btn-modern" onclick="submitQualificationOnly()">
                 <i class="bi bi-award me-2"></i>Add Qualification Only
               </button>
@@ -281,7 +281,7 @@
 </div>
 
 <!-- Student Qualifications Management Card (outside main form to avoid field name conflicts) -->
-{% if student %}
+{% if student and can_assign_qualification %}
 <div class="container-fluid mb-4">
   <div class="row justify-content-center">
     <div class="col-lg-10 col-xl-8">
@@ -423,7 +423,7 @@
 {% endif %}
 
 <!-- Standalone Qualification Form (hidden, for "Add Qualification Only" button) -->
-{% if student and qualification_form %}
+{% if student and qualification_form and can_assign_qualification %}
 <form method="post" id="qualificationFormStandalone" style="display: none;">
   {% csrf_token %}
   <input type="hidden" name="form_type" value="qualification">

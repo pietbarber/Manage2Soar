@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import transaction
 
 CONTACT_FIELDS = ("email", "phone", "address")
+PRIVILEGED_CONTACT_PERMISSION = "members.view_privileged_contact"
+SAFETY_REPORT_PERMISSION = "members.access_safety_reports"
 
 
 def _reconcile_legacy_contact_redaction(subject_member):
@@ -32,25 +34,36 @@ def _reconcile_legacy_contact_redaction(subject_member):
 
 
 def is_privileged_viewer(user):
+    """Return whether ``user`` may bypass member contact visibility choices.
+
+    ``is_staff`` is deliberately not used here.  Staff is an admin entry-gate
+    flag and is also derived for roles such as Instructor and Secretary; it is
+    not, by itself, a contact-privacy capability.  The dedicated permission
+    is seeded for the four roles that historically had this explicit policy.
+    Manually-created staff users therefore need an explicit grant, which is
+    the intentional privacy transition rather than an unresolved fallback.
+    """
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if user.is_superuser or getattr(user, "is_staff", False):
+    if user.is_superuser:
         return True
-    # Role flags that should grant privileged viewing rights
-    if (
-        getattr(user, "webmaster", False)
-        or getattr(user, "treasurer", False)
-        or getattr(user, "member_manager", False)
-        or getattr(user, "rostermeister", False)
-    ):
-        return True
-    exempt_groups = getattr(settings, "MEMBERS_REDACT_EXEMPT_GROUPS", [])
-    if not exempt_groups:
-        return False
+    if getattr(user, "_role_preview_group_name", None) is not None:
+        return user.has_perm(PRIVILEGED_CONTACT_PERMISSION)
     try:
-        return user.groups.filter(name__in=exempt_groups).exists()
+        if user.has_perm(PRIVILEGED_CONTACT_PERMISSION):
+            return True
     except Exception:
-        return False
+        # Keep privacy checks fail-closed for lightweight/auth-less user
+        # doubles and partially configured authentication backends.
+        pass
+    if getattr(settings, "MEMBERS_REDACT_EXEMPT_GROUPS", []):
+        try:
+            return user.groups.filter(
+                name__in=settings.MEMBERS_REDACT_EXEMPT_GROUPS
+            ).exists()
+        except Exception:
+            pass
+    return False
 
 
 def can_view_personal_info(viewer, subject_member):

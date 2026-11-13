@@ -1,4 +1,6 @@
+from django import forms
 from django.contrib import admin
+from django.contrib.auth.models import Group, Permission
 from reversion.admin import VersionAdmin
 from tinymce.models import HTMLField
 from tinymce.widgets import TinyMCE
@@ -6,16 +8,82 @@ from tinymce.widgets import TinyMCE
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
+    QUALIFICATION_ALLOWED_PERMISSIONS,
     ClubQualificationType,
     GroundInstruction,
     GroundLessonScore,
     InstructionReport,
     LessonScore,
     MemberQualification,
+    QualificationPermissionGrant,
     SyllabusDocument,
     TrainingLesson,
     TrainingPhase,
 )
+
+
+def safe_qualification_permissions():
+    """Return only explicitly approved qualification capabilities."""
+    allowed = [
+        (app_label, codename)
+        for app_label, codename in (
+            capability.split(".", 1) for capability in QUALIFICATION_ALLOWED_PERMISSIONS
+        )
+    ]
+    query = Permission.objects.none()
+    for app_label, codename in allowed:
+        query = query | Permission.objects.filter(
+            content_type__app_label=app_label,
+            codename=codename,
+        )
+    return query
+
+
+def eligible_qualification_groups():
+    return Group.objects.filter(
+        role_metadata__qualification_permission_bundle=True,
+        role_metadata__is_builtin=False,
+        role_metadata__is_protected=False,
+        role_metadata__is_system_managed=False,
+    ).order_by("name")
+
+
+class QualificationPermissionGrantAdminForm(forms.ModelForm):
+    class Meta:
+        model = QualificationPermissionGrant
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["group"].queryset = eligible_qualification_groups()
+        permissions = safe_qualification_permissions()
+        self.fields["permission"].queryset = permissions.select_related(
+            "content_type"
+        ).order_by("content_type__app_label", "codename")
+
+
+@admin.register(QualificationPermissionGrant)
+class QualificationPermissionGrantAdmin(admin.ModelAdmin):
+    form = QualificationPermissionGrantAdminForm
+    list_display = ("group", "permission")
+    list_filter = ("group", "permission__content_type__app_label")
+    search_fields = ("group__name", "permission__codename", "permission__name")
+
+    def has_module_permission(self, request):
+        return request.user.is_active and request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_add_permission(self, request):
+        return self.has_module_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
 
 ####################################################
 # TrainingLessonAdmin
@@ -191,10 +259,59 @@ class GroundInstructionAdmin(AdminHelperMixin, admin.ModelAdmin):
 
 @admin.register(ClubQualificationType)
 class ClubQualificationTypeAdmin(AdminHelperMixin, admin.ModelAdmin):
-    list_display = ("code", "name", "applies_to", "is_obsolete")
+    list_display = (
+        "code",
+        "name",
+        "applies_to",
+        "is_obsolete",
+        "permission_group",
+    )
     search_fields = ("code", "name")
     list_filter = ("applies_to", "is_obsolete")
     ordering = ("code",)
+
+    def _can_manage_permission_group(self, request):
+        """Keep qualification permission bundles in the bootstrap admin boundary."""
+        return bool(
+            request.user and request.user.is_active and request.user.is_superuser
+        )
+
+    def get_list_display(self, request):
+        fields = super().get_list_display(request)
+        if not self._can_manage_permission_group(request):
+            return tuple(field for field in fields if field != "permission_group")
+        return fields
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        # Excluding the field from the form, rather than merely hiding its
+        # widget, also makes a forged permission_group POST a no-op.  Django's
+        # ModelForm then preserves the existing value when saving other fields.
+        exclude = list(kwargs.pop("exclude", ()) or ())
+        if not self._can_manage_permission_group(request):
+            exclude.append("permission_group")
+        kwargs["exclude"] = exclude
+        return super().get_form(request, obj, change=change, **kwargs)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "permission_group":
+            allowed_permission_ids = safe_qualification_permissions().values("pk")
+            disallowed_permission_ids = Permission.objects.exclude(
+                pk__in=allowed_permission_ids
+            ).values("pk")
+            kwargs["queryset"] = (
+                Group.objects.filter(
+                    qualificationpermissiongrant__isnull=False,
+                    role_metadata__qualification_permission_bundle=True,
+                    role_metadata__is_builtin=False,
+                    role_metadata__is_protected=False,
+                    role_metadata__is_system_managed=False,
+                )
+                .filter(permissions__in=allowed_permission_ids)
+                .exclude(permissions__in=disallowed_permission_ids)
+                .distinct()
+                .order_by("name")
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     admin_helper_message = "Qualification types: define club qualifications and tooltips. Updates affect member qualifications listings."
 

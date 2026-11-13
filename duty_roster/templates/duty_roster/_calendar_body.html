@@ -11,7 +11,7 @@
         <div class="flex-grow-1">
           <div class="d-flex justify-content-between align-items-start">
             <strong class="d-block mb-1">Roster Manager Announcement:</strong>
-            {% if user.rostermeister or user.is_staff or user.is_superuser %}
+            {% if role_access.roster_admin %}
             <a href="{% url 'duty_roster:edit_roster_message' %}" class="btn btn-sm btn-outline-primary ms-2" title="Edit announcement">
               <i class="bi bi-pencil"></i>
             </a>
@@ -22,7 +22,7 @@
       </div>
       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-    {% elif user.rostermeister or user.is_staff or user.is_superuser %}
+            {% elif role_access.roster_admin %}
     {# Show "Add Message" button for rostermeisters when no message exists #}
     <div class="mb-4 text-end">
       <a href="{% url 'duty_roster:edit_roster_message' %}" class="btn btn-sm btn-outline-secondary" title="Add roster announcement">

@@ -26,6 +26,12 @@ from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from duty_roster.permissions import (
+    EDIT_ROSTER_MESSAGE_PERMISSION,
+    has_all_swap_requests_access,
+    has_duty_delinquents_access,
+    has_rostermeister_access,
+)
 from duty_roster.utils.delinquents import apply_duty_delinquent_exemptions
 from duty_roster.utils.email import (
     get_email_config,
@@ -33,6 +39,7 @@ from duty_roster.utils.email import (
     notify_ops_status,
 )
 from logsheet.models import Airfield
+from members.authorization import has_training_record_action
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -394,7 +401,7 @@ def blackout_manage(request):
     ]
 
     role_choices = []
-    if member.instructor and role_schedule_flags["instructor"]:
+    if has_training_record_action(member) and role_schedule_flags["instructor"]:
         role_choices.append(
             (
                 "instructor",
@@ -954,7 +961,7 @@ def _build_agenda_quick_actions(
         )
 
     # Review Student Requests (instructor roles)
-    if is_authenticated and getattr(request.user, "instructor", False):
+    if is_authenticated and has_training_record_action(request.user):
         review_reason = ""
         if not is_active_member:
             review_reason = "Active membership is required."
@@ -1092,7 +1099,7 @@ def duty_calendar_view(request, year=None, month=None):
         original_date__in=visible_dates,
     )
     if request.user.is_authenticated:
-        if not (request.user.is_staff or getattr(request.user, "rostermeister", False)):
+        if not has_all_swap_requests_access(request.user):
             open_swap_queryset = open_swap_queryset.filter(
                 models.Q(request_type="general")
                 | (
@@ -1556,7 +1563,7 @@ def calendar_day_detail(request, year, month, day):
         original_date=day_date,
     )
     if request.user.is_authenticated:
-        if not (request.user.is_staff or getattr(request.user, "rostermeister", False)):
+        if not has_all_swap_requests_access(request.user):
             open_swap_requests_queryset = open_swap_requests_queryset.filter(
                 models.Q(request_type="general")
                 | (
@@ -1611,7 +1618,7 @@ def calendar_day_detail(request, year, month, day):
                 assignment
                 and day_date >= date.today()
                 and request.user.is_authenticated
-                and getattr(request.user, "instructor", False)
+                and has_training_record_action(request.user)
                 and assignment.instructor_id is not None
                 and assignment.surge_instructor_id is None
                 and request.user.id != assignment.instructor_id
@@ -1990,7 +1997,7 @@ def maybe_notify_surge_towpilot(day_date):
 
 
 def assignment_edit_form(request, year, month, day):
-    if not request.user.is_authenticated or not request.user.rostermeister:
+    if not has_rostermeister_access(request.user):
         return HttpResponse("Forbidden", status=403)
 
     day_date = date(year, month, day)
@@ -2010,7 +2017,7 @@ def assignment_edit_form(request, year, month, day):
 
 @require_POST
 def assignment_save_form(request, year, month, day):
-    if not request.user.is_authenticated or not request.user.rostermeister:
+    if not has_rostermeister_access(request.user):
         return HttpResponse("Forbidden", status=403)
 
     day_date = date(year, month, day)
@@ -2180,7 +2187,7 @@ def calendar_instructor_signup(request, year, month, day):
     day_obj = date(int(year), int(month), int(day))
     member = request.user
 
-    if not member.instructor:
+    if not has_training_record_action(member):
         return HttpResponseForbidden("You are not an instructor.")
 
     # Use transaction with row lock to prevent race conditions
@@ -2450,7 +2457,7 @@ def calendar_cancel_ops_modal(request, year, month, day):
 
 
 def is_rostermeister(user):
-    return user.is_authenticated and user.rostermeister
+    return has_rostermeister_access(user)
 
 
 @active_member_required
@@ -3646,10 +3653,7 @@ def propose_roster(request):
     )
 
 
-@user_passes_test(
-    lambda u: u.is_authenticated
-    and (u.rostermeister or u.member_manager or u.director or u.is_superuser)
-)
+@user_passes_test(has_duty_delinquents_access)
 def duty_delinquents_detail(request):
     """
     Detailed view of members who haven't been performing duty.
@@ -4086,7 +4090,7 @@ def instructor_requests(request):
     """
     from .models import InstructionSlot
 
-    if not request.user.instructor:
+    if not has_training_record_action(request.user):
         messages.error(request, "Only instructors can access this page.")
         return redirect("duty_roster:duty_calendar")
 
@@ -4266,7 +4270,7 @@ def instructor_respond(request, slot_id):
     from .forms import InstructorResponseForm
     from .models import InstructionSlot
 
-    if not request.user.instructor:
+    if not has_training_record_action(request.user):
         return HttpResponseForbidden("Only instructors can respond to requests.")
 
     slot = get_object_or_404(InstructionSlot, id=slot_id)
@@ -4345,7 +4349,7 @@ def revert_instruction_response(request, slot_id):
     """Move an accepted student request back to pending for instructor review."""
     from .models import InstructionSlot
 
-    if not request.user.instructor:
+    if not has_training_record_action(request.user):
         return HttpResponseForbidden("Only instructors can modify requests.")
 
     slot = get_object_or_404(InstructionSlot, id=slot_id)
@@ -4494,7 +4498,7 @@ def volunteer_as_surge_instructor(request, assignment_id):
     assignment = get_object_or_404(DutyAssignment, id=assignment_id)
     member = request.user
 
-    if not member.instructor:
+    if not has_training_record_action(member):
         messages.error(
             request,
             "Only qualified instructors can volunteer as surge instructor.",
@@ -4711,7 +4715,7 @@ def retract_surge_instructor(request, assignment_id):
     assignment = get_object_or_404(DutyAssignment, id=assignment_id)
     member = request.user
 
-    if not member.instructor:
+    if not has_training_record_action(member):
         messages.error(
             request,
             "Only qualified instructors can retract a surge instructor offer.",
@@ -5494,7 +5498,14 @@ def _notify_student_instructor_assigned(slot):
 
 
 @active_member_required
-@user_passes_test(lambda u: is_rostermeister(u) or u.is_staff or u.is_superuser)
+@user_passes_test(
+    lambda u: (
+        u.is_superuser
+        or u.has_perm(EDIT_ROSTER_MESSAGE_PERMISSION)
+        or u.has_perm("duty_roster.edit_dutyroster_message")
+        or getattr(u, "rostermeister", False)
+    )
+)
 @never_cache
 def edit_roster_message(request):
     """

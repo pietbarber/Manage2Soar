@@ -87,6 +87,14 @@ class WrittenTestTemplate(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        permissions = [
+            (
+                "start_unassigned_written_test",
+                "Can start and submit an unassigned written test",
+            ),
+        ]
+
     def __str__(self):
         return self.name
 
@@ -128,6 +136,12 @@ class WrittenTestAttempt(models.Model):
     time_taken = models.DurationField(
         null=True, blank=True, help_text="Duration student took to complete the test"
     )
+
+    class Meta:
+        permissions = [
+            ("delete_any_written_test_attempt", "Can delete any written test attempt"),
+            ("view_recent_written_tests", "Can view recent written tests"),
+        ]
 
     def __str__(self):
         status = "Passed" if self.passed else "Failed"
@@ -176,6 +190,12 @@ class WrittenTestAssignment(models.Model):
 
     class Meta:
         unique_together = ("template", "student")
+        permissions = [
+            (
+                "delete_any_pending_written_test_assignment",
+                "Can delete any pending written test assignment",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.template.name} → {self.student}"

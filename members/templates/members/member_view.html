@@ -54,7 +54,7 @@
             </p>
           </div>
         </div>
-        {% if request.user.is_superuser or request.user.member_manager %}
+        {% if role_access.member_admin %}
         <div class="profile-action-buttons">
           <a href="{% url 'admin:members_member_change' member.id %}" class="btn btn-light btn-modern">
             <i class="bi bi-pencil-square me-2"></i>Edit Member
@@ -451,8 +451,16 @@
         </div>
       </div>
 
+      {% if request.user != member and role_access.ground_instruction and not role_access.instructor %}
+      <div class="mb-4">
+        <a href="{% url 'instructors:log_ground_instruction' %}?student={{ member.id }}" class="btn btn-outline-success">
+          Log Ground Instruction
+        </a>
+      </div>
+      {% endif %}
+
       <!-- Instructor Tools Section -->
-      {% if request.user == member or request.user.instructor %}
+      {% if request.user == member or role_access.instructor %}
       <div class="card contact-info mb-4">
         <div class="card-header bg-primary text-white">
           <h5 class="mb-0">
@@ -481,7 +489,7 @@
 
           <div class="row g-2">
             <div class="col-sm-6">
-              <a href="{% if request.user.instructor %}{% url 'instructors:member_training_grid' member.id %}{% else %}{% url 'members:training_progress' %}{% endif %}" class="btn btn-outline-primary btn-modern w-100">
+              <a href="{% if role_access.instructor %}{% url 'instructors:member_training_grid' member.id %}{% else %}{% url 'members:training_progress' %}{% endif %}" class="btn btn-outline-primary btn-modern w-100">
                 <i class="bi bi-grid-3x3 me-2"></i>View Training Grid
               </a>
             </div>
@@ -492,17 +500,21 @@
             </div>
           </div>
 
-          {% if request.user.instructor and request.user != member %}
+          {% if request.user != member %}
+          {% if role_access.instructor or role_access.ground_instruction %}
           <hr>
           <h6 class="text-primary mb-3">
-            <i class="bi bi-person-workspace me-2"></i>Instructor Actions
+            <i class="bi bi-person-workspace me-2"></i>Instruction Actions
           </h6>
           <div class="row g-2">
+            {% if role_access.ground_instruction %}
             <div class="col-lg-4">
               <a href="{% url 'instructors:log_ground_instruction' %}?student={{ member.id }}" class="btn btn-outline-success btn-modern w-100">
                 <i class="bi bi-pencil-square me-2"></i>Log Ground Instruction
               </a>
             </div>
+            {% endif %}
+            {% if role_access.instructor %}
             <div class="col-lg-4">
               <a href="{% url 'instructors:select_instruction_date' member.id %}" class="btn btn-outline-success btn-modern w-100">
                 <i class="bi bi-airplane me-2"></i>Log Flight Instruction
@@ -515,7 +527,9 @@
                 <i class="bi bi-plus-circle me-2"></i>Assign Qualification
               </button>
             </div>
+            {% endif %}
           </div>
+          {% endif %}
           {% endif %}
         </div>
       </div>
