@@ -63,6 +63,16 @@ def test_ground_instruction_endpoint_rechecks_qualification_expiry_and_revocatio
     response = client.get(url, {"student_id": student.pk})
     assert response.status_code == 200
 
+    assert b'id="qualificationFormFields"' not in response.content
+    for payload in (
+        {"form_type": "qualification", "qualification": qualification.pk},
+        {"qual_qualification": qualification.pk},
+    ):
+        response = client.post(f"{url}?student={user.pk}", payload)
+        assert response.status_code == 403
+        assert GroundInstruction.objects.count() == 0
+        assert MemberQualification.objects.count() == 1
+
     record.expiration_date = timezone.localdate() - timedelta(days=1)
     record.save(update_fields=["expiration_date"])
     assert client.get(url, {"student_id": student.pk}).status_code == 403

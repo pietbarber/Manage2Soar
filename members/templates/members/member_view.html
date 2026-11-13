@@ -451,6 +451,14 @@
         </div>
       </div>
 
+      {% if request.user != member and role_access.ground_instruction and not role_access.instructor %}
+      <div class="mb-4">
+        <a href="{% url 'instructors:log_ground_instruction' %}?student={{ member.id }}" class="btn btn-outline-success">
+          Log Ground Instruction
+        </a>
+      </div>
+      {% endif %}
+
       <!-- Instructor Tools Section -->
       {% if request.user == member or role_access.instructor %}
       <div class="card contact-info mb-4">
