@@ -572,19 +572,22 @@ def write_and_postmap(filepath, content):
             raise
 
         database_backup = None
+        database_published = False
         try:
             if os.path.exists(database_path):
                 backup_fd, database_backup = tempfile.mkstemp(dir=directory)
                 os.close(backup_fd)
                 os.unlink(database_backup)
-                os.replace(database_path, database_backup)
+                # Keep the live Postfix pathname available during publication.
+                os.link(database_path, database_backup)
             os.replace(temp_database_path, database_path)
+            database_published = True
             os.replace(temp_path, filepath)
         except Exception:
-            if os.path.exists(database_path):
-                os.unlink(database_path)
             if database_backup and os.path.exists(database_backup):
                 os.replace(database_backup, database_path)
+            elif database_published and os.path.exists(database_path):
+                os.unlink(database_path)
             raise
         finally:
             if database_backup and os.path.exists(database_backup):

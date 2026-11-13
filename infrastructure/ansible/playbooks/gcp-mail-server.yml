@@ -206,7 +206,7 @@
       tags: [base]
 
     - role: postfix
-      tags: [postfix, mail]
+      tags: [postfix, mail, mail-sync]
       vars:
         postfix_rspamd_enabled: "{{ gcp_enable_inbound_smtp | default(true) | bool }}"
 
@@ -218,7 +218,7 @@
       when: gcp_enable_inbound_smtp | default(true) | bool
 
     - role: m2s-mail-sync
-      tags: [mail-sync, mail]
+      tags: [mail-sync, mail, postfix]
 
   post_tasks:
     - name: Create DKIM keys output directory

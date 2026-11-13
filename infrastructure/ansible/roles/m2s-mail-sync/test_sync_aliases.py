@@ -184,6 +184,35 @@ def test_virtual_map_restores_database_if_source_publish_fails(tmp_path):
     assert database_file.read_text() == "old database"
 
 
+def test_virtual_map_keeps_live_database_during_publication(tmp_path):
+    sync = load_sync_module()
+    sync.MAP_LOCK_FILE = str(tmp_path / "map.lock")
+    Path(sync.MAP_LOCK_FILE).touch()
+    virtual_file = tmp_path / "virtual"
+    virtual_file.write_text("old source")
+    database_file = tmp_path / "virtual.db"
+    database_file.write_text("old database")
+    real_replace = os.replace
+
+    def observe_replace(source, target):
+        if target == str(database_file):
+            assert database_file.read_text() == "old database"
+        return real_replace(source, target)
+
+    def fake_postmap(command, check):
+        Path(f"{command[1]}.db").write_text("new database")
+
+    with patch.object(sync.subprocess, "run", side_effect=fake_postmap), patch.object(
+        sync.grp, "getgrnam", return_value=type("Group", (), {"gr_gid": os.getgid()})()
+    ), patch.object(sync.os, "chown"), patch.object(
+        sync.os, "replace", side_effect=observe_replace
+    ):
+        assert sync.write_and_postmap(str(virtual_file), "new source")
+
+    assert virtual_file.read_text() == "new source"
+    assert database_file.read_text() == "new database"
+
+
 def test_forwarding_alias_rejects_legacy_local_domain():
     sync = load_sync_module()
     content = sync.generate_virtual_aliases(

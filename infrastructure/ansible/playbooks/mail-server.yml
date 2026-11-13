@@ -61,7 +61,7 @@
       tags: [common]
 
     - role: postfix
-      tags: [postfix, mail]
+      tags: [postfix, mail, sync]
 
     - role: opendkim
       tags: [opendkim, dkim, mail]
@@ -70,7 +70,7 @@
       tags: [rspamd, spam, mail]
 
     - role: m2s-mail-sync
-      tags: [sync, mail]
+      tags: [sync, mail, postfix]
 
   post_tasks:
     - name: Display DKIM public keys for DNS

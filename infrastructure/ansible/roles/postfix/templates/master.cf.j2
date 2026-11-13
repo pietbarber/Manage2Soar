@@ -93,9 +93,14 @@ maillist-rewriter-inbound unix  -       n       n       -       10      pipe
 maillist-rewriter-submission unix  -       n       n       -       10      pipe
   flags=Rq user={{ postfix_filter_user }} null_sender= argv=/usr/local/bin/maillist-rewriter.py ${nexthop} ${sender} ${original_recipient} ${recipient} trusted
 
+# Keep queued messages from before the transport split deliverable.
+maillist-rewriter unix  -       n       n       -       10      pipe
+  flags=Rq user={{ postfix_filter_user }} null_sender= argv=/usr/local/bin/maillist-rewriter.py ${nexthop} ${sender} ${original_recipient} ${recipient} public
+
 # Reinjection port (after content filter)
 127.0.0.1:10025 inet n  -       y       -       -       smtpd
   -o syslog_name=postfix/reinject
+  -o smtpd_milters=unix:/opendkim/opendkim.sock
   -o content_filter=
   -o receive_override_options=no_header_body_checks
   -o smtpd_helo_restrictions=

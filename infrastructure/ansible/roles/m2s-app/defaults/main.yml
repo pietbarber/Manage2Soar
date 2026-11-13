@@ -56,7 +56,7 @@ m2s_db_user: "{{ postgresql_user }}"
 # Email settings (defaults)
 m2s_email_backend: "django.core.mail.backends.smtp.EmailBackend"
 m2s_email_host: "localhost"
-m2s_email_port: 25
+m2s_email_port: 587
 m2s_email_use_tls: false
 
 # Google OAuth settings (override in vault)

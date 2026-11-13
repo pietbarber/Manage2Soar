@@ -31,9 +31,14 @@
     label: "{{ item.prefix | default('missing-prefix') }}"
   tags: [always]
 
+- name: Reset resolved tenant domains for this mail-sync run
+  ansible.builtin.set_fact:
+    m2s_mail_sync_resolved_tenant_domains: []
+  tags: [always]
+
 - name: Resolve mail-sync tenant domains for uniqueness validation
   ansible.builtin.set_fact:
-    m2s_mail_sync_resolved_tenant_domains: "{{ ((m2s_mail_sync_resolved_tenant_domains | default([])) + (_tenant_domains | map('lower') | unique | list)) | unique | list }}"
+    m2s_mail_sync_resolved_tenant_domains: "{{ m2s_mail_sync_resolved_tenant_domains + (_tenant_domains | map('lower') | unique | list) }}"
   vars:
     _explicit_domains: "{{ [item.domains] if (item.domains is defined and item.domains is string) else (item.domains | default([])) }}"
     _base_mail_domain: "{{ mail_domain | default(m2s_domain | default('')) }}"

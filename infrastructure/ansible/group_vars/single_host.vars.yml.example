@@ -168,7 +168,7 @@ nginx_rate_limit_enabled: true
 
 m2s_email_backend: "django.core.mail.backends.smtp.EmailBackend"
 m2s_email_host: "localhost"
-m2s_email_port: 25
+m2s_email_port: 587
 m2s_email_use_tls: false
 m2s_default_from_email: "noreply@{{ m2s_domain }}"
 

@@ -100,7 +100,7 @@
 
     # Mail server (optional)
     - role: postfix
-      tags: [mail, postfix]
+      tags: [mail, postfix, sync]
       vars:
         postfix_rspamd_enabled: "{{ mail_server_receive_enabled | default(false) | bool }}"
       when: mail_server_enabled | default(false) | bool
@@ -114,7 +114,7 @@
       when: (mail_server_enabled | default(false)) and (mail_server_receive_enabled | default(false))
 
     - role: m2s-mail-sync
-      tags: [mail, sync]
+      tags: [mail, sync, postfix]
       vars:
         dev_mode_enabled: "{{ email_dev_mode | default(false) }}"
         dev_mode_redirect_to: "{{ email_dev_mode_redirect_to | default('') }}"
