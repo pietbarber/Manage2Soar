@@ -10,6 +10,92 @@
 # run independently with --tags sync without requiring the common role.
 # This follows IaC best practices: roles should not have hidden dependencies.
 
+- name: Validate mail-sync tenant configuration
+  ansible.builtin.assert:
+    that:
+      - (item.prefix | default('')) is string
+      - (item.prefix | default('')) == (item.prefix | default('') | lower)
+      - (item.prefix | default('')) is match('^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$')
+      - _tenant_domains | reject('match', '^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$') | list | length == 0
+      - _api_url is match('^https://[^\\s]+$') or _api_url is match('^http://(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]+)?(?:/|$)')
+    fail_msg: "Each mail tenant requires DNS-safe domains and an HTTPS API URL (local HTTP is allowed only for development)."
+  vars:
+    _explicit_domains: "{{ [item.domains] if (item.domains is defined and item.domains is string) else (item.domains | default([])) }}"
+    _tenant_domains: >-
+      {{ _explicit_domains if
+         ((item.use_explicit_domains_only | default(false) | bool) and (_explicit_domains | length > 0))
+         else ([(item.prefix | default('')) ~ '.' ~ (mail_domain | default(m2s_domain | default(''), true))] + _explicit_domains) }}
+    _api_url: "{{ item.api_url | default(m2s_site_url | default('https://' ~ (m2s_domain | default(''))) ~ '/api/email-lists/') }}"
+  loop: "{{ club_domains | default([]) }}"
+  loop_control:
+    label: "{{ item.prefix | default('missing-prefix') }}"
+  tags: [always]
+
+- name: Reset resolved tenant domains for this mail-sync run
+  ansible.builtin.set_fact:
+    m2s_mail_sync_resolved_tenant_domains: []
+  tags: [always]
+
+- name: Resolve mail-sync tenant domains for uniqueness validation
+  ansible.builtin.set_fact:
+    m2s_mail_sync_resolved_tenant_domains: "{{ m2s_mail_sync_resolved_tenant_domains + (_tenant_domains | map('lower') | unique | list) }}"
+  vars:
+    _explicit_domains: "{{ [item.domains] if (item.domains is defined and item.domains is string) else (item.domains | default([])) }}"
+    _base_mail_domain: "{{ mail_domain | default(m2s_domain | default('')) }}"
+    _tenant_domains: >-
+      {{ _explicit_domains if
+         ((item.use_explicit_domains_only | default(false) | bool) and (_explicit_domains | length > 0))
+         else ([(item.prefix | default('')) ~ '.' ~ _base_mail_domain] + _explicit_domains) }}
+  loop: "{{ club_domains | default([]) }}"
+  loop_control:
+    label: "{{ item.prefix | default('missing-prefix') }}"
+  tags: [always]
+
+- name: Reject duplicate mail-sync tenant prefixes and domains
+  ansible.builtin.assert:
+    that:
+      - (club_domains | map(attribute='prefix') | list | unique | length) == (club_domains | length)
+      - (m2s_mail_sync_resolved_tenant_domains | default([]) | unique | length) == (m2s_mail_sync_resolved_tenant_domains | default([]) | length)
+    fail_msg: "Mail-sync tenant prefixes and resolved mail domains must be unique."
+  tags: [always]
+
+- name: Resolve locally served mail domains
+  ansible.builtin.set_fact:
+    m2s_mail_sync_local_domains: "{{ [mail_hostname | default(m2s_domain | default(''), true), 'localhost', 'localhost.' ~ (mail_domain | default(m2s_domain | default('')))] | reject('equalto', '') | list }}"
+  when: admin_email is defined or (mail_server_receive_enabled | default(true) | bool)
+  tags: [always]
+
+- name: Add tenant mail domains to the local-domain safety set
+  ansible.builtin.set_fact:
+    m2s_mail_sync_local_domains: "{{ (m2s_mail_sync_local_domains + _tenant_domains) | unique }}"
+  vars:
+    _explicit_domains: "{{ [item.domains] if (item.domains is defined and item.domains is string) else (item.domains | default([])) }}"
+    _base_mail_domain: "{{ mail_domain | default(m2s_domain | default('')) }}"
+    _tenant_domains: >-
+      {{ _explicit_domains if
+         ((item.use_explicit_domains_only | default(false) | bool) and (_explicit_domains | length > 0))
+         else ([item.prefix ~ '.' ~ _base_mail_domain] + _explicit_domains) }}
+  loop: "{{ club_domains | default([]) }}"
+  when: m2s_mail_sync_local_domains is defined
+  loop_control:
+    label: "{{ item.prefix }}"
+  tags: [always]
+
+- name: Require an external monitored bounce mailbox
+  ansible.builtin.assert:
+    that:
+      - admin_email is defined
+      - admin_email | string | trim | length > 0
+      - admin_email is match('^[^@\\s]+@[^@\\s]+$')
+      - (admin_email_domain | lower) not in (m2s_mail_sync_local_domains | map('lower') | map('regex_replace', '\\.$', '') | list)
+    fail_msg: >-
+      admin_email must be a monitored external mailbox and must not use a domain
+      served by this Postfix instance.
+  vars:
+    admin_email_domain: "{{ (admin_email | default('')).rsplit('@', 1)[-1] | lower | regex_replace('\\.$', '') }}"
+  when: mail_server_receive_enabled | default(true) | bool
+  tags: [always]
+
 - name: Install Python dependencies for sync script
   ansible.builtin.apt:
     name:
@@ -69,4 +155,3 @@
   ansible.builtin.command:
     cmd: "/usr/bin/flock --wait 300 /run/lock/m2s-mail-sync.lock {{ m2s_sync_dir }}/sync-aliases.py"
   changed_when: true
-  ignore_errors: true  # May fail if M2S API not yet configured

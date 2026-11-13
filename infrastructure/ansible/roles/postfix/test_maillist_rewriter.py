@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any, Callable, cast
 from unittest.mock import mock_open, patch
 
+from jinja2 import Environment
+
 _TEMPLATE_PATH = Path(__file__).parent / "templates" / "maillist-rewriter.py.j2"
 _MAIN_CF_TEMPLATE_PATH = Path(__file__).parent / "templates" / "main.cf.j2"
 _MASTER_CF_TEMPLATE_PATH = Path(__file__).parent / "templates" / "master.cf.j2"
@@ -26,6 +28,23 @@ def test_rewriter_transport_limits_delivery_and_keeps_master_command_clean():
 
     assert "maillist-rewriter_destination_recipient_limit = 1" in main_cf
     assert "  -o recipient_limit=1" not in master_cf
+    assert "user={{ postfix_filter_user }}" in master_cf
+    assert "smtpd_milters=unix:/opendkim/opendkim.sock" in master_cf
+
+
+def test_main_cf_restriction_classes_keep_each_definition_on_its_own_line():
+    environment = Environment()
+    environment.filters["bool"] = bool
+    rendered = environment.from_string(_MAIN_CF_TEMPLATE_PATH.read_text()).render(
+        club_domains=[{"prefix": "single"}],
+        postfix_config_dir="/etc/postfix",
+        postfix_whitelist_dir="/etc/postfix/tenant-whitelists",
+        mail_hostname="mail.example.org",
+        mail_domain="example.org",
+        trusted_relay_ips=[],
+        postfix_rspamd_enabled=True,
+    )
+    assert "smtpd_restriction_classes = whitelist_required_single" in rendered
 
 
 def load_template_namespace():
@@ -56,8 +75,10 @@ def load_template_namespace():
     # for tests we replace the whole assignment with a static copy of
     # MAILING_LISTS so the module import does not depend on the filesystem.
     source, all_known_lists_replacements = re.subn(
-        r"ALL_KNOWN_LISTS\s*=\s*\{.*?\}\n|ALL_KNOWN_LISTS\s*=\s*MAILING_LISTS\s*\|\s*_load_lists_from_virtual\(\)",
-        "ALL_KNOWN_LISTS = MAILING_LISTS.copy()\n",
+        r"_VIRTUAL_LISTS, _VIRTUAL_FORWARDS, _ = _load_routing_snapshot\(\)\n"
+        r"ALL_KNOWN_LISTS, FORWARDING_ALIASES = _routing_sets\(\n"
+        r"\s*\(_VIRTUAL_LISTS, _VIRTUAL_FORWARDS, \{\}\)\n\s*\)",
+        "ALL_KNOWN_LISTS = MAILING_LISTS.copy()\nFORWARDING_ALIASES = set()",
         source,
         flags=re.DOTALL,
     )
@@ -79,6 +100,7 @@ def load_template_namespace():
         assert spec is not None and spec.loader is not None
         module = module_from_spec(spec)
         spec.loader.exec_module(module)
+        module.MAP_LOCK_FILE = "/dev/null"
         return cast(dict[str, Any], module.__dict__)
     finally:
         tmp_path.unlink(missing_ok=True)
@@ -312,6 +334,9 @@ def test_header_rewriting_with_bcc():
     assert "webmaster-bounces@skylinesoaring.org" in msg["From"]
     assert "John Doe via Webmaster" in msg["From"]
     assert "john@example.com" in msg["Reply-To"]
+    assert msg["List-Post"] == "<mailto:webmaster@skylinesoaring.org>"
+    assert "webmaster.skylinesoaring.org" in msg["List-Id"]
+    assert msg["Precedence"] == "list"
 
 
 def test_reverse_lookup_subset_match_for_bcc_plus_direct_recipient():
@@ -444,13 +469,14 @@ def test_reverse_lookup_uses_exact_alias_token_not_prefix_match():
     assert original_to == "members@skylinesoaring.org"
 
 
-def test_rewrite_headers_skips_exact_noreply_at_list_domain():
-    """Only the exact noreply@<list_domain> address is passed through unchanged (issue #846).
+def test_rewrite_headers_skips_exact_noreply_at_list_domain_for_trusted_submission():
+    """Trusted submission may preserve the exact automated sender (issue #846).
 
     When Django sends a notification from noreply@skylinesoaring.org to
     board@skylinesoaring.org the envelope sender matches the narrow passthrough
     condition (noreply@skylinesoaring.org == noreply@skylinesoaring.org) and the
-    headers must not be rewritten.
+    headers must not be rewritten. Public SMTP is tested separately and must
+    still rewrite this spoofable envelope sender.
     """
     ns = load_template_namespace()
     rewrite_headers = get_callable(ns, "rewrite_headers")
@@ -462,13 +488,37 @@ def test_rewrite_headers_skips_exact_noreply_at_list_domain():
     msg.set_content("Notification body")
 
     result = rewrite_headers(
-        msg, "board@skylinesoaring.org", envelope_sender="noreply@skylinesoaring.org"
+        msg,
+        "board@skylinesoaring.org",
+        envelope_sender="noreply@skylinesoaring.org",
+        allow_passthrough=True,
     )
 
     # From header must be unchanged
     assert result["From"] == "noreply@skylinesoaring.org"
     # No Reply-To should be injected for automated messages
     assert result["Reply-To"] is None
+
+
+def test_rewrite_headers_rewrites_noreply_sender_from_public_smtp():
+    """Public port-25 traffic cannot spoof the trusted noreply passthrough."""
+    ns = load_template_namespace()
+    rewrite_headers = get_callable(ns, "rewrite_headers")
+
+    msg = EmailMessage()
+    msg["From"] = "noreply@skylinesoaring.org"
+    msg["To"] = "board@skylinesoaring.org"
+    msg.set_content("Spoofed notification")
+
+    result = rewrite_headers(
+        msg,
+        "board@skylinesoaring.org",
+        envelope_sender="noreply@skylinesoaring.org",
+        allow_passthrough=False,
+    )
+
+    assert "board-bounces@skylinesoaring.org" in result["From"]
+    assert result["Reply-To"] is not None
 
 
 def test_rewrite_headers_rewrites_noreply_sender_from_different_domain():

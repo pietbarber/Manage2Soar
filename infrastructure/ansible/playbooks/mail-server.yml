@@ -43,10 +43,13 @@
           - mail_hostname is defined
           - mail_domain is defined
           - admin_email is defined
+          - admin_email | string | trim | length > 0
+          - admin_email is match('^[^@\\s]+@[^@\\s]+$')
           - club_domains is defined
-          - m2s_api_key is defined
+          - (m2s_api_key | default(vault_m2s_api_key | default('')) | string | length) > 0
           - smtp_auth_users is defined
-        fail_msg: "Required variables not set. Check group_vars/all.yml"
+        fail_msg: "Required variables not set. Provide a monitored external admin_email in group_vars/all.yml."
+      tags: [always]
 
     - name: Update apt cache
       ansible.builtin.apt:
@@ -58,7 +61,7 @@
       tags: [common]
 
     - role: postfix
-      tags: [postfix, mail]
+      tags: [postfix, mail, sync]
 
     - role: opendkim
       tags: [opendkim, dkim, mail]
@@ -67,7 +70,7 @@
       tags: [rspamd, spam, mail]
 
     - role: m2s-mail-sync
-      tags: [sync, mail]
+      tags: [sync, mail, postfix]
 
   post_tasks:
     - name: Display DKIM public keys for DNS
@@ -78,11 +81,11 @@
           DKIM PUBLIC KEYS - ADD THESE TO YOUR DNS
           ============================================================
 
-          For each club domain, add this TXT record:
+          For each resolved tenant domain, add this TXT record:
 
-          {% for club in club_domains %}
-          {{ dkim_selector }}._domainkey.{{ club.prefix }}.{{ mail_domain }}
-          (See /etc/opendkim/keys/{{ club.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt)
+          {% for domain in opendkim_domains %}
+          {{ dkim_selector }}._domainkey.{{ domain }}
+          (See /etc/opendkim/keys/{{ domain }}/{{ dkim_selector }}.txt)
 
           {% endfor %}
 

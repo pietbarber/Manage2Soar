@@ -1,0 +1,11 @@
+---
+# Safe defaults for older inventories that predate inbound-mail synchronization.
+m2s_sync_dir: "/opt/m2s-mail-sync"
+postfix_whitelist_dir: "{{ postfix_config_dir | default('/etc/postfix') }}/tenant-whitelists"
+
+# Backward-compatible mail configuration for older single-host inventories.
+club_domains: []
+
+# No safe default exists for bounce notifications. Deployments accepting
+# inbound mail must provide an explicitly monitored external mailbox.
+admin_email: ""

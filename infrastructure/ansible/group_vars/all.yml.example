@@ -16,8 +16,9 @@ mail_hostname: "mail.manage2soar.com"
 # Primary domain for sending
 mail_domain: "manage2soar.com"
 
-# Admin email for DMARC reports and postmaster
-admin_email: "postmaster@manage2soar.com"
+# REQUIRED: monitored external mailbox for mailing-list and forwarding bounces.
+# Do not use postmaster@{{ mail_domain }} or another mailbox served locally.
+# admin_email: "your-monitored-mailbox@example.net"
 
 # Let's Encrypt email for TLS certificate notifications
 letsencrypt_email: "ops@manage2soar.com"

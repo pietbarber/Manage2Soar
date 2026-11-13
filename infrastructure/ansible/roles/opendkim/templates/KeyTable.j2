@@ -4,9 +4,9 @@
 # Maps key names to actual key files
 # Format: key-name domain:selector:keyfile
 
-# Club domains (auto-generated from club_domains)
-{% for club in club_domains %}
-{{ dkim_selector }}._domainkey.{{ club.prefix }}.{{ mail_domain }} {{ club.prefix }}.{{ mail_domain }}:{{ dkim_selector }}:{{ opendkim_keys_dir }}/{{ club.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private
+# Club domains (auto-generated from the resolved tenant domains)
+{% for domain in opendkim_domains %}
+{{ dkim_selector }}._domainkey.{{ domain }} {{ domain }}:{{ dkim_selector }}:{{ opendkim_keys_dir }}/{{ domain }}/{{ dkim_selector }}.private
 {% endfor %}
 
 # Additional domains (custom/production domains)

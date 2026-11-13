@@ -129,7 +129,7 @@
     state: directory
     owner: _rspamd
     group: _rspamd
-    mode: "0755"
+    mode: "0750"
 
 - name: Configure Rspamd whitelist module (per-club isolation)
   ansible.builtin.template:
@@ -137,6 +137,35 @@
     dest: /etc/rspamd/local.d/whitelist.conf
     mode: "0644"
   notify: Restart Rspamd
+
+- name: Configure SPF enforcement for protected mailing lists
+  ansible.builtin.copy:
+    dest: /etc/rspamd/local.d/multimap.conf
+    content: |
+      # Reject messages to protected lists when the envelope sender does not
+      # pass SPF. Trusted submission is configured without this milter in
+      # master.cf, so this rule only applies to public SMTP.
+      M2S_PROTECTED_LIST_SPF {
+        type = "rcpt";
+        map = "file:///etc/rspamd/local.d/whitelists/protected_lists.map";
+        regexp = true;
+        require_symbols = "!R_SPF_ALLOW";
+        action = "reject";
+        message = "Sender authentication failed for this mailing list.";
+        description = "Require SPF for public mail to protected mailing lists";
+      }
+    mode: "0644"
+  notify: Restart Rspamd
+
+- name: Create initial protected-list SPF map
+  ansible.builtin.copy:
+    dest: /etc/rspamd/local.d/whitelists/protected_lists.map
+    content: "# Protected mailing lists - synchronized by m2s-mail-sync\n"
+    owner: _rspamd
+    group: _rspamd
+    mode: "0640"
+    force: false
+  notify: Reload Rspamd
 
 - name: Create initial empty whitelist maps for each club
   ansible.builtin.copy:
@@ -147,7 +176,7 @@
       # Format: one email address per line
     owner: _rspamd
     group: _rspamd
-    mode: "0644"
+    mode: "0640"
     force: false
   loop: "{{ club_domains }}"
   notify: Reload Rspamd

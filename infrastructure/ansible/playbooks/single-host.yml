@@ -60,6 +60,30 @@
         fail_msg: "Set vault_m2s_api_key in the single-host vault before enabling inbound lists."
       when: (mail_server_enabled | default(false) | bool) and (mail_server_receive_enabled | default(false) | bool)
       no_log: true
+      tags: [always]
+
+    - name: Require mail domains when Postfix is enabled
+      ansible.builtin.assert:
+        that:
+          - club_domains is defined
+          - club_domains | length > 0
+          - club_domains | selectattr('prefix', 'defined') | list | length == club_domains | length
+        fail_msg: "Define at least one club_domains entry with a prefix before enabling the mail server."
+      when: mail_server_enabled | default(false) | bool
+      tags: [always]
+
+    - name: Require monitored external mailbox for inbound lists
+      ansible.builtin.assert:
+        that:
+          - admin_email is defined
+          - admin_email | string | trim | length > 0
+          - admin_email is match('^[^@\\s]+@[^@\\s]+$')
+        fail_msg: |
+          Set admin_email to a monitored external mailbox before enabling inbound lists.
+          This address receives mailing-list and forwarding bounce notifications and
+          must not be a mailbox served by this Postfix instance.
+      when: (mail_server_enabled | default(false) | bool) and (mail_server_receive_enabled | default(false) | bool)
+      tags: [always]
 
   roles:
     # PostgreSQL database
@@ -68,7 +92,7 @@
 
     # Django/Gunicorn application
     - role: m2s-app
-      tags: [app, application]
+      tags: [app, application, mail]
 
     # NGINX reverse proxy
     - role: nginx
@@ -76,7 +100,9 @@
 
     # Mail server (optional)
     - role: postfix
-      tags: [mail, postfix]
+      tags: [mail, postfix, sync]
+      vars:
+        postfix_rspamd_enabled: "{{ mail_server_receive_enabled | default(false) | bool }}"
       when: mail_server_enabled | default(false) | bool
 
     - role: opendkim
@@ -88,7 +114,7 @@
       when: (mail_server_enabled | default(false)) and (mail_server_receive_enabled | default(false))
 
     - role: m2s-mail-sync
-      tags: [mail, sync]
+      tags: [mail, sync, postfix]
       vars:
         dev_mode_enabled: "{{ email_dev_mode | default(false) }}"
         dev_mode_redirect_to: "{{ email_dev_mode_redirect_to | default('') }}"
@@ -104,31 +130,14 @@
 
           Add this TXT record to your DNS:
 
-          Name: {{ dkim_selector | default('default') }}._domainkey.{{ mail_domain }}
+          Name: {{ dkim_selector | default('default') }}._domainkey.{{ opendkim_domains[0] }}
           Type: TXT
           Value: (see file on server - path shown below)
 
           To get the exact value, run on server:
-            cat /etc/opendkim/keys/{{ (club_domains[0].prefix | default(club_prefix | default('club'))) }}.{{ mail_domain | default(m2s_domain) }}/{{ dkim_selector | default('default') }}.txt
+            cat /etc/opendkim/keys/{{ opendkim_domains[0] }}/{{ dkim_selector | default('default') }}.txt
 
-          NOTE ABOUT PATH VS DNS:
-            The on-disk key directory name includes the club_prefix to support
-            multi-tenant OpenDKIM configuration:
-              /etc/opendkim/keys/{{ club_prefix | default('club') }}.{{ m2s_domain }}/{{ dkim_selector | default('default') }}.txt
-
-            For example, if:
-              - club_prefix = "msc"
-              - m2s_domain  = "mountainsoaring.org"
-            then the public key file will be at:
-              /etc/opendkim/keys/msc.mountainsoaring.org/default.txt
-
-            However, the DNS record name does NOT include the club_prefix.
-            You still create the TXT record for your actual mail domain only:
-              Name: {{ dkim_selector | default('default') }}._domainkey.{{ m2s_domain }}
-
-            OpenDKIM uses the key stored under the prefixed directory but
-            correctly signs outgoing email for the un-prefixed domain
-            {{ m2s_domain }}.
+          The key directory and DNS record use the same resolved tenant domain.
 
           ========================================
       when: mail_server_enabled | default(false) | bool
