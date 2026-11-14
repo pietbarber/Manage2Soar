@@ -7,7 +7,10 @@ from django.db import models
 from django.utils import timezone
 from tinymce.models import HTMLField
 
+from members.constants.membership import US_STATE_CHOICES
 from siteconfig.models import SiteConfiguration
+
+US_STATE_CODES = {code for code, _ in US_STATE_CHOICES}
 
 # The application stores three-letter country codes (see COUNTRY_CHOICES in
 # forms_applications.py), but Member.country holds two-letter ISO codes.
@@ -511,10 +514,21 @@ class MembershipApplication(models.Model):
         member.name_suffix = self.name_suffix
         member.phone = self.phone
         member.mobile_phone = self.mobile_phone
-        member.address = self.full_address
+        # Member.address holds only the street lines; city, state, ZIP and
+        # country have their own fields.
+        member.address = "\n".join(
+            line for line in (self.address_line1, self.address_line2) if line
+        )
         member.city = self.city
-        member.state_code = self.state if len(self.state) <= 2 else self.state[:2]
-        member.state_freeform = self.state if len(self.state) > 2 else ""
+        # state_code only accepts US state codes. Anything else (a province,
+        # a spelled-out state, any non-US region) goes in state_freeform.
+        state = self.state.strip()
+        if self.country in ("USA", "US") and state.upper() in US_STATE_CODES:
+            member.state_code = state.upper()
+            member.state_freeform = ""
+        else:
+            member.state_code = ""
+            member.state_freeform = state
         member.zip_code = self.zip_code
         # "OTHER" (or any code we can't translate) is left blank rather than
         # guessed; the applicant names their country in the comments.

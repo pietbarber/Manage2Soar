@@ -1524,3 +1524,43 @@ def test_approved_member_keeps_applicant_country(country, member_country):
 
     member.refresh_from_db()
     assert member.country == member_country
+
+
+@pytest.mark.django_db
+def test_approved_member_address_holds_only_street_lines():
+    app = MembershipApplication.objects.create(
+        **_valid_application_form_data(address_line2="Apt 4")
+    )
+
+    member = app.approve_application()
+
+    member.refresh_from_db()
+    assert member.address == "123 Main St\nApt 4"
+    assert (member.city, member.state_code, member.zip_code) == (
+        "Anytown",
+        "CA",
+        "12345",
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "country, state, state_code, state_freeform",
+    [
+        ("USA", "va", "VA", ""),
+        ("USA", "Virginia", "", "Virginia"),
+        ("CAN", "Ontario", "", "Ontario"),
+        # "WA" is a US state code, but here it means Western Australia.
+        ("AUS", "WA", "", "WA"),
+        ("JPN", "", "", ""),
+    ],
+)
+def test_approved_member_state(country, state, state_code, state_freeform):
+    app = MembershipApplication.objects.create(
+        **_valid_application_form_data(country=country, state=state)
+    )
+
+    member = app.approve_application()
+
+    member.refresh_from_db()
+    assert (member.state_code, member.state_freeform) == (state_code, state_freeform)
