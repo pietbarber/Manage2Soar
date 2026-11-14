@@ -338,10 +338,8 @@ ENTRY_FORMS = {
         "form": MemberPaidExpenseForm,
         "title": "Expense paid by member",
         "help": (
-            "A member paid a club bill out of pocket, such as maintenance items "
-            "purchased on a personal credit card. The expense is recorded and the "
-            "member's account is credited. To undo it, reverse the credit from "
-            "the member's ledger."
+            "Direct account reimbursements for out-of-pocket member expenses on "
+            "behalf of the Club"
         ),
         "post": lambda actor, data: post_member_paid_expense(actor=actor, **data),
     },
@@ -354,7 +352,7 @@ ENTRY_FORMS = {
     "transfer": {
         "form": TransferForm,
         "title": "Transfer between accounts",
-        "help": "Move money between bank or cash accounts, such as depositing collected checks.",
+        "help": "Move money between bank or cash accounts.",
         "post": lambda actor, data: post_cash_transfer(actor=actor, **data),
     },
 }

@@ -278,7 +278,7 @@ class AccountForm(forms.ModelForm):
         if instance.pk and (instance.system_role or instance.lines.exists()):
             self.fields["type"].disabled = True
             self.fields["type"].help_text = (
-                "Locked: system accounts and accounts with entries keep their type."
+                "System accounts and accounts with entries cannot change their Type."
             )
         if instance.system_role:
             self.fields["is_active"].disabled = True
