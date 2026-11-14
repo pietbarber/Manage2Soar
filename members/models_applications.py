@@ -9,6 +9,48 @@ from tinymce.models import HTMLField
 
 from siteconfig.models import SiteConfiguration
 
+# The application stores three-letter country codes (see COUNTRY_CHOICES in
+# forms_applications.py), but Member.country holds two-letter ISO codes.
+COUNTRY_CODE_TO_MEMBER = {
+    "USA": "US",
+    "US": "US",
+    "CAN": "CA",
+    "GBR": "GB",
+    "AUS": "AU",
+    "DEU": "DE",
+    "FRA": "FR",
+    "NZL": "NZ",
+    "CHE": "CH",
+    "AUT": "AT",
+    "NLD": "NL",
+    "SWE": "SE",
+    "NOR": "NO",
+    "DNK": "DK",
+    "FIN": "FI",
+    "ESP": "ES",
+    "ITA": "IT",
+    "POL": "PL",
+    "CZE": "CZ",
+    "HUN": "HU",
+    "SVK": "SK",
+    "SVN": "SI",
+    "HRV": "HR",
+    "ROU": "RO",
+    "BGR": "BG",
+    "GRC": "GR",
+    "PRT": "PT",
+    "BEL": "BE",
+    "LUX": "LU",
+    "IRL": "IE",
+    "ARG": "AR",
+    "BRA": "BR",
+    "CHL": "CL",
+    "ZAF": "ZA",
+    "JPN": "JP",
+    "KOR": "KR",
+    "SGP": "SG",
+}
+
 
 class MembershipApplication(models.Model):
     """
@@ -474,7 +516,9 @@ class MembershipApplication(models.Model):
         member.state_code = self.state if len(self.state) <= 2 else self.state[:2]
         member.state_freeform = self.state if len(self.state) > 2 else ""
         member.zip_code = self.zip_code
-        member.country = self.country[:2] if self.country in ["USA", "US"] else "US"
+        # "OTHER" (or any code we can't translate) is left blank rather than
+        # guessed; the applicant names their country in the comments.
+        member.country = COUNTRY_CODE_TO_MEMBER.get(self.country, "")
 
         # Aviation information
         if self.pilot_certificate_number:

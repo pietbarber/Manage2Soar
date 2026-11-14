@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from members.forms_applications import MembershipApplicationForm
 from members.models import Member
-from members.models_applications import MembershipApplication
+from members.models_applications import COUNTRY_CODE_TO_MEMBER, MembershipApplication
 
 
 @pytest.mark.django_db
@@ -1502,3 +1502,25 @@ def test_partial_emergency_contact_cannot_be_approved():
     assert not app.can_be_approved()
     with pytest.raises(ValueError, match="cannot be approved"):
         app.approve_application()
+
+
+def test_every_application_country_has_a_member_code():
+    codes = {code for code, _ in MembershipApplicationForm.COUNTRY_CHOICES}
+
+    assert codes - {"OTHER"} <= COUNTRY_CODE_TO_MEMBER.keys()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "country, member_country",
+    [("USA", "US"), ("JPN", "JP"), ("GBR", "GB"), ("OTHER", "")],
+)
+def test_approved_member_keeps_applicant_country(country, member_country):
+    app = MembershipApplication.objects.create(
+        **_valid_application_form_data(country=country)
+    )
+
+    member = app.approve_application()
+
+    member.refresh_from_db()
+    assert member.country == member_country
