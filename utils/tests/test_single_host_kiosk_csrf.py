@@ -7,7 +7,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse, JsonResponse
 from django.middleware.csrf import get_token
-from django.test import Client, override_settings
+from django.test import Client
 from django.urls import path
 from jinja2 import Template
 
@@ -67,10 +67,12 @@ urlpatterns = [path("kiosk-csrf-check/", csrf_test_view)]
 
 
 @pytest.mark.django_db
-@override_settings(ROOT_URLCONF=__name__)
 def test_kiosk_auto_login_accepts_valid_csrf_post_and_rejects_missing_token(settings):
     from members.models import KioskToken
 
+    # Use the settings fixture (not @override_settings) so both changes are
+    # undone together; mixing the two leaked ROOT_URLCONF into later tests.
+    settings.ROOT_URLCONF = __name__
     settings.MIDDLEWARE = middleware_from(SINGLE_HOST.read_text())
     member = get_user_model().objects.create_user(
         username="single-host-kiosk",
