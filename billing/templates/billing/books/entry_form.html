@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 720px">
+  {% with heading=title %}{% include "billing/books/_header.html" %}{% endwith %}
+  <p class="text-muted">{{ help }}</p>
+  {% if not has_cash_accounts %}
+  <div class="alert alert-warning">Add a bank or cash account first. <a href="{% url 'billing:account_create' %}">Add account</a></div>
+  {% endif %}
+  <form method="post" class="card border-0 shadow-sm">
+    <div class="card-body">
+      {% csrf_token %}
+      {% include "billing/books/_form_errors.html" %}
+      {% for field in form %}{% include "billing/books/_field.html" %}{% endfor %}
+      <button class="btn btn-primary" type="submit">Post</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,28 +1,28 @@
 import csv
 from datetime import date
-from functools import wraps
 
 from django.contrib import messages
-from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import ValidationError
 from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from billing.decorators import billing_app_required
+from billing.decorators import billing_app_required, treasurer_required
 from billing.forms import (
     GuestRemittanceForm,
     ManualEntryForm,
     OpeningBalanceOverrideForm,
     ReverseEntryForm,
 )
+from billing.ledger_services import member_books_live
 from billing.models import BillingPeriod, Ledger, LedgerEntry
 from billing.periods import close_period, reopen_period
 from billing.services import (
     get_balance,
     get_statement_rows,
+    member_label,
     override_opening_balance,
     post_manual_charge,
     post_manual_credit,
@@ -33,18 +33,6 @@ from billing.services import (
 )
 from members.models import Member
 from utils.csv import sanitize_csv_cell
-
-
-def treasurer_required(view_func):
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect_to_login(request.get_full_path())
-        if not (request.user.is_superuser or request.user.treasurer):
-            return HttpResponseForbidden("Treasurer access is required.")
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
 
 
 @billing_app_required
@@ -154,23 +142,26 @@ def ledger_detail(request, member_id):
     # Initial Debit/Credit set the starting balance, so they are offered only
     # while the member's ledger is still empty.
     has_entries = bool(ledger and ledger.entries.exists())
-    form = ManualEntryForm(request.POST or None, allow_initial_balance=not has_entries)
+    club_books = member_books_live()
+    form = ManualEntryForm(
+        request.POST or None,
+        allow_initial_balance=not has_entries,
+        club_books=club_books,
+    )
+    context = {
+        "member": member,
+        "ledger": ledger,
+        "statement_rows": statement_rows,
+        "form": form,
+        "has_opening_balance": has_opening_balance,
+        "override_form": OpeningBalanceOverrideForm(),
+        "balance": get_balance(ledger) if ledger else 0,
+        "remittance_form": GuestRemittanceForm() if club_books else None,
+    }
 
     if request.method == "POST":
         if not form.is_valid():
-            return render(
-                request,
-                "billing/ledger_detail.html",
-                {
-                    "member": member,
-                    "ledger": ledger,
-                    "statement_rows": statement_rows,
-                    "form": form,
-                    "has_opening_balance": has_opening_balance,
-                    "override_form": OpeningBalanceOverrideForm(),
-                    "balance": get_balance(ledger) if ledger else 0,
-                },
-            )
+            return render(request, "billing/ledger_detail.html", context)
         data = form.cleaned_data
         common = {
             "member": member,
@@ -180,13 +171,14 @@ def ledger_detail(request, member_id):
             "description": data["description"],
             "reason": data["reason"],
         }
+        book_account = data.get("book_account")
         try:
             if data["kind"] == "manual_charge":
-                post_manual_charge(**common)
+                post_manual_charge(book_account=book_account, **common)
             elif data["kind"] == "payment":
-                post_manual_payment(**common)
+                post_manual_payment(book_account=book_account, **common)
             elif data["kind"] == "credit":
-                post_manual_credit(**common)
+                post_manual_credit(book_account=book_account, **common)
             else:
                 post_opening_balance(
                     effect=ManualEntryForm.INITIAL_BALANCE_EFFECTS[data["kind"]],
@@ -198,19 +190,7 @@ def ledger_detail(request, member_id):
             messages.success(request, "Ledger entry posted.")
             return redirect("billing:ledger_detail", member_id=member.pk)
 
-    return render(
-        request,
-        "billing/ledger_detail.html",
-        {
-            "member": member,
-            "ledger": ledger,
-            "statement_rows": statement_rows,
-            "form": form,
-            "has_opening_balance": has_opening_balance,
-            "override_form": OpeningBalanceOverrideForm(),
-            "balance": get_balance(ledger) if ledger else 0,
-        },
-    )
+    return render(request, "billing/ledger_detail.html", context)
 
 
 @require_POST
@@ -273,9 +253,7 @@ def ledger_detail_csv(request, member_id):
                     else ""
                 ),
                 f"{row['running_balance']:.2f}",
-                sanitize_csv_cell(
-                    entry.created_by.get_full_name() or entry.created_by.username
-                ),
+                sanitize_csv_cell(member_label(entry.created_by)),
                 sanitize_csv_cell(entry.internal_note),
             ]
         )
@@ -324,6 +302,7 @@ def remit_guest_payment_entry(request, entry_id):
                 actor=request.user,
                 effective_date=get_club_today(),
                 reference=form.cleaned_data["reference"],
+                deposit_account=form.cleaned_data["deposit_account"],
             )
         except ValidationError as exc:
             messages.error(request, "; ".join(exc.messages))

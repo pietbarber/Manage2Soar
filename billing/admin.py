@@ -1,12 +1,28 @@
 from django.contrib import admin
 
 from billing.models import (
+    Account,
     BillingPeriod,
     BillingPeriodEvent,
     FlightChargeSnapshot,
+    JournalEntry,
+    JournalLine,
     Ledger,
     LedgerEntry,
 )
+
+
+class ViewOnlyAdminMixin:
+    """Admin pages for records that are never edited once posted."""
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Ledger)
@@ -31,7 +47,7 @@ class BillingPeriodEventAdmin(admin.ModelAdmin):
 
 
 @admin.register(LedgerEntry)
-class LedgerEntryAdmin(admin.ModelAdmin):
+class LedgerEntryAdmin(ViewOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("ledger", "kind", "effect", "amount", "effective_date")
     list_filter = ("kind", "effect", "effective_date")
     search_fields = ("ledger__member__username", "member_description", "source_key")
@@ -39,7 +55,7 @@ class LedgerEntryAdmin(admin.ModelAdmin):
 
 
 @admin.register(FlightChargeSnapshot)
-class FlightChargeSnapshotAdmin(admin.ModelAdmin):
+class FlightChargeSnapshotAdmin(ViewOnlyAdminMixin, admin.ModelAdmin):
     list_display = (
         "flight",
         "billed_member",
@@ -50,3 +66,38 @@ class FlightChargeSnapshotAdmin(admin.ModelAdmin):
     list_filter = ("allocation_rule", "allocation_version")
     search_fields = ("flight__id", "billed_member__username")
     readonly_fields = tuple(field.name for field in FlightChargeSnapshot._meta.fields)
+
+
+@admin.register(Account)
+class AccountAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "type", "is_cash", "system_role", "is_active")
+    list_filter = ("type", "is_cash", "is_active")
+    search_fields = ("code", "name")
+    readonly_fields = ("system_role",)
+    actions = None
+
+    def has_delete_permission(self, request, obj=None):
+        return (
+            super().has_delete_permission(request, obj)
+            and obj is not None
+            and not obj.system_role
+        )
+
+
+class JournalLineInline(admin.TabularInline):
+    model = JournalLine
+    can_delete = False
+    extra = 0
+    readonly_fields = ("account", "debit", "credit", "member", "memo")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(JournalEntry)
+class JournalEntryAdmin(ViewOnlyAdminMixin, admin.ModelAdmin):
+    list_display = ("id", "date", "memo", "source", "created_by")
+    list_filter = ("source", "date")
+    search_fields = ("memo", "payee", "reference", "source_key")
+    readonly_fields = tuple(field.name for field in JournalEntry._meta.fields)
+    inlines = (JournalLineInline,)

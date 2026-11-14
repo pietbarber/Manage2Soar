@@ -36,6 +36,7 @@ pytest-django
 pytest-playwright
 python-dotenv
 python-slugify
+PyYAML
 pytz
 qrcode
 ruff

@@ -5,12 +5,12 @@
 # DO NOT EDIT MANUALLY - changes will be overwritten
 
 {% for club in club_domains %}
-{# Merge legacy and explicit domains, then deduplicate #}
+{# Preserve legacy aliases unless a club opts into explicit-only domains. #}
 {% set explicit_domains = club.domains | default([]) %}
 {% if explicit_domains is string %}
 {% set explicit_domains = [explicit_domains] %}
 {% endif %}
-{% set tenant_domains = ([club.prefix ~ '.' ~ mail_domain] + explicit_domains) | unique %}
+{% set tenant_domains = (explicit_domains if (club.use_explicit_domains_only | default(false)) and explicit_domains else [club.prefix ~ '.' ~ mail_domain] + explicit_domains) | unique %}
 {% for domain in tenant_domains %}
 {{ domain }}    OK
 {% endfor %}

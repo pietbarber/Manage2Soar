@@ -134,6 +134,24 @@ class TestEmailListsAPI:
     """Tests for the /api/email-lists/ endpoint."""
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_returns_only_active_administrative_aliases(self, api_client):
+        from siteconfig.models import EmailAlias
+
+        EmailAlias.objects.create(name="admin", destination="external@example.com")
+        EmailAlias.objects.create(
+            name="disabled", destination="other@gmail.com", is_active=False
+        )
+        response = api_client.get(
+            reverse("api_email_lists"), HTTP_X_API_KEY="test-api-key-12345"
+        )
+        assert response.status_code == 200
+        assert response.json()["forwarding_aliases"] == {
+            "admin": "external@example.com"
+        }
+        assert "admin" not in response.json()["lists"]
+        assert "admin" not in response.json()["bypass_lists"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
     def test_requires_api_key(self, api_client, default_mailing_lists):
         """Test that the endpoint requires an API key."""
         url = reverse("api_email_lists")

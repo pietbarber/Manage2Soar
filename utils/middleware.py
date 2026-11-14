@@ -4,9 +4,10 @@ Custom middleware for health checks and other utilities.
 
 import logging
 
-from django.conf import settings
 from django.contrib.auth import login
 from django.http import HttpResponse
+
+from utils.ip_utils import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,4 @@ class KioskAutoLoginMiddleware:
         # Issue #1110: delegate to the shared helper so all per-IP logic in
         # the codebase (kiosk, login throttle, contact form) agrees on which
         # IP is "the client" behind the GKE load balancer.
-        from utils.ip_utils import get_client_ip
-
         return get_client_ip(request)

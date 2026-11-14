@@ -38,6 +38,8 @@ payment provider.
    and role-controlled.
 8. The first release should solve member balances well. It should not become a
    general accounts-receivable, payment-processing, or guest-settlement system.
+   Club-level bookkeeping (bank accounts, expenses, General Fund) is a separate,
+   opt-in extension. See `billing/docs/general-ledger.md`.
 
 ## 2.1 Tenant Billing Activation
 

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load widget_tweaks %}
+{% load billing_extras %}
 
 {% block title %}Billing: {{ member }}{% endblock %}
 
@@ -11,13 +12,13 @@
     <div class="card-body d-flex flex-wrap justify-content-between align-items-end gap-3">
       <div>
         <p class="text-uppercase text-muted small mb-1">Member ledger</p>
-        <h1 class="h3 mb-0">{{ member.get_full_name|default:member.username }}</h1>
+        <h1 class="h3 mb-0">{{ member|member_name }}</h1>
         <div class="text-muted">{{ member.username }}</div>
       </div>
       <div class="text-end">
         <div class="text-muted small">Current balance</div>
         <div class="display-6 mb-0 {% if balance > 0 %}text-danger{% elif balance < 0 %}text-success{% endif %}">
-          ${{ balance|floatformat:2 }}
+          {{ balance|money }}
         </div>
       </div>
     </div>
@@ -113,9 +114,9 @@
                 <td>{{ entry.get_kind_display }}</td>
                 <td>{{ entry.member_description }}</td>
                 <td class="text-end fw-semibold {% if entry.effect == 'debit' %}text-danger{% else %}text-success{% endif %}">
-                  {% if entry.effect == 'credit' %}-{% endif %}${{ entry.amount|floatformat:2 }}
+                  {% if entry.effect == 'credit' %}({{ entry.amount|money }}){% else %}{{ entry.amount|money }}{% endif %}
                 </td>
-                <td class="text-end fw-semibold {% if row.running_balance > 0 %}text-danger{% elif row.running_balance < 0 %}text-success{% endif %}">${{ row.running_balance|floatformat:2 }}</td>
+                <td class="text-end fw-semibold {% if row.running_balance > 0 %}text-danger{% elif row.running_balance < 0 %}text-success{% endif %}">{{ row.running_balance|money }}</td>
                 <td class="small text-muted">
                   {{ entry.created_by }}<br>
                   {{ entry.internal_note }}
@@ -127,6 +128,14 @@
                      {% csrf_token %}
                      <label class="visually-hidden" for="guest-remit-reference-{{ entry.pk }}">Remittance confirmation reference</label>
                      <input id="guest-remit-reference-{{ entry.pk }}" type="text" name="reference" maxlength="100" class="form-control form-control-sm d-inline-block me-2" style="width: 14rem;" placeholder="Confirmation reference">
+                     {% if remittance_form %}
+                     <label class="visually-hidden" for="guest-remit-deposit-{{ entry.pk }}">Deposit to</label>
+                     <select id="guest-remit-deposit-{{ entry.pk }}" name="deposit_account" class="form-select form-select-sm d-inline-block me-2" style="width: 14rem;">
+                       {% for account in remittance_form.fields.deposit_account.queryset %}
+                       <option value="{{ account.pk }}"{% if account.system_role == 'undeposited_funds' %} selected{% endif %}>Deposit to {{ account }}</option>
+                       {% endfor %}
+                     </select>
+                     {% endif %}
                      <button class="btn btn-sm btn-outline-success" type="submit">Confirm full remittance</button>
                    </form>
                    {% elif entry.kind == 'guest_payment_pending' and entry.remittance and not entry.remittance.reversal %}

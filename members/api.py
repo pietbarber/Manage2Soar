@@ -19,7 +19,12 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 
-from siteconfig.models import MailingList, MembershipStatus, SiteConfiguration
+from siteconfig.models import (
+    EmailAlias,
+    MailingList,
+    MembershipStatus,
+    SiteConfiguration,
+)
 
 from .models import Member
 
@@ -79,6 +84,7 @@ def email_lists(request):
         },
         "whitelist": ["email1@example.com", "email2@example.com", ...],
         "bypass_lists": ["treasurer", "webmaster", ...]
+        "forwarding_aliases": {"admin": "external@example.com", ...}
     }
 
     Lists are now dynamically generated from the MailingList model in siteconfig.
@@ -99,6 +105,12 @@ def email_lists(request):
 
     # Bypass lists - lists that accept mail from anyone (not just whitelisted senders)
     bypass_lists = [ml.name for ml in mailing_lists if ml.bypass_whitelist]
+    list_names = {name.lower() for name in lists_data}
+    forwarding_aliases = {
+        alias.name: alias.destination
+        for alias in EmailAlias.objects.filter(is_active=True)
+        if alias.name.lower() not in list_names
+    }
 
     # Whitelist = all active member emails + manual whitelist additions
     active_members = get_active_members()
@@ -129,5 +141,6 @@ def email_lists(request):
             "lists": lists_data,
             "whitelist": whitelist,
             "bypass_lists": bypass_lists,
+            "forwarding_aliases": forwarding_aliases,
         }
     )

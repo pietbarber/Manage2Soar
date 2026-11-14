@@ -19,7 +19,7 @@ Description=Hourly django-axes cleanup for Manage2Soar (issue #1110)
 
 [Timer]
 # Hourly at minute 0, matching the K8s CronJob schedule.
-OnCalendar=*:00
+OnCalendar=*-*-* *:00:00 UTC
 Persistent=true
 AccuracySec=1m
 Unit=m2s-cleanup-login-attempts.service

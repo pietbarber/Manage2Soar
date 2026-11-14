@@ -247,6 +247,10 @@
     enabled: true
     daemon_reload: true
 
+- name: Configure Django scheduled jobs
+  ansible.builtin.import_tasks: scheduled_jobs.yml
+  tags: [scheduled_jobs]
+
 - name: Configure logrotate for application logs
   ansible.builtin.template:
     src: logrotate.j2

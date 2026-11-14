@@ -33,6 +33,8 @@ urlpatterns = [
 ]
 ```
 
+Club books routes (`books/...`) are documented in [general-ledger.md](general-ledger.md#views-billingledger_viewspy).
+
 ---
 
 ## View Functions

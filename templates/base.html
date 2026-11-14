@@ -199,7 +199,7 @@
               {% if user.is_superuser or user.is_active_member and user.stats_monger %}
                <li><a class="dropdown-item" href="{% url 'logsheet:stats_dump_export_queue' %}"><i class="bi bi-download me-1"></i> Stats Dump Export</a></li>
                {% endif %}
-               {% if siteconfig and siteconfig.billing_app_enabled %}
+               {% if siteconfig and siteconfig.billing_app_enabled and not siteconfig.club_accounting_enabled %}
                {% if user.treasurer or user.is_superuser %}
                <li><a class="dropdown-item" href="{% url 'billing:ledger_list' %}"><i class="bi bi-cash-stack me-1"></i> Member Billing</a></li>
                {% endif %}
@@ -217,6 +217,30 @@
               {% endif %}
             </ul>
           </li>
+
+          {% if siteconfig and siteconfig.billing_app_enabled and siteconfig.club_accounting_enabled %}
+          {% if user.treasurer or user.is_superuser %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="clubFinancesDropdown" role="button" data-bs-toggle="dropdown"
+              aria-expanded="false">
+              Club Finances
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="clubFinancesDropdown">
+              <li><a class="dropdown-item" href="{% url 'billing:club_ledger' %}"><i class="bi bi-journal-text me-1"></i> Club Ledger</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:ledger_list' %}"><i class="bi bi-cash-stack me-1"></i> Member Billing</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'billing:record_expense' %}"><i class="bi bi-box-arrow-up-right me-1"></i> Record Expense Paid by Club</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:record_member_expense' %}"><i class="bi bi-person-check me-1"></i> Record Expense Paid by Member</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:record_income' %}"><i class="bi bi-box-arrow-in-down-left me-1"></i> Record Income</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:cash_transfer' %}"><i class="bi bi-arrow-left-right me-1"></i> Transfer Between Accounts</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:general_journal' %}"><i class="bi bi-pencil-square me-1"></i> General Journal Entry</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'billing:chart_of_accounts' %}"><i class="bi bi-list-columns me-1"></i> Chart of Accounts</a></li>
+              <li><a class="dropdown-item" href="{% url 'billing:go_live' %}"><i class="bi bi-flag me-1"></i> Finances Setup</a></li>
+            </ul>
+          </li>
+          {% endif %}
+          {% endif %}
 
           <!-- Resources (CMS) - moved into Members dropdown -->
 
