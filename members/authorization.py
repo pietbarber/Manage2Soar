@@ -15,6 +15,7 @@ GROUND_INSTRUCTION_PERMISSION = "instructors.can_manage_ground_instruction"
 WEBMASTER_MANAGEMENT_PERMISSION = "members.can_manage_member_roles"
 TRAINING_VIEW_PERMISSION = "instructors.view_trainingrecord"
 TRAINING_RECORD_PERMISSION = "instructors.can_record_instruction"
+QUALIFICATION_ASSIGN_PERMISSION = "instructors.can_assign_qualification"
 
 
 def has_webmaster_compatibility_access(user):
@@ -116,6 +117,18 @@ def has_training_record_action(user):
     decision = resolve_authorization(
         user,
         TRAINING_RECORD_PERMISSION,
+        require_active_member=True,
+    )
+    if decision.allow:
+        return True
+    return decision.reason == "no_grant" and bool(getattr(user, "instructor", False))
+
+
+def has_qualification_assignment_access(user):
+    """Return whether an active member may assign qualifications."""
+    decision = resolve_authorization(
+        user,
+        QUALIFICATION_ASSIGN_PERMISSION,
         require_active_member=True,
     )
     if decision.allow:

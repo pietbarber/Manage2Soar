@@ -3,7 +3,10 @@ from django.db import models
 from django.utils.html import format_html
 from tinymce.widgets import TinyMCE
 
-from knowledgetest.permissions import has_written_test_admin_access
+from knowledgetest.permissions import (
+    has_written_test_admin_access,
+    has_written_test_delete_access,
+)
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -222,7 +225,7 @@ class TestPresetAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to delete test presets
-        return self._has_preset_permission(request, allow_cfi=False)
+        return has_written_test_delete_access(request.user)
 
     def delete_model(self, request, obj):
         """Override delete to provide confirmation message."""

@@ -14,6 +14,7 @@ from instructors.models import (
     QualificationPermissionGrant,
     TrainingLesson,
 )
+from members.authorization import has_qualification_assignment_access
 from members.models import RoleMetadata
 from siteconfig.models import MembershipStatus
 
@@ -91,3 +92,31 @@ def test_ground_instruction_endpoint_rechecks_qualification_expiry_and_revocatio
     assert response.status_code == 403
     assert GroundInstruction.objects.count() == ground_instruction_count
     assert MemberQualification.objects.count() == qualification_count
+
+
+@pytest.mark.django_db
+def test_ground_instruction_qualification_writes_require_assignment_permission(client):
+    MembershipStatus.objects.create(name="Active assignment", is_active=True)
+    user = get_user_model().objects.create_user(
+        username="ground-recorder-only",
+        password="test-password",
+        membership_status="Active assignment",
+    )
+    student = get_user_model().objects.create_user(
+        username="assignment-student",
+        password="test-password",
+        membership_status="Active assignment",
+    )
+    TrainingLesson.objects.create(code="1.2", title="Ground lesson", sort_key="00002")
+    record_permission = Permission.objects.get(
+        content_type=ContentType.objects.get_for_model(GroundInstruction),
+        codename="can_record_instruction",
+    )
+    user.user_permissions.add(record_permission)
+    client.force_login(user)
+    assert not has_qualification_assignment_access(user)
+    response = client.post(
+        reverse("instructors:log_ground_instruction") + f"?student={student.pk}",
+        {"form_type": "qualification", "student_id": student.pk},
+    )
+    assert response.status_code == 403

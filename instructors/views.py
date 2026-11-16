@@ -74,7 +74,10 @@ from knowledgetest.views import get_presets
 from logsheet.models import Flight, Towplane
 from logsheet.utils.finalization_email import html_to_text_preserve_links
 from logsheet.utils.tow_logbook import get_tow_logbook_data
-from members.authorization import has_training_record_access, has_training_record_action
+from members.authorization import (
+    has_qualification_assignment_access,
+    has_training_record_access,
+)
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -913,7 +916,7 @@ def member_training_grid(request, member_id):
 def log_ground_instruction(request):
     # Accept either 'student' or 'student_id' as the query parameter for
     # compatibility with multiple templates/links in the codebase.
-    can_assign_qualification = has_training_record_action(request.user)
+    can_assign_qualification = has_qualification_assignment_access(request.user)
     student_id = request.GET.get("student") or request.GET.get("student_id")
     student = get_object_or_404(Member, pk=student_id) if student_id else None
     lessons = TrainingLesson.objects.all().order_by("sort_key")
@@ -1120,7 +1123,7 @@ def log_ground_instruction(request):
 
 
 def is_instructor(user):
-    return has_training_record_action(user)
+    return has_qualification_assignment_access(user)
 
 
 ####################################################
