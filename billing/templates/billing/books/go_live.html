@@ -23,7 +23,7 @@
   {% if opening %}
   <div class="alert alert-secondary">
     Opening balances are already posted in <a href="{% url 'billing:journal_detail' opening.pk %}">entry #{{ opening.pk }}</a>.
-    Saving again replaces that entry.
+    Replacing opening balances via this page will replace entry #{{ opening.pk }}.
   </div>
   {% endif %}
   <form method="post" class="card border-0 shadow-sm">
