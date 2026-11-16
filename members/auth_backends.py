@@ -15,16 +15,24 @@ class QualificationPermissionBackend(BaseBackend):
     retained in Django's per-user permission cache across expiry or revocation.
     """
 
+    def has_perm(self, user_obj, perm, obj=None):
+        from instructors.models import QUALIFICATION_ALLOWED_PERMISSIONS
+
+        if perm not in QUALIFICATION_ALLOWED_PERMISSIONS:
+            return False
+        return perm in self.get_all_permissions(user_obj, obj=obj)
+
     def get_group_permissions(self, user_obj, obj=None):
         if obj is not None or not user_obj.is_active or not user_obj.is_active_member():
             return set()
 
-        today = timezone.localdate()
         from instructors.models import (
             QUALIFICATION_ALLOWED_PERMISSIONS,
             MemberQualification,
             QualificationPermissionGrant,
         )
+
+        today = timezone.localdate()
 
         permission_groups = (
             MemberQualification.objects.filter(

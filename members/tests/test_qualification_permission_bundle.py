@@ -15,6 +15,7 @@ from instructors.models import (
     MemberQualification,
     QualificationPermissionGrant,
 )
+from members.auth_backends import QualificationPermissionBackend
 from members.models import RoleMetadata
 from siteconfig.models import MembershipStatus
 
@@ -55,6 +56,16 @@ def test_unmapped_qualification_grants_no_permission(db):
     )
     MemberQualification.objects.create(member=member, qualification=qualification)
     assert not member.has_perm("instructors.view_clubqualificationtype")
+
+
+def test_unsupported_permission_short_circuits_qualification_backend(monkeypatch):
+    backend = QualificationPermissionBackend()
+
+    def fail_if_queried(*args, **kwargs):
+        pytest.fail("unsupported permissions must not query qualifications")
+
+    monkeypatch.setattr(backend, "get_all_permissions", fail_if_queried)
+    assert not backend.has_perm(object(), "members.view_member")
 
 
 @pytest.mark.django_db
