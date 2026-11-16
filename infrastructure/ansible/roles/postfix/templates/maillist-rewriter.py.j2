@@ -523,7 +523,7 @@ def main():
             smtp.sendmail(sender, recipients, original_msg)
             smtp.quit()
             sys.exit(0)
-        except smtplib.SMTPException as e:
+        except (smtplib.SMTPException, OSError) as e:
             sys.stderr.write(f"maillist-rewriter: SMTP passthrough failed: {e}\n")
             sys.exit(os.EX_TEMPFAIL)
 

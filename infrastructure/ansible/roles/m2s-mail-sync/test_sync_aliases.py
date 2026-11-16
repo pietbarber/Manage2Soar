@@ -141,12 +141,14 @@ def test_virtual_map_publish_is_readable_by_rewriter(tmp_path):
     def fake_postmap(command, check):
         Path(f"{command[1]}.db").write_text("database")
 
-    with patch.object(
-        sync.subprocess, "run", side_effect=fake_postmap
-    ) as run, patch.object(
-        sync.grp, "getgrnam", return_value=type("Group", (), {"gr_gid": os.getgid()})()
-    ), patch.object(
-        sync.os, "chown"
+    with (
+        patch.object(sync.subprocess, "run", side_effect=fake_postmap) as run,
+        patch.object(
+            sync.grp,
+            "getgrnam",
+            return_value=type("Group", (), {"gr_gid": os.getgid()})(),
+        ),
+        patch.object(sync.os, "chown"),
     ):
         assert sync.write_and_postmap(str(virtual_file), "admin@example.com\n")
 
@@ -172,45 +174,21 @@ def test_virtual_map_restores_database_if_source_publish_fails(tmp_path):
     def fake_postmap(command, check):
         Path(f"{command[1]}.db").write_text("new database")
 
-    with patch.object(sync.subprocess, "run", side_effect=fake_postmap), patch.object(
-        sync.grp, "getgrnam", return_value=type("Group", (), {"gr_gid": os.getgid()})()
-    ), patch.object(sync.os, "chown"), patch.object(
-        sync.os, "replace", side_effect=fake_replace
+    with (
+        patch.object(sync.subprocess, "run", side_effect=fake_postmap),
+        patch.object(
+            sync.grp,
+            "getgrnam",
+            return_value=type("Group", (), {"gr_gid": os.getgid()})(),
+        ),
+        patch.object(sync.os, "chown"),
+        patch.object(sync.os, "replace", side_effect=fake_replace),
     ):
         with pytest.raises(OSError, match="source publication failed"):
             sync.write_and_postmap(str(virtual_file), "new source")
 
     assert virtual_file.read_text() == "old source"
     assert database_file.read_text() == "old database"
-
-
-def test_virtual_map_keeps_live_database_during_publication(tmp_path):
-    sync = load_sync_module()
-    sync.MAP_LOCK_FILE = str(tmp_path / "map.lock")
-    Path(sync.MAP_LOCK_FILE).touch()
-    virtual_file = tmp_path / "virtual"
-    virtual_file.write_text("old source")
-    database_file = tmp_path / "virtual.db"
-    database_file.write_text("old database")
-    real_replace = os.replace
-
-    def observe_replace(source, target):
-        if target == str(database_file):
-            assert database_file.read_text() == "old database"
-        return real_replace(source, target)
-
-    def fake_postmap(command, check):
-        Path(f"{command[1]}.db").write_text("new database")
-
-    with patch.object(sync.subprocess, "run", side_effect=fake_postmap), patch.object(
-        sync.grp, "getgrnam", return_value=type("Group", (), {"gr_gid": os.getgid()})()
-    ), patch.object(sync.os, "chown"), patch.object(
-        sync.os, "replace", side_effect=observe_replace
-    ):
-        assert sync.write_and_postmap(str(virtual_file), "new source")
-
-    assert virtual_file.read_text() == "new source"
-    assert database_file.read_text() == "new database"
 
 
 def test_forwarding_alias_rejects_legacy_local_domain():
@@ -268,13 +246,217 @@ def test_api_response_schema_rejects_malformed_authorization_data():
         sync.validate_club_response({"lists": {"board": ["member@example.com", None]}})
 
 
+def test_configuration_rejects_duplicate_tenant_domains_and_prefixes():
+    sync = load_sync_module()
+    base_club = {
+        "prefix": "one",
+        "domains": ["shared.example.org"],
+        "api_url": "https://one.example.org/api/email-lists/",
+    }
+    duplicate_domain = {
+        "mail_domain": "example.org",
+        "clubs": [
+            base_club,
+            {
+                "prefix": "two",
+                "domains": ["SHARED.example.org"],
+                "api_url": "https://two.example.org/api/email-lists/",
+            },
+        ],
+    }
+    with pytest.raises(ValueError, match="assigned more than once"):
+        sync.validate_configuration(duplicate_domain)
+
+    duplicate_prefix = {
+        "mail_domain": "example.org",
+        "clubs": [base_club, {**base_club, "domains": ["two.example.org"]}],
+    }
+    with pytest.raises(ValueError, match="duplicate tenant prefix"):
+        sync.validate_configuration(duplicate_prefix)
+
+
+def test_ansible_uniqueness_checks_preserve_duplicates_until_assertion():
+    mail_sync_tasks = (Path(__file__).parent / "tasks" / "main.yml").read_text()
+    postfix_tasks = (
+        Path(__file__).parent.parent / "postfix" / "tasks" / "main.yml"
+    ).read_text()
+
+    assert "m2s_mail_sync_resolved_tenant_domains: []" in mail_sync_tasks
+    assert "postfix_resolved_tenant_domains: []" in postfix_tasks
+    assert (
+        "m2s_mail_sync_resolved_tenant_domains + (_tenant_domains | map('lower') | list)"
+        in mail_sync_tasks
+    )
+    assert (
+        "postfix_resolved_tenant_domains + (_tenant_domains | map('lower') | list)"
+        in postfix_tasks
+    )
+
+
+def test_guarded_maps_retain_old_authorization_until_routing_is_live(tmp_path):
+    sync = load_sync_module()
+    recipient_map = tmp_path / "recipient_whitelist_check"
+    recipient_map.write_text(
+        "old@example.org  whitelist_required_old\n"
+        "same@example.org  whitelist_required_old\n"
+    )
+    guarded = sync.guarded_postfix_map(
+        str(recipient_map),
+        "same@example.org  whitelist_required_new\n"
+        "new@example.org  whitelist_required_new\n",
+    )
+    assert "old@example.org  whitelist_required_old" in guarded
+    assert "same@example.org  whitelist_required_new" in guarded
+    assert "same@example.org  whitelist_required_old" not in guarded
+
+    protected_map = tmp_path / "protected_lists.map"
+    protected_map.write_text("/^old@example\\.org$/i\n")
+    guarded_protected = sync.guarded_rspamd_map(
+        str(protected_map), "/^new@example\\.org$/i\n"
+    )
+    assert "/^old@example\\.org$/i" in guarded_protected
+    assert "/^new@example\\.org$/i" in guarded_protected
+
+
+def test_rspamd_map_write_failure_is_fatal(tmp_path):
+    sync = load_sync_module()
+    missing_path = tmp_path / "missing" / "protected_lists.map"
+    with pytest.raises(FileNotFoundError, match="directory does not exist"):
+        sync.write_rspamd_whitelist(str(missing_path), "protected\n")
+
+
+def test_main_publishes_authorization_before_routing_and_finalizes_afterward():
+    sync = load_sync_module()
+    config = {
+        "mail_domain": "example.org",
+        "mail_hostname": "mail.example.org",
+        "admin_email": "monitor@example.net",
+        "default_auth_token": "secret",
+        "postfix_virtual_file": "/maps/virtual",
+        "postfix_whitelist_dir": "/maps/tenant-whitelists",
+        "postfix_recipient_check_file": "/maps/recipient_whitelist_check",
+        "clubs": [
+            {
+                "prefix": "club",
+                "domains": ["club.example.org"],
+                "api_url": "https://club.example.org/api/email-lists/",
+            }
+        ],
+    }
+    writes = []
+
+    def record_write(path, content):
+        writes.append(path)
+        return True
+
+    with (
+        patch.object(sync, "load_config", return_value=config),
+        patch.object(
+            sync,
+            "fetch_club_lists",
+            return_value={
+                "lists": {"board": ["member@example.net"]},
+                "whitelist": ["member@example.net"],
+            },
+        ),
+        patch.object(sync, "write_and_postmap", side_effect=record_write),
+    ):
+        sync.main()
+
+    recipient_path = config["postfix_recipient_check_file"]
+    virtual_path = config["postfix_virtual_file"]
+    assert writes.index(recipient_path) < writes.index(virtual_path)
+    assert writes.index(virtual_path) < len(writes) - 1
+    assert writes[-1] == recipient_path
+
+
+def test_routing_failure_leaves_guarded_authorization_in_place(tmp_path):
+    sync = load_sync_module()
+    recipient_path = tmp_path / "recipient_whitelist_check"
+    recipient_path.write_text("old@club.example.org  whitelist_required_club\n")
+    config = {
+        "mail_domain": "example.org",
+        "mail_hostname": "mail.example.org",
+        "admin_email": "monitor@example.net",
+        "default_auth_token": "secret",
+        "postfix_virtual_file": str(tmp_path / "virtual"),
+        "postfix_whitelist_dir": str(tmp_path / "tenant-whitelists"),
+        "postfix_recipient_check_file": str(recipient_path),
+        "clubs": [
+            {
+                "prefix": "club",
+                "domains": ["club.example.org"],
+                "api_url": "https://club.example.org/api/email-lists/",
+            }
+        ],
+    }
+    writes = []
+
+    def fail_on_routing(path, content):
+        writes.append((path, content))
+        if path == config["postfix_virtual_file"]:
+            raise OSError("routing publication failed")
+        return True
+
+    with (
+        patch.object(sync, "load_config", return_value=config),
+        patch.object(
+            sync,
+            "fetch_club_lists",
+            return_value={
+                "lists": {"board": ["member@example.net"]},
+                "whitelist": ["member@example.net"],
+            },
+        ),
+        patch.object(sync, "write_and_postmap", side_effect=fail_on_routing),
+        pytest.raises(OSError, match="routing publication failed"),
+    ):
+        sync.main()
+
+    recipient_writes = [
+        content for path, content in writes if path == str(recipient_path)
+    ]
+    assert len(recipient_writes) == 1
+    assert "old@club.example.org  whitelist_required_club" in recipient_writes[0]
+
+
+def test_total_api_outage_preserves_routes_and_exits_nonzero():
+    sync = load_sync_module()
+    config = {
+        "mail_domain": "example.org",
+        "default_auth_token": "secret",
+        "postfix_virtual_file": "/maps/virtual",
+        "postfix_whitelist_dir": "/maps/tenant-whitelists",
+        "postfix_recipient_check_file": "/maps/recipient_whitelist_check",
+        "clubs": [
+            {
+                "prefix": "club",
+                "domains": ["club.example.org"],
+                "api_url": "https://club.example.org/api/email-lists/",
+            }
+        ],
+    }
+    with (
+        patch.object(sync, "load_config", return_value=config),
+        patch.object(sync, "fetch_club_lists", return_value=None),
+        patch.object(sync, "clear_virtual_aliases") as clear_routes,
+        patch.object(sync, "clear_authorization_maps") as clear_authorization,
+        pytest.raises(SystemExit) as exc,
+    ):
+        sync.main()
+
+    assert exc.value.code == 1
+    clear_routes.assert_not_called()
+    clear_authorization.assert_not_called()
+
+
 def test_protected_rspamd_map_includes_bypass_lists_for_spf():
     sync = load_sync_module()
     content = sync.generate_protected_lists_map(
         {"club.example.org": {"lists": {"board": [], "webmaster": []}}}
     )
-    assert r"/^board(?:\+[^@]+)?@club\.example\.org$/i" in content
-    assert r"/^webmaster(?:\+[^@]+)?@club\.example\.org$/i" in content
+    assert r"/^board(?:\+[^@]*)?@club\.example\.org$/i" in content
+    assert r"/^webmaster(?:\+[^@]*)?@club\.example\.org$/i" in content
 
 
 def test_bypass_rspamd_map_matches_tagged_recipients():
@@ -282,7 +464,7 @@ def test_bypass_rspamd_map_matches_tagged_recipients():
     content = sync.generate_bypass_lists_map(
         {"club": {"domains": ["club.example.org"], "bypass_lists": ["webmaster"]}}
     )
-    assert r"/^webmaster(?:\+[^@]+)?@club\.example\.org$/i" in content
+    assert r"/^webmaster(?:\+[^@]*)?@club\.example\.org$/i" in content
 
 
 def test_forwarding_and_list_bounces_route_to_external_admin():

@@ -28,8 +28,9 @@ submission inet n       -       y       -       -       smtpd
   -o smtpd_sender_restrictions=
   -o smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject
   -o smtpd_relay_restrictions=permit_mynetworks,permit_sasl_authenticated,reject
-  # Trusted submission is intentionally excluded from Rspamd SPF/list checks;
-  # OpenDKIM still signs the message and the content filter still rewrites it.
+  # Mark trusted submission for Rspamd's ORIGINATING exemption; OpenDKIM
+  # still signs the message and the content filter still rewrites it.
+  -o milter_macro_daemon_name=ORIGINATING
   -o smtpd_milters=unix:/opendkim/opendkim.sock
   -o content_filter=maillist-rewriter-submission:dummy
 

@@ -42,5 +42,5 @@ clubs:
       - "{{ domain }}"
 {% endfor %}
     api_url: "{{ club.api_url | default(m2s_site_url | default('https://' ~ (m2s_domain | default('localhost'))) ~ '/api/email-lists/') }}"
-    auth_token: "{{ club.auth_token | default(m2s_api_key | default(vault_m2s_api_key | default(''))) }}"
+    auth_token: "{{ club.auth_token | default(m2s_api_key | default(vault_m2s_api_key | default('')), true) }}"
 {% endfor %}

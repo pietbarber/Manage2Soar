@@ -125,15 +125,30 @@ def validate_configuration(config):
     if not is_valid_dns_name(mail_domain):
         raise ValueError('mail_domain must be a valid DNS name')
 
-    for club in config.get('clubs', []):
+    clubs = config.get('clubs', [])
+    if not isinstance(clubs, list):
+        raise ValueError('clubs must be a list')
+
+    seen_prefixes = set()
+    seen_domains = set()
+    for club in clubs:
+        if not isinstance(club, dict):
+            raise ValueError('each club must be an object')
         prefix = club.get('prefix', '')
         if not isinstance(prefix, str) or not TENANT_PREFIX_PATTERN.fullmatch(prefix):
             raise ValueError(f"invalid tenant prefix: {prefix!r}")
+        if prefix in seen_prefixes:
+            raise ValueError(f"duplicate tenant prefix: {prefix}")
+        seen_prefixes.add(prefix)
         domains = club.get('domains') or []
         if isinstance(domains, str):
             domains = [domains]
         if any(not is_valid_dns_name(domain) for domain in domains):
             raise ValueError(f"invalid tenant domain for {prefix}")
+        for domain in {domain.lower().rstrip('.') for domain in domains}:
+            if domain in seen_domains:
+                raise ValueError(f"tenant domain is assigned more than once: {domain}")
+            seen_domains.add(domain)
         if not is_safe_api_url(club.get('api_url', '')):
             raise ValueError(f"API URL for {prefix} must use HTTPS (or local HTTP)")
 
@@ -171,12 +186,18 @@ def fetch_club_lists(club, default_auth_token):
         if not is_safe_api_url(club.get('api_url', '')):
             raise ValueError('API URL must use HTTPS (or local HTTP)')
         # Use club-specific token if available, otherwise default
-        auth_token = club.get('auth_token', default_auth_token)
+        # Empty per-tenant values must not disable the safe global fallback.
+        auth_token = club.get('auth_token') or default_auth_token
         headers = {
             'X-API-Key': auth_token,
             'Accept': 'application/json',
         }
-        response = requests.get(club['api_url'], headers=headers, timeout=30)
+        # Never forward the tenant API key to an attacker-controlled redirect.
+        response = requests.get(
+            club['api_url'], headers=headers, timeout=30, allow_redirects=False
+        )
+        if response.is_redirect or response.is_permanent_redirect:
+            raise ValueError('API endpoint returned a redirect; refusing to follow it')
         response.raise_for_status()
         data = response.json()
         validate_club_response(data)
@@ -401,7 +422,7 @@ def generate_bypass_lists_map(clubs_bypass_lists):
                     continue
                 for domain in domains:
                     lines.append(
-                        f"/^{re.escape(list_name)}(?:\\+[^@]+)?@{re.escape(domain)}$/i"
+                        f"/^{re.escape(list_name)}(?:\\+[^@]*)?@{re.escape(domain)}$/i"
                     )
 
     return '\n'.join(lines)
@@ -421,7 +442,7 @@ def generate_protected_lists_map(clubs_data):
             recipient = f"{list_name}@{domain}"
             if is_valid_alias_name(list_name):
                 lines.append(
-                    f"/^{re.escape(list_name)}(?:\\+[^@]+)?@{re.escape(domain)}$/i"
+                    f"/^{re.escape(list_name)}(?:\\+[^@]*)?@{re.escape(domain)}$/i"
                 )
     return '\n'.join(lines)
 
@@ -522,6 +543,70 @@ def file_changed(filepath, new_content):
     return old_hash != new_hash
 
 
+def read_existing_map(filepath):
+    """Read an existing generated map, treating first deployment as empty."""
+    try:
+        with open(filepath, 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return ''
+
+
+def guarded_postfix_map(filepath, new_content):
+    """Keep old authorization records until the new routing map is live.
+
+    New records win by key. Records for routes being removed or changed to
+    bypass mode remain temporarily restrictive and are removed only after the
+    virtual alias map has been published successfully.
+    """
+    new_keys = set()
+    for line in new_content.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith('#'):
+            new_keys.add(stripped.split(None, 1)[0].lower())
+
+    retained = []
+    for line in read_existing_map(filepath).splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        key = stripped.split(None, 1)[0].lower()
+        if key not in new_keys:
+            retained.append(stripped)
+
+    if not retained:
+        return new_content
+    return (
+        new_content.rstrip('\n')
+        + '\n\n# Temporarily retained until routing publication succeeds\n'
+        + '\n'.join(retained)
+        + '\n'
+    )
+
+
+def guarded_rspamd_map(filepath, new_content):
+    """Retain old protected-list patterns until new routing is published."""
+    new_records = {
+        line.strip()
+        for line in new_content.splitlines()
+        if line.strip() and not line.lstrip().startswith('#')
+    }
+    retained = []
+    for line in read_existing_map(filepath).splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith('#') and stripped not in new_records:
+            retained.append(stripped)
+
+    if not retained:
+        return new_content
+    return (
+        new_content.rstrip('\n')
+        + '\n\n# Temporarily retained until routing publication succeeds\n'
+        + '\n'.join(retained)
+        + '\n'
+    )
+
+
 def secure_postfix_map(filepath):
     """Restrict a Postfix map and its database to the Postfix group."""
     postfix_gid = grp.getgrnam('postfix').gr_gid
@@ -572,22 +657,18 @@ def write_and_postmap(filepath, content):
             raise
 
         database_backup = None
-        database_published = False
         try:
             if os.path.exists(database_path):
                 backup_fd, database_backup = tempfile.mkstemp(dir=directory)
                 os.close(backup_fd)
                 os.unlink(database_backup)
-                # Keep the live Postfix pathname available during publication.
+                # Keep the live pathname readable until the new pair is ready.
                 os.link(database_path, database_backup)
             os.replace(temp_database_path, database_path)
-            database_published = True
             os.replace(temp_path, filepath)
         except Exception:
             if database_backup and os.path.exists(database_backup):
                 os.replace(database_backup, database_path)
-            elif database_published and os.path.exists(database_path):
-                os.unlink(database_path)
             raise
         finally:
             if database_backup and os.path.exists(database_backup):
@@ -684,8 +765,9 @@ def write_rspamd_whitelist(filepath, content):
         # Verify directory exists
         dir_path = os.path.dirname(filepath)
         if not os.path.isdir(dir_path):
-            print(f"[{datetime.now()}] ERROR: Rspamd whitelist directory does not exist: {dir_path}")
-            return False
+            raise FileNotFoundError(
+                f"Rspamd whitelist directory does not exist: {dir_path}"
+            )
 
         # Write to temp file first, then atomic move
         fd, temp_path = tempfile.mkstemp(dir=dir_path)
@@ -715,7 +797,7 @@ def write_rspamd_whitelist(filepath, content):
         return True
     except (IOError, OSError) as e:
         print(f"[{datetime.now()}] ERROR: Failed to write Rspamd whitelist: {e}")
-        return False
+        raise
 
 
 def ensure_rspamd_whitelist_dir(dir_path):
@@ -773,8 +855,12 @@ def main():
     clubs_data = {}
     clubs_whitelist_data = {}  # Track per-club whitelist data
     clubs_bypass_lists = {}  # Track per-club bypass lists (Issue #492)
+    fetch_failed = False
     for club in config['clubs']:
         data = fetch_club_lists(club, default_auth_token)
+        if data is None:
+            fetch_failed = True
+            continue
         if data:
             # Support both single 'domain' and multiple 'domains'
             # This provides backward compatibility with old configs
@@ -806,24 +892,16 @@ def main():
                 print(f"[{datetime.now()}] Bypass lists for {club['prefix']}: {', '.join(bypass_lists)}")
             print(f"[{datetime.now()}] Fetched {len(data.get('lists', {}))} lists for {club['prefix']} ({len(domains)} domains)")
 
-    if not clubs_data:
-        reason = 'no club data fetched; disabling mail aliases until synchronization recovers'
-        print(f"[{datetime.now()}] ERROR: {reason}")
-        clear_virtual_aliases(config, reason)
-        clear_authorization_maps(config, reason)
-        sys.exit(0)
+    if fetch_failed:
+        # A transient upstream failure is not authoritative configuration.
+        # Keep the last complete generation and retry on the next cron run.
+        print(f"[{datetime.now()}] ERROR: one or more clubs could not be fetched; preserving existing aliases")
+        sys.exit(1)
 
-    # A partially unavailable tenant must not retain stale authorization.
-    # Keep successful data, but publish empty maps for failed tenants below.
-    configured_prefixes = {club['prefix'] for club in config.get('clubs', [])}
-    for prefix in configured_prefixes - set(clubs_whitelist_data):
-        club = next(
-            club for club in config['clubs'] if club.get('prefix') == prefix
-        )
-        domains = club.get('domains') or []
-        if isinstance(domains, str):
-            domains = [domains]
-        clubs_whitelist_data[prefix] = {'domains': domains, 'whitelist': []}
+    if not clubs_data:
+        reason = 'no club data fetched; preserving existing aliases until synchronization recovers'
+        print(f"[{datetime.now()}] ERROR: {reason}")
+        sys.exit(1)
 
     # Check for dev mode (safety valve for development)
     dev_mode = config.get('dev_mode', {})
@@ -870,12 +948,14 @@ def main():
         data and data.get('forwarding_aliases')
         for data in clubs_data.values()
     )
-    if not dev_mode.get('enabled', False) and bounce_email and (
-        not is_valid_email(bounce_email)
+    if not dev_mode.get('enabled', False) and (
+        not bounce_email
+        or not is_valid_email(bounce_email)
         or bounce_email.rsplit('@', 1)[-1].lower().rstrip('.') in local_domains
     ):
+        # Do not publish a generation whose bounce routes cannot be delivered.
         print(f"[{datetime.now()}] ERROR: admin_email must be a valid external monitored mailbox")
-        bounce_email = ''
+        sys.exit(1)
     if has_forwards and not bounce_email:
         # Do not install direct forwards whose delivery failures have nowhere
         # monitored to go. Mailing-list routes may still be synchronized.
@@ -889,10 +969,36 @@ def main():
         local_domains=local_domains,
         bounce_email=bounce_email,
     )
-    if write_and_postmap(config['postfix_virtual_file'], virtual_content):
-        print(f"[{datetime.now()}] Updated virtual aliases")
+
+    recipient_check_content = generate_recipient_whitelist_check(
+        clubs_data, clubs_bypass_lists, clubs_whitelist_data
+    )
+    guarded_recipient_content = guarded_postfix_map(
+        config['postfix_recipient_check_file'], recipient_check_content
+    )
+
+    rspamd_enabled = 'rspamd_whitelist_dir' in config
+    protected_content = None
+    guarded_protected_content = None
+    bypass_content = None
+    if rspamd_enabled:
+        whitelist_dir = config['rspamd_whitelist_dir']
+        ensure_rspamd_whitelist_dir(whitelist_dir)
+        protected_content = generate_protected_lists_map(clubs_data)
+        guarded_protected_content = guarded_rspamd_map(
+            config['rspamd_protected_lists_file'], protected_content
+        )
+        bypass_content = generate_bypass_lists_map(clubs_bypass_lists)
+
+    # Publish authorization before routing. The guarded maps retain protection
+    # for routes that are being removed or changed to bypass mode, so any
+    # failure before the virtual map update leaves the old routes fail-closed.
+    if write_and_postmap(
+        config['postfix_recipient_check_file'], guarded_recipient_content
+    ):
+        print(f"[{datetime.now()}] Published guarded recipient authorization")
     else:
-        print(f"[{datetime.now()}] Virtual aliases unchanged")
+        print(f"[{datetime.now()}] Guarded recipient authorization unchanged")
 
     # Generate and update tenant-scoped Postfix whitelists.
     for club_prefix, club_data in clubs_whitelist_data.items():
@@ -905,10 +1011,14 @@ def main():
         else:
             print(f"[{datetime.now()}] Postfix whitelist unchanged for {club_prefix}")
 
-    # Generate and update per-club Rspamd whitelists (if configured)
-    if 'rspamd_whitelist_dir' in config:
-        whitelist_dir = config['rspamd_whitelist_dir']
-        ensure_rspamd_whitelist_dir(whitelist_dir)
+    # Generate and update per-club Rspamd whitelists (if configured).
+    if rspamd_enabled:
+        if write_rspamd_whitelist(
+            config['rspamd_protected_lists_file'], guarded_protected_content
+        ):
+            print(f"[{datetime.now()}] Published guarded protected-list SPF map")
+        else:
+            print(f"[{datetime.now()}] Guarded protected-list SPF map unchanged")
 
         for club_prefix, club_data in clubs_whitelist_data.items():
             whitelist_file = os.path.join(whitelist_dir, f"{club_prefix}_whitelist.map")
@@ -920,35 +1030,38 @@ def main():
             else:
                 print(f"[{datetime.now()}] Rspamd whitelist unchanged for {club_prefix}")
 
-    # Generate and update bypass lists map (Issue #492)
-    # This lists recipients that bypass sender whitelist enforcement
-    # Always write the file (even when empty) to clear stale data
-    if 'rspamd_whitelist_dir' in config:
+    # Publish the final bypass policy while the guarded Postfix map still
+    # protects every old and new route.
+    if rspamd_enabled:
         bypass_file = os.path.join(config['rspamd_whitelist_dir'], "bypass_lists.map")
-        bypass_content = generate_bypass_lists_map(clubs_bypass_lists)
         if write_rspamd_whitelist(bypass_file, bypass_content):
             print(f"[{datetime.now()}] Updated bypass lists map")
         else:
             print(f"[{datetime.now()}] Bypass lists map unchanged")
 
-        protected_content = generate_protected_lists_map(clubs_data)
+    # Routing goes live only after every authorization map was published.
+    if write_and_postmap(config['postfix_virtual_file'], virtual_content):
+        print(f"[{datetime.now()}] Updated virtual aliases")
+    else:
+        print(f"[{datetime.now()}] Virtual aliases unchanged")
+
+    # Routing is now authoritative; remove temporarily retained authorization
+    # records. Failures here leave stricter guards in place rather than opening
+    # delivery to unauthorized senders.
+    if write_and_postmap(
+        config['postfix_recipient_check_file'], recipient_check_content
+    ):
+        print(f"[{datetime.now()}] Finalized recipient authorization")
+    else:
+        print(f"[{datetime.now()}] Recipient authorization already final")
+
+    if rspamd_enabled:
         if write_rspamd_whitelist(
             config['rspamd_protected_lists_file'], protected_content
         ):
-            print(f"[{datetime.now()}] Updated protected-list SPF map")
+            print(f"[{datetime.now()}] Finalized protected-list SPF map")
         else:
-            print(f"[{datetime.now()}] Protected-list SPF map unchanged")
-
-    # Generate and update Postfix recipient whitelist check (Issue #533)
-    # This enforces sender whitelist for mailing lists (reject if sender not whitelisted)
-    if 'postfix_recipient_check_file' in config:
-        recipient_check_content = generate_recipient_whitelist_check(
-            clubs_data, clubs_bypass_lists, clubs_whitelist_data
-        )
-        if write_and_postmap(config['postfix_recipient_check_file'], recipient_check_content):
-            print(f"[{datetime.now()}] Updated recipient whitelist check")
-        else:
-            print(f"[{datetime.now()}] Recipient whitelist check unchanged")
+            print(f"[{datetime.now()}] Protected-list SPF map already final")
 
     print(f"[{datetime.now()}] Sync complete")
 
