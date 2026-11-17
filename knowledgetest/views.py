@@ -27,7 +27,7 @@ from knowledgetest.models import (
     WrittenTestTemplate,
     WrittenTestTemplateQuestion,
 )
-from knowledgetest.permissions import has_written_test_admin_access
+from members.authorization import has_webmaster_compatibility_access
 from members.decorators import active_member_required
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
@@ -54,7 +54,7 @@ DELETE_ANY_ASSIGNMENT = "knowledgetest.delete_any_pending_written_test_assignmen
 
 
 def _has_written_test_capability(user, permission):
-    return bool(user.has_perm(permission) or has_written_test_admin_access(user))
+    return bool(user.has_perm(permission) or has_webmaster_compatibility_access(user))
 
 
 def _get_site_config():

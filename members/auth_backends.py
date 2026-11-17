@@ -2,7 +2,7 @@
 
 from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth.models import Permission
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 
 
@@ -45,9 +45,6 @@ class QualificationPermissionBackend(BaseBackend):
         )
         # The permission_group relation is optional; exclude NULL IDs and keep
         # the bundle opt-in as a defense against stale/inconsistent rows.
-        approved_permissions = QualificationPermissionGrant.objects.filter(
-            group_id__in=permission_groups
-        ).values_list("permission_id", flat=True)
         allowed_filters = Q()
         for capability in QUALIFICATION_ALLOWED_PERMISSIONS:
             app_label, codename = capability.split(".", 1)
@@ -56,16 +53,16 @@ class QualificationPermissionBackend(BaseBackend):
                 codename=codename,
             )
         permissions = (
-            Permission.objects.filter(
-                id__in=approved_permissions,
-                group__id__in=permission_groups,
+            QualificationPermissionGrant.objects.filter(
+                group_id__in=permission_groups,
+                permission__group__id=F("group_id"),
                 group__role_metadata__qualification_permission_bundle=True,
                 group__role_metadata__is_builtin=False,
                 group__role_metadata__is_protected=False,
                 group__role_metadata__is_system_managed=False,
             )
-            .filter(allowed_filters)
-            .values_list("content_type__app_label", "codename")
+            .filter(permission__in=Permission.objects.filter(allowed_filters))
+            .values_list("permission__content_type__app_label", "permission__codename")
         )
         return {f"{app_label}.{codename}" for app_label, codename in permissions}
 

@@ -17,6 +17,14 @@ def backfill_missing_grant_events(apps, schema_editor):
     groups = dict(Group.objects.using(database).values_list("pk", "name"))
     role_keys = dict(RoleMetadata.objects.using(database).values_list("group_id", "key"))
     events = []
+
+    def flush_events():
+        timestamps = [event.timestamp for event in events]
+        Event.objects.using(database).bulk_create(events)
+        for event, timestamp in zip(events, timestamps):
+            event.timestamp = timestamp
+        Event.objects.using(database).bulk_update(events, ["timestamp"])
+
     for assignment in Assignment.objects.using(database).iterator():
         key = (assignment.member_id, assignment.group_id, assignment.source, assignment.source_key)
         if key in existing:
@@ -41,10 +49,10 @@ def backfill_missing_grant_events(apps, schema_editor):
             )
         )
         if len(events) >= 500:
-            Event.objects.using(database).bulk_create(events)
+            flush_events()
             events = []
     if events:
-        Event.objects.using(database).bulk_create(events)
+        flush_events()
 
 
 class Migration(migrations.Migration):
