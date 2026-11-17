@@ -2,7 +2,9 @@
 
 import csv
 from datetime import date
+from decimal import Decimal
 from functools import wraps
+from typing import cast
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -11,6 +13,7 @@ from django.db.models import Prefetch, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from billing.decorators import (
@@ -187,7 +190,14 @@ def club_ledger_csv(request):
 
 def _back_to_filter(request, url):
     """Send an export with bad filters back to the page that shows the errors."""
-    return redirect(f"{url}?{request.GET.urlencode()}")
+    redirect_url = f"{url}?{request.GET.urlencode()}"
+    if not url_has_allowed_host_and_scheme(
+        redirect_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(url)
+    return redirect(redirect_url)
 
 
 def _register_range(request):
@@ -328,10 +338,8 @@ ENTRY_FORMS = {
         "form": MemberPaidExpenseForm,
         "title": "Expense paid by member",
         "help": (
-            "A member paid a club bill out of pocket, such as maintenance items "
-            "purchased on a personal credit card. The expense is recorded and the "
-            "member's account is credited. To undo it, reverse the credit from "
-            "the member's ledger."
+            "Direct account reimbursements for out-of-pocket member expenses on "
+            "behalf of the Club"
         ),
         "post": lambda actor, data: post_member_paid_expense(actor=actor, **data),
     },
@@ -344,7 +352,7 @@ ENTRY_FORMS = {
     "transfer": {
         "form": TransferForm,
         "title": "Transfer between accounts",
-        "help": "Move money between bank or cash accounts, such as depositing collected checks.",
+        "help": "Move money between bank or cash accounts.",
         "post": lambda actor, data: post_cash_transfer(actor=actor, **data),
     },
 }
@@ -409,8 +417,8 @@ def general_journal(request):
         lines = [
             Line(
                 account=line["account"],
-                debit=line.get("debit") or 0,
-                credit=line.get("credit") or 0,
+                debit=cast(Decimal | None, line.get("debit")) or Decimal("0"),
+                credit=cast(Decimal | None, line.get("credit")) or Decimal("0"),
                 memo=line.get("memo", ""),
             )
             for line in formset.filled_lines()
@@ -460,7 +468,7 @@ def go_live_setup(request):
             BankBalance(
                 account=data.get("account"),
                 name=data.get("name", ""),
-                amount=data.get("amount") or 0,
+                amount=cast(Decimal | None, data.get("amount")) or Decimal("0"),
             )
             for data in formset.cleaned_data
             if data.get("account") or data.get("name") or data.get("amount")

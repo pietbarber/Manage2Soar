@@ -179,7 +179,7 @@ oauthlib==4.0.1
     # via
     #   requests-oauthlib
     #   social-auth-core
-opentelemetry-api==1.45.1
+opentelemetry-api==1.45.2
     # via
     #   -r requirements.in
     #   google-api-core

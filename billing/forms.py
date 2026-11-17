@@ -4,6 +4,7 @@ from decimal import Decimal
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from django.utils.html import format_html, format_html_join
 
 from billing.models import Account, LedgerEntry
 from billing.services import OPENING_BALANCE_OVERRIDE_MAX_DESCRIPTION
@@ -32,15 +33,26 @@ class ManualEntryForm(forms.Form):
         initial=date.today, widget=forms.DateInput(attrs={"type": "date"})
     )
     description = forms.CharField(max_length=255)
-    reason = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}))
+    reason = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="For additional internal audit context",
+    )
     book_account = forms.ModelChoiceField(
         queryset=Account.objects.none(),
         required=False,
         label="Club books account",
-        help_text=(
-            "Leave blank for the default: charges go to Miscellaneous Charges, "
-            "payments to Undeposited Funds, and credits to Member Credits and "
-            "Discounts. Initial balances always offset the General Fund."
+        help_text=format_html(
+            'Defaults:<ul class="mb-0">{}</ul>',
+            format_html_join(
+                "",
+                "<li>{}</li>",
+                (
+                    ("Charges go to Miscellaneous Charges",),
+                    ("Payments go to Undeposited Funds",),
+                    ("Credits go to Member Credits and Discounts",),
+                    ("Initial balances always offset the General Fund",),
+                ),
+            ),
         ),
     )
 

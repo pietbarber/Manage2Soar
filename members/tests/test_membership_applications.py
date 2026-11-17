@@ -2,6 +2,7 @@
 Tests for the membership application system.
 """
 
+import itertools
 from unittest.mock import patch
 
 import pytest
@@ -13,7 +14,7 @@ from django.urls import reverse
 
 from members.forms_applications import MembershipApplicationForm
 from members.models import Member
-from members.models_applications import MembershipApplication
+from members.models_applications import COUNTRY_CODE_TO_MEMBER, MembershipApplication
 from members.views_applications import _application_withdrawal_token
 
 
@@ -326,34 +327,6 @@ class MembershipApplicationFormTests:
 
         form = MembershipApplicationForm(data=form_data)
         assert form.is_valid()
-
-    def test_valid_form_without_emergency_contact(self):
-        form_data = {
-            "first_name": "John",
-            "last_name": "Doe",
-            "email": "john@example.com",
-            "phone": "555-123-4567",
-            "address_line1": "123 Main St",
-            "city": "Anytown",
-            "state": "CA",
-            "zip_code": "12345",
-            "soaring_goals": "I want to learn gliding",
-            "agrees_to_terms": True,
-            "agrees_to_safety_rules": True,
-            "agrees_to_financial_obligations": True,
-        }
-
-        form = MembershipApplicationForm(data=form_data)
-
-        assert form.is_valid()
-        assert all(
-            not form.fields[field].required
-            for field in (
-                "emergency_contact_name",
-                "emergency_contact_relationship",
-                "emergency_contact_phone",
-            )
-        )
 
     @pytest.mark.parametrize(
         ("field", "value"),
@@ -1560,32 +1533,90 @@ def _valid_application_form_data(**contact_data):
         "agrees_to_terms": True,
         "agrees_to_safety_rules": True,
         "agrees_to_financial_obligations": True,
+        "emergency_contact_name": "Jane Doe",
+        "emergency_contact_relationship": "Spouse",
+        "emergency_contact_phone": "555-987-6543",
         **contact_data,
     }
 
 
-@pytest.mark.django_db
-def test_partial_emergency_contact_is_rejected_with_clear_errors():
-    form = MembershipApplicationForm(
-        data=_valid_application_form_data(
-            emergency_contact_name="Jane Doe",
-            emergency_contact_phone="555-987-6543",
-        )
+EMERGENCY_CONTACT_FIELDS = (
+    "emergency_contact_name",
+    "emergency_contact_relationship",
+    "emergency_contact_phone",
+)
+
+
+def _set_require_emergency_contact(required):
+    from siteconfig.models import SiteConfiguration
+
+    SiteConfiguration.objects.all().delete()
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        club_abbreviation="TC",
+        domain_name="testclub.com",
+        membership_application_require_emergency_contact=required,
     )
 
-    assert not form.is_valid()
-    assert (
-        "Provide the emergency contact's name"
-        in form.errors.as_data()["emergency_contact_relationship"][0].message
-    )
-    assert "emergency_contact_relationship" in form.errors
-
 
 @pytest.mark.django_db
-def test_empty_emergency_contact_is_valid():
+@pytest.mark.parametrize("required", [True, False], ids=["required", "optional"])
+def test_complete_emergency_contact_is_valid(required):
+    _set_require_emergency_contact(required)
     form = MembershipApplicationForm(data=_valid_application_form_data())
 
-    assert form.is_valid()
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("required", [True, False], ids=["required", "optional"])
+@pytest.mark.parametrize(
+    "blank_fields",
+    [
+        set(combo)
+        for size in range(1, len(EMERGENCY_CONTACT_FIELDS) + 1)
+        for combo in itertools.combinations(EMERGENCY_CONTACT_FIELDS, size)
+    ],
+    ids=lambda fields: "+".join(
+        sorted(f.removeprefix("emergency_contact_") for f in fields)
+    ),
+)
+def test_incomplete_emergency_contact(blank_fields, required):
+    """A partial contact is always rejected; a fully blank one only when required."""
+    _set_require_emergency_contact(required)
+    form = MembershipApplicationForm(
+        data=_valid_application_form_data(**dict.fromkeys(blank_fields, ""))
+    )
+
+    if not required and blank_fields == set(EMERGENCY_CONTACT_FIELDS):
+        assert form.is_valid(), form.errors
+    else:
+        assert not form.is_valid()
+        assert set(form.errors) == blank_fields
+
+
+@pytest.mark.django_db
+def test_non_us_form_allows_blank_state_and_zip():
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "email": "jane@example.com",
+        "phone": "555-123-4567",
+        "address_line1": "1-2-3 Ginza",
+        "city": "Tokyo",
+        "country": "JPN",
+        "state": "",
+        "zip_code": "",
+        "soaring_goals": "I want to learn gliding",
+        "agrees_to_terms": True,
+        "agrees_to_safety_rules": True,
+        "agrees_to_financial_obligations": True,
+    }
+
+    form = MembershipApplicationForm(data=form_data)
+
+    assert form.is_valid(), form.errors
+    assert form.instance.can_be_approved()
 
 
 @pytest.mark.django_db
@@ -1603,10 +1634,7 @@ def test_membership_application_accepts_an_existing_member_email():
 @pytest.mark.django_db
 def test_model_rejects_partial_emergency_contact():
     app = MembershipApplication(
-        **_valid_application_form_data(
-            emergency_contact_name="Jane Doe",
-            emergency_contact_phone="555-987-6543",
-        )
+        **_valid_application_form_data(emergency_contact_relationship="")
     )
 
     with pytest.raises(ValidationError) as exc_info:
@@ -1618,12 +1646,71 @@ def test_model_rejects_partial_emergency_contact():
 @pytest.mark.django_db
 def test_partial_emergency_contact_cannot_be_approved():
     app = MembershipApplication(
-        **_valid_application_form_data(
-            emergency_contact_name="Jane Doe",
-            emergency_contact_phone="555-987-6543",
-        )
+        **_valid_application_form_data(emergency_contact_relationship="")
     )
 
     assert not app.can_be_approved()
     with pytest.raises(ValueError, match="cannot be approved"):
         app.approve_application()
+
+
+def test_every_application_country_has_a_member_code():
+    codes = {code for code, _ in MembershipApplicationForm.COUNTRY_CHOICES}
+
+    assert codes - {"OTHER"} <= COUNTRY_CODE_TO_MEMBER.keys()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "country, member_country",
+    [("USA", "US"), ("JPN", "JP"), ("GBR", "GB"), ("OTHER", "")],
+)
+def test_approved_member_keeps_applicant_country(country, member_country):
+    app = MembershipApplication.objects.create(
+        **_valid_application_form_data(country=country)
+    )
+
+    member = app.approve_application()
+
+    member.refresh_from_db()
+    assert member.country == member_country
+
+
+@pytest.mark.django_db
+def test_approved_member_address_holds_only_street_lines():
+    app = MembershipApplication.objects.create(
+        **_valid_application_form_data(address_line2="Apt 4")
+    )
+
+    member = app.approve_application()
+
+    member.refresh_from_db()
+    assert member.address == "123 Main St\nApt 4"
+    assert (member.city, member.state_code, member.zip_code) == (
+        "Anytown",
+        "CA",
+        "12345",
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "country, state, state_code, state_freeform",
+    [
+        ("USA", "va", "VA", ""),
+        ("USA", "Virginia", "", "Virginia"),
+        ("CAN", "Ontario", "", "Ontario"),
+        # "WA" is a US state code, but here it means Western Australia.
+        ("AUS", "WA", "", "WA"),
+        ("JPN", "", "", ""),
+    ],
+)
+def test_approved_member_state(country, state, state_code, state_freeform):
+    app = MembershipApplication.objects.create(
+        **_valid_application_form_data(country=country, state=state)
+    )
+
+    member = app.approve_application()
+
+    member.refresh_from_db()
+    assert (member.state_code, member.state_freeform) == (state_code, state_freeform)

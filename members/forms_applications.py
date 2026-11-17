@@ -2,6 +2,11 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from members.constants.locations import (
+    COUNTRY_CHOICES as MEMBERSHIP_APPLICATION_COUNTRY_CHOICES,
+)
+from siteconfig.models import SiteConfiguration
+
 from .models_applications import MembershipApplication
 
 
@@ -22,46 +27,7 @@ class MembershipApplicationForm(forms.ModelForm):
         ("foreign", "Foreign pilot"),
     ]
 
-    # Country choices - most common countries for soaring clubs
-    COUNTRY_CHOICES = [
-        ("USA", "United States"),
-        ("CAN", "Canada"),
-        ("GBR", "United Kingdom"),
-        ("AUS", "Australia"),
-        ("DEU", "Germany"),
-        ("FRA", "France"),
-        ("NZL", "New Zealand"),
-        ("CHE", "Switzerland"),
-        ("AUT", "Austria"),
-        ("NLD", "Netherlands"),
-        ("SWE", "Sweden"),
-        ("NOR", "Norway"),
-        ("DNK", "Denmark"),
-        ("FIN", "Finland"),
-        ("ESP", "Spain"),
-        ("ITA", "Italy"),
-        ("POL", "Poland"),
-        ("CZE", "Czech Republic"),
-        ("HUN", "Hungary"),
-        ("SVK", "Slovakia"),
-        ("SVN", "Slovenia"),
-        ("HRV", "Croatia"),
-        ("ROU", "Romania"),
-        ("BGR", "Bulgaria"),
-        ("GRC", "Greece"),
-        ("PRT", "Portugal"),
-        ("BEL", "Belgium"),
-        ("LUX", "Luxembourg"),
-        ("IRL", "Ireland"),
-        ("ARG", "Argentina"),
-        ("BRA", "Brazil"),
-        ("CHL", "Chile"),
-        ("ZAF", "South Africa"),
-        ("JPN", "Japan"),
-        ("KOR", "South Korea"),
-        ("SGP", "Singapore"),
-        ("OTHER", "Other (please specify in comments)"),
-    ]
+    COUNTRY_CHOICES = MEMBERSHIP_APPLICATION_COUNTRY_CHOICES
 
     # Override country field as ChoiceField to ensure proper dropdown rendering
     country = forms.ChoiceField(
@@ -198,19 +164,19 @@ class MembershipApplicationForm(forms.ModelForm):
             "emergency_contact_name": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Full Name (optional)",
+                    "placeholder": "Full Name",
                 }
             ),
             "emergency_contact_relationship": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "e.g., Spouse, Parent, Sibling (optional)",
+                    "placeholder": "e.g., Spouse, Parent, Sibling, Friend",
                 }
             ),
             "emergency_contact_phone": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "(555) 123-4567 (optional)",
+                    "placeholder": "(555) 867-5309",
                 }
             ),
             # Aviation Experience
@@ -359,6 +325,26 @@ class MembershipApplicationForm(forms.ModelForm):
         # Make soaring goals required
         self.fields["soaring_goals"].required = True
 
+        # State and postal code are required for US addresses only. The model
+        # fields are non-blank for legacy US applications, so override their
+        # generated form requirements when a submitted non-US country is used.
+        country = (
+            self.data.get(self.add_prefix("country"))
+            if self.is_bound
+            else self.initial.get("country")
+        ) or self.fields["country"].initial
+        if country != "USA":
+            self.fields["state"].required = False
+            self.fields["zip_code"].required = False
+
+        # Require a complete emergency contact if the club turned that on.
+        # Otherwise the model still rejects a partly filled-in contact.
+        config = SiteConfiguration.objects.first()
+        if config and config.membership_application_require_emergency_contact:
+            self.fields["emergency_contact_name"].required = True
+            self.fields["emergency_contact_relationship"].required = True
+            self.fields["emergency_contact_phone"].required = True
+
         # Make aviation experience fields optional for beginners
         self.fields["glider_rating"].required = False
         self.fields["total_flight_hours"].required = False
@@ -393,23 +379,6 @@ class MembershipApplicationForm(forms.ModelForm):
         """Validate form data and handle conditional requirements."""
         super().clean()
         cleaned_data = self.cleaned_data
-
-        contact_name = cleaned_data.get("emergency_contact_name")
-        contact_relationship = cleaned_data.get("emergency_contact_relationship")
-        contact_phone = cleaned_data.get("emergency_contact_phone")
-
-        emergency_contact_fields = {
-            "emergency_contact_name": contact_name,
-            "emergency_contact_relationship": contact_relationship,
-            "emergency_contact_phone": contact_phone,
-        }
-        if any(emergency_contact_fields.values()) and not all(
-            emergency_contact_fields.values()
-        ):
-            error = "Provide the emergency contact's name, relationship, and phone number, or leave all three blank."
-            for field, value in emergency_contact_fields.items():
-                if not value:
-                    self.add_error(field, error)
 
         # Validate agreement checkboxes
         if not cleaned_data.get("agrees_to_terms"):
