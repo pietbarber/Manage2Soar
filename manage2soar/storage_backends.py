@@ -1,12 +1,13 @@
 # manage2soar/storage_backends.py
 
 import os
+import stat
 import tempfile
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.staticfiles.storage import ManifestFilesMixin
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, SuspiciousFileOperation
 from django.core.files.storage import FileSystemStorage
 from storages.backends.gcloud import GoogleCloudStorage
 
@@ -90,7 +91,26 @@ class PrivateStatsDumpFileSystemStorage(FileSystemStorage):
                 )
             user_id = os.getuid() if hasattr(os, "getuid") else "dev"
             root = Path(tempfile.gettempdir()) / f"m2s-stats-dumps-{user_id}"
-        root = Path(root).resolve()
+        root = Path(root).expanduser().absolute()
+        try:
+            root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            root_stat = root.lstat()
+        except OSError as exc:
+            raise ImproperlyConfigured(
+                "STATS_DUMP_ROOT must be creatable as a private directory."
+            ) from exc
+        if stat.S_ISLNK(root_stat.st_mode) or not stat.S_ISDIR(root_stat.st_mode):
+            raise ImproperlyConfigured("STATS_DUMP_ROOT must be a real directory.")
+        if hasattr(os, "getuid") and root_stat.st_uid != os.getuid():
+            raise ImproperlyConfigured("STATS_DUMP_ROOT must be owned by this user.")
+        if os.name == "posix" and stat.S_IMODE(root_stat.st_mode) & 0o077:
+            root.chmod(0o700)
+            root_stat = root.lstat()
+            if stat.S_IMODE(root_stat.st_mode) & 0o077:
+                raise ImproperlyConfigured(
+                    "STATS_DUMP_ROOT must not be accessible by other users."
+                )
+        root = root.resolve()
         # Reject both a served directory and its ancestor, including symlinks.
         for setting in ("MEDIA_ROOT", "STATIC_ROOT", "BASE_DIR"):
             served = getattr(settings, setting, None)
@@ -107,6 +127,38 @@ class PrivateStatsDumpFileSystemStorage(FileSystemStorage):
             directory_permissions_mode=0o700,
         )
         super().__init__(**kwargs)
+
+    def path(self, name):
+        # FileSystemStorage follows symlinks while creating or opening paths.
+        # Refuse any pre-existing symlink component, especially the tenant
+        # directory, before allowing a storage operation to follow it.
+        root = Path(self.location)
+        safe_path = Path(super().path(name))
+        try:
+            root_stat = root.lstat()
+        except OSError as exc:
+            raise SuspiciousFileOperation("Stats storage root is unavailable.") from exc
+        if stat.S_ISLNK(root_stat.st_mode) or not stat.S_ISDIR(root_stat.st_mode):
+            raise SuspiciousFileOperation("Stats storage root is not a real directory.")
+        if hasattr(os, "getuid") and root_stat.st_uid != os.getuid():
+            raise SuspiciousFileOperation("Stats storage root ownership changed.")
+        if os.name == "posix" and stat.S_IMODE(root_stat.st_mode) & 0o077:
+            raise SuspiciousFileOperation(
+                "Stats storage root is accessible by other users."
+            )
+
+        current = root
+        for component in safe_path.relative_to(root).parts:
+            current /= component
+            try:
+                component_stat = current.lstat()
+            except FileNotFoundError:
+                continue
+            if stat.S_ISLNK(component_stat.st_mode):
+                raise SuspiciousFileOperation(
+                    "Stats storage paths may not contain symlinks."
+                )
+        return str(safe_path)
 
     def url(self, name):
         raise NotImplementedError(

@@ -293,7 +293,7 @@ if settings.DEBUG:
     from django.views.static import serve
 
     def serve_public_media(request, path, **kwargs):
-        normalized = posixpath.normpath(path).lstrip("/")
+        normalized = posixpath.normpath(path.replace("\\", "/")).lstrip("/")
         if normalized == "exports/stats_dumps" or normalized.startswith(
             "exports/stats_dumps/"
         ):
