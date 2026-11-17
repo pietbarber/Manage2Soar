@@ -8,7 +8,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -67,6 +67,19 @@ from .utils.badge_utils import suppress_badge_board_legs, suppress_member_badge_
 from .utils.vcard_tools import generate_vcard, generate_vcard_qr
 
 logger = logging.getLogger(__name__)
+
+
+def _visiting_pilot_manager(user):
+    return bool(
+        user.is_authenticated
+        and (
+            getattr(user, "duty_officer", False)
+            or getattr(user, "is_staff", False)
+            or getattr(user, "is_superuser", False)
+        )
+    )
+
+
 EMAIL_CHANGE_TOKEN_MAX_AGE = 60 * 60 * 24
 
 
@@ -1543,6 +1556,7 @@ def visiting_pilot_signup(request, token):
 
 
 @login_required
+@user_passes_test(_visiting_pilot_manager)
 @require_http_methods(["GET"])
 def visiting_pilot_qr_code(request):
     """
@@ -1612,6 +1626,7 @@ def visiting_pilot_qr_code(request):
 
 
 @login_required
+@user_passes_test(_visiting_pilot_manager)
 def visiting_pilot_qr_display(request):
     """
     Display page with QR code and instructions for duty officers.

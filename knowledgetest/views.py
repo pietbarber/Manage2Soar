@@ -27,7 +27,10 @@ from knowledgetest.models import (
     WrittenTestTemplate,
     WrittenTestTemplateQuestion,
 )
-from members.authorization import has_webmaster_compatibility_access
+from members.authorization import (
+    has_training_record_action,
+    has_webmaster_compatibility_access,
+)
 from members.decorators import active_member_required
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
@@ -202,6 +205,11 @@ class AssignmentPermissionMixin:
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
     form_class = TestBuilderForm
+
+    def dispatch(self, request, *args, **kwargs):
+        if not has_training_record_action(request.user):
+            return HttpResponseForbidden("Written-test creation access is required.")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()
@@ -505,10 +513,23 @@ class WrittenTestSubmitView(View):
         return redirect("knowledgetest:quiz-result", attempt.pk)
 
 
+@method_decorator(active_member_required, name="dispatch")
 class WrittenTestResultView(DetailView):
     model = WrittenTestAttempt
     template_name = "written_test/result.html"
     context_object_name = "attempt"
+
+    def dispatch(self, request, *args, **kwargs):
+        attempt = get_object_or_404(WrittenTestAttempt, pk=kwargs["pk"])
+        allowed = (
+            request.user == attempt.student
+            or request.user == attempt.instructor
+            or request.user == getattr(attempt.template, "created_by", None)
+            or _has_written_test_capability(request.user, VIEW_RECENT_TESTS)
+        )
+        if not allowed:
+            return HttpResponseForbidden("You are not allowed to view this result.")
+        return super().dispatch(request, *args, **kwargs)
 
 
 @method_decorator(active_member_required, name="dispatch")

@@ -79,6 +79,7 @@ from logsheet.utils.tow_logbook import get_tow_logbook_data
 from members.authorization import (
     has_qualification_assignment_access,
     has_training_record_access,
+    has_webmaster_compatibility_access,
 )
 from members.decorators import active_member_required
 from members.models import Member
@@ -1410,6 +1411,8 @@ def member_instruction_record(request, member_id):
         ),
         pk=member_id,
     )
+    if request.user != member and not has_training_record_access(request.user):
+        raise PermissionDenied
     visible_qualifications = list(
         member.memberqualification_set.filter(
             is_qualified=True,
@@ -2766,6 +2769,22 @@ class CreateWrittenTestView(FormView):
 
 class WrittenTestReviewView(DjangoView):
     template_name = "written_test/review.html"
+
+    @method_decorator(active_member_required)
+    def dispatch(self, request, *args, **kwargs):
+        template = get_object_or_404(WrittenTestTemplate, pk=kwargs["pk"])
+        student_pk = kwargs["student_pk"]
+        allowed = (
+            request.user == template.created_by
+            or WrittenTestAssignment.objects.filter(
+                template=template, student_id=student_pk, instructor=request.user
+            ).exists()
+            or request.user.has_perm("knowledgetest.view_recent_written_tests")
+            or has_webmaster_compatibility_access(request.user)
+        )
+        if not allowed:
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, pk, student_pk):
         from knowledgetest.models import Member, WrittenTestTemplate
