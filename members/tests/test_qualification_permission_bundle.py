@@ -85,6 +85,50 @@ def test_unmapped_qualification_has_no_custom_permissions(bundle):
 
 
 @pytest.mark.django_db
+def test_qualification_approval_cannot_cross_bundle_permission_membership():
+    member = get_user_model().objects.create_user(
+        username="same-bundle-only", membership_status="Full Member"
+    )
+    permission = Permission.objects.get(
+        content_type=ContentType.objects.get_for_model(GroundInstruction),
+        codename="can_manage_ground_instruction",
+    )
+    approved_group = Group.objects.create(name="Approved bundle")
+    RoleMetadata.objects.create(
+        group=approved_group,
+        key="approved_bundle",
+        display_name=approved_group.name,
+        qualification_permission_bundle=True,
+    )
+    approved_group.permissions.add(permission)
+    QualificationPermissionGrant.objects.create(
+        group=approved_group, permission=permission
+    )
+    unapproved_group = Group.objects.create(name="Unapproved bundle")
+    RoleMetadata.objects.create(
+        group=unapproved_group,
+        key="unapproved_bundle",
+        display_name=unapproved_group.name,
+        qualification_permission_bundle=True,
+    )
+    unapproved_group.permissions.add(permission)
+    approved = ClubQualificationType.objects.create(
+        code="APPROVED_BUNDLE", name="Approved bundle", permission_group=approved_group
+    )
+    unapproved = ClubQualificationType.objects.create(
+        code="UNAPPROVED_BUNDLE",
+        name="Unapproved bundle",
+        permission_group=unapproved_group,
+    )
+    MemberQualification.objects.create(member=member, qualification=approved)
+    MemberQualification.objects.create(member=member, qualification=unapproved)
+
+    assert member.has_perm("instructors.can_manage_ground_instruction")
+    QualificationPermissionGrant.objects.filter(group=approved_group).delete()
+    assert not member.has_perm("instructors.can_manage_ground_instruction")
+
+
+@pytest.mark.django_db
 def test_current_expired_and_revoked_qualification_permissions(bundle):
     group, permission = bundle
     member = get_user_model().objects.create_user(
