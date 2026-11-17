@@ -9,7 +9,8 @@ from django.db import models, transaction
 from django.db.models import Q
 from tinymce.models import HTMLField
 
-from members.constants.membership import MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
+from members.constants.locations import US_STATE_CHOICES
+from members.constants.membership import MEMBERSHIP_STATUS_CHOICES
 from utils.upload_entropy import (
     upload_badge_image,
     upload_biography,
@@ -450,7 +451,9 @@ class Member(AbstractUser):
         # 5) now safe to touch M2M
         transaction.on_commit(self._sync_groups)
 
-    class Meta:
+    # Django treats each model's Meta as declarative options; inheriting
+    # AbstractUser.Meta here could also inherit its abstract setting.
+    class Meta:  # type: ignore[reportIncompatibleVariableOverride]
         verbose_name = "user"
         verbose_name_plural = "users"
 

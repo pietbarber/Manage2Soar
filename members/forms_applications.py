@@ -2,6 +2,9 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from members.constants.locations import (
+    COUNTRY_CHOICES as MEMBERSHIP_APPLICATION_COUNTRY_CHOICES,
+)
 from siteconfig.models import SiteConfiguration
 
 from .models_applications import MembershipApplication
@@ -24,46 +27,7 @@ class MembershipApplicationForm(forms.ModelForm):
         ("foreign", "Foreign pilot"),
     ]
 
-    # Country choices - most common countries for soaring clubs
-    COUNTRY_CHOICES = [
-        ("USA", "United States"),
-        ("CAN", "Canada"),
-        ("GBR", "United Kingdom"),
-        ("AUS", "Australia"),
-        ("DEU", "Germany"),
-        ("FRA", "France"),
-        ("NZL", "New Zealand"),
-        ("CHE", "Switzerland"),
-        ("AUT", "Austria"),
-        ("NLD", "Netherlands"),
-        ("SWE", "Sweden"),
-        ("NOR", "Norway"),
-        ("DNK", "Denmark"),
-        ("FIN", "Finland"),
-        ("ESP", "Spain"),
-        ("ITA", "Italy"),
-        ("POL", "Poland"),
-        ("CZE", "Czech Republic"),
-        ("HUN", "Hungary"),
-        ("SVK", "Slovakia"),
-        ("SVN", "Slovenia"),
-        ("HRV", "Croatia"),
-        ("ROU", "Romania"),
-        ("BGR", "Bulgaria"),
-        ("GRC", "Greece"),
-        ("PRT", "Portugal"),
-        ("BEL", "Belgium"),
-        ("LUX", "Luxembourg"),
-        ("IRL", "Ireland"),
-        ("ARG", "Argentina"),
-        ("BRA", "Brazil"),
-        ("CHL", "Chile"),
-        ("ZAF", "South Africa"),
-        ("JPN", "Japan"),
-        ("KOR", "South Korea"),
-        ("SGP", "Singapore"),
-        ("OTHER", "Other (please specify in comments)"),
-    ]
+    COUNTRY_CHOICES = MEMBERSHIP_APPLICATION_COUNTRY_CHOICES
 
     # Override country field as ChoiceField to ensure proper dropdown rendering
     country = forms.ChoiceField(

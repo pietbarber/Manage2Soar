@@ -7,52 +7,14 @@ from django.db import models
 from django.utils import timezone
 from tinymce.models import HTMLField
 
-from members.constants.membership import US_STATE_CHOICES
+from members.constants.locations import (
+    COUNTRY_CODE_TO_MEMBER,
+    COUNTRY_NAME_TO_MEMBER,
+    US_STATE_CHOICES,
+)
 from siteconfig.models import SiteConfiguration
 
 US_STATE_CODES = {code for code, _ in US_STATE_CHOICES}
-
-# The application stores three-letter country codes (see COUNTRY_CHOICES in
-# forms_applications.py), but Member.country holds two-letter ISO codes.
-COUNTRY_CODE_TO_MEMBER = {
-    "USA": "US",
-    "US": "US",
-    "CAN": "CA",
-    "GBR": "GB",
-    "AUS": "AU",
-    "DEU": "DE",
-    "FRA": "FR",
-    "NZL": "NZ",
-    "CHE": "CH",
-    "AUT": "AT",
-    "NLD": "NL",
-    "SWE": "SE",
-    "NOR": "NO",
-    "DNK": "DK",
-    "FIN": "FI",
-    "ESP": "ES",
-    "ITA": "IT",
-    "POL": "PL",
-    "CZE": "CZ",
-    "HUN": "HU",
-    "SVK": "SK",
-    "SVN": "SI",
-    "HRV": "HR",
-    "ROU": "RO",
-    "BGR": "BG",
-    "GRC": "GR",
-    "PRT": "PT",
-    "BEL": "BE",
-    "LUX": "LU",
-    "IRL": "IE",
-    "ARG": "AR",
-    "BRA": "BR",
-    "CHL": "CL",
-    "ZAF": "ZA",
-    "JPN": "JP",
-    "KOR": "KR",
-    "SGP": "SG",
-}
 
 
 class MembershipApplication(models.Model):
@@ -514,11 +476,21 @@ class MembershipApplication(models.Model):
         member.name_suffix = self.name_suffix
         member.phone = self.phone
         member.mobile_phone = self.mobile_phone
-        # Member.address holds only the street lines; city, state, ZIP and
-        # country have their own fields.
-        member.address = "\n".join(
+        # Member.address holds the street lines; city, state, ZIP and
+        # recognized countries have their own fields.
+        address_lines = [
             line for line in (self.address_line1, self.address_line2) if line
-        )
+        ]
+        country = (self.country or "").strip()
+        country_key = country.upper()
+        member_country = COUNTRY_CODE_TO_MEMBER.get(
+            country_key
+        ) or COUNTRY_NAME_TO_MEMBER.get(country_key)
+        if country and not member_country:
+            # Keep legacy or custom country values that cannot fit into the
+            # two-character Member.country field instead of dropping them.
+            address_lines.append(country)
+        member.address = "\n".join(address_lines)
         member.city = self.city
         # state_code only accepts US state codes. Anything else (a province,
         # a spelled-out state, any non-US region) goes in state_freeform.
@@ -530,9 +502,7 @@ class MembershipApplication(models.Model):
             member.state_code = ""
             member.state_freeform = state
         member.zip_code = self.zip_code
-        # "OTHER" (or any code we can't translate) is left blank rather than
-        # guessed; the applicant names their country in the comments.
-        member.country = COUNTRY_CODE_TO_MEMBER.get(self.country, "")
+        member.country = member_country or ""
 
         # Aviation information
         if self.pilot_certificate_number:
