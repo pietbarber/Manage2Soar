@@ -16,6 +16,8 @@ WEBMASTER_MANAGEMENT_PERMISSION = "members.can_manage_member_roles"
 TRAINING_VIEW_PERMISSION = "instructors.view_trainingrecord"
 TRAINING_RECORD_PERMISSION = "instructors.can_record_instruction"
 QUALIFICATION_ASSIGN_PERMISSION = "instructors.can_assign_qualification"
+SYLLABUS_EDIT_PERMISSION = "instructors.change_syllabusdocument"
+BULK_QUALIFICATION_PERMISSION = "instructors.can_bulk_assign_qualification"
 
 
 def has_webmaster_compatibility_access(user):
@@ -134,6 +136,32 @@ def has_qualification_assignment_access(user):
     if decision.allow:
         return True
     return decision.reason == "no_grant" and bool(getattr(user, "instructor", False))
+
+
+def has_syllabus_edit_access(user):
+    """Return whether an active member may edit syllabus documents."""
+    decision = resolve_authorization(
+        user,
+        SYLLABUS_EDIT_PERMISSION,
+        require_active_member=True,
+    )
+    if decision.allow:
+        return True
+    return decision.reason == "no_grant" and bool(getattr(user, "instructor", False))
+
+
+def has_bulk_qualification_access(user):
+    """Return whether an active member may assign qualifications in bulk."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if not getattr(user, "is_active", False) or not is_active_member(user):
+        return False
+    return bool(
+        getattr(user, "is_superuser", False)
+        or user.has_perm(BULK_QUALIFICATION_PERMISSION)
+        or getattr(user, "instructor", False)
+        or getattr(user, "safety_officer", False)
+    )
 
 
 @dataclass(frozen=True)

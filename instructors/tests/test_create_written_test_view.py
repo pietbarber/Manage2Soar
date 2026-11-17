@@ -1,4 +1,6 @@
 import pytest
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
@@ -64,6 +66,25 @@ class TestCreateWrittenTestView(TestCase):
         assert "weight_fields" in response.context
         assert list(response.context["weight_fields"]) == []
         assert b"No question categories are configured yet." in response.content
+
+    def test_training_record_viewer_cannot_create_written_tests(self):
+        viewer = Member.objects.create_user(
+            username="viewer_ctv",
+            password="testpass123",
+            membership_status="Full Member",
+        )
+        permission = Permission.objects.get(
+            content_type=ContentType.objects.get(
+                app_label="instructors", model="instructionreport"
+            ),
+            codename="view_trainingrecord",
+        )
+        viewer.user_permissions.add(permission)
+        self.client.force_login(viewer)
+
+        response = self.client.get(self.url)
+
+        assert response.status_code == 403
 
     def test_self_assigned_test_shows_practice_warning_and_no_assignment(self):
         category = QuestionCategory.objects.create(code="PRE", description="Pre-Solo")

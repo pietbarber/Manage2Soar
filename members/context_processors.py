@@ -5,8 +5,12 @@ from duty_roster.permissions import has_duty_delinquents_access
 from logsheet.permissions import has_stats_dump_export_access
 from members.authorization import (
     can_manage_ground_instruction,
+    has_bulk_qualification_access,
     has_membership_application_view_access,
+    has_qualification_assignment_access,
     has_role_admin_access,
+    has_syllabus_edit_access,
+    has_training_record_access,
     has_training_record_action,
     has_webmaster_compatibility_access,
 )
@@ -35,7 +39,12 @@ def authorization(request):
                 getattr(user, "duty_officer", False)
                 or has_perm("logsheet.can_manage_logsheet_finances")
             ),
-            "instructor": has_training_record_action(user),
+            "instructor": has_training_record_access(user),
+            "training_view": has_training_record_access(user),
+            "training_write": has_training_record_action(user),
+            "qualification_assignment": has_qualification_assignment_access(user),
+            "bulk_qualification": has_bulk_qualification_access(user),
+            "syllabus_edit": has_syllabus_edit_access(user),
             "ground_instruction": can_manage_ground_instruction(user),
             "safety_reports": bool(
                 has_perm("members.access_safety_reports")

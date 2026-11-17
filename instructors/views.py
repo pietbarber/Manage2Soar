@@ -2634,7 +2634,7 @@ def instruction_report_detail(request, report_id):
     )
 
 
-@method_decorator(instructor_required, name="dispatch")
+@method_decorator(training_record_action_required, name="dispatch")
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
     form_class = TestBuilderForm
