@@ -231,6 +231,37 @@ def test_virtual_map_publishes_database_before_source_under_lock(tmp_path):
     assert order == ["database", "source"]
 
 
+def test_rspamd_maps_publish_as_one_generation(tmp_path):
+    sync = load_sync_module()
+    sync.MAP_LOCK_FILE = str(tmp_path / "map.lock")
+    Path(sync.MAP_LOCK_FILE).touch()
+    active = tmp_path / "current"
+    active.mkdir()
+    (active / "old.map").write_text("old\n")
+    maps = {
+        str(active / "club_whitelist.map"): "club@example.net\n",
+        str(active / "bypass_lists.map"): "bypass@example.net\n",
+        str(active / "protected_lists.map"): "protected@example.net\n",
+    }
+
+    with (
+        patch.object(sync.pwd, "getpwnam", side_effect=KeyError),
+        patch.object(sync.grp, "getgrnam", side_effect=KeyError),
+    ):
+        assert sync.publish_rspamd_maps(maps)
+
+    assert active.is_symlink()
+    generation_dir = active.resolve()
+    generations = [p for p in tmp_path.iterdir() if p.name.startswith(".m2s-rspamd-")]
+    assert generation_dir in generations
+    generation_ids = {
+        path.read_text().splitlines()[0] for path in generation_dir.iterdir()
+    }
+    assert len(generation_ids) == 1
+    assert generation_ids.pop().startswith("# M2S generation: ")
+    assert not (tmp_path / ".m2s-rspamd.transaction").exists()
+
+
 def test_virtual_map_removes_new_database_if_source_publish_fails_without_old_db(
     tmp_path,
 ):

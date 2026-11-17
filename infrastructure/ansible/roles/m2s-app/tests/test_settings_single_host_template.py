@@ -116,3 +116,16 @@ def test_tasks_reconcile_disabled_timer():
     # And it must set state to stopped + enabled false.
     assert stop_task["ansible.builtin.systemd"]["state"] == "stopped"
     assert stop_task["ansible.builtin.systemd"]["enabled"] is False
+
+
+def test_django_env_task_is_selected_by_postfix_tag():
+    import yaml
+
+    tasks = yaml.safe_load(
+        (Path(__file__).parents[1] / "tasks" / "main.yml").read_text()
+    )
+    env_task = next(
+        t for t in tasks if t.get("name") == "Deploy Django environment file"
+    )
+    assert "postfix" in env_task["tags"]
+    assert "Restart gunicorn" in env_task["notify"]

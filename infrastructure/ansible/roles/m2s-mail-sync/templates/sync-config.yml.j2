@@ -17,8 +17,8 @@ mail_hostname: "{{ mail_hostname | default(m2s_domain | default(''), true) }}"
 admin_email: "{{ admin_email | default('') }}"
 
 # Rspamd whitelist directory (per-club whitelist files stored here)
-rspamd_whitelist_dir: "/etc/rspamd/local.d/whitelists"
-rspamd_protected_lists_file: "/etc/rspamd/local.d/whitelists/protected_lists.map"
+rspamd_whitelist_dir: "/etc/rspamd/local.d/whitelists/current"
+rspamd_protected_lists_file: "/etc/rspamd/local.d/whitelists/current/protected_lists.map"
 
 # Development mode - redirect all mailing list recipients to configured addresses
 # This prevents accidental emails during development/testing

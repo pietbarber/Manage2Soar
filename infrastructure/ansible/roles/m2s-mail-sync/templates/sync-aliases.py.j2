@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from datetime import datetime
 from urllib.parse import urlsplit
 
@@ -789,23 +790,17 @@ def clear_authorization_maps(config, reason):
     write_and_postmap(config['postfix_recipient_check_file'], empty_postfix_map)
     rspamd_dir = config.get('rspamd_whitelist_dir')
     if rspamd_dir:
+        rspamd_maps = {}
         for club in config.get('clubs', []):
             prefix = club.get('prefix')
             if prefix:
-                write_rspamd_whitelist(
-                    os.path.join(rspamd_dir, f"{prefix}_whitelist.map"),
-                    empty_postfix_map,
-                )
-        write_rspamd_whitelist(
-            os.path.join(rspamd_dir, 'bypass_lists.map'), empty_postfix_map
-        )
-        write_rspamd_whitelist(
-            config.get(
-                'rspamd_protected_lists_file',
-                os.path.join(rspamd_dir, 'protected_lists.map'),
-            ),
-            empty_postfix_map,
-        )
+                rspamd_maps[os.path.join(rspamd_dir, f"{prefix}_whitelist.map")] = empty_postfix_map
+        rspamd_maps[os.path.join(rspamd_dir, 'bypass_lists.map')] = empty_postfix_map
+        rspamd_maps[config.get(
+            'rspamd_protected_lists_file',
+            os.path.join(rspamd_dir, 'protected_lists.map'),
+        )] = empty_postfix_map
+        publish_rspamd_maps(rspamd_maps)
 
 
 def write_rspamd_whitelist(filepath, content):
@@ -864,6 +859,99 @@ def write_rspamd_whitelist(filepath, content):
     except (IOError, OSError) as e:
         print(f"[{datetime.now()}] ERROR: Failed to write Rspamd whitelist: {e}")
         raise
+
+
+def publish_rspamd_maps(map_contents):
+    """Publish every Rspamd map as one lock-protected generation.
+
+    Rspamd follows the ``current`` directory selected by the sync config. A
+    complete generation is built off to the side, then selected as one unit;
+    the transaction marker lets the next sync recover if a process dies while
+    changing the active generation. This prevents whitelist, bypass, and SPF
+    maps from being assembled from different sync runs.
+    """
+    if not map_contents:
+        return False
+    active_dir = os.path.dirname(next(iter(map_contents)))
+    parent_dir = os.path.dirname(active_dir)
+    generation = f".m2s-rspamd-{uuid.uuid4().hex}"
+    generation_dir = os.path.join(parent_dir, generation)
+    transaction_path = os.path.join(parent_dir, '.m2s-rspamd.transaction')
+    lock_fd = os.open(MAP_LOCK_FILE, os.O_RDWR)
+    fcntl.flock(lock_fd, fcntl.LOCK_EX)
+    old_dir = None
+    try:
+        if os.path.exists(transaction_path):
+            with open(transaction_path) as transaction_file:
+                pending = json.load(transaction_file)
+            pending_active = pending['active']
+            pending_generation = pending['generation']
+            pending_old = pending.get('old')
+            if not os.path.lexists(pending_active) and pending_old and os.path.lexists(pending_old):
+                os.replace(pending_old, pending_active)
+            os.unlink(transaction_path)
+        os.makedirs(parent_dir, mode=0o750, exist_ok=True)
+        os.makedirs(generation_dir, mode=0o750)
+        generation_id = generation.removeprefix('.m2s-rspamd-')
+        for filepath, content in map_contents.items():
+            filename = os.path.basename(filepath)
+            target = os.path.join(generation_dir, filename)
+            with open(target, 'w') as map_file:
+                map_file.write(f"# M2S generation: {generation_id}\n{content}")
+                map_file.flush()
+                os.fsync(map_file.fileno())
+            try:
+                rspamd_uid = pwd.getpwnam('_rspamd').pw_uid
+                rspamd_gid = grp.getgrnam('_rspamd').gr_gid
+                os.chown(target, rspamd_uid, rspamd_gid)
+            except KeyError:
+                pass
+            os.chmod(target, 0o640)
+        with open(transaction_path, 'w') as transaction_file:
+            json.dump({'active': active_dir, 'generation': generation_dir}, transaction_file)
+            transaction_file.flush()
+            os.fsync(transaction_file.fileno())
+        # A symlink swap is atomic for subsequent publications. The first run
+        # may migrate the role-created directory; its contents are retained as
+        # a rollback directory until the transaction is complete.
+        if os.path.lexists(active_dir):
+            old_dir = f"{active_dir}.previous"
+            if os.path.lexists(old_dir):
+                if os.path.isdir(old_dir) and not os.path.islink(old_dir):
+                    shutil.rmtree(old_dir)
+                else:
+                    os.unlink(old_dir)
+            os.replace(active_dir, old_dir)
+            with open(transaction_path, 'w') as transaction_file:
+                json.dump({'active': active_dir, 'generation': generation_dir, 'old': old_dir}, transaction_file)
+                transaction_file.flush()
+                os.fsync(transaction_file.fileno())
+        link_path = f"{active_dir}.new"
+        os.symlink(generation_dir, link_path)
+        os.replace(link_path, active_dir)
+        os.unlink(transaction_path)
+        if old_dir and os.path.lexists(old_dir):
+            if os.path.isdir(old_dir) and not os.path.islink(old_dir):
+                shutil.rmtree(old_dir)
+            else:
+                os.unlink(old_dir)
+        return True
+    except Exception:
+        if os.path.lexists(transaction_path):
+            try:
+                os.unlink(transaction_path)
+            except OSError:
+                pass
+        if old_dir and os.path.lexists(old_dir) and not os.path.lexists(active_dir):
+            os.replace(old_dir, active_dir)
+        if os.path.isdir(generation_dir) and not (
+            os.path.islink(active_dir) and os.readlink(active_dir) == generation_dir
+        ):
+            shutil.rmtree(generation_dir)
+        raise
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
 
 
 def ensure_rspamd_whitelist_dir(dir_path):
@@ -1079,33 +1167,16 @@ def main():
         else:
             print(f"[{datetime.now()}] Postfix whitelist unchanged for {club_prefix}")
 
-    # Generate and update per-club Rspamd whitelists (if configured).
     if rspamd_enabled:
-        if write_rspamd_whitelist(
-            config['rspamd_protected_lists_file'], guarded_protected_content
-        ):
-            print(f"[{datetime.now()}] Published guarded protected-list SPF map")
-        else:
-            print(f"[{datetime.now()}] Guarded protected-list SPF map unchanged")
-
+        rspamd_maps = {
+            config['rspamd_protected_lists_file']: guarded_protected_content,
+            os.path.join(whitelist_dir, 'bypass_lists.map'): bypass_content,
+        }
         for club_prefix, club_data in clubs_whitelist_data.items():
-            whitelist_file = os.path.join(whitelist_dir, f"{club_prefix}_whitelist.map")
-            whitelist_content = generate_per_club_rspamd_whitelist(
+            rspamd_maps[os.path.join(whitelist_dir, f"{club_prefix}_whitelist.map")] = generate_per_club_rspamd_whitelist(
                 club_prefix, club_data['whitelist']
             )
-            if write_rspamd_whitelist(whitelist_file, whitelist_content):
-                print(f"[{datetime.now()}] Updated Rspamd whitelist for {club_prefix}")
-            else:
-                print(f"[{datetime.now()}] Rspamd whitelist unchanged for {club_prefix}")
-
-    # Publish the final bypass policy while the guarded Postfix map still
-    # protects every old and new route.
-    if rspamd_enabled:
-        bypass_file = os.path.join(config['rspamd_whitelist_dir'], "bypass_lists.map")
-        if write_rspamd_whitelist(bypass_file, bypass_content):
-            print(f"[{datetime.now()}] Updated bypass lists map")
-        else:
-            print(f"[{datetime.now()}] Bypass lists map unchanged")
+        publish_rspamd_maps(rspamd_maps)
 
     # Routing goes live only after every authorization map was published.
     if write_and_postmap(config['postfix_virtual_file'], virtual_content):
@@ -1124,12 +1195,15 @@ def main():
         print(f"[{datetime.now()}] Recipient authorization already final")
 
     if rspamd_enabled:
-        if write_rspamd_whitelist(
-            config['rspamd_protected_lists_file'], protected_content
-        ):
-            print(f"[{datetime.now()}] Finalized protected-list SPF map")
-        else:
-            print(f"[{datetime.now()}] Protected-list SPF map already final")
+        rspamd_maps = {
+            config['rspamd_protected_lists_file']: protected_content,
+            os.path.join(whitelist_dir, 'bypass_lists.map'): bypass_content,
+        }
+        for club_prefix, club_data in clubs_whitelist_data.items():
+            rspamd_maps[os.path.join(whitelist_dir, f"{club_prefix}_whitelist.map")] = generate_per_club_rspamd_whitelist(
+                club_prefix, club_data['whitelist']
+            )
+        publish_rspamd_maps(rspamd_maps)
 
     print(f"[{datetime.now()}] Sync complete")
 

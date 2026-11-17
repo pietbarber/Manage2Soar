@@ -164,6 +164,9 @@
     group: "{{ m2s_app_group }}"
     mode: "0600"
   notify: Restart gunicorn
+  # A single-host --tags postfix run must refresh Django's SMTP 587/STARTTLS
+  # settings as well as the MTA configuration.
+  tags: [postfix]
 
 - name: Deploy Gunicorn configuration
   ansible.builtin.template:
