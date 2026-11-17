@@ -29,6 +29,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from billing.decorators import billing_app_required
 from duty_roster.models import GliderReservation
+from logsheet.permissions import has_logsheet_finance_access
 from members.authorization import has_webmaster_compatibility_access
 from members.decorators import active_member_required
 from members.models import Member
@@ -115,7 +116,7 @@ class _CSVBuffer:
 
 def _can_issue_commercial_ticket(user):
     return bool(
-        getattr(user, "duty_officer", False) or getattr(user, "treasurer", False)
+        getattr(user, "duty_officer", False) or has_logsheet_finance_access(user)
     )
 
 

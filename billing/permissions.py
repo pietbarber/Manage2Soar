@@ -11,7 +11,11 @@ def has_billing_access(actor):
         return False
     if not getattr(actor, "is_active", False) or not is_active_member(actor):
         return False
-    return bool(actor.is_superuser or actor.has_perm(BILLING_PERMISSION))
+    return bool(
+        actor.is_superuser
+        or actor.has_perm(BILLING_PERMISSION)
+        or getattr(actor, "treasurer", False)
+    )
 
 
 def require_manual_transaction_access(actor):

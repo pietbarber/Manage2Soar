@@ -14,7 +14,10 @@ def has_logsheet_finance_access(user, *, export=False):
         return False
     if getattr(user, "is_superuser", False):
         return True
-    return user.has_perm(FINANCE_EXPORT_PERMISSION if export else FINANCE_PERMISSION)
+    return bool(
+        user.has_perm(FINANCE_EXPORT_PERMISSION if export else FINANCE_PERMISSION)
+        or getattr(user, "treasurer", False)
+    )
 
 
 def has_stats_dump_export_access(user):
