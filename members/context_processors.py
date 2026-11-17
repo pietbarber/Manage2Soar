@@ -2,7 +2,10 @@
 
 from billing.permissions import has_billing_access
 from duty_roster.permissions import has_duty_delinquents_access
-from logsheet.permissions import has_stats_dump_export_access
+from logsheet.permissions import (
+    has_logsheet_finance_access,
+    has_stats_dump_export_access,
+)
 from members.authorization import (
     can_manage_ground_instruction,
     has_bulk_qualification_access,
@@ -15,6 +18,14 @@ from members.authorization import (
     has_webmaster_compatibility_access,
 )
 from members.utils.membership import is_active_member
+
+
+def _can_edit_roster_message(user):
+    return bool(
+        getattr(user, "is_superuser", False)
+        or getattr(user, "rostermeister", False)
+        or user.has_perm("duty_roster.edit_dutyroster_message")
+    )
 
 
 def authorization(request):
@@ -37,7 +48,7 @@ def authorization(request):
             ),
             "commercial_ticket": bool(
                 getattr(user, "duty_officer", False)
-                or has_perm("logsheet.can_manage_logsheet_finances")
+                or has_logsheet_finance_access(user)
             ),
             "instructor": has_training_record_access(user),
             "training_view": has_training_record_access(user),
@@ -64,6 +75,15 @@ def authorization(request):
                 or getattr(user, "is_staff", False)
                 or getattr(user, "is_superuser", False)
             ),
+            "roster_message": _can_edit_roster_message(user),
+            "recent_written_tests": bool(
+                user.has_perm("knowledgetest.view_recent_written_tests")
+                or has_webmaster_compatibility_access(user)
+            ),
+            "written_test_delete": bool(
+                user.has_perm("knowledgetest.delete_any_written_test_attempt")
+                or has_webmaster_compatibility_access(user)
+            ),
             "member_admin": bool(
                 has_perm("members.change_member")
                 or getattr(user, "member_manager", False)
@@ -76,7 +96,9 @@ def authorization(request):
                 getattr(user, "is_staff", False) or has_role_admin_access(user)
             ),
             "visiting_pilot": bool(
-                getattr(user, "duty_officer", False) or getattr(user, "is_staff", False)
+                getattr(user, "duty_officer", False)
+                or getattr(user, "is_staff", False)
+                or getattr(user, "is_superuser", False)
             ),
         }
     }

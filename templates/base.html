@@ -219,7 +219,7 @@
           </li>
 
           {% if siteconfig and siteconfig.billing_app_enabled and siteconfig.club_accounting_enabled %}
-          {% if user.treasurer or user.is_superuser %}
+          {% if role_access.billing %}
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="clubFinancesDropdown" role="button" data-bs-toggle="dropdown"
               aria-expanded="false">
@@ -254,6 +254,7 @@
               {% endif %}
             </a>
             <ul class="dropdown-menu" aria-labelledby="instructorDropdown">
+              {% if role_access.training_write %}
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:instructor_requests' %}">
                   <i class="fas fa-chalkboard-teacher me-1"></i>Student Requests
@@ -262,19 +263,26 @@
                   {% endif %}
                 </a>
               </li>
+              {% endif %}
               <li><hr class="dropdown-divider"></li>
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'instructors:instructors-dashboard' %}">🏠 Instructor Home</a>
               </li>
+              {% if role_access.syllabus_edit %}
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'instructors:syllabus_overview' %}">📚 Syllabus Overview</a>
               </li>
+              {% endif %}
+              {% if role_access.training_write %}
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'instructors:create-written-test' %}">📋 Create Written Test</a>
               </li>
+              {% endif %}
+              {% if role_access.recent_written_tests %}
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'knowledgetest:instructor-recent-tests' %}">📊 Recent Written Tests</a>
               </li>
+              {% endif %}
               <li class="nav-item">
                 <!--<a class="dropdown-item" href="{% url 'admin:knowledgetest_question_changelist' %}">📋 Update Test Bank</a>-->
               </li>

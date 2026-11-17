@@ -431,7 +431,7 @@
         {% endfor %}
       </ul>
       {# Show Review Requests button for instructors assigned to this day #}
-      {% if user.is_authenticated and role_access.instructor %}
+      {% if user.is_authenticated and role_access.training_write %}
         {% if user == assignment.instructor or user == assignment.surge_instructor %}
         <div class="mt-3">
           <a href="{% url 'duty_roster:instructor_requests' %}" class="btn btn-primary btn-sm w-100">

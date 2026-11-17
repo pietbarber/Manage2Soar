@@ -26,7 +26,9 @@
        aria-label="View Member Profile for {{ member.full_display_name }}">
       <i class="fas fa-id-badge" aria-hidden="true"></i>
     </a>
-    <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm me-2">📊 View Training Grid</a>
+    {% if request.user == member or role_access.training_view %}
+      <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm me-2">📊 View Training Grid</a>
+    {% endif %}
     {% if request.user == member or role_access.training_view %}
       <a href="{% url 'instructors:member_logbook_member' member.id %}" class="btn btn-outline-success btn-sm me-2">📘 View Logbook</a>
     {% endif %}
