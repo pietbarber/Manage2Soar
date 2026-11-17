@@ -21,14 +21,31 @@
     - "{{ opendkim_config_dir }}"
     - "{{ opendkim_keys_dir }}"
 
+- name: Resolve OpenDKIM tenant domains
+  ansible.builtin.set_fact:
+    opendkim_domains: []
+
+- name: Resolve OpenDKIM tenant domains from configured clubs
+  ansible.builtin.set_fact:
+    opendkim_domains: "{{ (opendkim_domains | default([]) + _tenant_domains) | unique }}"
+  vars:
+    _explicit_domains: "{{ [item.domains] if (item.domains is defined and item.domains is string) else (item.domains | default([])) }}"
+    _tenant_domains: >-
+      {{ _explicit_domains if
+         ((item.use_explicit_domains_only | default(false) | bool) and (_explicit_domains | length > 0))
+         else ([item.prefix ~ '.' ~ mail_domain] + _explicit_domains) }}
+  loop: "{{ club_domains }}"
+  loop_control:
+    label: "{{ item.prefix }}"
+
 - name: Create key directories for each club domain
   ansible.builtin.file:
-    path: "{{ opendkim_keys_dir }}/{{ item.prefix }}.{{ mail_domain }}"
+    path: "{{ opendkim_keys_dir }}/{{ item }}"
     state: directory
     owner: opendkim
     group: opendkim
     mode: "0750"
-  loop: "{{ club_domains }}"
+  loop: "{{ opendkim_domains }}"
 
 # ============================================================
 # DKIM Key Management (Hybrid: Deploy from files OR Generate)
@@ -39,16 +56,16 @@
 
 - name: Check if DKIM private key files exist in Ansible for club domains
   ansible.builtin.stat:
-    path: "{{ role_path }}/files/dkim-keys/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
-  loop: "{{ club_domains }}"
+    path: "{{ role_path }}/files/dkim-keys/{{ item }}/{{ dkim_selector }}.private"
+  loop: "{{ opendkim_domains }}"
   register: club_key_files_check
   delegate_to: localhost
   become: false
 
 - name: Deploy DKIM private keys for club domains from Ansible vault (if available)
   ansible.builtin.copy:
-    src: "dkim-keys/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
-    dest: "{{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+    src: "dkim-keys/{{ item.item }}/{{ dkim_selector }}.private"
+    dest: "{{ opendkim_keys_dir }}/{{ item.item }}/{{ dkim_selector }}.private"
     decrypt: yes
     owner: opendkim
     group: opendkim
@@ -59,8 +76,8 @@
 
 - name: Deploy DKIM public keys for club domains (if available)
   ansible.builtin.copy:
-    src: "dkim-keys/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
-    dest: "{{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
+    src: "dkim-keys/{{ item.item }}/{{ dkim_selector }}.txt"
+    dest: "{{ opendkim_keys_dir }}/{{ item.item }}/{{ dkim_selector }}.txt"
     owner: opendkim
     group: opendkim
     mode: "0644"
@@ -72,16 +89,16 @@
     cmd: >
       opendkim-genkey
       -b {{ dkim_key_size }}
-      -d {{ item.item.prefix }}.{{ mail_domain }}
+      -d {{ item.item }}
       -s {{ dkim_selector }}
-      -D {{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/
-    creates: "{{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+      -D {{ opendkim_keys_dir }}/{{ item.item }}/
+    creates: "{{ opendkim_keys_dir }}/{{ item.item }}/{{ dkim_selector }}.private"
   loop: "{{ club_key_files_check.results }}"
   when: not item.stat.exists
 
 - name: Set ownership on generated DKIM private keys for club domains
   ansible.builtin.file:
-    path: "{{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+    path: "{{ opendkim_keys_dir }}/{{ item.item }}/{{ dkim_selector }}.private"
     owner: opendkim
     group: opendkim
     mode: "0600"
