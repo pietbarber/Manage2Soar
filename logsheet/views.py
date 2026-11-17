@@ -1342,16 +1342,19 @@ def flight_split_request_detail(request, token):
             "logsheet:flight_split_request_detail", token=split_request.token
         )
 
+    log_date = split_request.flight.logsheet.log_date
     with transaction.atomic():
         # Books lock first, like every other club-books write, so a posting
         # holding it can't deadlock with this one over the period lock.
         lock_books()
+        # Lock the billing period before the split request: close_period()
+        # takes the same two locks in that order, so the two can't deadlock.
+        period_closed = lock_period_for_date(log_date)
         split_request = (
             FlightSplitRequest.objects.select_for_update()
             .select_related("flight")
             .get(pk=split_request.pk)
         )
-        period_closed = lock_period_for_date(split_request.flight.logsheet.log_date)
         allowed_statuses = {FlightSplitRequest.Status.PENDING}
         if period_closed and is_treasurer:
             allowed_statuses.add(FlightSplitRequest.Status.LOCKED)
