@@ -21,6 +21,9 @@ These constants remain only for migration fallback scenarios when the database
 is not yet available. New code should NEVER import these directly.
 """
 
+# Backwards-compatible import; active location constants live in locations.py.
+from .locations import US_STATE_CHOICES
+
 # =============================================================================
 # DEPRECATED: Use members.utils.membership.get_all_membership_statuses() instead
 # =============================================================================
@@ -81,64 +84,6 @@ MEMBERSHIP_STATUS_CHOICES = [
     ("Pending", "Pending"),
     ("Role Account", "Role Account"),  # System/robot accounts
     ("Deceased", "Deceased"),
-]
-
-US_STATE_CHOICES = [
-    ("AL", "Alabama"),
-    ("AK", "Alaska"),
-    ("AZ", "Arizona"),
-    ("AR", "Arkansas"),
-    ("CA", "California"),
-    ("CO", "Colorado"),
-    ("CT", "Connecticut"),
-    ("DE", "Delaware"),
-    ("FL", "Florida"),
-    ("GA", "Georgia"),
-    ("HI", "Hawaii"),
-    ("ID", "Idaho"),
-    ("IL", "Illinois"),
-    ("IN", "Indiana"),
-    ("IA", "Iowa"),
-    ("KS", "Kansas"),
-    ("KY", "Kentucky"),
-    ("LA", "Louisiana"),
-    ("ME", "Maine"),
-    ("MD", "Maryland"),
-    ("MA", "Massachusetts"),
-    ("MI", "Michigan"),
-    ("MN", "Minnesota"),
-    ("MS", "Mississippi"),
-    ("MO", "Missouri"),
-    ("MT", "Montana"),
-    ("NE", "Nebraska"),
-    ("NV", "Nevada"),
-    ("NH", "New Hampshire"),
-    ("NJ", "New Jersey"),
-    ("NM", "New Mexico"),
-    ("NY", "New York"),
-    ("NC", "North Carolina"),
-    ("ND", "North Dakota"),
-    ("OH", "Ohio"),
-    ("OK", "Oklahoma"),
-    ("OR", "Oregon"),
-    ("PA", "Pennsylvania"),
-    ("RI", "Rhode Island"),
-    ("SC", "South Carolina"),
-    ("SD", "South Dakota"),
-    ("TN", "Tennessee"),
-    ("TX", "Texas"),
-    ("UT", "Utah"),
-    ("VT", "Vermont"),
-    ("VA", "Virginia"),
-    ("WA", "Washington"),
-    ("WV", "West Virginia"),
-    ("WI", "Wisconsin"),
-    ("WY", "Wyoming"),
-    ("DC", "District of Columbia"),
-    # Military APO regions (USPS special service)
-    ("AA", "APO (Armed Forces Americas)"),
-    ("AE", "APO (Armed Forces Europe)"),
-    ("AP", "APO (Armed Forces Pacific)"),
 ]
 
 STATUS_ALIASES = {

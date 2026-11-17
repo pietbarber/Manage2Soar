@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from members.constants.membership import US_STATE_CHOICES
+from members.constants.locations import US_STATE_CHOICES
 from members.models import Member
 
 
@@ -149,7 +149,7 @@ class VisitingPilotSignupForm(forms.Form):
 
     def clean(self):
         """Custom validation based on site configuration."""
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
 
         # Import here to avoid circular imports
         from .models import SiteConfiguration
@@ -413,7 +413,7 @@ class VisitingPilotReturningUpdateForm(forms.Form):
         return ssa_number
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         errors = []
         exclude_n_number = None
         submitted_n_number = (cleaned_data.get("glider_n_number") or "").strip().upper()

@@ -7,7 +7,14 @@ from django.db import models
 from django.utils import timezone
 from tinymce.models import HTMLField
 
+from members.constants.locations import (
+    COUNTRY_CODE_TO_MEMBER,
+    COUNTRY_NAME_TO_MEMBER,
+    US_STATE_CHOICES,
+)
 from siteconfig.models import SiteConfiguration
+
+US_STATE_CODES = {code for code, _ in US_STATE_CHOICES}
 
 
 class MembershipApplication(models.Model):
@@ -385,9 +392,9 @@ class MembershipApplication(models.Model):
             self.phone,
             self.address_line1,
             self.city,
-            self.state,
-            self.zip_code,
         ]
+        if self.country in ("USA", "US"):
+            required_fields.extend((self.state, self.zip_code))
 
         # All required fields must be filled
         if not all(required_fields):
@@ -469,12 +476,33 @@ class MembershipApplication(models.Model):
         member.name_suffix = self.name_suffix
         member.phone = self.phone
         member.mobile_phone = self.mobile_phone
-        member.address = self.full_address
+        # Member.address holds the street lines; city, state, ZIP and
+        # recognized countries have their own fields.
+        address_lines = [
+            line for line in (self.address_line1, self.address_line2) if line
+        ]
+        country = (self.country or "").strip()
+        country_key = country.upper()
+        member_country = COUNTRY_CODE_TO_MEMBER.get(
+            country_key
+        ) or COUNTRY_NAME_TO_MEMBER.get(country_key)
+        if country and not member_country:
+            # Keep legacy or custom country values that cannot fit into the
+            # two-character Member.country field instead of dropping them.
+            address_lines.append(country)
+        member.address = "\n".join(address_lines)
         member.city = self.city
-        member.state_code = self.state if len(self.state) <= 2 else self.state[:2]
-        member.state_freeform = self.state if len(self.state) > 2 else ""
+        # state_code only accepts US state codes. Anything else (a province,
+        # a spelled-out state, any non-US region) goes in state_freeform.
+        state = self.state.strip()
+        if self.country in ("USA", "US") and state.upper() in US_STATE_CODES:
+            member.state_code = state.upper()
+            member.state_freeform = ""
+        else:
+            member.state_code = ""
+            member.state_freeform = state
         member.zip_code = self.zip_code
-        member.country = self.country[:2] if self.country in ["USA", "US"] else "US"
+        member.country = member_country or ""
 
         # Aviation information
         if self.pilot_certificate_number:
