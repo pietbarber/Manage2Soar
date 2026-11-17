@@ -57,6 +57,10 @@
         <div class="mt-2"><small>{{ export_job.last_error }}</small></div>
       {% endif %}
     </div>
+  {% elif export_job.status == 'expired' %}
+    <div class="alert alert-info mt-3 mb-0">
+      Export expired or retired. Queue a new export to download current data.
+    </div>
   {% else %}
     <div class="alert alert-info mt-3 mb-0">
       Export is being prepared. This page refreshes automatically.

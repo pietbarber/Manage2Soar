@@ -14,6 +14,7 @@ from logsheet.models import (
     TowplaneChargeScheme,
     TowplaneChargeTier,
 )
+from logsheet.stats_storage import private_stats_name
 from logsheet.utils.flight_charges import (
     effective_rental_cost as _effective_rental_cost,
 )
@@ -269,6 +270,7 @@ def process_stats_dump_outbox_job(outbox_id):
         if outbox.status in [
             StatsDumpOutbox.STATUS_PROCESSING,
             StatsDumpOutbox.STATUS_READY,
+            StatsDumpOutbox.STATUS_EXPIRED,
         ]:
             return
 
@@ -297,13 +299,13 @@ def process_stats_dump_outbox_job(outbox_id):
             suffix=".csv",
             delete=False,
         ) as tmp_file:
+            temp_path = tmp_file.name
             writer = csv.writer(tmp_file)
             for row in iter_stats_dump_rows():
                 writer.writerow(row)
-            temp_path = tmp_file.name
 
         outbox = StatsDumpOutbox.objects.get(pk=outbox_id)
-        if outbox.result_file:
+        if outbox.result_file and private_stats_name(outbox.result_file.name):
             outbox.result_file.delete(save=False)
 
         with open(temp_path, "rb") as generated_file:

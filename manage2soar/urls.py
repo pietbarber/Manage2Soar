@@ -22,6 +22,7 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.http import HttpResponse, JsonResponse
 from django.urls import include, path
+from django.views.decorators.cache import never_cache
 from django.views.generic import TemplateView
 
 from cms import views as cms_views
@@ -283,8 +284,28 @@ urlpatterns = [
     ),
 ]
 
-# Serve media files in development only
+# Serve public media in development, with the same legacy-export restriction
+# as NGINX. Normalize first, exactly as Django's static view does, so doubled
+# slashes and dot segments cannot bypass the restriction.
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    import posixpath
+
+    from django.views.static import serve
+
+    def serve_public_media(request, path, **kwargs):
+        normalized = posixpath.normpath(path).lstrip("/")
+        if normalized == "exports/stats_dumps" or normalized.startswith(
+            "exports/stats_dumps/"
+        ):
+            return deny_legacy_stats_media(request)
+        return serve(request, path, **kwargs)
+
+    @never_cache
+    def deny_legacy_stats_media(request):
+        return HttpResponse(status=404)
+
+    urlpatterns += static(
+        settings.MEDIA_URL, view=serve_public_media, document_root=settings.MEDIA_ROOT
+    )
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

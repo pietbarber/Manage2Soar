@@ -49,6 +49,14 @@
     - "{{ m2s_django_static_root }}"
     - "{{ m2s_django_media_root }}"
 
+- name: Create private stats export storage directory
+  ansible.builtin.file:
+    path: "{{ m2s_stats_dump_root }}"
+    state: directory
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    mode: "0700"
+
 - name: Create private import/export temporary storage directory
   # Holds django-import-export member import/export temp files. Kept OUTSIDE
   # /var/www/m2s/media (which Nginx serves publicly at /media/) and made

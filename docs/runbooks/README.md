@@ -17,6 +17,7 @@ This directory contains operational runbooks for system administrators managing 
 | [Ansible Playbook Guide](ansible-playbook-guide.md) | Complete reference for all Ansible playbooks | Reference |
 | [Database Operations](database-operations.md) | PostgreSQL backups, restoration, troubleshooting | Database changes, disaster recovery |
 | [Ansible Secrets Backup](ansible-secrets-backup.md) | Audit/sync/backup the gitignored files required to run the site & playbooks | Before deploys, onboarding a co-webmaster, disaster recovery |
+| [Private Stats Exports](../security/stats-dump-private-storage.md) | Provision private export storage, retire public dumps, verify privacy, and roll back safely | Issue #1159 rollout and export-storage maintenance |
 | Security Operations *(coming soon)* | Secret rotation, vulnerability patching | Security incidents, monthly maintenance |
 | Disaster Recovery *(coming soon)* | System restore, data recovery | Critical outages |
 

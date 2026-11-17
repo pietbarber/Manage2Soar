@@ -408,6 +408,14 @@
           - "Location: {{ (verify_result.stdout | from_json).location }}"
           - "Uniform bucket-level access: {{ (verify_result.stdout | from_json).uniform_bucket_level_access | default('unknown') }}"
 
+    - name: Reject shared public and private storage buckets
+      tags: [bucket, permissions, lifecycle]
+      ansible.builtin.assert:
+        that:
+          - gcs_import_export_bucket_name | length > 0
+          - gcs_import_export_bucket_name != gcs_bucket_name
+        fail_msg: "Private exports must never use the public media/static bucket."
+
     - name: Ensure private import/export bucket exists with uniform access
       tags: [bucket]
       google.cloud.gcp_storage_bucket:
@@ -488,16 +496,15 @@
           | map(attribute='members') | list | flatten | default([])
         )
 
+    # This file is authoritative for both prefixes. Comparing the whole policy
+    # ensures an existing one-day rule does not hide a missing stats rule.
     - name: Check for import/export object expiration lifecycle rule
       tags: [lifecycle]
       ansible.builtin.set_fact:
         import_export_lifecycle_exists: >-
           {{
             import_export_bucket_info.lifecycle.rule | default([])
-            | selectattr('action.type', 'equalto', 'Delete')
-            | selectattr('condition.age', 'equalto', 1)
-            | selectattr('condition.matchesPrefix', 'equalto', ['django-import-export/'])
-            | list | length > 0
+            == (lookup('file', playbook_dir ~ '/../files/gcs-import-export-lifecycle.json') | from_json).rule
           }}
 
     - name: Apply import/export object expiration lifecycle policy

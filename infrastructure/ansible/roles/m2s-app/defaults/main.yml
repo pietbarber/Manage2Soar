@@ -67,6 +67,7 @@ m2s_scheduled_jobs:
 # Private, non-web-served storage for django-import-export temp files.
 # Deliberately OUTSIDE /var/www/m2s/media so Nginx does not expose member
 # import CSVs over the public /media/ URL (issue #1071).
+m2s_stats_dump_root: "{{ m2s_app_home }}/stats-dumps"
 m2s_import_export_tmp_dir: "{{ m2s_app_home }}/import-export-tmp"
 # Retention (days) for import/export temp files. django-import-export removes
 # an object only after the confirmation request is processed, so uploads
