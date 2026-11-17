@@ -12,6 +12,15 @@
 
 rules {
 {% for club in club_domains %}
+{% set explicit_domains = club.domains | default([]) %}
+{% if explicit_domains is string %}
+{% set explicit_domains = [explicit_domains] %}
+{% endif %}
+{% set tenant_domains = (explicit_domains if (club.use_explicit_domains_only | default(false)) and explicit_domains else [club.prefix ~ '.' ~ mail_domain] + explicit_domains) | unique %}
+{% set escaped_domains = namespace(values=[]) %}
+{% for domain in tenant_domains %}
+{% set escaped_domains.values = escaped_domains.values + [domain | replace('.', '\\.') ] %}
+{% endfor %}
   M2S_{{ club.prefix | upper }}_WHITELIST {
     valid_dkim = false;
     # Only whitelist if SPF passes (prevents spoofing via SPF validation)
@@ -22,7 +31,7 @@ rules {
     action = "no action";
     map = "file:///etc/rspamd/local.d/whitelists/{{ club.prefix }}_whitelist.map";
     # Only apply to mail destined for this club's domain
-    rcpt = "/.*@{{ club.prefix }}\.{{ mail_domain | replace('.', '\\.') }}$/";
+    rcpt = "/.*@({{ escaped_domains.values | join('|') }})$/";
     description = "{{ club.name }} member whitelist - bypass spam checks (requires SPF pass)";
   }
 {% endfor %}
@@ -46,6 +55,7 @@ rules {
     action = "no action";
     # Match any sender when recipient is in bypass list
     rcpt_map = "file:///etc/rspamd/local.d/whitelists/bypass_lists.map";
+    regexp = true;
     description = "Bypass whitelist for service accounts (treasurer, webmaster, etc.) - requires SPF pass";
   }
 }
