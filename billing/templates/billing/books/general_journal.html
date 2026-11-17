@@ -6,7 +6,7 @@
 {% block content %}
 <div class="container py-4">
   {% with heading="General journal entry" %}{% include "billing/books/_header.html" %}{% endwith %}
-  <p class="text-muted">For entries the other forms don't cover, such as unpaid bills, depreciation, or setting money aside in a reserve. Total debits must equal total credits. Member balances change only through member ledgers.</p>
+  <p class="text-muted">For entries the other forms don't cover, such as unpaid bills, depreciation, or setting money aside in a reserve</p>
   <form method="post">
     {% csrf_token %}
     <div class="card border-0 shadow-sm mb-3">
@@ -52,6 +52,7 @@
       </table>
     </div>
     <button class="btn btn-primary" type="submit">Post entry</button>
+    <p class="small text-muted mt-2">Total debits must equal total credits.</p>
   </form>
 </div>
 {% endblock %}
