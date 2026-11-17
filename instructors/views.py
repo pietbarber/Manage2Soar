@@ -32,6 +32,8 @@ from instructors.decorators import (
     ground_instruction_required,
     instructor_or_safety_officer_required,
     instructor_required,
+    syllabus_document_edit_required,
+    training_record_action_required,
 )
 from instructors.forms import (
     BulkQualificationAssignForm,
@@ -270,7 +272,7 @@ def syllabus_detail(request, code):
 ####################################################
 
 
-@instructor_required
+@training_record_action_required
 def fill_instruction_report(request, student_id, report_date):
     try:
         report_date = datetime.strptime(report_date, "%Y-%m-%d").date()
@@ -1348,7 +1350,7 @@ def progress_dashboard(request):
 ####################################################
 
 
-@instructor_required
+@syllabus_document_edit_required
 def edit_syllabus_document(request, slug):
     doc = get_object_or_404(SyllabusDocument, slug=slug)
     if request.method == "POST":

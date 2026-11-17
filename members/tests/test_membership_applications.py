@@ -3,7 +3,9 @@ Tests for the membership application system.
 """
 
 import itertools
+import re
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from django.contrib.auth.models import Group
@@ -840,6 +842,82 @@ class MembershipApplicationViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         app.refresh_from_db()
         self.assertEqual(app.status, "withdrawn")
+
+    def test_matching_email_can_request_a_fresh_withdrawal_link(self):
+        app = MembershipApplication.objects.create(
+            first_name="John",
+            last_name="Doe",
+            email="john@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn gliding",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        response = self.client.post(
+            reverse("members:membership_application_status", args=[app.application_id]),
+            {
+                "action": "request_withdrawal_link",
+                "email": " JOHN@example.com ",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [app.email])
+        self.assertIn("withdrawal link", mail.outbox[0].subject.lower())
+        self.assertContains(response, "If the email matches an eligible application")
+        self.assertNotContains(response, app.email)
+
+        withdrawal_url = re.search(r"https?://\S+", mail.outbox[0].body).group(0)
+        token = parse_qs(urlsplit(withdrawal_url).query)["withdrawal_token"][0]
+        status_response = self.client.get(
+            reverse("members:membership_application_status", args=[app.application_id]),
+            {"withdrawal_token": token},
+        )
+        self.assertTrue(status_response.context["can_withdraw"])
+
+    def test_nonmatching_email_does_not_send_withdrawal_link(self):
+        app = MembershipApplication.objects.create(
+            first_name="John",
+            last_name="Doe",
+            email="john@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Jane Doe",
+            emergency_contact_relationship="Spouse",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="I want to learn gliding",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+
+        response = self.client.post(
+            reverse("members:membership_application_status", args=[app.application_id]),
+            {
+                "action": "request_withdrawal_link",
+                "email": "someone-else@example.com",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(response, "If the email matches an eligible application")
+        self.assertNotContains(response, app.email)
 
     def test_waitlist_view(self):
         """Test the waitlist view."""

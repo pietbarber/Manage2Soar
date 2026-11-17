@@ -1,9 +1,11 @@
 import logging
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib import messages
 from django.core import signing
 from django.core.exceptions import PermissionDenied
+from django.core.mail import send_mail
 from django.db import models, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
@@ -17,6 +19,7 @@ from members.authorization import (
     has_membership_application_view_access,
 )
 from siteconfig.models import SiteConfiguration
+from utils.email import enforce_noreply_from_email
 
 from .account_emails import send_account_setup_email
 from .decorators import non_kiosk_member_required
@@ -29,6 +32,11 @@ from .models_applications import MembershipApplication
 logger = logging.getLogger(__name__)
 APPLICATION_WITHDRAWAL_SALT = "members.application-withdrawal"
 APPLICATION_WITHDRAWAL_MAX_AGE = 30 * 24 * 60 * 60
+WITHDRAWABLE_APPLICATION_STATUSES = (
+    "pending",
+    "under_review",
+    "additional_info_needed",
+)
 
 
 def _application_withdrawal_token(application):
@@ -631,11 +639,61 @@ def membership_application_status(request, application_id):
     withdrawal_token = request.POST.get("withdrawal_token") or request.GET.get(
         "withdrawal_token"
     )
-    can_withdraw = application.status in [
-        "pending",
-        "under_review",
-        "additional_info_needed",
-    ] and _valid_application_withdrawal_token(application, withdrawal_token)
+    can_request_withdrawal_link = (
+        application.status in WITHDRAWABLE_APPLICATION_STATUSES
+    )
+    can_withdraw = can_request_withdrawal_link and _valid_application_withdrawal_token(
+        application, withdrawal_token
+    )
+
+    if (
+        request.method == "POST"
+        and request.POST.get("action") == "request_withdrawal_link"
+    ):
+        requested_email = request.POST.get("email", "").strip().casefold()
+        application_email = (application.email or "").strip().casefold()
+        if (
+            can_request_withdrawal_link
+            and requested_email
+            and requested_email == application_email
+        ):
+            token = _application_withdrawal_token(application)
+            status_url = reverse(
+                "members:membership_application_status",
+                kwargs={"application_id": application.application_id},
+            )
+            withdrawal_url = request.build_absolute_uri(
+                f"{status_url}?{urlencode({'withdrawal_token': token})}"
+            )
+            try:
+                send_mail(
+                    subject="Your membership application withdrawal link",
+                    message=(
+                        "You requested a link to withdraw your membership "
+                        "application. Use the link below if you want to withdraw it:\n\n"
+                        f"{withdrawal_url}\n\n"
+                        "The link expires in 30 days. If you did not request it, "
+                        "you can ignore this email."
+                    ),
+                    from_email=enforce_noreply_from_email(settings.DEFAULT_FROM_EMAIL),
+                    recipient_list=[application.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to send a withdrawal link for membership application %s",
+                    application.application_id,
+                )
+
+        messages.info(
+            request,
+            "If the email matches an eligible application, a new withdrawal link "
+            "will be sent to the address on file.",
+        )
+        return redirect(
+            "members:membership_application_status",
+            application_id=application.application_id,
+        )
 
     # Handle withdrawal request
     if request.method == "POST" and request.POST.get("action") == "withdraw":
@@ -679,6 +737,7 @@ def membership_application_status(request, application_id):
         "submitted_date": application.submitted_at,
         "applicant_name": application.first_name,  # Only show first name for privacy
         "can_withdraw": can_withdraw,
+        "can_request_withdrawal_link": can_request_withdrawal_link,
         "withdrawal_token": withdrawal_token,
     }
 

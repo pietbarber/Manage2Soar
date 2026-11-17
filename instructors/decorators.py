@@ -6,22 +6,21 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from members.authorization import (
     can_manage_ground_instruction,
+    has_admin_model_permission,
     has_training_record_access,
     has_training_record_action,
 )
 from members.models import Member
 from members.utils import is_active_member
-from members.utils.permissions import SAFETY_REPORT_PERMISSION
 
 BULK_QUALIFICATION_PERMISSION = "instructors.can_bulk_assign_qualification"
 
 ####################################################
 # instructor_required
 #
-# Decorator to restrict view access to authenticated instructors.
-# Allows superusers, then checks:
-# - membership_status in ALLOWED_MEMBERSHIP_STATUSES
-# - user.instructor flag True
+# Restrict instructor-facing read views to members who can view training
+# records, retaining the legacy instructor fallback in the authorization
+# helper.
 # Redirects unauthenticated users to login;
 # renders 403.html for forbidden access.
 #
@@ -44,7 +43,51 @@ def instructor_required(view_func):
         if not is_active_member(user):
             return render(request, "403.html", status=403)
 
-        if not has_training_record_action(user):
+        if not has_training_record_access(user):
+            return render(request, "403.html", status=403)
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+def training_record_action_required(view_func):
+    """Require permission to create or update training records."""
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+
+        if not user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+
+        if not is_active_member(user) or not has_training_record_action(user):
+            return render(request, "403.html", status=403)
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+def syllabus_document_edit_required(view_func):
+    """Require syllabus edit permission or the legacy instructor role."""
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+
+        if not user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+
+        if not is_active_member(user):
+            return render(request, "403.html", status=403)
+
+        if not (
+            has_admin_model_permission(
+                user, "instructors", "syllabusdocument", "change"
+            )
+            or getattr(user, "instructor", False)
+        ):
             return render(request, "403.html", status=403)
 
         return view_func(request, *args, **kwargs)
@@ -112,10 +155,8 @@ def member_or_instructor_required(view_func):
 ####################################################
 # instructor_or_safety_officer_required
 #
-# Decorator to restrict view access to instructors or safety officers.
-# Allows superusers, then checks:
-# - membership_status in ALLOWED_MEMBERSHIP_STATUSES
-# - user.instructor flag True OR the safety-report capability
+# Restrict bulk qualification assignment to its dedicated capability or the
+# legacy instructor/safety-officer roles.
 # Redirects unauthenticated users to login;
 # renders 403.html for forbidden access.
 #
@@ -145,9 +186,8 @@ def instructor_or_safety_officer_required(view_func):
         # Instructors retain their existing role behavior; safety access is an
         # explicit capability rather than a legacy boolean authorization read.
         if not (
-            has_training_record_action(user)
+            getattr(user, "instructor", False)
             or user.has_perm(BULK_QUALIFICATION_PERMISSION)
-            or user.has_perm(SAFETY_REPORT_PERMISSION)
             or getattr(user, "safety_officer", False)
         ):
             return render(request, "403.html", status=403)
