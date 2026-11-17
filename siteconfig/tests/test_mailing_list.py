@@ -1003,6 +1003,71 @@ class TestMailingListAdminForm:
         stale_label = choices["role:old_role"].lower()
         assert "stale" in stale_label and "role metadata" in stale_label
 
+    def test_canonical_role_choices_use_singular_audience_labels(self, db):
+        from siteconfig.admin import MailingListAdminForm
+
+        group = Group.objects.create(name="Webmasters")
+        role = RoleMetadata.objects.create(
+            group=group,
+            key="webmasters",
+            display_name="Webmasters",
+            mailing_list_eligible=True,
+        )
+        mailing_list = MailingList.objects.create(
+            name="singular-role-labels", criteria=[MailingListCriterion.ACTIVE_MEMBER]
+        )
+
+        form = MailingListAdminForm(instance=mailing_list)
+
+        assert (
+            dict(form.fields["criteria_select"].choices)[f"role:{role.key}"]
+            == "Webmaster"
+        )
+
+    def test_canonical_role_hides_duplicate_legacy_criterion_and_preserves_saved_one(
+        self, db
+    ):
+        from siteconfig.admin import MailingListAdminForm
+
+        group = Group.objects.create(name="Webmasters")
+        RoleMetadata.objects.create(
+            group=group,
+            key="webmasters",
+            display_name="Webmasters",
+            mailing_list_eligible=True,
+        )
+        new_form = MailingListAdminForm()
+        new_choices = dict(new_form.fields["criteria_select"].choices)
+        assert "role:webmasters" in new_choices
+        assert MailingListCriterion.WEBMASTER not in new_choices
+
+        mailing_list = MailingList.objects.create(
+            name="legacy-webmaster-list", criteria=[MailingListCriterion.WEBMASTER]
+        )
+
+        form = MailingListAdminForm(instance=mailing_list)
+        choices = dict(form.fields["criteria_select"].choices)
+
+        assert "role:webmasters" in choices
+        assert MailingListCriterion.WEBMASTER in choices
+        assert choices[MailingListCriterion.WEBMASTER] == "Webmaster"
+        assert form.fields["criteria_select"].initial == [
+            MailingListCriterion.WEBMASTER
+        ]
+
+        form = MailingListAdminForm(
+            instance=mailing_list,
+            data={
+                "name": mailing_list.name,
+                "description": mailing_list.description,
+                "is_active": mailing_list.is_active,
+                "sort_order": mailing_list.sort_order,
+                "criteria_select": [MailingListCriterion.WEBMASTER],
+            },
+        )
+        assert form.is_valid(), form.errors
+        assert form.save().criteria == [MailingListCriterion.WEBMASTER]
+
     def test_ineligible_existing_role_is_labeled_and_saveable(self, db):
         from siteconfig.admin import MailingListAdminForm
 

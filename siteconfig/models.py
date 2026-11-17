@@ -275,6 +275,7 @@ class MailingList(models.Model):
             for role in self._role_metadata().filter(key__in=role_keys.values())
         }
         from members.models import MemberTag
+        from members.role_definitions import mailing_list_role_label
 
         tag_keys = {
             criterion: key
@@ -286,12 +287,16 @@ class MailingList(models.Model):
         }
         return [
             (
-                self._role_display(role_keys[c], role_metadata.get(role_keys[c]))
-                if c in role_keys
+                mailing_list_role_label(role_metadata[role_keys[c]])
+                if c in role_keys and role_keys[c] in role_metadata
                 else (
-                    self._tag_display(tag_keys[c], tags.get(tag_keys[c]))
-                    if c in tag_keys
-                    else criterion_map.get(c, c)
+                    self._role_display(role_keys[c], None)
+                    if c in role_keys
+                    else (
+                        self._tag_display(tag_keys[c], tags.get(tag_keys[c]))
+                        if c in tag_keys
+                        else criterion_map.get(c, c)
+                    )
                 )
             )
             for c in self.criteria

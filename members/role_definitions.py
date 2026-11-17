@@ -40,6 +40,27 @@ CANONICAL_ROLES = (
 ROLE_BY_KEY = {role.key: role for role in CANONICAL_ROLES}
 ROLE_BY_GROUP_NAME = {role.group_name: role for role in CANONICAL_ROLES}
 
+# Mailing-list audiences are presented as singular role names. Keep these
+# labels separate from Group display names because the latter are also used in
+# administration and audit contexts where the canonical plural names are
+# useful.
+MAILING_LIST_ROLE_LABELS = {
+    "instructor_admins": "Instructor Admin",
+    "webmasters": "Webmaster",
+    "member_managers": "Member Manager",
+    "rostermeisters": "Rostermeister",
+    "safety_officers": "Safety Officer",
+    "directors": "Director",
+    "secretary": "Secretary",
+    "treasurer": "Treasurer",
+}
+
+
+def mailing_list_role_label(role):
+    """Return the user-facing singular label for a mailing-list role."""
+    return MAILING_LIST_ROLE_LABELS.get(role.key, role.display_name)
+
+
 # These are the legacy flag/group relationships that Member._sync_groups has
 # historically maintained. Other built-in roles may be backfilled by their
 # dedicated migration and are intentionally not added to that synchronization

@@ -6,6 +6,7 @@ from django.utils.html import format_html
 
 from duty_roster.models import DutyRoleDefinition
 from members.authorization import has_admin_model_permission
+from members.role_definitions import CANONICAL_ROLES, mailing_list_role_label
 from members.role_preview import has_preview_group
 from utils.admin_helpers import AdminHelperMixin
 
@@ -49,15 +50,32 @@ class MailingListAdminForm(forms.ModelForm):
         from members.models import MemberTag, RoleMetadata
 
         selected = list(self.instance.criteria or []) if self.instance else []
+        eligible_roles = list(RoleMetadata.objects.filter(mailing_list_eligible=True))
+        eligible_role_keys = {metadata.key for metadata in eligible_roles}
+        # Built-in roles historically also had boolean Member criteria. Once
+        # the canonical group-backed role is available, showing both gives
+        # admins two labels for the same audience. Keep the legacy criterion
+        # valid for existing lists, but expose the canonical selector for new
+        # configuration.
+        hidden_legacy_criteria = {
+            role.legacy_flag
+            for role in CANONICAL_ROLES
+            if role.key in eligible_role_keys and role.legacy_flag
+        }
+        criterion_choices = [
+            choice
+            for choice in MailingListCriterion.choices
+            if choice[0] not in hidden_legacy_criteria
+        ]
         role_choices = [
-            (f"role:{role.key}", role.display_name)
-            for role in RoleMetadata.objects.filter(mailing_list_eligible=True)
+            (f"role:{role.key}", mailing_list_role_label(role))
+            for role in eligible_roles
         ]
         tag_choices = [
             (f"tag:{tag.key}", tag.display_label)
             for tag in MemberTag.objects.filter(is_active=True)
         ]
-        known_values = {value for value, _label in MailingListCriterion.choices}
+        known_values = {value for value, _label in criterion_choices}
         known_values.update(value for value, _label in role_choices)
         known_values.update(value for value, _label in tag_choices)
         # Keep legacy/stale values selectable while editing an existing list;
@@ -101,7 +119,7 @@ class MailingListAdminForm(forms.ModelForm):
             preserved.append((value, label))
 
         self.fields["criteria_select"].choices = [
-            *MailingListCriterion.choices,
+            *criterion_choices,
             *role_choices,
             *tag_choices,
             *preserved,
