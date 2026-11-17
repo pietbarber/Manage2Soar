@@ -180,7 +180,24 @@ class MailingList(models.Model):
     def clean(self):
         """Validate that criteria contains valid criterion codes."""
         if self.name:
-            alias_name = self.name.removesuffix("-bounces")
+            normalized_name = self.name.lower()
+            if not re.fullmatch(r"[a-z0-9](?:[a-z0-9._-]*[a-z0-9-])?", self.name) or (
+                ".." in self.name or self.name.endswith(".")
+            ):
+                raise ValidationError(
+                    {
+                        "name": "Use a lowercase email local part (letters, digits, . _ -); + is reserved by Postfix."
+                    }
+                )
+            if normalized_name.endswith("-bounces"):
+                raise ValidationError(
+                    {"name": "Bounce addresses are reserved for mailing lists."}
+                )
+            alias_name = (
+                normalized_name[: -len("-bounces")]
+                if normalized_name.endswith("-bounces")
+                else normalized_name
+            )
             if EmailAlias.objects.filter(name__iexact=alias_name).exists():
                 raise ValidationError(
                     {"name": "This address is reserved by an email alias."}
@@ -307,11 +324,13 @@ class EmailAlias(models.Model):
         return self.name
 
     def clean(self):
-        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9._+-]*[a-z0-9])?", self.name or "") or (
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9._-]*[a-z0-9-])?", self.name or "") or (
             ".." in self.name or self.name.endswith(".")
         ):
             raise ValidationError(
-                {"name": "Use a lowercase email local part (letters, digits, . _ + -)."}
+                {
+                    "name": "Use a lowercase email local part (letters, digits, . _ -); + is reserved by Postfix."
+                }
             )
         if self.name.endswith("-bounces"):
             raise ValidationError(

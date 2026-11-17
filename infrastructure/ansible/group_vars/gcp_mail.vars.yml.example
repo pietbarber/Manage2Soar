@@ -131,6 +131,11 @@ mail_domain: "manage2soar.com"
 # This will be used in HELO/EHLO and TLS certificates
 mail_hostname: "mail.{{ mail_domain }}"
 
+# REQUIRED: monitored external mailbox for mailing-list and forwarding bounces.
+# Do not use a mailbox at mail_domain; uncomment and replace with the operator's
+# real monitored address before enabling inbound mail.
+# admin_email: "your-monitored-mailbox@example.net"
+
 # ============================================================
 # SPAM REJECTION MESSAGES
 # ============================================================
@@ -186,9 +191,11 @@ dkim_key_size: 2048
 club_domains:
   - prefix: "ssc"
     name: "Skyline Soaring Club"
+    api_url: "https://ssc.manage2soar.com/api/email-lists/"
 
   - prefix: "masa"
     name: "Mid-Atlantic Soaring Association"
+    api_url: "https://masa.manage2soar.com/api/email-lists/"
 
 # ============================================================
 # M2S API KEY (for mail sync)
