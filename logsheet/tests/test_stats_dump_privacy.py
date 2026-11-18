@@ -279,6 +279,32 @@ def test_retirement_preserves_reference_on_delete_failure(legacy_export):
     assert default_storage.exists(name)
 
 
+@pytest.mark.parametrize("symlink_legacy_root", [False, True])
+def test_retirement_rejects_symlink_to_unrelated_local_directory(
+    symlink_legacy_root,
+):
+    media_root = Path(default_storage.location)
+    unrelated = media_root / "unrelated-files"
+    unrelated.mkdir(parents=True)
+    protected_file = unrelated / "keep.csv"
+    protected_file.write_text("do not delete")
+
+    legacy_root = media_root / "exports" / "stats_dumps"
+    legacy_root.parent.mkdir(parents=True)
+    if symlink_legacy_root:
+        legacy_root.symlink_to(unrelated, target_is_directory=True)
+    else:
+        legacy_root.mkdir()
+        (legacy_root / "unrelated-files").symlink_to(
+            unrelated, target_is_directory=True
+        )
+
+    with pytest.raises(CommandError, match="symlink"):
+        call_command("retire_public_stats_dumps", apply=True, stdout=StringIO())
+
+    assert protected_file.read_text() == "do not delete"
+
+
 def test_retirement_rejects_running_workers(legacy_export):
     StatsDumpOutbox.objects.create(status=StatsDumpOutbox.STATUS_PROCESSING)
     with pytest.raises(CommandError, match="Stop and drain"):

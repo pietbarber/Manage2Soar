@@ -77,9 +77,13 @@
   ansible.builtin.file:
     path: "{{ m2s_stats_dump_root }}"
     state: directory
-    owner: "{{ m2s_app_user }}"
-    group: "{{ m2s_app_group }}"
     mode: "0700"
+  # This path is inside an application-writable parent by default. Create the
+  # leaf as the app user so a symlink substitution cannot make root chown/chmod
+  # an unrelated target. Operators using a protected parent must provision
+  # that parent separately with safe ownership and permissions.
+  become: true
+  become_user: "{{ m2s_app_user }}"
 
 - name: Create private import/export temporary storage directory
   # Holds django-import-export member import/export temp files. Kept OUTSIDE

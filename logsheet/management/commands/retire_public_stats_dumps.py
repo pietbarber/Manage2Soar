@@ -1,10 +1,12 @@
 """Inventory, then explicitly retire this tenant's legacy public stats exports."""
 
 import json
-from pathlib import PurePosixPath
+import os
+import stat
+from pathlib import Path, PurePosixPath
 
 from django.conf import settings
-from django.core.files.storage import default_storage
+from django.core.files.storage import FileSystemStorage, default_storage
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -12,15 +14,76 @@ from logsheet.models import StatsDumpOutbox
 from logsheet.stats_storage import LEGACY_STATS_PREFIX
 
 
+def reject_local_symlink_components(name):
+    """Reject symlinks in a local storage path before using FileSystemStorage."""
+    if not isinstance(default_storage, FileSystemStorage):
+        return
+
+    relative = PurePosixPath(name)
+    if relative.is_absolute() or any(part in (".", "..") for part in relative.parts):
+        raise CommandError("Unsafe local stats export path; inspect it manually.")
+
+    root = Path(default_storage.location).absolute()
+    current = Path(root.anchor)
+    for component in (*root.parts[1:], *relative.parts):
+        current /= component
+        try:
+            component_stat = current.lstat()
+        except FileNotFoundError:
+            # A missing component means no later component can exist yet.
+            return
+        except OSError as exc:
+            raise CommandError(
+                "Could not safely inspect local stats export storage."
+            ) from exc
+        if stat.S_ISLNK(component_stat.st_mode):
+            raise CommandError(
+                "Local stats export path contains a symlink; inspect it manually."
+            )
+
+
+def list_local_directory(directory):
+    reject_local_symlink_components(directory)
+    path = Path(default_storage.path(directory))
+    directories = []
+    files = []
+    try:
+        with os.scandir(path) as entries:
+            for entry in entries:
+                entry_stat = entry.stat(follow_symlinks=False)
+                if stat.S_ISLNK(entry_stat.st_mode):
+                    raise CommandError(
+                        "Local stats export path contains a symlink; inspect it manually."
+                    )
+                if stat.S_ISDIR(entry_stat.st_mode):
+                    directories.append(entry.name)
+                else:
+                    files.append(entry.name)
+    except FileNotFoundError:
+        raise
+    except OSError as exc:
+        raise CommandError(
+            "Could not safely inspect local stats export storage."
+        ) from exc
+    return directories, files
+
+
 def legacy_names(directory=LEGACY_STATS_PREFIX.rstrip("/")):
     try:
-        directories, files = default_storage.listdir(directory)
+        if isinstance(default_storage, FileSystemStorage):
+            directories, files = list_local_directory(directory)
+        else:
+            directories, files = default_storage.listdir(directory)
     except FileNotFoundError:
         return
     for filename in files:
-        yield f"{directory}/{filename}"
+        name = f"{directory}/{filename}"
+        reject_local_symlink_components(name)
+        yield name
     for child in directories:
-        yield from legacy_names(f"{directory}/{child}")
+        child_directory = f"{directory}/{child}"
+        reject_local_symlink_components(child_directory)
+        yield from legacy_names(child_directory)
 
 
 class Command(BaseCommand):
@@ -70,6 +133,7 @@ class Command(BaseCommand):
         # Delete first. If storage deletion fails, keep DB references for retry.
         # If the DB update fails, rerunning is safe (missing files are accepted).
         for name in names:
+            reject_local_symlink_components(name)
             with transaction.atomic():
                 matching = StatsDumpOutbox.objects.select_for_update().filter(
                     result_file=name

@@ -498,16 +498,37 @@
           | map(attribute='members') | list | flatten | default([])
         )
 
-    # This file is authoritative for both prefixes. Comparing the whole policy
-    # ensures an existing one-day rule does not hide a missing stats rule.
+    # gcloud's --lifecycle-file replaces the complete bucket policy. Refuse to
+    # apply it if the bucket has rules outside the two we manage, so unrelated
+    # expiration or archival rules cannot be silently removed.
+    - name: Load managed and existing import/export lifecycle rules
+      tags: [lifecycle]
+      ansible.builtin.set_fact:
+        import_export_managed_lifecycle_rules: >-
+          {{
+            (lookup('file', playbook_dir ~ '/../files/gcs-import-export-lifecycle.json') | from_json).rule
+          }}
+        import_export_existing_lifecycle_rules: >-
+          {{ import_export_bucket_info.lifecycle.rule | default([]) }}
+
+    - name: Reject unmanaged import/export lifecycle rules
+      tags: [lifecycle]
+      ansible.builtin.assert:
+        that:
+          - item in import_export_managed_lifecycle_rules
+        fail_msg: >-
+          The private import/export bucket has lifecycle rules not managed by
+          this playbook. The configured lifecycle file replaces the whole
+          policy; reconcile the existing and managed rules before retrying.
+      loop: "{{ import_export_existing_lifecycle_rules }}"
+      loop_control:
+        label: "{{ item }}"
+
     - name: Check for import/export object expiration lifecycle rule
       tags: [lifecycle]
       ansible.builtin.set_fact:
         import_export_lifecycle_exists: >-
-          {{
-            import_export_bucket_info.lifecycle.rule | default([])
-            == (lookup('file', playbook_dir ~ '/../files/gcs-import-export-lifecycle.json') | from_json).rule
-          }}
+          {{ import_export_existing_lifecycle_rules == import_export_managed_lifecycle_rules }}
 
     - name: Apply import/export object expiration lifecycle policy
       tags: [lifecycle]
