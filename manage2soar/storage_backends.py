@@ -75,7 +75,7 @@ class PrivateStatsDumpGCS(GoogleCloudStorage):
         )
         super().__init__(**kwargs)
 
-    def url(self, name, **kwargs):
+    def url(self, name, parameters=None):
         raise NotImplementedError(
             "Stats exports require the authenticated download view."
         )
@@ -91,7 +91,32 @@ class PrivateStatsDumpFileSystemStorage(FileSystemStorage):
                 )
             user_id = os.getuid() if hasattr(os, "getuid") else "dev"
             root = Path(tempfile.gettempdir()) / f"m2s-stats-dumps-{user_id}"
-        root = Path(root).expanduser().absolute()
+
+        # Validate the canonical path before creating it or tightening its
+        # permissions. In particular, never chmod a served directory when a
+        # misconfiguration points STATS_DUMP_ROOT at MEDIA_ROOT or STATIC_ROOT.
+        configured_root = Path(root).expanduser().absolute()
+        try:
+            configured_root_stat = configured_root.lstat()
+        except FileNotFoundError:
+            configured_root_stat = None
+        except OSError as exc:
+            raise ImproperlyConfigured(
+                "STATS_DUMP_ROOT must be accessible as a private directory."
+            ) from exc
+        if configured_root_stat and stat.S_ISLNK(configured_root_stat.st_mode):
+            raise ImproperlyConfigured("STATS_DUMP_ROOT must be a real directory.")
+        root = configured_root.resolve()
+        # Reject both a served directory and its ancestor, including symlinks.
+        for setting in ("MEDIA_ROOT", "STATIC_ROOT", "BASE_DIR"):
+            served = getattr(settings, setting, None)
+            if served:
+                served = Path(served).resolve()
+                if root.is_relative_to(served) or served.is_relative_to(root):
+                    raise ImproperlyConfigured(
+                        f"STATS_DUMP_ROOT must be separate from {setting}."
+                    )
+
         try:
             root.mkdir(mode=0o700, parents=True, exist_ok=True)
             root_stat = root.lstat()
@@ -110,16 +135,6 @@ class PrivateStatsDumpFileSystemStorage(FileSystemStorage):
                 raise ImproperlyConfigured(
                     "STATS_DUMP_ROOT must not be accessible by other users."
                 )
-        root = root.resolve()
-        # Reject both a served directory and its ancestor, including symlinks.
-        for setting in ("MEDIA_ROOT", "STATIC_ROOT", "BASE_DIR"):
-            served = getattr(settings, setting, None)
-            if served:
-                served = Path(served).resolve()
-                if root.is_relative_to(served) or served.is_relative_to(root):
-                    raise ImproperlyConfigured(
-                        f"STATS_DUMP_ROOT must be separate from {setting}."
-                    )
         kwargs.update(
             location=root,
             base_url=None,
