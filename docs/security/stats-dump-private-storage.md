@@ -46,10 +46,21 @@ Members can generate a fresh private export. The schema migration only changes
 storage metadata/status choices; it does not access storage or delete files.
 
 1. Disable export generation and suspend/drain all old export workers/CronJobs.
-   Use a maintenance window if the queue route cannot be disabled separately.
+   Keep the pause in persistent inventory so a deployment cannot resume workers
+   before verification:
+
+   - For GKE, set `cronjobs_enabled: false` on every affected tenant in
+     `group_vars/gcp_app.vars.yml`. The deploy playbook applies that value to
+     every managed CronJob; a one-time `kubectl` suspension is not persistent.
+   - For single-host, set `m2s_stats_dump_outbox_enabled: false` in the host or
+     group inventory. The application role stops and disables the existing
+     `process-stats-dump-outbox` systemd timer and keeps it disabled on later
+     role runs.
+
    Wait for existing jobs to finish; the retirement command refuses to apply
    while a job is `processing`. Inspect stale jobs before clearing their status.
-   Do not allow old and new workers to run simultaneously.
+   Do not allow old and new workers to run simultaneously. Leave these inventory
+   overrides in place through retirement and the privacy checks below.
 2. Inventory current public objects promptly, including orphans and tenant
    prefixes with no running application. Record public bucket IAM/listing access
    and object versioning/soft-delete settings. Restrict or remove the export
@@ -93,10 +104,13 @@ storage metadata/status choices; it does not access storage or delete files.
    from soft-deleted objects/backups. Retention holds can prevent deletion: resolve
    them or make those exact exports inaccessible before declaring rollout done.
    The command cannot prove this from a live-object listing.
-6. Verify private access using the checks below, then resume new workers and
-   export generation. Run a fresh export and confirm it downloads through Django.
-   Record per-tenant deployment, retirement, and verification results. This work
-   is not completed merely by merging the application PR.
+6. Verify private access using the checks below. Only after every tenant passes,
+   remove the pause overrides: set `cronjobs_enabled: true` for the GKE tenants
+   and `m2s_stats_dump_outbox_enabled: true` for single-host inventory, then
+   deploy again to resume the workers. Re-enable export generation if it was
+   separately disabled. Run a fresh export and confirm it downloads through
+   Django. Record per-tenant deployment, retirement, and verification results.
+   This work is not completed merely by merging the application PR.
 
 ## Verify actual deployment privacy
 

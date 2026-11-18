@@ -712,11 +712,18 @@ def stats_dump_export_status(request, pk):
     if not request.user.is_superuser and export_job.requested_by_id != request.user.id:
         return HttpResponseForbidden("You do not have permission to view this export.")
 
+    download_available = (
+        export_job.status == StatsDumpOutbox.STATUS_READY
+        and bool(export_job.result_file)
+        and private_stats_name(export_job.result_file.name)
+        and not stats_dump_expired(export_job)
+    )
     return render(
         request,
         "logsheet/stats_dump_export_status.html",
         {
             "export_job": export_job,
+            "download_available": download_available,
             "polling": export_job.status
             in [
                 StatsDumpOutbox.STATUS_PENDING,

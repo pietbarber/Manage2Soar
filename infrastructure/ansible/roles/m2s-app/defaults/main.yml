@@ -23,6 +23,9 @@ m2s_django_debug: false
 m2s_django_allowed_hosts: "{{ m2s_domain }}"
 m2s_django_static_root: "/var/www/m2s/static"
 m2s_django_media_root: "/var/www/m2s/media"
+# Keep false in single-host inventory during stats-export privacy rollouts so
+# deployment runs cannot restart the stats outbox worker before verification.
+m2s_stats_dump_outbox_enabled: true
 # Match the active GKE Django CronJobs on single-host installations. Calendar
 # expressions specify UTC explicitly, independently of the server's timezone.
 m2s_scheduled_jobs:
