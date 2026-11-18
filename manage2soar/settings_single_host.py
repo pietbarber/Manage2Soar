@@ -168,7 +168,11 @@ MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/var/www/m2s/media")
 # will bypass the retention policy (issue #1071).
 IMPORT_EXPORT_TMP_DIR = os.getenv("IMPORT_EXPORT_TMP_DIR", "/opt/m2s/import-export-tmp")
 
+STATS_DUMP_ROOT = os.getenv("STATS_DUMP_ROOT", "/opt/m2s/stats-dumps")
 STORAGES = {
+    "stats_dumps": {
+        "BACKEND": "manage2soar.storage_backends.PrivateStatsDumpFileSystemStorage",
+    },
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },

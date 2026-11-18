@@ -15,12 +15,14 @@ from logsheet.utils.stats_dump import (
 )
 from members.models import Member
 
+pytestmark = pytest.mark.usefixtures("private_stats_storage")
+
 
 @pytest.mark.django_db
 class TestStatsDumpOutboxCommand:
     @pytest.fixture(autouse=True)
     def setup(self, settings, tmp_path):
-        settings.MEDIA_ROOT = str(tmp_path)
+        settings.MEDIA_ROOT = str(tmp_path / "media")
         self.requester = Member.objects.create_user(
             username="stats_requester",
             password="testpass",
@@ -112,7 +114,7 @@ class TestStatsDumpOutboxCommand:
 
     def test_process_job_skips_already_processing_job(self, settings, tmp_path):
         """process_stats_dump_outbox_job is idempotent for STATUS_PROCESSING."""
-        settings.MEDIA_ROOT = str(tmp_path)
+        settings.MEDIA_ROOT = str(tmp_path / "media")
         outbox = StatsDumpOutbox.objects.create(
             requested_by=self.requester,
             status=StatsDumpOutbox.STATUS_PROCESSING,
@@ -127,7 +129,7 @@ class TestStatsDumpOutboxCommand:
 
     def test_process_job_skips_already_ready_job(self, settings, tmp_path):
         """process_stats_dump_outbox_job is idempotent for STATUS_READY."""
-        settings.MEDIA_ROOT = str(tmp_path)
+        settings.MEDIA_ROOT = str(tmp_path / "media")
         outbox = StatsDumpOutbox.objects.create(
             requested_by=self.requester,
             status=StatsDumpOutbox.STATUS_READY,

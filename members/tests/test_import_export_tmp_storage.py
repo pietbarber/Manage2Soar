@@ -76,7 +76,7 @@ class MemberImportTmpStorageTests(TestCase):
         policy = json.loads(policy_path.read_text())
 
         self.assertEqual(
-            policy["rule"],
+            policy["rule"][:1],
             [
                 {
                     "action": {"type": "Delete"},

@@ -3,6 +3,10 @@
 import io
 import json
 import os
+import re
+import shutil
+import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -184,6 +188,36 @@ class TestServiceWorkerView:
         # Core pages that should be cached
         assert "'/'" in content or '"/"' in content
         assert "'/offline/'" in content or '"/offline/"' in content
+
+    def test_download_bypass_decodes_encoded_and_malformed_paths(self):
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("Node.js is required to exercise the service-worker matcher")
+
+        service_worker = (
+            Path(__file__).resolve().parents[1] / "static/js/service-worker.js"
+        ).read_text()
+        match = re.search(
+            r"^function isDownloadRequest\(pathname\) \{.*?^\}",
+            service_worker,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+        assert match is not None
+
+        paths = [
+            "/logsheet/%73tats-dump/%65xport/%64ownload/123/",
+            "/logsheet/other/%65xport/%64ownload/123/",
+            "/logsheet/%E0%A4%A",
+            "/logsheet/manage/123/edit-flight/456/",
+        ]
+        script = (
+            f"{match.group(0)}\n"
+            f"console.log(JSON.stringify({json.dumps(paths)}.map(isDownloadRequest)));"
+        )
+        result = subprocess.run(
+            [node, "-e", script], capture_output=True, check=True, text=True
+        )
+        assert json.loads(result.stdout) == [True, True, True, False]
 
 
 @pytest.mark.django_db

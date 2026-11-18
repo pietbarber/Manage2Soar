@@ -258,8 +258,19 @@ function isLogsheetAjaxRequest(pathname) {
 
 // Check if request is for a downloadable export that should bypass SW caching.
 function isDownloadRequest(pathname) {
+    let decodedPathname;
+    try {
+        decodedPathname = decodeURIComponent(pathname);
+    } catch {
+        // A malformed path must bypass interception too: Django may still
+        // normalize it before routing, while Cache Storage must not retain it.
+        return true;
+    }
+
     return (
-        pathname.startsWith('/logsheet/') && pathname.includes('/export/download/')
+        decodedPathname.startsWith('/logsheet/stats-dump/') ||
+        (decodedPathname.startsWith('/logsheet/') &&
+            decodedPathname.includes('/export/download/'))
     );
 }
 

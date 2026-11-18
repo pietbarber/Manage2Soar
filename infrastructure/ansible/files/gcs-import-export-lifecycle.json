@@ -10,6 +10,17 @@
           "django-import-export/"
         ]
       }
+    },
+    {
+      "action": {
+        "type": "Delete"
+      },
+      "condition": {
+        "age": 7,
+        "matchesPrefix": [
+          "stats-dumps/"
+        ]
+      }
     }
   ]
 }
