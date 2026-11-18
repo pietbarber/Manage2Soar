@@ -1,7 +1,10 @@
 """Authorization decisions used only for template visibility."""
 
 from billing.permissions import has_billing_access
-from duty_roster.permissions import has_duty_delinquents_access
+from duty_roster.permissions import (
+    EDIT_ROSTER_MESSAGE_PERMISSION,
+    has_duty_delinquents_access,
+)
 from logsheet.permissions import (
     has_logsheet_finance_access,
     has_stats_dump_export_access,
@@ -24,6 +27,7 @@ def _can_edit_roster_message(user):
     return bool(
         getattr(user, "is_superuser", False)
         or getattr(user, "rostermeister", False)
+        or user.has_perm(EDIT_ROSTER_MESSAGE_PERMISSION)
         or user.has_perm("duty_roster.edit_dutyroster_message")
     )
 
