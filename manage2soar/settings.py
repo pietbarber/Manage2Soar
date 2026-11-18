@@ -287,6 +287,7 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
 
 GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", f"{CLUB_PREFIX}/media")
 GS_STATIC_LOCATION = os.getenv("GS_STATIC_LOCATION", f"{CLUB_PREFIX}/static")
+STATS_DUMP_ROOT = os.getenv("STATS_DUMP_ROOT")
 
 # Credentials for GCS (only load if using GCS)
 if GS_BUCKET_NAME:
@@ -305,6 +306,9 @@ if GS_BUCKET_NAME:
         },
         "import_export": {
             "BACKEND": "manage2soar.storage_backends.PrivateImportExportGCS",
+        },
+        "stats_dumps": {
+            "BACKEND": "manage2soar.storage_backends.PrivateStatsDumpGCS",
         },
         "staticfiles": {
             "BACKEND": "manage2soar.storage_backends.StaticRootGCS",
@@ -344,6 +348,9 @@ else:
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "stats_dumps": {
+            "BACKEND": "manage2soar.storage_backends.PrivateStatsDumpFileSystemStorage",
         },
         "import_export": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",

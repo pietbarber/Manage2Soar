@@ -62,7 +62,9 @@
     gcs_location: "{{ gke_gcs_location | default('us-east1') }}"
     gcs_storage_class: "{{ gke_gcs_storage_class | default('STANDARD') }}"
     gcs_import_export_bucket_name: >-
-      {{ gke_gcs_import_export_bucket | default(gcs_project ~ '-private-import-export') }}
+      {{ gke_gcs_import_export_bucket | default(
+        (gke_gcs_bucket | default(gcs_project)) ~ '-private-import-export'
+      ) }}
     # Service account the Django app authenticates as (the principal that must be
     # granted access to these buckets). Override with gke_service_account_email.
     # Default follows the documented production SA naming convention
@@ -408,6 +410,14 @@
           - "Location: {{ (verify_result.stdout | from_json).location }}"
           - "Uniform bucket-level access: {{ (verify_result.stdout | from_json).uniform_bucket_level_access | default('unknown') }}"
 
+    - name: Reject shared public and private storage buckets
+      tags: [bucket, permissions, lifecycle]
+      ansible.builtin.assert:
+        that:
+          - gcs_import_export_bucket_name | length > 0
+          - gcs_import_export_bucket_name != gcs_bucket_name
+        fail_msg: "Private exports must never use the public media/static bucket."
+
     - name: Ensure private import/export bucket exists with uniform access
       tags: [bucket]
       google.cloud.gcp_storage_bucket:
@@ -488,17 +498,37 @@
           | map(attribute='members') | list | flatten | default([])
         )
 
+    # gcloud's --lifecycle-file replaces the complete bucket policy. Refuse to
+    # apply it if the bucket has rules outside the two we manage, so unrelated
+    # expiration or archival rules cannot be silently removed.
+    - name: Load managed and existing import/export lifecycle rules
+      tags: [lifecycle]
+      ansible.builtin.set_fact:
+        import_export_managed_lifecycle_rules: >-
+          {{
+            (lookup('file', playbook_dir ~ '/../files/gcs-import-export-lifecycle.json') | from_json).rule
+          }}
+        import_export_existing_lifecycle_rules: >-
+          {{ import_export_bucket_info.lifecycle.rule | default([]) }}
+
+    - name: Reject unmanaged import/export lifecycle rules
+      tags: [lifecycle]
+      ansible.builtin.assert:
+        that:
+          - item in import_export_managed_lifecycle_rules
+        fail_msg: >-
+          The private import/export bucket has lifecycle rules not managed by
+          this playbook. The configured lifecycle file replaces the whole
+          policy; reconcile the existing and managed rules before retrying.
+      loop: "{{ import_export_existing_lifecycle_rules }}"
+      loop_control:
+        label: "{{ item }}"
+
     - name: Check for import/export object expiration lifecycle rule
       tags: [lifecycle]
       ansible.builtin.set_fact:
         import_export_lifecycle_exists: >-
-          {{
-            import_export_bucket_info.lifecycle.rule | default([])
-            | selectattr('action.type', 'equalto', 'Delete')
-            | selectattr('condition.age', 'equalto', 1)
-            | selectattr('condition.matchesPrefix', 'equalto', ['django-import-export/'])
-            | list | length > 0
-          }}
+          {{ import_export_existing_lifecycle_rules == import_export_managed_lifecycle_rules }}
 
     - name: Apply import/export object expiration lifecycle policy
       tags: [lifecycle]

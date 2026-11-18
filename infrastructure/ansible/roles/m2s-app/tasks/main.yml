@@ -49,6 +49,42 @@
     - "{{ m2s_django_static_root }}"
     - "{{ m2s_django_media_root }}"
 
+- name: Validate private stats export storage path
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - |
+        import os
+        import sys
+
+        root = os.path.realpath(os.path.expanduser(sys.argv[1]))
+        for path in sys.argv[2:]:
+            protected = os.path.realpath(os.path.expanduser(path))
+            if os.path.commonpath((root, protected)) in (root, protected):
+                raise SystemExit(
+                    f"STATS_DUMP_ROOT {root!r} overlaps protected path {protected!r}"
+                )
+      - "{{ m2s_stats_dump_root }}"
+      - "{{ m2s_django_media_root }}"
+      - "{{ m2s_django_static_root }}"
+      - "{{ nginx_media_root | default(m2s_django_media_root) }}"
+      - "{{ nginx_static_root | default(m2s_django_static_root) }}"
+      - "{{ m2s_app_home }}/app"
+  changed_when: false
+
+- name: Create private stats export storage directory
+  ansible.builtin.file:
+    path: "{{ m2s_stats_dump_root }}"
+    state: directory
+    mode: "0700"
+  # This path is inside an application-writable parent by default. Create the
+  # leaf as the app user so a symlink substitution cannot make root chown/chmod
+  # an unrelated target. Operators using a protected parent must provision
+  # that parent separately with safe ownership and permissions.
+  become: true
+  become_user: "{{ m2s_app_user }}"
+
 - name: Create private import/export temporary storage directory
   # Holds django-import-export member import/export temp files. Kept OUTSIDE
   # /var/www/m2s/media (which Nginx serves publicly at /media/) and made

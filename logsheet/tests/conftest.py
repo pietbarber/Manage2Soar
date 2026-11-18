@@ -18,6 +18,18 @@ User = get_user_model()
 
 
 @pytest.fixture
+def private_stats_storage(settings, tmp_path):
+    settings.STATS_DUMP_ROOT = str(tmp_path / "private")
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "stats_dumps": {
+            "BACKEND": "manage2soar.storage_backends.PrivateStatsDumpFileSystemStorage",
+        },
+    }
+
+
+@pytest.fixture
 def active_member(db):
     user = User.objects.create_user(
         username="active_user",

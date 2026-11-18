@@ -8,6 +8,8 @@ from django.utils import timezone
 from logsheet.models import StatsDumpOutbox
 from members.models import Member
 
+pytestmark = pytest.mark.usefixtures("private_stats_storage")
+
 
 def _create_stats_user(**kwargs):
     grant_permission = kwargs.pop("grant_permission", True)
@@ -142,7 +144,7 @@ def test_stats_dump_status_rejects_non_superuser_when_requested_by_missing(clien
 
 @pytest.mark.django_db
 def test_stats_dump_download_returns_file_for_ready_export(client, tmp_path, settings):
-    settings.MEDIA_ROOT = str(tmp_path)
+    settings.MEDIA_ROOT = str(tmp_path / "media")
     requester = _create_stats_user(
         username="stats_owner_download",
         password="pass",

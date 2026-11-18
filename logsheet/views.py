@@ -15,6 +15,7 @@ from django.http import (
     FileResponse,
     HttpResponse,
     HttpResponseForbidden,
+    HttpResponseGone,
     HttpResponseNotAllowed,
     JsonResponse,
 )
@@ -24,12 +25,14 @@ from django.utils import timezone
 from django.utils.dateparse import parse_time
 from django.utils.html import format_html
 from django.utils.timezone import now
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from billing.decorators import billing_app_required
 from duty_roster.models import GliderReservation
 from logsheet.permissions import has_logsheet_finance_access
+from logsheet.stats_storage import private_stats_name, stats_dump_expired
 from members.authorization import has_webmaster_compatibility_access
 from members.decorators import active_member_required
 from members.models import Member
@@ -677,6 +680,7 @@ def tow_pilot_logbook_csv(request):
     return response
 
 
+@never_cache
 @active_member_required
 def stats_dump_export_queue(request):
     """Render queue page on GET and enqueue asynchronous export on POST."""
@@ -700,6 +704,7 @@ def stats_dump_export_queue(request):
     return redirect("logsheet:stats_dump_export_status", pk=outbox.pk)
 
 
+@never_cache
 @active_member_required
 def stats_dump_export_status(request, pk):
     """Display status for an asynchronous stats dump export job."""
@@ -710,11 +715,18 @@ def stats_dump_export_status(request, pk):
     if not request.user.is_superuser and export_job.requested_by_id != request.user.id:
         return HttpResponseForbidden("You do not have permission to view this export.")
 
+    download_available = (
+        export_job.status == StatsDumpOutbox.STATUS_READY
+        and bool(export_job.result_file)
+        and private_stats_name(export_job.result_file.name)
+        and not stats_dump_expired(export_job)
+    )
     return render(
         request,
         "logsheet/stats_dump_export_status.html",
         {
             "export_job": export_job,
+            "download_available": download_available,
             "polling": export_job.status
             in [
                 StatsDumpOutbox.STATUS_PENDING,
@@ -724,6 +736,7 @@ def stats_dump_export_status(request, pk):
     )
 
 
+@never_cache
 @active_member_required
 def stats_dump_export_download(request, pk):
     """Download a completed asynchronous stats dump export file."""
@@ -734,13 +747,26 @@ def stats_dump_export_download(request, pk):
     if not request.user.is_superuser and export_job.requested_by_id != request.user.id:
         return HttpResponseForbidden("You do not have permission to view this export.")
 
+    if export_job.status == StatsDumpOutbox.STATUS_EXPIRED:
+        return HttpResponseGone("Export expired or retired. Please queue a new export.")
+
     if export_job.status != StatsDumpOutbox.STATUS_READY or not export_job.result_file:
         messages.error(request, "Export file is not ready yet.")
         return redirect("logsheet:stats_dump_export_status", pk=export_job.pk)
 
     filename = export_job.result_filename or f"stats_dump_{export_job.pk}.csv"
+    if not private_stats_name(export_job.result_file.name) or stats_dump_expired(
+        export_job
+    ):
+        return HttpResponseGone("Export expired or retired. Please queue a new export.")
+    try:
+        exported_file = export_job.result_file.open("rb")
+    except FileNotFoundError:
+        return HttpResponseGone(
+            "Export is no longer available. Please queue a new export."
+        )
     return FileResponse(
-        export_job.result_file.open("rb"),
+        exported_file,
         as_attachment=True,
         filename=filename,
         content_type="text/csv",

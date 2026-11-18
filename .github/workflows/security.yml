@@ -43,8 +43,34 @@ jobs:
       - name: Run pip-audit - Python Package Audit
         run: |
           echo "Auditing Python packages..."
-          pip-audit --format=json --output=pip-audit-report.json || true
-          pip-audit || true
+          : > pip-audit.log
+          report_valid=false
+
+          for attempt in 1 2 3; do
+            rm -f pip-audit-report.json
+            if pip-audit --format=json --output=pip-audit-report.json --timeout 60 2>&1 | tee -a pip-audit.log; then
+              audit_status=0
+            else
+              audit_status=$?
+            fi
+
+            # pip-audit exits nonzero when it finds vulnerabilities, so accept
+            # any valid JSON report regardless of its exit status.
+            if [ -s pip-audit-report.json ] && python -m json.tool pip-audit-report.json >/dev/null 2>&1; then
+              report_valid=true
+              break
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "pip-audit did not produce valid JSON (exit ${audit_status}); retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+
+          if [ "$report_valid" != true ]; then
+            echo "pip-audit failed to produce a valid report after 3 attempts. See pip-audit.log."
+            printf '%s\n' '{"error":"pip-audit failed to produce a valid report after 3 attempts; see pip-audit.log."}' > pip-audit-report.json
+          fi
 
       - name: Upload Security Reports
         uses: actions/upload-artifact@v4
@@ -54,6 +80,7 @@ jobs:
           path: |
             bandit-report.json
             pip-audit-report.json
+            pip-audit.log
 
       - name: Comment PR with Security Summary
         if: github.event_name == 'pull_request'
@@ -88,18 +115,22 @@ jobs:
             // Parse pip-audit results
             try {
               const auditData = JSON.parse(fs.readFileSync('pip-audit-report.json', 'utf8'));
-              const dependencies = auditData.dependencies || [];
-              const vulnerabilities = dependencies.flatMap(dependency =>
-                (dependency.vulns || []).map(vulnerability => ({
-                  ...vulnerability,
-                  package: dependency.name
-                }))
-              );
-              const vulnerablePackages = new Set(vulnerabilities.map(vulnerability => vulnerability.package));
-
               comment += `### Dependency Vulnerability Check\n`;
-              comment += `- **Vulnerable Packages**: ${vulnerablePackages.size}\n`;
-              comment += `- **Known Vulnerabilities**: ${vulnerabilities.length}\n\n`;
+              if (auditData.error) {
+                comment += `❌ **Scan incomplete**: ${auditData.error}\n\n`;
+              } else {
+                const dependencies = auditData.dependencies || [];
+                const vulnerabilities = dependencies.flatMap(dependency =>
+                  (dependency.vulns || []).map(vulnerability => ({
+                    ...vulnerability,
+                    package: dependency.name
+                  }))
+                );
+                const vulnerablePackages = new Set(vulnerabilities.map(vulnerability => vulnerability.package));
+
+                comment += `- **Vulnerable Packages**: ${vulnerablePackages.size}\n`;
+                comment += `- **Known Vulnerabilities**: ${vulnerabilities.length}\n\n`;
+              }
             } catch (e) {
               console.log('Error parsing pip-audit results:', e.message);
               comment += `### Dependency Vulnerability Check\n❌ Failed to parse pip-audit results: ${e.message}\n\n`;

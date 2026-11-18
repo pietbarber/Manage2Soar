@@ -203,7 +203,11 @@ IMPORT_EXPORT_TMP_DIR = os.getenv(
     ),
 )
 
+STATS_DUMP_ROOT = os.getenv("STATS_DUMP_ROOT", "/opt/m2s/stats-dumps")
 STORAGES = {
+    "stats_dumps": {
+        "BACKEND": "manage2soar.storage_backends.PrivateStatsDumpFileSystemStorage",
+    },
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },

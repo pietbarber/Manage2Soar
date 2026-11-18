@@ -11,6 +11,7 @@ from django.db.models.functions import Length
 from django.utils import timezone
 from tinymce.models import HTMLField
 
+from logsheet.stats_storage import StatsDumpStorage, stats_dump_upload_to
 from members.models import Member
 from utils.upload_entropy import (
     upload_airfield_photo,
@@ -1040,11 +1041,13 @@ class StatsDumpOutbox(models.Model):
     STATUS_PROCESSING = "processing"
     STATUS_READY = "ready"
     STATUS_FAILED = "failed"
+    STATUS_EXPIRED = "expired"
     STATUS_CHOICES = [
         (STATUS_PENDING, "Pending"),
         (STATUS_PROCESSING, "Processing"),
         (STATUS_READY, "Ready"),
         (STATUS_FAILED, "Failed"),
+        (STATUS_EXPIRED, "Expired or retired"),
     ]
 
     requested_by = models.ForeignKey(
@@ -1060,7 +1063,9 @@ class StatsDumpOutbox(models.Model):
         default=STATUS_PENDING,
         db_index=True,
     )
-    result_file = models.FileField(upload_to="exports/stats_dumps/", blank=True)
+    result_file = models.FileField(
+        upload_to=stats_dump_upload_to, storage=StatsDumpStorage(), blank=True
+    )
     result_filename = models.CharField(max_length=255, blank=True)
     attempt_count = models.PositiveIntegerField(default=0)
     last_error = models.TextField(blank=True)

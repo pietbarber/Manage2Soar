@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from logsheet.models import StatsDumpOutbox
 from logsheet.utils.stats_dump import process_stats_dump_outbox_job
+from logsheet.utils.stats_dump_retention import expire_stats_dump_exports
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 MAX_ATTEMPTS = 5  # Maximum retries before a job is permanently abandoned.
@@ -25,6 +26,12 @@ class Command(BaseCronJobCommand):
         )
 
     def execute_job(self, *args, **options):
+        if options.get("dry_run"):
+            self.log_info(
+                "Would expire private exports and process pending/failed jobs."
+            )
+            return
+        expire_stats_dump_exports()
         limit = options.get("limit", 20)
         stale_cutoff = timezone.now() - self.max_execution_time
 
