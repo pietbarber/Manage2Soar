@@ -154,16 +154,17 @@
       }
     mode: "0644"
 
-- name: Flush handlers before initial sync
-  ansible.builtin.meta: flush_handlers
-  tags: [always]
-
 - name: Run initial sync
   ansible.builtin.command:
     cmd: "/usr/bin/flock --wait 300 /run/lock/m2s-mail-sync.lock {{ m2s_sync_dir }}/sync-aliases.py"
   register: m2s_initial_sync
   changed_when: false
   failed_when: false
+
+- name: Activate mail configuration after successful sync
+  ansible.builtin.meta: flush_handlers
+  when: m2s_initial_sync.rc == 0
+  tags: [always]
 
 - name: Defer initial sync after a transient failure
   ansible.builtin.debug:

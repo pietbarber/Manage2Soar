@@ -890,8 +890,8 @@ def publish_rspamd_maps(map_contents):
             if not os.path.lexists(pending_active) and pending_old and os.path.lexists(pending_old):
                 os.replace(pending_old, pending_active)
             os.unlink(transaction_path)
-        os.makedirs(parent_dir, mode=0o750, exist_ok=True)
-        os.makedirs(generation_dir, mode=0o750)
+        ensure_rspamd_whitelist_dir(parent_dir)
+        ensure_rspamd_whitelist_dir(generation_dir)
         generation_id = generation.removeprefix('.m2s-rspamd-')
         for filepath, content in map_contents.items():
             filename = os.path.basename(filepath)

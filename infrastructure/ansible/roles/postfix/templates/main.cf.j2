@@ -80,10 +80,16 @@ broken_sasl_auth_clients = yes
 {% for club in club_domains %}
 {% set restriction_classes.values = restriction_classes.values + ['whitelist_required_' ~ (club.prefix | replace('-', '_'))] %}
 {% endfor %}
+{% if club_domains | length == 1 %}
+{% set restriction_classes.values = restriction_classes.values + ['whitelist_required'] %}
+{% endif %}
 smtpd_restriction_classes = {{ restriction_classes.values | join(', ') }}
 {% for club in club_domains %}
 whitelist_required_{{ club.prefix | replace('-', '_') }} = check_sender_access hash:{{ postfix_whitelist_dir }}/{{ club.prefix }}_whitelist, reject
 {% endfor %}
+{% if club_domains | length == 1 %}
+whitelist_required = check_sender_access hash:{{ postfix_whitelist_dir }}/{{ club_domains[0].prefix }}_whitelist, reject
+{% endif %}
 
 # Who can connect
 smtpd_client_restrictions =

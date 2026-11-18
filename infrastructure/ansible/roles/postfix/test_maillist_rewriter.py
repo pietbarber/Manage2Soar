@@ -52,7 +52,7 @@ def test_filter_account_and_submission_trust_boundary_are_configured():
     rspamd_tasks = (
         _TEMPLATE_PATH.parent.parent.parent / "rspamd" / "tasks" / "main.yml"
     ).read_text(encoding="utf-8")
-    assert "primary_group: postfix" in postfix_tasks
+    assert "group: postfix" in postfix_tasks
     assert "M2S_TRUSTED_SUBMISSION" in rspamd_tasks
     assert "authenticated = yes;" in rspamd_tasks
     assert "inet:127.0.0.1:11332" in master_cf

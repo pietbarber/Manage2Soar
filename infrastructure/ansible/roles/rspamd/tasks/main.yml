@@ -106,15 +106,13 @@
     dest: /etc/rspamd/local.d/settings.conf
     content: |
       # Postfix submission authentication is the trust boundary for app mail.
-      settings {
-        M2S_TRUSTED_SUBMISSION {
-          priority = high;
-          authenticated = yes;
-          apply {
-            groups_disabled = ["spam"];
-            actions {
-              reject = null;
-            }
+      M2S_TRUSTED_SUBMISSION {
+        priority = high;
+        authenticated = yes;
+        apply {
+          groups_disabled = ["spam"];
+          actions {
+            reject = null;
           }
         }
       }
