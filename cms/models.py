@@ -587,6 +587,8 @@ class Page(models.Model):
         """
         if not user or not user.is_authenticated:
             return False
+        if not getattr(user, "is_active", False):
+            return False
 
         # Check superuser first (cheap attribute check, avoids DB queries)
         if getattr(user, "is_superuser", False):
