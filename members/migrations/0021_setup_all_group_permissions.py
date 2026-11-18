@@ -449,10 +449,23 @@ def setup_groups(apps, schema_editor):
     for group_name, perm_tuples in GROUP_PERMISSIONS.items():
         group, _ = Group.objects.using(db_alias).get_or_create(name=group_name)
         if perm_tuples:
-            perms = _resolve_permissions(Permission, ContentType, perm_tuples, db_alias)
-            if len(perms) < len(perm_tuples):
+            # Some entries intentionally refer to models introduced by later
+            # migrations.  They are completed by 0025; do not report those
+            # expected historical-state omissions as migration warnings.
+            available_tuples = []
+            for app_label, model_name, codename in perm_tuples:
+                try:
+                    apps.get_model(app_label, model_name)
+                except LookupError:
+                    continue
+                available_tuples.append((app_label, model_name, codename))
+
+            perms = _resolve_permissions(
+                Permission, ContentType, available_tuples, db_alias
+            )
+            if len(perms) < len(available_tuples):
                 warnings.warn(
-                    f"setup_groups: {len(perm_tuples) - len(perms)} permission(s) for "
+                    f"setup_groups: {len(available_tuples) - len(perms)} permission(s) for "
                     f"group '{group_name}' could not be resolved – check "
                     f"GROUP_PERMISSIONS for typos.",
                     stacklevel=2,

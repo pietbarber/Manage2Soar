@@ -19,6 +19,12 @@ This document summarizes all classes and functions in `knowledgetest/views.py`.
 ---
 
 ## Also See
+- Written-test administrative actions use the registered `knowledgetest.*`
+  capability permissions, granted to **Instructor Admins**. Assignment,
+  instructor, template-creator, and active-member checks remain contextual.
+  During the role migration, named **Webmasters** and **Chief Flight
+  Instructor** groups retain a compatibility fallback; this is intentionally
+  not a grant for arbitrary users with `is_staff` set.
 - [README (App Overview)](README.md)
 - [Models](models.md)
 - [Forms](forms.md)

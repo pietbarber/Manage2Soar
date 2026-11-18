@@ -7,6 +7,8 @@ all migrations at setup time, the groups and permissions should already exist
 when these tests run -- we simply assert the expected state.
 """
 
+from importlib import import_module
+
 import pytest
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
@@ -44,11 +46,42 @@ def test_all_canonical_groups_exist():
         "Rostermeisters",
         "Secretary",
         "Treasurer",
+        "Directors",
     ]
     for name in expected:
         assert Group.objects.filter(
             name=name
         ).exists(), f"Group '{name}' was not created by migration 0021"
+
+
+@pytest.mark.django_db
+def test_every_canonical_permission_is_backfilled_after_all_migrations():
+    """0025 must complete any assignments unavailable when 0021 first runs."""
+    mapping = import_module(
+        "members.migrations.0021_setup_all_group_permissions"
+    ).GROUP_PERMISSIONS
+    missing = []
+
+    for group_name, permission_tuples in mapping.items():
+        group = Group.objects.filter(name=group_name).first()
+        if group is None:
+            missing.append(f"{group_name}: group missing")
+            continue
+        for app_label, model_name, codename in permission_tuples:
+            permission = Permission.objects.filter(
+                content_type__app_label=app_label,
+                content_type__model=model_name,
+                codename=codename,
+            ).first()
+            if (
+                permission is None
+                or not group.permissions.filter(pk=permission.pk).exists()
+            ):
+                missing.append(f"{group_name}: {app_label}.{model_name}.{codename}")
+
+    assert (
+        not missing
+    ), "Canonical Group permissions missing after migrations:\n" + "\n".join(missing)
 
 
 # ---------------------------------------------------------------------------
@@ -130,21 +163,59 @@ def test_webmasters_has_cms_permissions():
 
 
 # ---------------------------------------------------------------------------
-# Secretary / Treasurer – no model permissions
+# Secretary / Treasurer – deliberately scoped capabilities
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-def test_secretary_group_exists_with_no_permissions():
-    """Secretary group is created for _sync_groups assignment; it has no model perms."""
+def test_secretary_group_has_only_registered_capabilities():
     group = Group.objects.get(name="Secretary")
-    assert group.permissions.count() == 0
+    assert {
+        f"{app}.{codename}"
+        for app, codename in group.permissions.values_list(
+            "content_type__app_label", "codename"
+        )
+    } == {
+        "cms.view_page",
+        "cms.change_page",
+        "duty_roster.view_all_swap_requests",
+        "duty_roster.can_manage_any_swap",
+    }
 
 
 @pytest.mark.django_db
-def test_treasurer_group_exists_with_no_permissions():
+def test_treasurer_group_has_only_registered_capabilities():
     group = Group.objects.get(name="Treasurer")
-    assert group.permissions.count() == 0
+    assert {
+        f"{app}.{codename}"
+        for app, codename in group.permissions.values_list(
+            "content_type__app_label", "codename"
+        )
+    } == {
+        "billing.can_manage_billing",
+        "logsheet.can_manage_logsheet_finances",
+        "logsheet.can_export_logsheet_finances",
+        "members.view_privileged_contact",
+        "duty_roster.view_all_swap_requests",
+        "duty_roster.can_manage_any_swap",
+        "logsheet.can_unfinalize_logsheet",
+    }
+
+
+@pytest.mark.django_db
+def test_directors_have_only_membership_application_view_capability():
+    assert _has_perm(
+        "Directors",
+        "members",
+        "membershipapplication",
+        "view_membership_applications",
+    )
+    for codename in (
+        "add_membershipapplication",
+        "change_membershipapplication",
+        "delete_membershipapplication",
+    ):
+        assert not _has_perm("Directors", "members", "membershipapplication", codename)
 
 
 # ---------------------------------------------------------------------------

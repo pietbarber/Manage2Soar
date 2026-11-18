@@ -1,10 +1,12 @@
 import json
+import tempfile
 from pathlib import Path
 
+from django.conf import settings
 from django.contrib import admin
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.storage import StorageHandler
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from import_export.tmp_storages import MediaStorage, TempFolderStorage
 
 from manage2soar.storage_backends import PrivateImportExportGCS
@@ -29,18 +31,30 @@ class MemberImportTmpStorageTests(TestCase):
         """save -> read -> remove must work through the active shared backend."""
         payload = b"username,first_name\njane.doe,Jane\n"
 
-        storage = MediaStorage()
-        storage.save(payload)
-        try:
-            self.assertEqual(storage.read(), payload)
-        finally:
-            storage.remove()
+        # Do not rely on a deployment path (for example /opt/m2s) being
+        # writable on the machine running the test suite.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            storages = {
+                **settings.STORAGES,
+                "import_export": {
+                    "BACKEND": "django.core.files.storage.FileSystemStorage",
+                    "OPTIONS": {"location": tmp_dir},
+                },
+            }
+            with override_settings(STORAGES=storages):
+                storage = MediaStorage()
+                storage.save(payload)
+                try:
+                    self.assertEqual(storage.read(), payload)
+                finally:
+                    storage.remove()
 
-        # After remove(), the underlying object should be gone from the backend,
-        # so reading it back must fail. Both GCS (FileDoesNotExist) and the local
-        # FileSystemStorage (FileNotFoundError) surface as OSError subclasses.
-        with self.assertRaises(OSError):
-            storage.read()
+                # After remove(), the underlying object should be gone from the
+                # backend, so reading it back must fail. Both GCS
+                # (FileDoesNotExist) and local FileSystemStorage
+                # (FileNotFoundError) surface as OSError subclasses.
+                with self.assertRaises(OSError):
+                    storage.read()
 
     def test_media_storage_resolves_to_configured_import_export_backend(self):
         """MediaStorage should use the dedicated import/export storage alias."""

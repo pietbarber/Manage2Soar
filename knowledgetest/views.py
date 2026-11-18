@@ -27,6 +27,9 @@ from knowledgetest.models import (
     WrittenTestTemplate,
     WrittenTestTemplateQuestion,
 )
+from members.authorization import (
+    has_webmaster_compatibility_access,
+)
 from members.decorators import active_member_required
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
@@ -41,6 +44,27 @@ except ImportError:
     Notification = None
 
 logger = logging.getLogger(__name__)
+
+
+# Capabilities permit explicit delegation alongside existing staff and
+# Webmaster compatibility access during the transition.
+START_UNASSIGNED_TEST = "knowledgetest.start_unassigned_written_test"
+DELETE_ANY_ATTEMPT = "knowledgetest.delete_any_written_test_attempt"
+VIEW_RECENT_TESTS = "knowledgetest.view_recent_written_tests"
+DELETE_ANY_ASSIGNMENT = "knowledgetest.delete_any_pending_written_test_assignment"
+
+
+def _has_written_test_capability(user, permission):
+    # Retain the existing staff workflow until its removal is explicitly
+    # approved; a new capability also permits delegation to non-staff users.
+    return bool(
+        user.is_active
+        and (
+            user.is_staff
+            or user.has_perm(permission)
+            or has_webmaster_compatibility_access(user)
+        )
+    )
 
 
 def _get_site_config():
@@ -133,7 +157,11 @@ def can_access_written_test(template, user):
         template=template, student=user
     ).exists()
     is_creator = template.created_by_id == user.id
-    return user.is_staff or has_assignment or is_creator
+    return (
+        _has_written_test_capability(user, START_UNASSIGNED_TEST)
+        or has_assignment
+        or is_creator
+    )
 
 
 @method_decorator(active_member_required, name="dispatch")
@@ -169,8 +197,9 @@ class AssignmentPermissionMixin:
         is_owner = WrittenTestAssignment.objects.filter(
             template_id=template_id, student=request.user
         ).exists()
-        # Allow staff (or superusers) too
-        if not is_owner and not request.user.is_staff:
+        if not is_owner and not _has_written_test_capability(
+            request.user, START_UNASSIGNED_TEST
+        ):
             return HttpResponseForbidden("You’re not allowed to take this test.")
 
         return super().dispatch(request, *args, **kwargs)
@@ -486,10 +515,23 @@ class WrittenTestSubmitView(View):
         return redirect("knowledgetest:quiz-result", attempt.pk)
 
 
+@method_decorator(active_member_required, name="dispatch")
 class WrittenTestResultView(DetailView):
     model = WrittenTestAttempt
     template_name = "written_test/result.html"
     context_object_name = "attempt"
+
+    def dispatch(self, request, *args, **kwargs):
+        attempt = get_object_or_404(WrittenTestAttempt, pk=kwargs["pk"])
+        allowed = (
+            request.user == attempt.student
+            or request.user == attempt.instructor
+            or request.user == getattr(attempt.template, "created_by", None)
+            or _has_written_test_capability(request.user, VIEW_RECENT_TESTS)
+        )
+        if not allowed:
+            return HttpResponseForbidden("You are not allowed to view this result.")
+        return super().dispatch(request, *args, **kwargs)
 
 
 @method_decorator(active_member_required, name="dispatch")
@@ -500,11 +542,11 @@ class WrittenTestAttemptDeleteView(View):
 
     def _check_permission(self, user, attempt):
         """Check if user can delete this attempt"""
-        # Allow staff, the grading instructor, the template creator, or the
+        # Allow the explicit test-admin capability, the grading instructor, the template creator, or the
         # student who took the attempt to delete their own attempt. Tests rely
         # on students being able to remove their own records in several flows.
         return (
-            user.is_staff
+            _has_written_test_capability(user, DELETE_ANY_ATTEMPT)
             or user == attempt.student
             or (attempt.instructor and attempt.instructor == user)
             or (attempt.template and attempt.template.created_by == user)
@@ -590,9 +632,9 @@ class InstructorRecentTestsView(ListView):
     period_days = 30
 
     def dispatch(self, request, *args, **kwargs):
-        # Check if user is an instructor (has given instruction reports or is staff)
+        # Instructors retain contextual access through their instruction reports.
         if not (
-            request.user.is_staff
+            _has_written_test_capability(request.user, VIEW_RECENT_TESTS)
             or InstructionReport.objects.filter(instructor=request.user).exists()
         ):
             return HttpResponseForbidden("Access restricted to instructors and staff")
@@ -653,7 +695,7 @@ class InstructorRecentTestsView(ListView):
 
 @method_decorator(active_member_required, name="dispatch")
 class WrittenTestAssignmentDeleteView(View):
-    """Allow the assigning instructor (or staff) to delete a pending test assignment."""
+    """Allow the assigning instructor (or explicit test admins) to delete a pending assignment."""
 
     template_name = "written_test/delete_assignment_confirm.html"
 
@@ -661,12 +703,12 @@ class WrittenTestAssignmentDeleteView(View):
         """Check if user can delete this assignment.
 
         Allowed if:
-        - User is staff, OR
+        - User has the explicit pending-assignment capability, OR
         - User is the instructor who created the assignment, OR
         - User is the student assigned AND no attempt has been made yet
         """
         return (
-            user.is_staff
+            _has_written_test_capability(user, DELETE_ANY_ASSIGNMENT)
             or (asn.instructor and asn.instructor == user)
             or (asn.student == user and asn.attempt is None)
         )

@@ -89,6 +89,12 @@ class DutyRosterMessage(models.Model):
     class Meta:
         verbose_name = "Duty Roster Message"
         verbose_name_plural = "Duty Roster Message"  # Singular since it's a singleton
+        permissions = [
+            (
+                "edit_dutyroster_message",
+                "Can edit the duty roster message",
+            ),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(id__lte=1),
@@ -449,6 +455,9 @@ class DutyAssignment(models.Model):
 
     class Meta:
         ordering = ["date"]
+        permissions = [
+            ("view_duty_delinquents", "Can view duty delinquents"),
+        ]
 
     def __str__(self):
         return f"{self.date} @ {self.location.identifier if self.location else 'Unknown Field'}"
@@ -799,6 +808,9 @@ class DutySwapRequest(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        permissions = [
+            ("view_all_swap_requests", "Can view all duty swap requests"),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=(

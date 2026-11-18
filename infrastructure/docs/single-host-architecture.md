@@ -123,6 +123,59 @@ EMAIL_HOST_USER=m2s-app@your-domain.com
 EMAIL_HOST_PASSWORD=<smtp-password>
 ```
 
+### Settings source of truth
+
+`manage2soar/settings.py` remains the default settings module and the one used
+by the GKE deployment. Single-host is an explicit deployment variant, not a
+replacement default.
+
+For single-host deployments, `manage2soar/settings_single_host.py` in the
+application checkout is the authoritative settings module for development and
+tests. The m2s-app role renders
+`infrastructure/ansible/roles/m2s-app/templates/settings_single_host.py.j2`
+over that path on the host, as it always has. The template is therefore a
+required second copy and must be updated in the same change as the checked-in
+module.
+
+Drift is prevented by:
+
+- `infrastructure/ansible/roles/m2s-app/tests/test_settings_single_host_template.py`,
+  which renders the template and fails if its parsed Python body differs from
+  `manage2soar/settings_single_host.py`;
+- `infrastructure/ansible/roles/m2s-app/tests/test_settings_contract.py`,
+  which asserts that the role deploys the template, that the deployment uses
+  the single-host settings module, that required environment variables are
+  present, and that the base/GKE and single-host settings both retain the kiosk
+  middleware, qualification permission backend, cookie/HSTS trust settings,
+  TinyMCE static URL, and protected social-auth fields.
+
+To change a shared setting, edit `manage2soar/settings.py`,
+`manage2soar/settings_single_host.py`, and the single-host template together,
+then extend the contract test if the setting is security- or
+authorization-relevant. Keeping the deployment system unchanged means the
+template copy is deliberate; the tests are the guard against it drifting again.
+
+Known single-host gaps are tracked below and are not changed by this work.
+
+### Known single-host gaps (follow-up)
+
+These are recorded so they are not mistaken for parity. They are deliberately
+out of scope for the roles/permissions change:
+
+- The single-host role provisions no scheduled maintenance jobs. The GKE
+  `k8s-cronjobs.yaml` currently defines billing close, aging-logsheet and SPR
+  notifications, email outboxes, duty preop mail, instructor summaries,
+  maintenance digest, swap expiry/reminders, and related jobs.
+- `m2s_git_branch` defaults to `main`; single-host is not pinned to a release
+  artifact or commit, and the deployed commit is not reported.
+- Single-host uses `python3.12`; the container image uses Python 3.14.
+- The settings contract test checks presence and selected literal values, not
+  full behavioral parity.
+- CI does not currently run the settings contract test, the Ansible syntax
+  check, or a single-host application smoke test.
+
+
+
 ### 4. PostgreSQL Database
 
 **Purpose:** Primary data store

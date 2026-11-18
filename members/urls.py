@@ -4,12 +4,23 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path
 
-from . import views, views_applications, views_kiosk, views_safety_reports
+from . import role_preview, views, views_applications, views_kiosk, views_safety_reports
 from .views import tinymce_image_upload
 
 app_name = "members"
 
 urlpatterns = [
+    path("role-preview/", role_preview.role_preview, name="role_preview"),
+    path(
+        "role-preview/start/",
+        role_preview.start_role_preview,
+        name="role_preview_start",
+    ),
+    path(
+        "role-preview/stop/",
+        role_preview.stop_role_preview,
+        name="role_preview_stop",
+    ),
     path("", views.member_list, name="member_list"),
     path("badges/", views.badge_board, name="badge_board"),
     path("<int:member_id>/biography/", views.biography_view, name="biography_view"),

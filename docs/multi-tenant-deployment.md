@@ -1,5 +1,8 @@
 # Multi-Tenant Deployment Guide
 
+For the authoritative application and Ansible variable catalog, see the
+[Deployment Configuration Reference](deployment-configuration-reference.md).
+
 ## Overview
 
 Manage2Soar supports multiple flying clubs using a shared GCP bucket with isolated directories. Each club gets their own subdomain and storage path while sharing the same codebase and infrastructure.
@@ -155,8 +158,13 @@ GS_MEDIA_LOCATION=ssc/media
 GS_STATIC_LOCATION=ssc/static
 STATIC_URL=https://storage.googleapis.com/your-bucket-name/ssc/static/
 
-# Database
-DATABASE_URL=postgresql://user:pass@host:port/ssc_manage2soar
+# Database (the application consumes these DB_* variables; DATABASE_URL is not parsed)
+DB_NAME=m2s_ssc
+DB_USER=m2s_ssc
+DB_PASSWORD=use-an-encrypted-secret
+DB_HOST=database.internal
+DB_PORT=5432
+DB_SSLMODE=require
 
 # Other settings...
 ```
@@ -172,8 +180,13 @@ GS_MEDIA_LOCATION=masa/media
 GS_STATIC_LOCATION=masa/static
 STATIC_URL=https://storage.googleapis.com/your-bucket-name/masa/static/
 
-# Database
-DATABASE_URL=postgresql://user:pass@host:port/masa_manage2soar
+# Database (the application consumes these DB_* variables; DATABASE_URL is not parsed)
+DB_NAME=m2s_masa
+DB_USER=m2s_masa
+DB_PASSWORD=use-an-encrypted-secret
+DB_HOST=database.internal
+DB_PORT=5432
+DB_SSLMODE=require
 
 # Other settings...
 ```
@@ -189,8 +202,13 @@ GS_MEDIA_LOCATION=nfss/media
 GS_STATIC_LOCATION=nfss/static
 STATIC_URL=https://storage.googleapis.com/your-bucket-name/nfss/static/
 
-# Database
-DATABASE_URL=postgresql://user:pass@host:port/nfss_manage2soar
+# Database (the application consumes these DB_* variables; DATABASE_URL is not parsed)
+DB_NAME=m2s_nfss
+DB_USER=m2s_nfss
+DB_PASSWORD=use-an-encrypted-secret
+DB_HOST=database.internal
+DB_PORT=5432
+DB_SSLMODE=require
 
 # Other settings...
 ```
@@ -271,11 +289,19 @@ spec:
           value: "masa/media"
         - name: GS_STATIC_LOCATION
           value: "masa/static"
-        - name: DATABASE_URL
+        - name: DB_NAME
+          value: "m2s_masa"
+        - name: DB_USER
+          value: "m2s_masa"
+        - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
               name: masa-db-secret
-              key: url
+              key: password
+        - name: DB_HOST
+          value: "database.internal"
+        - name: DB_PORT
+          value: "5432"
         # ... other environment variables
 ```
 

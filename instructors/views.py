@@ -29,8 +29,11 @@ from django.views.generic import FormView
 
 from instructors import foreflight_export as ff
 from instructors.decorators import (
+    ground_instruction_required,
     instructor_or_safety_officer_required,
     instructor_required,
+    syllabus_document_edit_required,
+    training_record_action_required,
 )
 from instructors.forms import (
     BulkQualificationAssignForm,
@@ -69,10 +72,18 @@ from knowledgetest.models import (
     WrittenTestTemplate,
     WrittenTestTemplateQuestion,
 )
-from knowledgetest.views import get_presets
+from knowledgetest.views import (
+    VIEW_RECENT_TESTS,
+    _has_written_test_capability,
+    get_presets,
+)
 from logsheet.models import Flight, Towplane
 from logsheet.utils.finalization_email import html_to_text_preserve_links
 from logsheet.utils.tow_logbook import get_tow_logbook_data
+from members.authorization import (
+    has_qualification_assignment_access,
+    has_training_record_access,
+)
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
@@ -265,7 +276,7 @@ def syllabus_detail(request, code):
 ####################################################
 
 
-@instructor_required
+@training_record_action_required
 def fill_instruction_report(request, student_id, report_date):
     try:
         report_date = datetime.strptime(report_date, "%Y-%m-%d").date()
@@ -292,6 +303,10 @@ def fill_instruction_report(request, student_id, report_date):
 
     if request.method == "POST":
         # Track if this is an update to an existing report
+        if request.POST.get(
+            "qual_qualification"
+        ) and not has_qualification_assignment_access(request.user):
+            raise PermissionDenied("Qualification assignment access is required.")
         is_update = is_existing_report
         new_qualification = None  # Track newly awarded qualification
 
@@ -587,7 +602,7 @@ def member_training_grid(request, member_id):
         .select_related("instructor")
         .prefetch_related("lesson_scores__lesson")
     )
-    if request.user != member and not request.user.instructor:
+    if request.user != member and not has_training_record_access(request.user):
         raise PermissionDenied
 
     # Keep one grid column per saved report and add a pending column for
@@ -907,16 +922,21 @@ def member_training_grid(request, member_id):
 ####################################################
 
 
-@instructor_required
+@ground_instruction_required
 def log_ground_instruction(request):
     # Accept either 'student' or 'student_id' as the query parameter for
     # compatibility with multiple templates/links in the codebase.
+    can_assign_qualification = has_qualification_assignment_access(request.user)
     student_id = request.GET.get("student") or request.GET.get("student_id")
     student = get_object_or_404(Member, pk=student_id) if student_id else None
     lessons = TrainingLesson.objects.all().order_by("sort_key")
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
+        if (
+            form_type == "qualification" or request.POST.get("qual_qualification")
+        ) and not can_assign_qualification:
+            raise PermissionDenied
 
         if form_type == "qualification" and student:
             # Handle qualification assignment
@@ -1018,6 +1038,8 @@ def log_ground_instruction(request):
                     messages.success(
                         request, "Ground instruction session logged successfully."
                     )
+                if student is not None and not has_training_record_access(request.user):
+                    return redirect("members:member_view", member_id=student.id)
                 if student is not None:
                     return redirect(
                         "instructors:member_instruction_record", member_id=student.id
@@ -1091,6 +1113,7 @@ def log_ground_instruction(request):
             "existing_qualifications": existing_qualifications,
             "qualification_form": qualification_form,
             "all_qualifications": all_qualifications,
+            "can_assign_qualification": can_assign_qualification,
         },
     )
 
@@ -1110,7 +1133,7 @@ def log_ground_instruction(request):
 
 
 def is_instructor(user):
-    return user.is_authenticated and user.instructor
+    return has_qualification_assignment_access(user)
 
 
 ####################################################
@@ -1335,7 +1358,7 @@ def progress_dashboard(request):
 ####################################################
 
 
-@instructor_required
+@syllabus_document_edit_required
 def edit_syllabus_document(request, slug):
     doc = get_object_or_404(SyllabusDocument, slug=slug)
     if request.method == "POST":
@@ -1395,6 +1418,8 @@ def member_instruction_record(request, member_id):
         ),
         pk=member_id,
     )
+    if request.user != member and not has_training_record_access(request.user):
+        raise PermissionDenied
     visible_qualifications = list(
         member.memberqualification_set.filter(
             is_qualified=True,
@@ -1802,7 +1827,7 @@ def member_logbook(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
     # Determine which years to show
 
@@ -2619,7 +2644,7 @@ def instruction_report_detail(request, report_id):
     )
 
 
-@method_decorator(instructor_required, name="dispatch")
+@method_decorator(training_record_action_required, name="dispatch")
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
     form_class = TestBuilderForm
@@ -2752,6 +2777,21 @@ class CreateWrittenTestView(FormView):
 class WrittenTestReviewView(DjangoView):
     template_name = "written_test/review.html"
 
+    @method_decorator(active_member_required)
+    def dispatch(self, request, *args, **kwargs):
+        template = get_object_or_404(WrittenTestTemplate, pk=kwargs["pk"])
+        student_pk = kwargs["student_pk"]
+        allowed = (
+            request.user == template.created_by
+            or WrittenTestAssignment.objects.filter(
+                template=template, student_id=student_pk, instructor=request.user
+            ).exists()
+            or _has_written_test_capability(request.user, VIEW_RECENT_TESTS)
+        )
+        if not allowed:
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
     def get(self, request, pk, student_pk):
         from knowledgetest.models import Member, WrittenTestTemplate
 
@@ -2847,7 +2887,7 @@ def export_member_logbook_csv(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
 
     def format_hhmm(duration):
@@ -3178,7 +3218,7 @@ def export_member_logbook_foreflight_csv(request, member_id=None):
     member = request.user
     if member_id is not None:
         member = get_object_or_404(Member, pk=member_id)
-        if request.user != member and not request.user.instructor:
+        if request.user != member and not has_training_record_access(request.user):
             raise PermissionDenied
 
     events, report_lookup, rating_date = _build_logbook_events(

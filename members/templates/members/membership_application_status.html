@@ -103,9 +103,33 @@
                     <form method="post" style="display: inline;">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="withdraw">
+                        <input type="hidden" name="withdrawal_token" value="{{ withdrawal_token }}">
                         <button type="submit" class="btn btn-sm btn-outline-warning"
                                 onclick="return confirm('Are you sure you want to withdraw your application? This cannot be undone.')">
                             <i class="fas fa-times"></i> Withdraw Application
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% elif can_request_withdrawal_link %}
+        <div class="mt-4">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <h6 class="card-title text-warning">Need a new withdrawal link?</h6>
+                    <p class="card-text small">
+                        Enter the email address on your application and we’ll send a fresh link if it matches.
+                    </p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="request_withdrawal_link">
+                        <div class="mb-2">
+                            <label for="withdrawal-email" class="form-label">Email address</label>
+                            <input id="withdrawal-email" type="email" name="email" class="form-control"
+                                   autocomplete="email" required>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline-warning">
+                            Send withdrawal link
                         </button>
                     </form>
                 </div>

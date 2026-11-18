@@ -15,7 +15,7 @@
   <hr/>
 
   {% comment %}Delete button for authorised instructors / staff{% endcomment %}
-  {% if request.user.is_staff or request.user == attempt.instructor or request.user == attempt.template.created_by %}
+  {% if request.user == attempt.student or request.user == attempt.instructor or request.user == attempt.template.created_by or role_access.written_test_delete %}
     <form method="post" action="{% url 'knowledgetest:quiz-attempt-delete' attempt.pk %}" class="mb-3">
       {% csrf_token %}
       <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this test record? This action cannot be undone and will permanently delete the attempt and all associated answers.');">🗑️ Remove Test Record</button>

@@ -8,6 +8,7 @@ from django.urls import reverse
 from cms.constants import MAX_CMS_DEPTH
 from cms.models import HomePageContent, Page
 from members.utils import is_active_member, is_kiosk_session
+from members.utils.permissions import SAFETY_REPORT_PERMISSION
 from siteconfig.templatetags.siteconfig_tags import webcam_enabled
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,7 @@ def _build_resources_nav_items(request, footer=None):
         request.user
     )
     has_safety_utility_links = request.user.is_authenticated and (
-        getattr(request.user, "safety_officer", False) or request.user.is_superuser
+        request.user.is_superuser or request.user.has_perm(SAFETY_REPORT_PERMISSION)
     )
 
     # Separator between promoted pages and utility links.

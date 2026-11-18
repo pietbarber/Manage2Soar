@@ -26,6 +26,13 @@
       </div>
     {% endif %}
   </div>
+  {% if role_preview_edit_diagnostic.0 %}
+    <div class="alert {% if role_preview_edit_diagnostic.1 %}alert-success{% else %}alert-secondary{% endif %} mb-3">
+      Role preview: this role
+      {% if role_preview_edit_diagnostic.1 %}<strong>would be able to edit</strong>{% else %}<strong>would not be able to edit</strong>{% endif %}
+      this page.
+    </div>
+  {% endif %}
   {% if breadcrumbs %}
     <nav aria-label="breadcrumb" style="margin:0.5rem 0;">
       <ol class="breadcrumb cms-breadcrumb">

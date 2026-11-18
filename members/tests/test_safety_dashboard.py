@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import Client
 from django.urls import reverse
 
@@ -19,7 +20,7 @@ Member = get_user_model()
 @pytest.fixture
 def safety_officer(db):
     """Create a safety officer member."""
-    return Member.objects.create_user(
+    member = Member.objects.create_user(
         username="safetyofficer",
         email="safety@example.com",
         password="testpass123",
@@ -29,6 +30,12 @@ def safety_officer(db):
         is_active=True,
         safety_officer=True,
     )
+    member.user_permissions.add(
+        Permission.objects.get(
+            content_type__app_label="members", codename="access_safety_reports"
+        )
+    )
+    return member
 
 
 @pytest.fixture

@@ -7,6 +7,7 @@ MemberQualification records.
 """
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 
@@ -242,6 +243,28 @@ class TestBulkAssignQualificationView(TestCase):
             membership_status="Full Member",
             instructor=True,
         )
+        cls.record_only_member = Member.objects.create_user(
+            username="record_only",
+            email="record-only@example.com",
+            membership_status="Full Member",
+        )
+        cls.record_only_member.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="instructors",
+                codename="can_record_instruction",
+            )
+        )
+        cls.bulk_permission_member = Member.objects.create_user(
+            username="bulk_permission",
+            email="bulk-permission@example.com",
+            membership_status="Full Member",
+        )
+        cls.bulk_permission_member.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="instructors",
+                codename="can_bulk_assign_qualification",
+            )
+        )
         cls.safety_officer = Member.objects.create_user(
             username="safety_officer",
             first_name="Safety",
@@ -250,6 +273,11 @@ class TestBulkAssignQualificationView(TestCase):
             password="testpass123",
             membership_status="Full Member",
             safety_officer=True,
+        )
+        cls.safety_officer.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="members", codename="access_safety_reports"
+            )
         )
         cls.regular_member = Member.objects.create_user(
             username="regular",
@@ -291,6 +319,28 @@ class TestBulkAssignQualificationView(TestCase):
         self.client.force_login(self.instructor)
         response = self.client.get(self.url)
         assert response.status_code == 200
+
+    def test_bulk_assignment_permission_can_access(self):
+        """The dedicated bulk permission grants access without instructor flags."""
+        self.client.force_login(self.bulk_permission_member)
+        response = self.client.get(self.url)
+        assert response.status_code == 200
+
+    def test_record_instruction_permission_alone_cannot_bulk_assign(self):
+        """Recording instruction cannot authorize bulk qualification writes."""
+        self.client.force_login(self.record_only_member)
+        response = self.client.post(
+            self.url,
+            {
+                "qualification": self.qual.pk,
+                "date_awarded": "2026-02-15",
+                "members": [self.member1.pk],
+            },
+        )
+        assert response.status_code == 403
+        assert not MemberQualification.objects.filter(
+            qualification=self.qual, member=self.member1
+        ).exists()
 
     def test_safety_officer_can_access(self):
         """Safety officers can access the bulk assignment page."""

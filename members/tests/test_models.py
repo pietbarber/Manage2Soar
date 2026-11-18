@@ -1,17 +1,95 @@
 from unittest.mock import MagicMock, patch
 
 from django import forms
+from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from members.forms import SetPasswordForm
-from members.models import Biography, Member
+from members.models import Biography, Member, MemberRoleAssignment
 from members.utils.membership import clear_active_membership_statuses_cache
 from siteconfig.models import MembershipStatus
 from utils.upload_entropy import upload_biography
 
 
 class MemberModelTests(TestCase):
+    def test_role_sync_callback_uses_fresh_locked_flags(self):
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            member = Member.objects.create_user(
+                username="stale_callback_member",
+                membership_status="Full Member",
+                instructor=True,
+            )
+            # Simulate another writer committing before the queued callback.
+            Member.objects.filter(pk=member.pk).update(instructor=False)
+
+        for callback in callbacks:
+            callback()
+
+        self.assertFalse(
+            MemberRoleAssignment.objects.filter(
+                member=member, source="legacy", source_key="instructor"
+            ).exists()
+        )
+
+    def test_role_sync_preserves_manual_group_when_flag_is_removed(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            member = Member.objects.create_user(
+                username="provenance_member",
+                membership_status="Full Member",
+                instructor=True,
+            )
+
+        manual_group = Group.objects.create(name="Unrelated manual role")
+        member.groups.add(manual_group)
+        MemberRoleAssignment.objects.create(
+            member=member,
+            group=manual_group,
+            source="manual",
+            source_key="test",
+        )
+
+        member.instructor = False
+        with self.captureOnCommitCallbacks(execute=True):
+            member.save()
+
+        self.assertTrue(member.groups.filter(pk=manual_group.pk).exists())
+        self.assertFalse(member.groups.filter(name="Instructor Admins").exists())
+
+        assert not MemberRoleAssignment.objects.filter(
+            member=member, source="legacy", source_key="instructor"
+        ).exists()
+
+    def test_role_sync_records_one_assignment_per_enabled_role_flag(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            member = Member.objects.create_user(
+                username="role_assignment_rows",
+                membership_status="Full Member",
+                instructor=True,
+                secretary=True,
+            )
+
+        rows = MemberRoleAssignment.objects.filter(member=member, source="legacy")
+        self.assertEqual(
+            set(rows.values_list("source_key", flat=True)),
+            {"instructor", "secretary"},
+        )
+        self.assertEqual(rows.count(), 2)
+
+    def test_role_sync_does_not_replace_unprovenanced_group(self):
+        manual_group = Group.objects.create(name="Preexisting direct role")
+        member = Member.objects.create_user(
+            username="direct_group_member",
+            membership_status="Full Member",
+            instructor=True,
+        )
+        member.groups.add(manual_group)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            member.save()
+
+        self.assertTrue(member.groups.filter(pk=manual_group.pk).exists())
+
     @override_settings(TESTING=False)
     @patch("django.core.files.storage.default_storage.exists", return_value=False)
     @patch("members.models.generate_identicon", side_effect=OSError("storage down"))
@@ -358,3 +436,17 @@ class MembershipStatusIntegrationTests(TestCase):
 
         # Member should now be inactive
         self.assertFalse(member.is_active_member())
+
+    def test_explicit_account_deactivation_is_preserved(self):
+        member = Member.objects.create_user(
+            username="explicitly-disabled",
+            membership_status=self.active_status.name,
+            is_active=False,
+        )
+
+        self.assertFalse(member.is_active)
+
+        member.save()
+
+        member.refresh_from_db()
+        self.assertFalse(member.is_active)

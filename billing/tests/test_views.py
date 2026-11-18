@@ -15,7 +15,7 @@ from billing.services import (
     post_opening_balance,
 )
 from members.models import Member
-from siteconfig.models import SiteConfiguration
+from siteconfig.models import MembershipStatus, SiteConfiguration
 
 
 @pytest.fixture
@@ -185,6 +185,30 @@ def test_billing_navigation_is_hidden_when_disabled(client, treasurer):
 
     assert reverse("billing:ledger_list") not in response.content.decode()
     assert reverse("logsheet:personal_charges") in response.content.decode()
+
+
+def test_billing_navigation_is_visible_for_active_treasurer(client, treasurer):
+    client.force_login(treasurer)
+
+    response = client.get("/")
+
+    assert reverse("billing:ledger_list") in response.content.decode()
+
+
+def test_billing_navigation_is_hidden_for_inactive_membership(client, treasurer):
+    inactive_status = MembershipStatus.objects.create(
+        name="Inactive Billing Member", is_active=False
+    )
+    Member.objects.filter(pk=treasurer.pk).update(
+        membership_status=inactive_status.name,
+        is_active=True,
+    )
+    treasurer.refresh_from_db()
+    client.force_login(treasurer)
+
+    response = client.get("/")
+
+    assert reverse("billing:ledger_list") not in response.content.decode()
 
 
 def test_ledger_detail_posts_manual_charge_and_shows_audit(client, member, treasurer):

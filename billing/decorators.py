@@ -5,6 +5,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
 
+from billing.permissions import has_billing_access
 from siteconfig.models import SiteConfiguration
 
 
@@ -24,7 +25,7 @@ def treasurer_required(view_func):
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect_to_login(request.get_full_path())
-        if not (request.user.is_superuser or request.user.treasurer):
+        if not has_billing_access(request.user):
             return HttpResponseForbidden("Treasurer access is required.")
         return view_func(request, *args, **kwargs)
 

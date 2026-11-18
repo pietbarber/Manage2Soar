@@ -500,6 +500,12 @@ class Page(models.Model):
         if self.is_public:
             return True
 
+        # Explicit page editors retain editor-implied view access, including
+        # for private pages and inactive memberships. Kiosk sessions remain
+        # the explicit exception for the ordinary membership gate below.
+        from members.utils import is_active_member, is_kiosk_session
+
+        kiosk_access = bool(request and is_kiosk_session(request))
         # Users with EDIT permission should also be able to VIEW
         # (editors need to see what they're editing)
         # Use thread-local storage to guard against recursion in a thread-safe manner
@@ -522,14 +528,7 @@ class Page(models.Model):
             finally:
                 checking_access_via_edit.discard(page_key)
 
-        # Check if user is an active member or authenticated via kiosk
-        from members.utils import is_active_member, is_kiosk_session
-
-        # Allow kiosk sessions to view member content (Issue #486)
-        if request and is_kiosk_session(request):
-            # Kiosk sessions can view member content
-            pass
-        elif not is_active_member(user):
+        if not kiosk_access and not is_active_member(user):
             return False
 
         # If no role restrictions, any active member can access
@@ -543,7 +542,20 @@ class Page(models.Model):
         if "active_member" in required_roles:
             return True  # User already passed is_active_member check above
 
-        return any(getattr(user, role, False) for role in required_roles)
+        # A global CMS view capability is intentionally not enough here: a
+        # page's stored role restrictions must remain an independent boundary.
+        # Officer compatibility is retained through the legacy helper, while
+        # explicit page editors are handled above via can_user_edit().
+        from .permissions import has_legacy_cms_officer_access
+
+        return any(
+            (
+                has_legacy_cms_officer_access(user)
+                if role in {"director", "secretary", "webmaster"}
+                else getattr(user, role, False)
+            )
+            for role in required_roles
+        )
 
     def can_user_edit(self, user):
         """
@@ -575,6 +587,8 @@ class Page(models.Model):
         """
         if not user or not user.is_authenticated:
             return False
+        if not getattr(user, "is_active", False):
+            return False
 
         # Check superuser first (cheap attribute check, avoids DB queries)
         if getattr(user, "is_superuser", False):
@@ -584,11 +598,9 @@ class Page(models.Model):
         if self.has_member_permission(user):
             return True
 
-        # Check if user has officer roles (director, secretary, webmaster)
-        if any(
-            getattr(user, role, False)
-            for role in ["director", "secretary", "webmaster"]
-        ):
+        from .permissions import has_cms_edit_access, has_legacy_cms_officer_access
+
+        if has_cms_edit_access(user) or has_legacy_cms_officer_access(user):
             return True
 
         return False
