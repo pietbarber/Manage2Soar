@@ -74,6 +74,22 @@ def test_disabled_account_denied_by_webmaster_compatibility_helpers(member, gran
 
 
 @pytest.mark.django_db
+def test_role_management_capability_does_not_imply_webmaster_access(member):
+    permission = Permission.objects.get(
+        content_type__app_label="members",
+        content_type__model="member",
+        codename="can_manage_member_roles",
+    )
+    group = Group.objects.create(name="Role managers without Webmaster access")
+    group.permissions.add(permission)
+    member.groups.add(group)
+
+    assert member.has_perm("members.can_manage_member_roles")
+    assert not has_webmaster_compatibility_access(member)
+    assert not has_admin_model_permission(member, "cms", "page", "change")
+
+
+@pytest.mark.django_db
 def test_membership_application_helpers_require_active_account_and_membership(member):
     member.member_manager = True
     assert has_membership_application_view_access(member)

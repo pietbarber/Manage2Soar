@@ -27,6 +27,7 @@ def principals(db):
         "inactive": make("baseline-inactive", membership_status="Non-Member"),
         "member": make("baseline-member"),
         "director": make("baseline-director", director=True),
+        "secretary": make("baseline-secretary", secretary=True),
         "webmaster": make("baseline-webmaster", webmaster=True),
         "superuser": make("baseline-superuser", is_staff=True, is_superuser=True),
         "kiosk": make("baseline-kiosk", membership_status="Non-Member"),
@@ -128,6 +129,40 @@ def test_editor_grant_implies_view_on_private_page_but_not_edit_for_everyone(
     assert page.can_user_access(principals["editor"]) is True
     assert page.can_user_edit(principals["editor"]) is True
     assert page.can_user_edit(principals["member"]) is False
+
+
+@pytest.mark.django_db
+def test_inactive_explicit_page_editor_retains_private_page_view(pages, principals):
+    page = pages["private"]
+    editor = principals["editor"]
+    editor.membership_status = "Non-Member"
+    editor.save(update_fields=["membership_status"])
+    PageMemberPermission.objects.create(page=page, member=editor)
+
+    assert page.can_user_edit(editor) is True
+    assert page.can_user_access(editor) is True
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("officer", ["director", "secretary", "webmaster"])
+def test_inactive_legacy_cms_officer_retains_page_edit(pages, principals, officer):
+    user = principals[officer]
+    setattr(user, officer, True)
+    user.membership_status = "Non-Member"
+    user.save(update_fields=[officer, "membership_status"])
+    # Model membership deactivation normally disables the account too; this
+    # isolates the legacy CMS policy for an authenticated active account whose
+    # membership status is inactive.
+    type(user).objects.filter(pk=user.pk).update(is_active=True)
+    user.refresh_from_db()
+    request = RequestFactory().get("/admin/cms/page/")
+    request.user = user
+
+    assert pages["private"].can_user_edit(user) is True
+    assert (
+        PageAdmin(Page, AdminSite()).has_change_permission(request, pages["private"])
+        is True
+    )
 
 
 @pytest.mark.django_db

@@ -35,25 +35,10 @@ def grant_capabilities(apps, schema_editor):
 
 
 def revoke_capabilities(apps, schema_editor):
-    db = schema_editor.connection.alias
-    Group = apps.get_model("auth", "Group")
-    Permission = apps.get_model("auth", "Permission")
-    ContentType = apps.get_model("contenttypes", "ContentType")
-    try:
-        group = Group.objects.using(db).get(name="Instructor Admins")
-    except Group.DoesNotExist:
-        return
-    for model_name, codename in PERMISSIONS:
-        try:
-            content_type = ContentType.objects.using(db).get(
-                app_label="knowledgetest", model=model_name
-            )
-            permission = Permission.objects.using(db).get(
-                content_type=content_type, codename=codename
-            )
-        except (ContentType.DoesNotExist, Permission.DoesNotExist):
-            continue
-        group.permissions.db_manager(db).remove(permission)
+    # This migration predates provenance tracking for group permissions.
+    # Removing relations here could revoke tenant-created access during a
+    # rollback, so the reverse operation intentionally preserves all grants.
+    return
 
 
 class Migration(migrations.Migration):

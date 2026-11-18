@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from members.utils.membership import is_active_member
 
 GROUND_INSTRUCTION_PERMISSION = "instructors.can_manage_ground_instruction"
-WEBMASTER_MANAGEMENT_PERMISSION = "members.can_manage_member_roles"
 TRAINING_VIEW_PERMISSION = "instructors.view_trainingrecord"
 TRAINING_RECORD_PERMISSION = "instructors.can_record_instruction"
 QUALIFICATION_ASSIGN_PERMISSION = "instructors.can_assign_qualification"
@@ -23,10 +22,9 @@ BULK_QUALIFICATION_PERMISSION = "instructors.can_bulk_assign_qualification"
 def has_webmaster_compatibility_access(user):
     """Return the legacy webmaster-level grant used during the transition.
 
-    Webmaster authority is represented by the approved capability.  The legacy
-    flag remains a compatibility fallback for accounts that have not yet passed
-    through role synchronization; staff status and membership status do not
-    grant this access.
+    Webmaster authority is represented by the legacy flag/group during the
+    transition. Role-management capability is intentionally separate; staff
+    status and membership status do not grant this access.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
@@ -36,7 +34,6 @@ def has_webmaster_compatibility_access(user):
 
     return bool(
         getattr(user, "is_superuser", False)
-        or user.has_perm(WEBMASTER_MANAGEMENT_PERMISSION)
         or getattr(user, "webmaster", False)
         or has_preview_group(user, "Webmasters")
     )

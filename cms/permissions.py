@@ -43,6 +43,10 @@ def has_legacy_cms_officer_access(user):
         return True
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if not getattr(user, "is_active", False) or not is_active_member(user):
+    if not getattr(user, "is_active", False):
         return False
-    return bool(getattr(user, "director", False) or getattr(user, "secretary", False))
+    return bool(
+        getattr(user, "director", False)
+        or getattr(user, "secretary", False)
+        or getattr(user, "webmaster", False)
+    )

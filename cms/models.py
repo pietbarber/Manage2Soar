@@ -500,15 +500,12 @@ class Page(models.Model):
         if self.is_public:
             return True
 
-        # Private CMS content requires a current account and membership state
-        # before either a global capability or page-specific editor grant is
-        # considered. Kiosk sessions remain the explicit exception.
+        # Explicit page editors retain editor-implied view access, including
+        # for private pages and inactive memberships. Kiosk sessions remain
+        # the explicit exception for the ordinary membership gate below.
         from members.utils import is_active_member, is_kiosk_session
 
         kiosk_access = bool(request and is_kiosk_session(request))
-        if not kiosk_access and not is_active_member(user):
-            return False
-
         # Users with EDIT permission should also be able to VIEW
         # (editors need to see what they're editing)
         # Use thread-local storage to guard against recursion in a thread-safe manner
@@ -531,11 +528,7 @@ class Page(models.Model):
             finally:
                 checking_access_via_edit.discard(page_key)
 
-        # Allow kiosk sessions to view member content (Issue #486)
-        if kiosk_access:
-            # Kiosk sessions can view member content
-            pass
-        elif not is_active_member(user):
+        if not kiosk_access and not is_active_member(user):
             return False
 
         # If no role restrictions, any active member can access

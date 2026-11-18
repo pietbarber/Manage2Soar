@@ -63,26 +63,10 @@ def create_and_grant_capabilities(apps, schema_editor):
 
 
 def revoke_capability_grants(apps, schema_editor):
-    db_alias = schema_editor.connection.alias
-    Group = apps.get_model("auth", "Group")
-    Permission = apps.get_model("auth", "Permission")
-    ContentType = apps.get_model("contenttypes", "ContentType")
-
-    group = Group.objects.using(db_alias).filter(name="Instructor Admins").first()
-    if not group:
-        return
-
-    for model_name, codename, _ in WRITTEN_TEST_PERMISSIONS:
-        content_type = ContentType.objects.using(db_alias).filter(
-            app_label="knowledgetest", model=model_name
-        ).first()
-        if not content_type:
-            continue
-        permission = Permission.objects.using(db_alias).filter(
-            content_type=content_type, codename=codename
-        ).first()
-        if permission:
-            group.permissions.db_manager(db_alias).remove(permission)
+    # This migration cannot distinguish its grants from pre-existing tenant
+    # grants. Preserve them during rollback rather than risking authorization
+    # loss; upgrades remain forward-only for these seed permissions.
+    return
 
 
 class Migration(migrations.Migration):

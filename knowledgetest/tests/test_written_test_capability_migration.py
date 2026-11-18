@@ -19,7 +19,7 @@ WRITTEN_TEST_CAPABILITIES = {
 
 
 def _instructor_admin_capabilities():
-    group = Group.objects.get(name="Instructor Admins")
+    group, _ = Group.objects.get_or_create(name="Instructor Admins")
     return (
         set(
             group.permissions.filter(
@@ -55,6 +55,26 @@ def test_fresh_migration_creates_and_grants_all_written_test_capabilities():
             content_type__app_label="knowledgetest",
             codename__in=WRITTEN_TEST_CAPABILITIES,
         ).count() == len(WRITTEN_TEST_CAPABILITIES)
+    finally:
+        MigrationExecutor(connection).migrate(leaf_targets)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_written_test_migration_rollback_preserves_existing_grant():
+    executor = MigrationExecutor(connection)
+    leaf_targets = executor.loader.graph.leaf_nodes()
+    permission = Permission.objects.get(
+        content_type__app_label="knowledgetest",
+        codename="view_recent_written_tests",
+    )
+    group, _ = Group.objects.get_or_create(name="Instructor Admins")
+    group.permissions.add(permission)
+    before = ("knowledgetest", "0006_written_test_capability_permissions")
+
+    try:
+        executor.migrate([before])
+        group = Group.objects.get(name="Instructor Admins")
+        assert group.permissions.filter(pk=permission.pk).exists()
     finally:
         MigrationExecutor(connection).migrate(leaf_targets)
 
