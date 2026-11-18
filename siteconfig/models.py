@@ -1492,15 +1492,46 @@ class MembershipStatus(models.Model):
     def save(self, *args, **kwargs):
         """Preserve the stable key while allowing the display name to change."""
         using = kwargs.get("using") or self._state.db
+        with transaction.atomic(using=using):
+            if self.pk and (
+                kwargs.get("update_fields") is None or "name" in kwargs["update_fields"]
+            ):
+                previous_name = (
+                    type(self)
+                    .objects.using(using)
+                    .filter(pk=self.pk)
+                    .values_list("name", flat=True)
+                    .first()
+                )
+                if previous_name and previous_name != self.name:
+                    from members.models import Member
+
+                    # Match the reconciler's member-before-status lock order.
+                    list(
+                        Member.objects.using(using)
+                        .select_for_update()
+                        .filter(membership_status=previous_name)
+                        .order_by("pk")
+                        .values_list("pk", flat=True)
+                    )
+            return self._save_status(*args, **kwargs)
+
+    def _save_status(self, *args, **kwargs):
+        using = kwargs.get("using") or self._state.db
         previous_is_active = None
+        previous_name = None
         if self.pk:
-            previous_is_active = (
+            previous = (
                 type(self)
                 .objects.using(using)
+                .select_for_update()
                 .filter(pk=self.pk)
-                .values_list("is_active", flat=True)
+                .values("is_active", "name")
                 .first()
             )
+            if previous:
+                previous_is_active = previous["is_active"]
+                previous_name = previous["name"]
         if self.pk:
             persisted_key = (
                 type(self)
@@ -1526,13 +1557,28 @@ class MembershipStatus(models.Model):
             )
         self.full_clean()
         result = super().save(*args, **kwargs)
+        renamed = (
+            previous_name is not None
+            and previous_name != self.name
+            and (
+                kwargs.get("update_fields") is None or "name" in kwargs["update_fields"]
+            )
+        )
+        if renamed:
+            from members.models import Member
+
+            Member.objects.using(using).filter(membership_status=previous_name).update(
+                membership_status=self.name
+            )
         from members.utils.membership import clear_active_membership_statuses_cache
 
         # Invalidate immediately so later writes in the same transaction see
         # the new status policy; on_commit covers requests after a commit too.
         clear_active_membership_statuses_cache()
-        transaction.on_commit(clear_active_membership_statuses_cache)
-        if previous_is_active is not None and previous_is_active != self.is_active:
+        transaction.on_commit(clear_active_membership_statuses_cache, using=using)
+        if renamed or (
+            previous_is_active is not None and previous_is_active != self.is_active
+        ):
             _schedule_status_role_reconciliation(self.pk, using or self._state.db)
         return result
 
@@ -1625,8 +1671,31 @@ class MembershipStatusRoleMapping(models.Model):
                 )
 
     def save(self, *args, **kwargs):
-        self.full_clean()
-        return super().save(*args, **kwargs)
+        using = kwargs.get("using") or self._state.db
+        with transaction.atomic(using=using):
+            previous_status_id = (
+                type(self)
+                .objects.using(using)
+                .select_for_update()
+                .filter(pk=self.pk)
+                .values_list("membership_status_id", flat=True)
+                .first()
+                if self.pk
+                else None
+            )
+            self.full_clean()
+            result = super().save(*args, **kwargs)
+            if (
+                previous_status_id is not None
+                and previous_status_id != self.membership_status_id
+                and (
+                    kwargs.get("update_fields") is None
+                    or "membership_status" in kwargs["update_fields"]
+                    or "membership_status_id" in kwargs["update_fields"]
+                )
+            ):
+                _schedule_status_role_reconciliation(previous_status_id, using)
+            return result
 
     def __str__(self):
         return f"{self.membership_status} → {self.role}"

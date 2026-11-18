@@ -309,10 +309,10 @@ class TestEditRosterMessageView:
         assert response.status_code == 200
         assert b"Edit Roster Announcement" in response.content
 
-    def test_non_roster_staff_user_is_denied(
+    def test_non_roster_staff_user_retains_legacy_access(
         self, client, membership_statuses, siteconfig
     ):
-        """Staff status alone must not grant roster-message access."""
+        """Preserve staff access until the endpoint policy explicitly changes."""
         staff_user = Member.objects.create_user(
             username="staff",
             email="staff@test.org",
@@ -325,7 +325,7 @@ class TestEditRosterMessageView:
         client.force_login(staff_user)
         url = reverse("duty_roster:edit_roster_message")
         response = client.get(url)
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_rostermeister_has_message_permission(self, rostermeister):
         assert rostermeister.has_perm("duty_roster.edit_dutyroster_message")

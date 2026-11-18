@@ -153,7 +153,7 @@ def test_normal_role_preview_blocks_mutation(client, preview_admin, preview_page
 
 @pytest.mark.django_db
 @override_settings(DEBUG=True)
-def test_debug_role_preview_allows_mutation_route(client, preview_admin, preview_page):
+def test_debug_role_preview_remains_read_only(client, preview_admin, preview_page):
     client.force_login(preview_admin)
     client.post(
         reverse("members:role_preview_start"),
@@ -165,7 +165,7 @@ def test_debug_role_preview_allows_mutation_route(client, preview_admin, preview
         {},
     )
 
-    assert response.status_code != 403
+    assert response.status_code == 403
 
 
 @pytest.mark.django_db

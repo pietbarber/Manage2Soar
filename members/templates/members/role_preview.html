@@ -11,7 +11,7 @@
     <div class="alert {% if role_preview.debug %}alert-danger{% else %}alert-warning{% endif %}">
       Previewing <strong>{{ role_preview.display_name }}</strong>.
       {% if role_preview.debug %}
-        Debug mode is enabled; edits and side effects are allowed.
+        Debug diagnostics are enabled; preview remains read-only.
       {% else %}
         Read-only mode is enabled; mutation requests are blocked.
       {% endif %}
@@ -39,7 +39,7 @@
       <div class="col-12 form-check">
         <input class="form-check-input" type="checkbox" name="debug" id="debug">
         <label class="form-check-label" for="debug">
-          Enable DEBUG preview (allow edits and side effects)
+          Enable DEBUG preview diagnostics (read-only)
         </label>
       </div>
     {% endif %}

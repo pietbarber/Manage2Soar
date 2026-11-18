@@ -1,19 +1,21 @@
 """Session-based role preview for administrators and local developers."""
 
 import logging
+from contextlib import ExitStack
 from dataclasses import dataclass
 from functools import wraps
 from types import MethodType
 
 from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
+from django.core.exceptions import PermissionDenied
+from django.db import connections
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
-from members.models import RoleMetadata
+from members.models import Member, RoleMetadata
 from members.role_definitions import ROLE_BY_KEY
-from members.utils.membership import is_active_member
 
 SESSION_KEY = "role_preview"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -36,9 +38,21 @@ ROLE_FLAG_KEYS = (
 logger = logging.getLogger(__name__)
 
 
+def _read_only_preview_query(execute, sql, params, many, context):
+    """Fail closed on ORM writes, including writes hidden in GET handlers."""
+    command = sql.lstrip().split(None, 1)[0].upper() if sql.strip() else ""
+    if command not in {"SELECT", "SHOW", "SAVEPOINT", "RELEASE", "ROLLBACK"}:
+        raise PermissionDenied(
+            "Role preview is read-only; this request attempted a database write."
+        )
+    return execute(sql, params, many, context)
+
+
 def _log_preview_event(request, outcome, *, role=None, debug=None, reason=None):
     """Log a preview decision with fields usable by structured log handlers."""
-    user = getattr(request, "user", None)
+    user = getattr(request, "role_preview_actor", None) or getattr(
+        request, "user", None
+    )
     actor = user.get_username() if user is not None else None
     event = {
         "outcome": outcome,
@@ -241,11 +255,7 @@ class RolePreviewMiddleware:
         # otherwise the projected role would fail its own start/stop gate.
         if request.path in CONTROL_PATHS:
             return self.get_response(request)
-        if (
-            request.method not in SAFE_METHODS
-            and not state.debug
-            and request.path not in CONTROL_PATHS
-        ):
+        if request.method not in SAFE_METHODS and request.path not in CONTROL_PATHS:
             _log_preview_event(
                 request,
                 "blocked",
@@ -254,25 +264,31 @@ class RolePreviewMiddleware:
                 reason="read_only",
             )
             return HttpResponseForbidden(
-                "Role preview is read-only. Enable DEBUG preview to test edits."
+                "Role preview is read-only, including DEBUG preview."
             )
 
-        user = request.user
-        original = {}
-        for name in ("has_perm", "has_module_perms", "get_all_permissions"):
-            original[name] = getattr(user, name)
-        for name in (*ROLE_FLAG_KEYS, "is_superuser", "is_staff"):
-            original[name] = getattr(user, name)
-        original["_role_preview_group_name"] = getattr(
-            user, "_role_preview_group_name", None
+        actor = request.user
+        # Use a distinct, unsaved identity so object ownership, per-member
+        # grants, qualifications, and operational assignments cannot leak from
+        # the real administrator into the selected role.
+        preview_id = 9223372036854775807
+        if Member.objects.filter(pk=preview_id).exists():
+            return HttpResponseForbidden("The role preview identity is unavailable.")
+        user = Member(
+            pk=preview_id,
+            username="role-preview",
+            first_name="Role",
+            last_name="Preview",
+            is_active=True,
+            is_staff=False,
+            is_superuser=False,
         )
-        original["_role_preview_active_member"] = getattr(
-            user, "_role_preview_active_member", None
-        )
-        user._role_preview_active_member = is_active_member(user)
+        user._role_preview_active_member = True
+        user._role_preview_group_name = state.group_name
+        user.is_active_member = MethodType(lambda _user: True, user)
 
         def has_perm(_user, permission, obj=None):
-            return permission in state.permissions
+            return obj is None and permission in state.permissions
 
         def has_module_perms(_user, app_label):
             return any(
@@ -280,27 +296,23 @@ class RolePreviewMiddleware:
                 for permission in state.permissions
             )
 
-        def get_all_permissions(_user):
-            return state.permissions
+        def get_all_permissions(_user, obj=None):
+            return state.permissions if obj is None else frozenset()
 
         user.has_perm = MethodType(has_perm, user)
         user.has_module_perms = MethodType(has_module_perms, user)
         user.get_all_permissions = MethodType(get_all_permissions, user)
+        role = ROLE_BY_KEY.get(state.role_key)
         for name in ROLE_FLAG_KEYS:
-            role = ROLE_BY_KEY.get(state.role_key)
             setattr(user, name, bool(role and role.legacy_flag == name))
-        user.is_superuser = False
-        user.is_staff = False
-        user._role_preview_group_name = state.group_name
+        request.role_preview_actor = actor
+        request.user = user
         try:
-            return self.get_response(request)
+            with ExitStack() as stack:
+                for connection in connections.all():
+                    stack.enter_context(
+                        connection.execute_wrapper(_read_only_preview_query)
+                    )
+                return self.get_response(request)
         finally:
-            for name, value in original.items():
-                if name == "_role_preview_active_member" and value is None:
-                    delattr(user, name)
-                else:
-                    setattr(user, name, value)
-            if original["_role_preview_group_name"] is None:
-                delattr(user, "_role_preview_group_name")
-            else:
-                user._role_preview_group_name = original["_role_preview_group_name"]
+            request.user = actor

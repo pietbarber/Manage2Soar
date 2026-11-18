@@ -1,5 +1,9 @@
 # Single-Host Ansible Deployment
 
+For the complete variable-by-variable reference, including the generated
+`.env` contract and production safety checks, see the [Deployment Configuration
+Reference](deployment-configuration-reference.md).
+
 ## Overview
 
 Manage2Soar supports deployment to a single Linux server using Ansible automation. This deployment option is ideal for soaring clubs that want to self-host their instance without the complexity of Kubernetes or cloud infrastructure.

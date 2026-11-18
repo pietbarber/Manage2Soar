@@ -72,14 +72,17 @@ from knowledgetest.models import (
     WrittenTestTemplate,
     WrittenTestTemplateQuestion,
 )
-from knowledgetest.views import get_presets
+from knowledgetest.views import (
+    VIEW_RECENT_TESTS,
+    _has_written_test_capability,
+    get_presets,
+)
 from logsheet.models import Flight, Towplane
 from logsheet.utils.finalization_email import html_to_text_preserve_links
 from logsheet.utils.tow_logbook import get_tow_logbook_data
 from members.authorization import (
     has_qualification_assignment_access,
     has_training_record_access,
-    has_webmaster_compatibility_access,
 )
 from members.decorators import active_member_required
 from members.models import Member
@@ -300,6 +303,10 @@ def fill_instruction_report(request, student_id, report_date):
 
     if request.method == "POST":
         # Track if this is an update to an existing report
+        if request.POST.get(
+            "qual_qualification"
+        ) and not has_qualification_assignment_access(request.user):
+            raise PermissionDenied("Qualification assignment access is required.")
         is_update = is_existing_report
         new_qualification = None  # Track newly awarded qualification
 
@@ -2779,8 +2786,7 @@ class WrittenTestReviewView(DjangoView):
             or WrittenTestAssignment.objects.filter(
                 template=template, student_id=student_pk, instructor=request.user
             ).exists()
-            or request.user.has_perm("knowledgetest.view_recent_written_tests")
-            or has_webmaster_compatibility_access(request.user)
+            or _has_written_test_capability(request.user, VIEW_RECENT_TESTS)
         )
         if not allowed:
             raise PermissionDenied

@@ -828,7 +828,9 @@ def toggle_redaction(request, member_id):
 @active_member_required
 def biography_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
-    biography, _ = Biography.objects.get_or_create(member=member)
+    biography = Biography.objects.filter(member=member).first() or Biography(
+        member=member
+    )
 
     can_edit = request.user == member or request.user.is_superuser
     if request.user == member:

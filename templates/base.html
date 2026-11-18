@@ -447,7 +447,7 @@
     <div class="alert {% if role_preview.debug %}alert-danger{% else %}alert-warning{% endif %} rounded-0 mb-0 text-center" role="status">
       Role preview: <strong>{{ role_preview.display_name }}</strong>.
       {% if role_preview.debug %}
-        DEBUG mode — edits and side effects are enabled.
+        DEBUG diagnostics — preview remains read-only.
       {% else %}
         Read-only mode — edits and other mutation requests are blocked.
       {% endif %}

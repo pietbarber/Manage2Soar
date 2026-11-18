@@ -13,10 +13,9 @@ def has_written_test_admin_access(user, *, allow_cfi=True):
         return False
     return bool(
         getattr(user, "is_superuser", False)
-        or user.has_perm("knowledgetest.change_testpreset")
+        or user.has_perm("knowledgetest.can_manage_test_presets")
         or has_webmaster_compatibility_access(user)
         or (allow_cfi and has_preview_group(user, "Chief Flight Instructor"))
-        or (allow_cfi and user.has_perm("knowledgetest.change_writtentesttemplate"))
     )
 
 
@@ -28,6 +27,6 @@ def has_written_test_delete_access(user):
         return False
     return bool(
         getattr(user, "is_superuser", False)
-        or user.has_perm("knowledgetest.delete_testpreset")
+        or user.has_perm("knowledgetest.can_delete_test_presets")
         or has_webmaster_compatibility_access(user)
     )

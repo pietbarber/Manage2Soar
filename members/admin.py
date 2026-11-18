@@ -669,6 +669,13 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
     # read-only so admins can still inspect it but cannot set the legacy
     # full-redaction override that members have no UI/endpoint to clear.
     list_editable = ("membership_status",)
+
+    def get_changelist_instance(self, request):
+        changelist = super().get_changelist_instance(request)
+        if self._limited_member_editor(request):
+            changelist.list_editable = ()
+        return changelist
+
     # Allow filtering by redact flag in the admin sidebar
     list_filter = list_filter + ("redact_contact",)
 

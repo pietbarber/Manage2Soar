@@ -111,6 +111,9 @@ failures.
    `members.0058_alter_memberroleassignment_source_key_and_more`,
    `siteconfig.0058_membershipstatus_key_membershipstatusrolemapping`, and
    `siteconfig.0059_membershipstatusrolemappingevent`.
+   Also confirm `logsheet.0041_merge_roles_and_private_stats_storage` and
+   `knowledgetest.0009_test_preset_action_permissions` completed. The latter
+   defines explicit preset actions without adding grants to ordinary instructors.
 5. Run the role registry parity test against the migrated database.
 6. Compare role permissions and sensitive-action allow/deny results with the
    pre-release baseline before enabling traffic.
@@ -188,7 +191,7 @@ the following in order:
 2. Confirm the corresponding `RoleMetadata` row and Group still exist.
 3. Stop the preview through its POST control, then start it again.
 4. Confirm the request is using the same browser session and deployment.
-5. Outside DEBUG, expect unsafe preview methods to be denied; preview must not
+5. Expect unsafe preview methods to be denied, including in DEBUG; preview must not
    be used as a write-testing mechanism in production.
 
 Preview start, stop, rejection, and blocked-method events are structured log

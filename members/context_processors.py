@@ -4,6 +4,8 @@ from billing.permissions import has_billing_access
 from duty_roster.permissions import (
     EDIT_ROSTER_MESSAGE_PERMISSION,
     has_duty_delinquents_access,
+    has_roster_edit_access,
+    has_roster_generation_access,
 )
 from logsheet.permissions import (
     has_logsheet_finance_access,
@@ -26,6 +28,7 @@ from members.utils.membership import is_active_member
 def _can_edit_roster_message(user):
     return bool(
         getattr(user, "is_superuser", False)
+        or getattr(user, "is_staff", False)
         or getattr(user, "rostermeister", False)
         or user.has_perm(EDIT_ROSTER_MESSAGE_PERMISSION)
         or user.has_perm("duty_roster.edit_dutyroster_message")
@@ -66,11 +69,8 @@ def authorization(request):
                 or getattr(user, "safety_officer", False)
                 or getattr(user, "is_superuser", False)
             ),
-            "rostermeister": bool(
-                has_perm("duty_roster.edit_dutyroster_message")
-                or has_perm("duty_roster.can_generate_roster")
-                or getattr(user, "rostermeister", False)
-            ),
+            "rostermeister": has_roster_edit_access(user),
+            "roster_generate": has_roster_generation_access(user),
             "roster_admin": bool(
                 has_perm("duty_roster.edit_dutyroster_message")
                 or has_perm("duty_roster.can_generate_roster")
@@ -81,11 +81,13 @@ def authorization(request):
             ),
             "roster_message": _can_edit_roster_message(user),
             "recent_written_tests": bool(
-                user.has_perm("knowledgetest.view_recent_written_tests")
+                getattr(user, "is_staff", False)
+                or user.has_perm("knowledgetest.view_recent_written_tests")
                 or has_webmaster_compatibility_access(user)
             ),
             "written_test_delete": bool(
-                user.has_perm("knowledgetest.delete_any_written_test_attempt")
+                getattr(user, "is_staff", False)
+                or user.has_perm("knowledgetest.delete_any_written_test_attempt")
                 or has_webmaster_compatibility_access(user)
             ),
             "member_admin": bool(

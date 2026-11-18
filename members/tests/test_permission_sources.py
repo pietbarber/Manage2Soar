@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from instructors.models import (
     ClubQualificationType,
+    GroundInstruction,
     MemberQualification,
     QualificationPermissionGrant,
 )
@@ -35,9 +36,9 @@ def member(db):
 @pytest.fixture
 def action_permission(db):
     permission, _ = Permission.objects.get_or_create(
-        content_type=ContentType.objects.get_for_model(ClubQualificationType),
-        codename="can_dispatch_aircraft",
-        defaults={"name": "Can dispatch aircraft"},
+        content_type=ContentType.objects.get_for_model(GroundInstruction),
+        codename="can_manage_ground_instruction",
+        defaults={"name": "Can manage ground instruction"},
     )
     return permission
 
@@ -142,10 +143,12 @@ def test_qualification_requires_current_approved_safe_grant(member, action_permi
         codename="can_dispatch_unapproved",
         defaults={"name": "Unapproved"},
     )
-    group.permissions.add(unapproved)
     qualification = ClubQualificationType.objects.create(
         code="DISPATCH", name="Dispatch", permission_group=group
     )
+    # Simulate an unrelated permission added after the bundle was configured.
+    # New qualification links correctly reject such a mixed bundle.
+    group.permissions.add(unapproved)
     record = MemberQualification.objects.create(
         member=member, qualification=qualification
     )

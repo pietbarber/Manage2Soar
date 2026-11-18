@@ -236,6 +236,10 @@ class TestPreset(models.Model):
 
     class Meta:
         ordering = ["sort_order", "name"]
+        permissions = [
+            ("can_manage_test_presets", "Can add and change shared test presets"),
+            ("can_delete_test_presets", "Can delete shared test presets"),
+        ]
         verbose_name = "Test Preset"
         verbose_name_plural = "Test Presets"
 

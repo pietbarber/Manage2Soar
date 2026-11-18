@@ -30,6 +30,24 @@ def has_rostermeister_access(user):
     )
 
 
+def has_roster_edit_access(user):
+    """Require the assignment-edit capability or the legacy roster role."""
+    return has_rostermeister_access(user) and bool(
+        user.is_superuser
+        or getattr(user, "rostermeister", False)
+        or user.has_perm(EDIT_ROSTER_PERMISSION)
+    )
+
+
+def has_roster_generation_access(user):
+    """Require the roster-generation capability or the legacy roster role."""
+    return has_rostermeister_access(user) and bool(
+        user.is_superuser
+        or getattr(user, "rostermeister", False)
+        or user.has_perm(GENERATE_ROSTER_PERMISSION)
+    )
+
+
 def has_duty_delinquents_access(user):
     """Return whether *user* may view the duty-delinquents report."""
     if (
@@ -59,6 +77,7 @@ def has_all_swap_requests_access(user):
         return False
     return bool(
         getattr(user, "is_superuser", False)
+        or getattr(user, "is_staff", False)
         or user.has_perm(VIEW_ALL_SWAP_REQUESTS_PERMISSION)
         or user.has_perm(MANAGE_ANY_SWAP_PERMISSION)
     )

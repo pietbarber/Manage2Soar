@@ -95,3 +95,24 @@ def test_stats_dump_navigation_context_requires_active_membership(db):
     context = authorization(_request_for(member))
 
     assert context["role_access"]["stats_dump_export"] is False
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "codename,expected",
+    [
+        ("can_edit_roster", True),
+        ("can_generate_roster", False),
+        ("can_edit_roster_message", False),
+        ("edit_dutyroster_message", False),
+    ],
+)
+def test_roster_controls_match_roster_access(codename, expected):
+    member = Member.objects.create_user(
+        username="roster-context-member", membership_status="Full Member"
+    )
+    _grant_permission(member, app_label="duty_roster", codename=codename)
+
+    context = authorization(_request_for(member))
+
+    assert context["role_access"]["rostermeister"] is expected

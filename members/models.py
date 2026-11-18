@@ -773,7 +773,23 @@ class Member(AbstractUser):
         # An active membership cannot override an explicit account deactivation.
         # Inactive membership still always disables the Django account.
         if not self.is_superuser:  # Don't override superuser active status
-            self.is_active = self.is_active and self.is_active_member()
+            from members.utils.membership import get_active_membership_statuses
+
+            active_statuses = get_active_membership_statuses()
+            active_membership = self.membership_status in active_statuses
+            if (
+                status_changed
+                and persisted_member
+                and previous_status not in active_statuses
+                and active_membership
+                and (update_fields is None or "is_active" not in update_fields)
+            ):
+                # Restore accounts disabled by the previous membership status.
+                # An explicit account-status update still wins.
+                self.is_active = True
+            self.is_active = self.is_active and active_membership
+            if update_fields is not None and status_changed:
+                kwargs["update_fields"] = set(update_fields) | {"is_active"}
 
         # 3) persist first so generated media can use the member's immutable PK
         super().save(*args, **kwargs)

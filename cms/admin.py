@@ -3,7 +3,10 @@ from django.core.exceptions import ValidationError
 from django.db.models import Prefetch
 from django.utils.html import format_html
 
-from members.authorization import has_admin_model_permission
+from members.authorization import (
+    has_admin_model_permission,
+    has_webmaster_compatibility_access,
+)
 
 from .models import (
     Document,
@@ -69,7 +72,7 @@ class PageAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context=extra_context)
 
     def _can_manage_navbar_promotion(self, request):
-        return has_admin_model_permission(request.user, "cms", "page", "change")
+        return has_webmaster_compatibility_access(request.user)
 
     def _has_page_permission(self, request, action):
         return has_admin_model_permission(request.user, "cms", "page", action)

@@ -63,6 +63,7 @@ MEMBER_CSV_PRIVILEGE_FIELDS = frozenset(
         "is_staff",
         "groups",
         "user_permissions",
+        "membership_status",
         "instructor",
         "towpilot",
         "duty_officer",

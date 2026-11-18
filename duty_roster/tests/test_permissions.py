@@ -37,13 +37,13 @@ def test_duty_delinquent_access_requires_active_account_and_membership(active_st
 
 
 @pytest.mark.django_db
-def test_staff_alone_cannot_view_all_swap_requests(active_status):
+def test_staff_retains_legacy_all_swap_requests_access(active_status):
     member = Member.objects.create_user(
         username="staff-swap-viewer",
         membership_status=active_status.name,
         is_staff=True,
     )
-    assert not has_all_swap_requests_access(member)
+    assert has_all_swap_requests_access(member)
 
 
 @pytest.mark.django_db

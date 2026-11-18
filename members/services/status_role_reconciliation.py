@@ -286,6 +286,15 @@ def apply(member, *, using=None, dry_run=False) -> StatusRoleResult:
 
         granted = 0
         for target in current_plan.grants:
+            if target.group_id in current_plan.unexplained_group_ids:
+                # Preserve the independent membership before overlaying our
+                # status source, just as the initial provenance backfill does.
+                MemberRoleAssignment.objects.using(db_alias).get_or_create(
+                    member_id=locked_member.pk,
+                    group_id=target.group_id,
+                    source="manual",
+                    source_key="migration",
+                )
             _, created = MemberRoleAssignment.objects.using(db_alias).get_or_create(
                 member_id=locked_member.pk,
                 group_id=target.group_id,

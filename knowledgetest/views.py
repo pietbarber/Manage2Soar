@@ -28,7 +28,6 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from members.authorization import (
-    has_training_record_action,
     has_webmaster_compatibility_access,
 )
 from members.decorators import active_member_required
@@ -47,9 +46,8 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-# These are capabilities, not a synonym for Django's staff flag.  The group
-# fallback is deliberately retained while the legacy Webmaster/CFI role
-# mapping is being migrated; do not extend it to arbitrary staff accounts.
+# Capabilities permit explicit delegation alongside existing staff and
+# Webmaster compatibility access during the transition.
 START_UNASSIGNED_TEST = "knowledgetest.start_unassigned_written_test"
 DELETE_ANY_ATTEMPT = "knowledgetest.delete_any_written_test_attempt"
 VIEW_RECENT_TESTS = "knowledgetest.view_recent_written_tests"
@@ -57,7 +55,16 @@ DELETE_ANY_ASSIGNMENT = "knowledgetest.delete_any_pending_written_test_assignmen
 
 
 def _has_written_test_capability(user, permission):
-    return bool(user.has_perm(permission) or has_webmaster_compatibility_access(user))
+    # Retain the existing staff workflow until its removal is explicitly
+    # approved; a new capability also permits delegation to non-staff users.
+    return bool(
+        user.is_active
+        and (
+            user.is_staff
+            or user.has_perm(permission)
+            or has_webmaster_compatibility_access(user)
+        )
+    )
 
 
 def _get_site_config():
@@ -205,11 +212,6 @@ class AssignmentPermissionMixin:
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
     form_class = TestBuilderForm
-
-    def dispatch(self, request, *args, **kwargs):
-        if not has_training_record_action(request.user):
-            return HttpResponseForbidden("Written-test creation access is required.")
-        return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()

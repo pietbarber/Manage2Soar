@@ -64,5 +64,5 @@ def test_change_only_grant_cannot_delete_written_test_preset():
             codename="change_testpreset",
         )
     )
-    assert has_written_test_admin_access(member)
+    assert not has_written_test_admin_access(member)
     assert not has_written_test_delete_access(member)

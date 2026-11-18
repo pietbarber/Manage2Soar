@@ -2746,7 +2746,7 @@ class TestSwapVisibilityInCalendar:
         assert "1 open" in content
         assert "2 open" not in content
 
-    def test_calendar_month_hides_direct_request_from_non_roster_staff_viewer(
+    def test_calendar_month_preserves_direct_request_visibility_for_staff(
         self, client, site_config, alice, bob
     ):
         duty_date = date.today() + timedelta(days=11)
@@ -2789,7 +2789,7 @@ class TestSwapVisibilityInCalendar:
 
         assert response.status_code == 200
         summary = response.context["open_swap_summary_by_date"][duty_date]
-        assert summary["count"] == 1
+        assert summary["count"] == 2
 
     def test_calendar_keeps_requesters_own_direct_swap_visible(
         self, client, site_config, alice, bob
@@ -2837,7 +2837,7 @@ class TestSwapVisibilityInCalendar:
             ("Member Managers", 2),
             ("Instructor Admins", 2),
             ("Rostermeisters", 2),
-            ("staff", 1),
+            ("staff", 2),
             ("ordinary", 1),
             ("superuser", 2),
         ],
@@ -2985,7 +2985,7 @@ class TestSwapVisibilityInCalendar:
         assert "1 open coverage request" in content
         assert "Direct to Bob Offerer" not in content
 
-    def test_calendar_day_modal_hides_direct_request_from_non_roster_staff_viewer(
+    def test_calendar_day_modal_preserves_direct_request_visibility_for_staff(
         self, client, site_config, alice, bob
     ):
         duty_date = date.today() + timedelta(days=12)
@@ -3032,8 +3032,8 @@ class TestSwapVisibilityInCalendar:
 
         assert response.status_code == 200
         open_swap_requests = response.context["open_swap_requests"]
-        assert len(open_swap_requests) == 1
-        assert all(req.request_type == "general" for req in open_swap_requests)
+        assert len(open_swap_requests) == 2
+        assert {req.request_type for req in open_swap_requests} == {"general", "direct"}
 
     def test_calendar_month_swap_badge_aria_label_includes_roles(
         self, client, site_config, alice

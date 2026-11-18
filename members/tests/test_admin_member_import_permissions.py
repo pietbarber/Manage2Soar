@@ -8,7 +8,7 @@ from tablib import Dataset
 from members.admin import MemberAdmin
 from members.models import Member
 from members.resources import MEMBER_CSV_PRIVILEGE_FIELDS
-from siteconfig.models import MembershipStatus
+from siteconfig.models import MembershipStatus, MembershipStatusRoleMapping
 
 
 def _request(user):
@@ -81,6 +81,37 @@ def test_limited_member_importer_can_still_import_profile_fields():
     target.refresh_from_db()
     assert target.first_name == "After"
     assert target.email == "after@example.com"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_limited_import_cannot_grant_status_mapped_role():
+    from django.contrib.auth.models import Group
+
+    from members.models import RoleMetadata
+
+    editor = _limited_editor(username="status-import-editor")
+    privileged_status = MembershipStatus.objects.create(
+        name="Privileged Import Status", is_active=True
+    )
+    group, _ = Group.objects.get_or_create(name="Webmasters")
+    RoleMetadata.objects.get_or_create(
+        group=group, defaults={"key": "webmaster", "display_name": "Webmasters"}
+    )
+    MembershipStatusRoleMapping.objects.create(
+        membership_status=privileged_status, role=group
+    )
+    resource_class = MemberAdmin(Member, admin.site).get_import_resource_classes(
+        _request(editor)
+    )[0]
+    dataset = Dataset(headers=["id", "username", "membership_status"])
+    dataset.append((str(editor.pk), editor.username, privileged_status.name))
+
+    result = resource_class().import_data(dataset, dry_run=False, user=editor)
+
+    assert not result.has_errors()
+    editor.refresh_from_db()
+    assert editor.membership_status == "Full Member"
+    assert not editor.groups.filter(pk=group.pk).exists()
 
 
 @pytest.mark.django_db

@@ -916,9 +916,7 @@ def personal_charges_summary_csv(request):
 
 @active_member_required
 def export_logsheet_finances_csv(request, pk):
-    """Export finalized per-flight financial charges for treasurer workflows."""
-    if not has_logsheet_finance_access(request.user, export=True):
-        return HttpResponseForbidden("Treasurer access is required.")
+    """Export finalized per-flight charges for active members, as before."""
     logsheet = get_object_or_404(Logsheet, pk=pk)
 
     if not logsheet.finalized:

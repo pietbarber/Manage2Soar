@@ -1006,12 +1006,14 @@ class TestMailingListAdminForm:
     def test_canonical_role_choices_use_singular_audience_labels(self, db):
         from siteconfig.admin import MailingListAdminForm
 
-        group = Group.objects.create(name="Webmasters")
-        role = RoleMetadata.objects.create(
+        group, _ = Group.objects.get_or_create(name="Webmasters")
+        role, _ = RoleMetadata.objects.get_or_create(
             group=group,
-            key="webmasters",
-            display_name="Webmasters",
-            mailing_list_eligible=True,
+            defaults={
+                "key": "webmasters",
+                "display_name": "Webmasters",
+                "mailing_list_eligible": True,
+            },
         )
         mailing_list = MailingList.objects.create(
             name="singular-role-labels", criteria=[MailingListCriterion.ACTIVE_MEMBER]
@@ -1029,12 +1031,14 @@ class TestMailingListAdminForm:
     ):
         from siteconfig.admin import MailingListAdminForm
 
-        group = Group.objects.create(name="Webmasters")
-        RoleMetadata.objects.create(
+        group, _ = Group.objects.get_or_create(name="Webmasters")
+        RoleMetadata.objects.get_or_create(
             group=group,
-            key="webmasters",
-            display_name="Webmasters",
-            mailing_list_eligible=True,
+            defaults={
+                "key": "webmasters",
+                "display_name": "Webmasters",
+                "mailing_list_eligible": True,
+            },
         )
         new_form = MailingListAdminForm()
         new_choices = dict(new_form.fields["criteria_select"].choices)
