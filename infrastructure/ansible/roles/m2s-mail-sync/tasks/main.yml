@@ -117,6 +117,10 @@
     group: root
     mode: "0755"
 
+- name: Load compatible Postfix rules before cron can publish converted maps
+  ansible.builtin.meta: flush_handlers
+  when: postfix_legacy_whitelist is defined
+
 - name: Install sync script
   ansible.builtin.template:
     src: sync-aliases.py.j2
@@ -160,11 +164,6 @@
   register: m2s_initial_sync
   changed_when: false
   failed_when: false
-
-- name: Activate mail configuration after successful sync
-  ansible.builtin.meta: flush_handlers
-  when: m2s_initial_sync.rc == 0
-  tags: [always]
 
 - name: Defer initial sync after a transient failure
   ansible.builtin.debug:

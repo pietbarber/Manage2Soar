@@ -97,11 +97,14 @@ def test_legacy_outbound_list_header_checks_are_disabled():
     assert "state: absent" in postfix_tasks
 
 
-def test_main_cf_restriction_classes_keep_each_definition_on_its_own_line():
-    environment = Environment()
+@pytest.mark.parametrize("prefixes", [["single"], ["club-a", "club-b"]])
+@pytest.mark.parametrize("legacy_map", [True, False])
+def test_main_cf_supports_only_available_whitelists(prefixes, legacy_map):
+    environment = Environment(trim_blocks=True)
     environment.filters["bool"] = bool
     rendered = environment.from_string(_MAIN_CF_TEMPLATE_PATH.read_text()).render(
-        club_domains=[{"prefix": "single"}],
+        club_domains=[{"prefix": prefix} for prefix in prefixes],
+        postfix_legacy_whitelist={"stat": {"exists": legacy_map}},
         postfix_config_dir="/etc/postfix",
         postfix_whitelist_dir="/etc/postfix/tenant-whitelists",
         mail_hostname="mail.example.org",
@@ -109,7 +112,23 @@ def test_main_cf_restriction_classes_keep_each_definition_on_its_own_line():
         trusted_relay_ips=[],
         postfix_rspamd_enabled=True,
     )
-    assert "smtpd_restriction_classes = whitelist_required_single" in rendered
+    lines = rendered.splitlines()
+    classes = []
+    for prefix in prefixes:
+        name = f"whitelist_required_{prefix.replace('-', '_')}"
+        classes.append(name)
+        assert (
+            f"{name} = check_sender_access hash:/etc/postfix/tenant-whitelists/"
+            f"{prefix}_whitelist, reject"
+        ) in lines
+    if legacy_map:
+        classes.append("whitelist_required")
+        assert (
+            "whitelist_required = check_sender_access hash:/etc/postfix/sender_whitelist, reject"
+        ) in lines
+    else:
+        assert not any(line.startswith("whitelist_required =") for line in lines)
+    assert f"smtpd_restriction_classes = {', '.join(classes)}" in lines
 
 
 def load_template_namespace():

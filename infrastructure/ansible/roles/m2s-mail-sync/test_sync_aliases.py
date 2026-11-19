@@ -571,6 +571,9 @@ def test_main_publishes_authorization_before_routing_and_finalizes_afterward():
 
     recipient_path = config["postfix_recipient_check_file"]
     virtual_path = config["postfix_virtual_file"]
+    assert writes.index("/maps/tenant-whitelists/club_whitelist") < writes.index(
+        recipient_path
+    )
     assert writes.index(recipient_path) < writes.index(virtual_path)
     assert writes.index(virtual_path) < len(writes) - 1
     assert writes[-1] == recipient_path

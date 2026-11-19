@@ -1149,13 +1149,6 @@ def main():
     # Publish authorization before routing. The guarded maps retain protection
     # for routes that are being removed or changed to bypass mode, so any
     # failure before the virtual map update leaves the old routes fail-closed.
-    if write_and_postmap(
-        config['postfix_recipient_check_file'], guarded_recipient_content
-    ):
-        print(f"[{datetime.now()}] Published guarded recipient authorization")
-    else:
-        print(f"[{datetime.now()}] Guarded recipient authorization unchanged")
-
     # Generate and update tenant-scoped Postfix whitelists.
     for club_prefix, club_data in clubs_whitelist_data.items():
         whitelist_file = os.path.join(
@@ -1166,6 +1159,13 @@ def main():
             print(f"[{datetime.now()}] Updated Postfix whitelist for {club_prefix}")
         else:
             print(f"[{datetime.now()}] Postfix whitelist unchanged for {club_prefix}")
+
+    if write_and_postmap(
+        config['postfix_recipient_check_file'], guarded_recipient_content
+    ):
+        print(f"[{datetime.now()}] Published guarded recipient authorization")
+    else:
+        print(f"[{datetime.now()}] Guarded recipient authorization unchanged")
 
     if rspamd_enabled:
         rspamd_maps = {
