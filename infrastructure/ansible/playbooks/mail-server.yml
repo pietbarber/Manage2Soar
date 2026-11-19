@@ -61,13 +61,13 @@
       tags: [postfix, mail]
 
     - role: opendkim
-      tags: [opendkim, dkim, mail]
+      tags: [opendkim, dkim, mail, postfix]
 
     - role: rspamd
-      tags: [rspamd, spam, mail]
+      tags: [rspamd, spam, mail, postfix]
 
     - role: m2s-mail-sync
-      tags: [sync, mail]
+      tags: [sync, mail, postfix]
 
   post_tasks:
     - name: Display DKIM public keys for DNS
@@ -78,11 +78,11 @@
           DKIM PUBLIC KEYS - ADD THESE TO YOUR DNS
           ============================================================
 
-          For each club domain, add this TXT record:
+          For each resolved tenant domain, add this TXT record:
 
-          {% for club in club_domains %}
-          {{ dkim_selector }}._domainkey.{{ club.prefix }}.{{ mail_domain }}
-          (See /etc/opendkim/keys/{{ club.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt)
+          {% for domain in opendkim_domains %}
+          {{ dkim_selector }}._domainkey.{{ domain }}
+          (See {{ opendkim_keys_dir }}/{{ domain }}/{{ dkim_selector }}.txt)
 
           {% endfor %}
 
