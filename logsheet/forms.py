@@ -80,16 +80,15 @@ def validate_glider_availability(flight, glider, launch_time, landing_time=None)
                 )
         # If other flight has no landing, check for overlap
         elif landing_time and not other_landing:
-            if landing_time > other_launch and launch_time <= other_launch:
+            if launch_time >= other_launch:
                 raise ValidationError(
                     f"This glider is already airborne in another flight (ID {other.pk}) starting at {other_launch}."
                 )
         # If neither has landing time, both are open-ended
         elif not landing_time and not other_landing:
-            if launch_time == other_launch:
-                raise ValidationError(
-                    f"This glider is already airborne in another open-ended flight (ID {other.pk}) at {other_launch}."
-                )
+            raise ValidationError(
+                f"This glider is already airborne in another open-ended flight (ID {other.pk}) starting at {other_launch}."
+            )
 
 
 def get_active_members_with_role(role_flag: Optional[str] = None):
