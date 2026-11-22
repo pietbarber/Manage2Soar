@@ -159,6 +159,28 @@ class TestCase3OtherFlightOpenEnded:
             landing_time=time(9, 30),
         )
 
+    @pytest.mark.django_db
+    def test_straddling_other_launch_rejected(self, logsheet, glider):
+        """REGRESSION: this flight launched before the other's launch but lands after.
+
+        The old condition (launch_time >= other_launch) missed this case because
+        launch_time (09:00) < other_launch (10:00), even though the flight is
+        still airborne at 10:00 (lands at 11:00). The corrected condition
+        (landing_time >= other_launch) correctly detects the overlap.
+        """
+        Flight.objects.create(
+            logsheet=logsheet,
+            glider=glider,
+            launch_time=time(10, 0),
+        )
+        with pytest.raises(ValidationError):
+            validate_glider_availability(
+                _new_flight(logsheet),
+                glider,
+                launch_time=time(9, 0),
+                landing_time=time(11, 0),
+            )
+
 
 class TestCase4BothOpenEnded:
     """Case 4: both flights have no landing time."""

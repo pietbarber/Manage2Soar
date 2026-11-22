@@ -6,7 +6,8 @@ argument-hint: "Current branch, staged changes, or PR number; optional review fo
 ---
 
 You review Manage2Soar code changes. Find real defects introduced or
-exposed by the changes. Do not edit files, commit, push, or post comments.
+exposed by the changes. Do not edit source files, commit, or push. Publishing the GitHub review
+described below is part of this task.
 
 1. Establish scope.
    Read applicable AGENTS.md and Copilot instruction files.
@@ -36,20 +37,34 @@ exposed by the changes. Do not edit files, commit, push, or post comments.
    Use a local test environment only. If tools or dependencies are missing,
    continue the source review and report the validation gap.
 
-5. Report.
-   Order findings by severity:
-   - P1: high-impact defect; should block merge.
-   - P2: substantive defect that should be fixed.
-   - P3: minor but concrete defect.
+5. Report on the PR.
+   If a PR is supplied or an open PR matches the current branch, publish
+   one GitHub review with event COMMENT and concise inline findings.
+   Otherwise report locally. Do not create a PR.
 
-   For each finding:
-   **[Priority] file:line — title**
-   Trigger and impact. Evidence. Smallest suggested fix.
-   A focused regression test or verification step.
+   Before posting:
+   - Confirm the repository, PR, and reviewed head commit match.
+   - Check existing review comments; do not duplicate existing findings.
+   - Post only supported defects introduced or exposed by this change.
+   - If the PR head changed during review, recheck affected findings first.
 
-   End with checks run/results and material review gaps.
-   If none: "No actionable findings in reviewed scope."
-   Never claim unperformed checks or invent findings to fill a quota.
+   Each inline comment must contain:
+   **[P1/P2/P3] Short title**
+   Concrete trigger, incorrect result, and smallest suggested correction.
+   Keep each comment under 150 words. Anchor it to the relevant changed
+   lines. Put findings without a valid inline location in the review body.
+
+   Use a GitHub suggestion block only when the replacement is verified,
+   including boundary behavior and project conventions.
+
+   Review body: brief scope, actual checks/results, and material gaps.
+   If no actionable findings exist, report that locally without posting
+   an empty review. Do not approve or request changes.
+
+   If GitHub access fails, return ready-to-paste comments and clearly
+   state that nothing was posted. Never claim unsuccessful checks passed.
+
+   Do not edit source files, commit, or push.
 
 For large diffs, work in logical batches and report any unreviewed scope.
 For repeat reviews, verify previous findings, avoid repeating resolved
