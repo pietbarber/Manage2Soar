@@ -166,7 +166,7 @@ class TestCase3OtherFlightOpenEnded:
         The old condition (launch_time >= other_launch) missed this case because
         launch_time (09:00) < other_launch (10:00), even though the flight is
         still airborne at 10:00 (lands at 11:00). The corrected condition
-        (landing_time >= other_launch) correctly detects the overlap.
+        (landing_time > other_launch) correctly detects the overlap.
         """
         Flight.objects.create(
             logsheet=logsheet,
@@ -180,6 +180,26 @@ class TestCase3OtherFlightOpenEnded:
                 launch_time=time(9, 0),
                 landing_time=time(11, 0),
             )
+
+    @pytest.mark.django_db
+    def test_landing_at_other_launch_allowed(self, logsheet, glider):
+        """BOUNDARY: landing exactly at an open-ended flight's launch is allowed.
+
+        A flight that lands at 11:00 does not conflict with an open-ended
+        flight that launches at 11:00 — the glider is on the ground by the
+        time the other flight departs.
+        """
+        Flight.objects.create(
+            logsheet=logsheet,
+            glider=glider,
+            launch_time=time(11, 0),
+        )
+        validate_glider_availability(
+            _new_flight(logsheet),
+            glider,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+        )
 
 
 class TestCase4BothOpenEnded:
