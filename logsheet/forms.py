@@ -72,9 +72,12 @@ def validate_glider_availability(flight, glider, launch_time, landing_time=None)
                 raise ValidationError(
                     f"This glider is already scheduled for another flight (ID {other.pk}) from {other_launch} to {other_landing}."
                 )
-        # If this flight has no landing, check if launch is during another flight
+        # If this flight has no landing, it is still airborne after launch,
+        # so it conflicts whenever it launches before the other flight lands.
+        # The boundary (launch_time == other_landing) is allowed: the glider
+        # is on the ground by the time this flight departs.
         elif not landing_time and other_landing:
-            if launch_time < other_landing and launch_time >= other_launch:
+            if launch_time < other_landing:
                 raise ValidationError(
                     f"This glider is already airborne in another flight (ID {other.pk}) from {other_launch} to {other_landing}."
                 )

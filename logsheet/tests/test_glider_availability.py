@@ -94,7 +94,30 @@ class TestCase2ThisFlightOpenEnded:
             )
 
     @pytest.mark.django_db
-    def test_launch_before_other_flight_allowed(self, logsheet, glider):
+    def test_launch_before_other_flight_rejected(self, logsheet, glider):
+        """An open-ended flight launched at 09:00 is still airborne
+        throughout the existing 10:00-11:00 flight — a double booking."""
+        Flight.objects.create(
+            logsheet=logsheet,
+            glider=glider,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+        )
+        with pytest.raises(ValidationError):
+            validate_glider_availability(
+                _new_flight(logsheet),
+                glider,
+                launch_time=time(9, 0),
+                landing_time=None,
+            )
+
+    @pytest.mark.django_db
+    def test_launch_at_other_landing_allowed(self, logsheet, glider):
+        """BOUNDARY: launching exactly when the other flight lands is allowed.
+
+        A flight that launches at 11:00 does not conflict with a flight that
+        lands at 11:00 — the glider is on the ground by the time it departs.
+        """
         Flight.objects.create(
             logsheet=logsheet,
             glider=glider,
@@ -104,7 +127,7 @@ class TestCase2ThisFlightOpenEnded:
         validate_glider_availability(
             _new_flight(logsheet),
             glider,
-            launch_time=time(9, 0),
+            launch_time=time(11, 0),
             landing_time=None,
         )
 
