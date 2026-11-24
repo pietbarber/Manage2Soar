@@ -167,7 +167,7 @@ def _render_systemd(name):
 
 def test_rendered_systemd_cleanup_timer_and_service():
     timer = _render_systemd("m2s-cleanup-login-attempts.timer.j2")
-    assert timer["Timer"]["OnCalendar"] == "*:00"
+    assert timer["Timer"]["OnCalendar"] == "*-*-* *:00:00 UTC"
     assert timer["Timer"].getboolean("Persistent") is True
     assert timer["Timer"]["Unit"] == "m2s-cleanup-login-attempts.service"
 

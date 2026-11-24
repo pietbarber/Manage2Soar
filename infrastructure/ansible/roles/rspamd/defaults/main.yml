@@ -4,6 +4,8 @@
 # ============================================================
 # Spam filtering configuration for inbound email
 # NOTE: Rspamd is only deployed when mail_server_receive_enabled: true
+
+club_domains: []
 # in the playbook. This role has no separate enable flag.
 
 # NOTE: mail_domain is defined in group_vars/all.yml (shared across mail roles)

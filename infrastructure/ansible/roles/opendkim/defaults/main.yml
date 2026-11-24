@@ -21,6 +21,8 @@ dkim_key_size: 2048
 # NOTE: mail_domain is defined in group_vars/all.yml (shared across mail roles)
 # Do not define it here to avoid duplication.
 
+club_domains: []
+
 # ============================================================
 # SINGLE-HOST MODE
 # ============================================================

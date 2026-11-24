@@ -101,6 +101,24 @@
     mode: "0644"
   notify: Restart Rspamd
 
+- name: Exempt authenticated submissions in Rspamd
+  ansible.builtin.copy:
+    dest: /etc/rspamd/local.d/settings.conf
+    content: |
+      # Postfix submission authentication is the trust boundary for app mail.
+      M2S_TRUSTED_SUBMISSION {
+        priority = high;
+        authenticated = yes;
+        apply {
+          groups_disabled = ["spam"];
+          actions {
+            reject = null;
+          }
+        }
+      }
+    mode: "0644"
+  notify: Restart Rspamd
+
 - name: Configure custom rejection messages
   ansible.builtin.copy:
     dest: /etc/rspamd/local.d/replies.conf
@@ -129,7 +147,7 @@
     state: directory
     owner: _rspamd
     group: _rspamd
-    mode: "0755"
+    mode: "0750"
 
 - name: Configure Rspamd whitelist module (per-club isolation)
   ansible.builtin.template:
@@ -138,16 +156,53 @@
     mode: "0644"
   notify: Restart Rspamd
 
+- name: Create active Rspamd map generation directory
+  ansible.builtin.file:
+    path: /etc/rspamd/local.d/whitelists/current
+    state: directory
+    owner: _rspamd
+    group: _rspamd
+    mode: "0750"
+
+- name: Configure SPF enforcement for protected mailing lists
+  ansible.builtin.copy:
+    dest: /etc/rspamd/local.d/multimap.conf
+    content: |
+      # Reject messages to protected lists when the envelope sender does not
+      # pass SPF. Authenticated/trusted submission is marked ORIGINATING and
+      # must not be treated as public inbound mail if a milter is inherited.
+      M2S_PROTECTED_LIST_SPF {
+        type = "rcpt";
+        map = "file:///etc/rspamd/local.d/whitelists/current/protected_lists.map";
+        regexp = true;
+        require_symbols = "!R_SPF_ALLOW & !ORIGINATING";
+        action = "reject";
+        message = "Sender authentication failed for this mailing list.";
+        description = "Require SPF for public mail to protected mailing lists";
+      }
+    mode: "0644"
+  notify: Restart Rspamd
+
+- name: Create initial protected-list SPF map
+  ansible.builtin.copy:
+    dest: /etc/rspamd/local.d/whitelists/current/protected_lists.map
+    content: "# Protected mailing lists - synchronized by m2s-mail-sync\n"
+    owner: _rspamd
+    group: _rspamd
+    mode: "0640"
+    force: false
+  notify: Reload Rspamd
+
 - name: Create initial empty whitelist maps for each club
   ansible.builtin.copy:
-    dest: /etc/rspamd/local.d/whitelists/{{ item.prefix }}_whitelist.map
+    dest: /etc/rspamd/local.d/whitelists/current/{{ item.prefix }}_whitelist.map
     content: |
       # Sender whitelist for {{ item.name }} - synced from M2S API
       # DO NOT EDIT MANUALLY - will be overwritten
       # Format: one email address per line
     owner: _rspamd
     group: _rspamd
-    mode: "0644"
+    mode: "0640"
     force: false
   loop: "{{ club_domains }}"
   notify: Reload Rspamd

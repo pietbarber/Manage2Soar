@@ -168,8 +168,9 @@ nginx_rate_limit_enabled: true
 
 m2s_email_backend: "django.core.mail.backends.smtp.EmailBackend"
 m2s_email_host: "localhost"
-m2s_email_port: 25
-m2s_email_use_tls: false
+m2s_email_port: 587
+m2s_email_use_tls: "{{ mail_server_enabled | default(false) | bool }}"
+m2s_email_username: "m2s-app"
 m2s_default_from_email: "noreply@{{ m2s_domain }}"
 
 # Google OAuth (optional - leave disabled if not using)
@@ -202,6 +203,8 @@ mail_domain: "{{ m2s_domain }}"
 # Enable incoming mail processing (requires additional DNS setup)
 # Only enable if you need mailing list functionality
 mail_server_receive_enabled: false
+# When enabled, vault_email_host_password is used for Django's authenticated
+# submission to localhost:587.
 
 # Club domains configuration (required for mail server roles)
 # This must be defined here to avoid duplication across roles
