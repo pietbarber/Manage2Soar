@@ -281,6 +281,13 @@ class FlightAdmin(AdminHelperMixin, admin.ModelAdmin):
     # Reduce rows per page so the admin page renders faster with large tables
     list_per_page = 50
 
+    # flight_type is obsolete and no longer used by the public site or any
+    # downstream consumer. It is a required CharField with no default, so
+    # leaving it on the form makes every admin save fail with
+    # "Flight Type is required." Exclude it from the add/change forms; the
+    # field stays on the model for existing data and API consumers.
+    exclude = ("flight_type",)
+
     # Show a date drill-down if admins want to quickly jump by log date
     date_hierarchy = "logsheet__log_date"
 
