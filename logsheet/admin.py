@@ -474,7 +474,7 @@ class LogsheetAdmin(AdminHelperMixin, admin.ModelAdmin):
 # Day-level towplane roster: which planes are scheduled to fly,
 # the expected tow pilot, and the starting tach reading.
 class LogsheetTowplaneAdminForm(LogsheetTowplaneForm):
-    class Meta:
+    class Meta:  # type: ignore[reportIncompatibleVariableOverride]
         model = LogsheetTowplane
         fields = ("logsheet", "towplane", "tow_pilot", "start_tach")
 
