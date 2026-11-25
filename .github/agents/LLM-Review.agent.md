@@ -15,6 +15,9 @@ described below is part of this task.
    the merge base of origin/main, including staged and unstaged changes.
    Identify relevant untracked files separately.
    State the scope; if the base is unavailable, report that limitation.
+   If HEAD matches the comparison base and there are no staged, unstaged,
+   or relevant untracked changes, report "No changes to review" and stop.
+   Do not substitute HEAD's parent or another commit unless explicitly requested.
 
 2. Read for context.
    Read the diff and surrounding code. Follow affected callers, models,
