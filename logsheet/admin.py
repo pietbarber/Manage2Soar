@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -253,8 +254,20 @@ class GliderAdmin(AdminHelperMixin, admin.ModelAdmin):
 # used only when there is a problem with the app that we can't fix.
 # This is kind of an ugly view in admin, because if we have a zillion flights,
 # they're all going to be listed here. I don't have any better solutions.
+# Issue #1163: flight_type is a legacy attribute with no role in how
+# Manage2Soar records flights. It stays on the model (the offline API
+# passes it through), but the admin no longer shows or requires it so
+# routine data fixes save without a dummy value.
+class FlightAdminForm(forms.ModelForm):
+    class Meta:
+        model = Flight
+        fields = "__all__"
+        exclude = ("flight_type",)
+
+
 @admin.register(Flight)
 class FlightAdmin(AdminHelperMixin, admin.ModelAdmin):
+    form = FlightAdminForm
     # Keep list display small and use select_related to avoid N+1 queries
     list_display = (
         "logsheet",
