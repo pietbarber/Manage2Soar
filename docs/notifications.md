@@ -31,3 +31,10 @@ Examples
 In your `manage2soar/settings.py` or environment-specific settings file:
 
 REDACTION_NOTIFICATION_DEDUPE_MINUTES = 15  # dedupe for 15 minutes
+
+Display window
+--------------
+Members only see notifications from the last 30 days (rolling window, applied
+to both the page-top block and the notifications page; expired records remain
+in the database). See `notifications/docs/display-policy.md` for the full
+policy and how it differs from database retention.

@@ -277,3 +277,43 @@ def test_context_processor_hides_stale_overdue_notification(django_user_model):
 
     assert stale not in rendered_notifications
     assert keep in rendered_notifications
+
+
+@pytest.mark.django_db
+def test_display_window_hides_old_spr_reminder_even_when_sprs_still_overdue(
+    django_user_model,
+):
+    """Issue #1168: the 30-day display window applies on top of suppression.
+
+    The instructor still has overdue SPRs, so the stale-SPR suppression pass
+    alone would keep the reminder visible — only the display window hides it.
+    """
+    instructor = django_user_model.objects.create_user(
+        username="inst_window1", password="pw"
+    )
+    student = django_user_model.objects.create_user(
+        username="stud_window1", password="pw"
+    )
+
+    # Flight 8 days ago without a report: instructor still has overdue SPRs,
+    # so suppression does NOT hide the reminder below.
+    _create_finalized_instructional_flight(
+        instructor=instructor,
+        student=student,
+        flight_date=timezone.localdate() - timedelta(days=8),
+        suffix="201",
+    )
+
+    old_reminder = Notification.objects.create(
+        user=instructor,
+        message=f"📌 You have 1 {OVERDUE_SPR_NOTIFICATION_FRAGMENT}(s)",
+        dismissed=False,
+        created_at=timezone.now() - timedelta(days=31),
+    )
+
+    request = RequestFactory().get("/")
+    request.user = instructor
+
+    context = notifications_context(request)
+
+    assert old_reminder not in context["notifications"]
