@@ -9,9 +9,7 @@ from .models import Notification
 
 @active_member_required
 def notifications_list(request):
-    notifications = Notification.objects.filter(
-        user=request.user, dismissed=False
-    ).order_by("-created_at")
+    notifications = Notification.objects.for_display(request.user)
     return render(
         request,
         "notifications/notifications_list.html",

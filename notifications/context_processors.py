@@ -17,9 +17,7 @@ def notifications(request):
             is_overdue_spr_notification_message,
         )
 
-        notifications_qs = Notification.objects.filter(
-            user=request.user, dismissed=False
-        ).order_by("-created_at")
+        notifications_qs = Notification.objects.for_display(request.user)
 
         notifications = list(notifications_qs)
         if notifications:
